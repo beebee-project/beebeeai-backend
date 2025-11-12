@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 const { fileTypeFromBuffer } = require("file-type");
-const bucket = require("../config/gcs");
+const { getBucket } = require("../config/gcs");
 
 function sha256(buf) {
   return crypto.createHash("sha256").update(buf).digest("hex");
@@ -34,7 +34,7 @@ async function uploadBufferToGCS({ userId, buffer, originalName }) {
   const { mime } = await sniffMime(buffer, originalName);
   const hash = sha256(buffer);
   const key = gcsKey({ userId, originalName, hash });
-  const file = bucket.file(key);
+  const file = getBucket().file(fileName);
 
   await file.save(buffer, {
     contentType: mime,
