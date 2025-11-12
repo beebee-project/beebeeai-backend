@@ -1,3 +1,11 @@
+console.log(
+  "ENV SNAPSHOT:",
+  Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([k]) => k.startsWith("GCS_") || k === "PORT"
+    )
+  )
+);
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
