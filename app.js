@@ -38,9 +38,6 @@ app.use(
   })
 );
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
-
 // JSON/폼 파서
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
@@ -71,7 +68,7 @@ app.use("/api/payments", paymentRoutes);
 app.use(errorHandler);
 
 // ==== 서버 리슨 (Railway는 PORT를 환경변수로 제공) ====
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 BeeBeeAI API is running on port ${PORT}`);
 });
