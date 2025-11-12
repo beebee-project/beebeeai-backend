@@ -1,7 +1,3 @@
-console.log(
-  "DEBUG GCS_BUCKET_NAME =",
-  JSON.stringify(process.env.GCS_BUCKET_NAME)
-);
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");

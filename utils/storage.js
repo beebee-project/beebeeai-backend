@@ -1,8 +1,11 @@
 const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
+const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
-const { getBucket } = require("../config/gcs");
+
+const storage = new Storage();
+const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
 function sha256(buf) {
   return crypto.createHash("sha256").update(buf).digest("hex");
@@ -34,7 +37,7 @@ async function uploadBufferToGCS({ userId, buffer, originalName }) {
   const { mime } = await sniffMime(buffer, originalName);
   const hash = sha256(buffer);
   const key = gcsKey({ userId, originalName, hash });
-  const file = getBucket().file(fileName);
+  const file = bucket.file(key);
 
   await file.save(buffer, {
     contentType: mime,
