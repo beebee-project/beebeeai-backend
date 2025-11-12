@@ -3,8 +3,12 @@
 # 절대 Git에 올리면 안 되는 파일들
 # ==================================
 .env
-*.json
 *.log
+
+.env.*
+package-lock.json
+config/*.json
+meta-cache/
 
 # ==================================
 # Node.js
