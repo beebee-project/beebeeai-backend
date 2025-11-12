@@ -1,6 +1,3 @@
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true, message: "BeeBeeAI backend is running" });
-});
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
