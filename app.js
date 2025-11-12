@@ -38,6 +38,9 @@ app.use(
   })
 );
 
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 // JSON/폼 파서
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
