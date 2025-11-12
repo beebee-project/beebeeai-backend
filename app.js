@@ -1,3 +1,6 @@
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, message: "BeeBeeAI backend is running" });
+});
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -6,10 +9,10 @@ const connectDB = require("./config/db");
 const errorHandler = require("./middleware/errorHandler");
 
 // 라우터
-const authRoutes = require("./routes/authRoutes");
-const fileRoutes = require("./routes/fileRoutes");
-const convertRoutes = require("./routes/convertRoutes");
-const paymentRoutes = require("./routes/paymentRoutes");
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/files", require("./routes/fileRoutes"));
+app.use("/api/convert", require("./routes/convertRoutes"));
+app.use("/api/payments", require("./routes/paymentRoutes"));
 
 const app = express();
 
