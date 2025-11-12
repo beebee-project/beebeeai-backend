@@ -1,11 +1,8 @@
 const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
-const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
-
-const storage = new Storage();
-const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+const bucket = require("../config/gcs");
 
 function sha256(buf) {
   return crypto.createHash("sha256").update(buf).digest("hex");

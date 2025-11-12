@@ -1,9 +1,6 @@
-const { Storage } = require("@google-cloud/storage");
 const { v4: uuidv4 } = require("uuid");
 const User = require("../models/User");
-
-const storage = new Storage();
-const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+const bucket = require("../config/gcs");
 const { bumpUsage } = require("../services/usageService");
 
 exports.upload = async (req, res) => {
