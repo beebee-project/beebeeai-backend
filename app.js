@@ -21,6 +21,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://beebeeai.kr",
   "https://www.beebeeai.kr",
   "https://api.beebeeai.kr",
+  "https://beebeeai-backend-production.up.railway.app",
   "http://localhost:3000",
 ]);
 
