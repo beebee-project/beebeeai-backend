@@ -20,10 +20,18 @@ app.set("trust proxy", 1);
 const ALLOWED_ORIGINS = new Set([
   "https://beebeeai.kr",
   "https://www.beebeeai.kr",
-  "https://api.beebeeai.kr",
-  "https://beebeeai-backend-production.up.railway.app",
   "http://localhost:3000",
 ]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
 
 const corsMiddleware = cors({
   origin: (origin, cb) => {
@@ -41,7 +49,7 @@ app.options("*", corsMiddleware);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
 
-// Passport (선택)
+// Passport
 app.use(passport.initialize());
 try {
   require("./config/passport")(passport);
@@ -61,7 +69,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api/convert", convertRoutes);
 app.use("/api/payments", paymentRoutes);
 
-// 에러 핸들러 (맨 마지막)
+// 에러 핸들러
 app.use(errorHandler);
 
 // 서버 시작
