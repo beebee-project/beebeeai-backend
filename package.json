@@ -29,6 +29,7 @@
     "pdf-parse": "^1.1.1",
     "uuid": "^11.1.0",
     "xlsx": "^0.18.5",
+    "file-type": "16.5.4",
     "@google-cloud/storage": "^7.16.0",
     "@google/generative-ai": "^0.24.1",
     "@tosspayments/payment-sdk": "^1.9.1"
