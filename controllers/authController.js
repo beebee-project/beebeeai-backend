@@ -73,9 +73,9 @@ exports.verifyEmail = async (req, res, next) => {
     user.emailVerificationExpires = undefined;
     await user.save();
 
-    res.status(200).json({
-      message:
-        "이메일 인증이 성공적으로 완료되었습니다. 이제 로그인할 수 있습니다.",
+    res.status(201).json({ message: "가입 성공! 인증 메일을 확인하세요." });
+    sendVerificationEmail(user.email, token).catch((err) => {
+      console.error("[MAIL] verify send error:", err);
     });
   } catch (error) {
     next(error);
