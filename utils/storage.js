@@ -4,6 +4,19 @@ const fs = require("fs");
 const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
 
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  console.error("ENV MISSING: GOOGLE_APPLICATION_CREDENTIALS_JSON");
+  throw new Error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set");
+}
+if (!process.env.GCLOUD_PROJECT) {
+  console.error("ENV MISSING: GCLOUD_PROJECT");
+  throw new Error("GCLOUD_PROJECT is not set");
+}
+if (!process.env.GCS_BUCKET_NAME) {
+  console.error("ENV MISSING: GCS_BUCKET_NAME");
+  throw new Error("GCS_BUCKET_NAME is not set");
+}
+
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 const storage = new Storage({
   projectId: process.env.GCLOUD_PROJECT,
