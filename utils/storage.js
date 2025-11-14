@@ -4,10 +4,7 @@ const fs = require("fs");
 const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
 
-import { Storage } from "@google-cloud/storage";
-
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
-
 const storage = new Storage({
   projectId: process.env.GCLOUD_PROJECT,
   credentials,
