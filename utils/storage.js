@@ -4,6 +4,7 @@ const fs = require("fs");
 const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
 
+// ==== ENV 체크 ====
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
   console.error("ENV MISSING: GOOGLE_APPLICATION_CREDENTIALS_JSON");
   throw new Error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set");
@@ -17,12 +18,33 @@ if (!process.env.GCS_BUCKET_NAME) {
   throw new Error("GCS_BUCKET_NAME is not set");
 }
 
-const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+// ==== 서비스 계정 JSON을 임시 파일로 저장하고,
+//      GOOGLE_APPLICATION_CREDENTIALS 를 그 파일로 지정 ====
+
+// 키 파일을 저장할 경로 (컨테이너 로컬 디스크, 재시작되면 사라져도 상관 없음)
+const KEY_FILE_PATH = path.join(__dirname, "..", "gcs-key.json");
+
+// 이미 파일이 없으면 생성
+if (!fs.existsSync(KEY_FILE_PATH)) {
+  fs.writeFileSync(
+    KEY_FILE_PATH,
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
+    "utf8"
+  );
+}
+
+// 표준 ADC 환경 변수 설정
+process.env.GOOGLE_APPLICATION_CREDENTIALS = KEY_FILE_PATH;
+
+// 이제 Storage는 기본 자격증명을 사용하게 됨
 const storage = new Storage({
   projectId: process.env.GCLOUD_PROJECT,
-  credentials,
 });
+
+// 버킷 핸들
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+
+// ==== 이하 기존 코드 동일 ====
 
 function sha256(buf) {
   return crypto.createHash("sha256").update(buf).digest("hex");
