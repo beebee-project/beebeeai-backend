@@ -1,4 +1,4 @@
-const toss = require("../tossClient");
+const toss = require("../../config/tossClient");
 
 const CURRENCY = process.env.CURRENCY || "KRW";
 
