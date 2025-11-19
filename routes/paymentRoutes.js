@@ -1,11 +1,6 @@
 const router = require("express").Router();
 const { protect } = require("../middleware/authMiddleware");
-console.log(
-  "paymentController path:",
-  require.resolve("../controllers/paymentController")
-);
 const ctrl = require("../controllers/paymentController");
-console.log("typeof getPlans =", typeof ctrl.getPlans);
 
 const isBeta = String(process.env.BETA_MODE).toLowerCase() === "true";
 const blockInBeta = (req, res, next) =>
@@ -21,7 +16,6 @@ router.get("/usage", protect, ctrl.getUsage);
 router.post("/checkout", protect, blockInBeta, ctrl.createCheckout);
 router.post("/confirm", protect, blockInBeta, ctrl.confirmPayment);
 
-// (웹훅은 나중에 PG 연결 시 활성화)
-// router.post("/webhook", ctrl.webhook);
+// router.post("/webhook", ctrl.webhook); // 필요 시 나중에 활성화
 
 module.exports = router;
