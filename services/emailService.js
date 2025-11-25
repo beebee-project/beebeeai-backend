@@ -18,13 +18,31 @@ const sendVerificationEmail = async (to, token) => {
     to: to,
     subject: "BeeBee AI 회원가입 이메일 인증",
     html: `
-      <h2>BeeBee AI에 가입해 주셔서 감사합니다!</h2>
-      <p>아래 버튼을 클릭하여 이메일 인증을 완료해 주세요.</p>
-      
-      <a href="${verificationLink}" 
-         style="background-color: #ffc800; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-         이메일 인증하기
-      </a>
+      <div style="font-family: Pretendard, sans-serif; max-width: 600px; margin: auto;">
+  <h2 style="font-weight: 700;">BeeBee AI에 가입해 주셔서 감사합니다!</h2>
+  <p style="font-size: 16px; margin-top: 12px;">
+      아래 버튼을 클릭하여 이메일 인증을 완료해 주세요.
+  </p>
+
+  <div style="margin-top: 32px; display:flex; justify-content:center;">
+    <a href="${verificationLink}"
+       style="
+         background-color: #FFC800;
+         padding: 14px 26px;
+         border-radius: 8px;
+         color: black;
+         text-decoration: none;
+         font-size: 18px;
+         font-weight: 600;
+       ">
+      이메일 인증하기
+    </a>
+  </div>
+
+  <p style="font-size: 14px; margin-top: 40px; color: #777; text-align:center;">
+    인증 버튼이 작동하지 않으면 고객센터(help@beebeeai.kr)로 문의해 주세요.
+  </p>
+</div>
     `,
   };
 
