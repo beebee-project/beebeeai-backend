@@ -39,7 +39,7 @@ const sendVerificationEmail = async (to, token) => {
     </a>
   </div>
 
-  <p style="font-size: 14px; margin-top: 40px; color: #777; text-align:center;">
+  <p style="font-size: 14px; margin-top: 40px; color: #777;">
     인증 버튼이 작동하지 않으면 고객센터(help@beebeeai.kr)로 문의해 주세요.
   </p>
 </div>
