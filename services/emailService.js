@@ -33,7 +33,13 @@ const sendVerificationEmail = async (to, token) => {
     await transporter.sendMail(mailOptions);
     console.log(`Verification email sent to ${to}`);
   } catch (error) {
-    console.error(`Error sending email to ${to}:`, error);
+    // console.error(`Error sending email to ${to}:`, error);
+    console.error("==== EMAIL ERROR START ====");
+    console.error(error); // 전체 에러 출력
+    console.error("code:", error.code);
+    console.error("command:", error.command);
+    console.error("response:", error.response);
+    console.error("==== EMAIL ERROR END ====");
     throw new Error("이메일 발송에 실패했습니다.");
   }
 };
