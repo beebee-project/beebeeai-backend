@@ -2,8 +2,8 @@ const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  port: 587, // 465 쓰면 secure: true
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -33,13 +33,7 @@ const sendVerificationEmail = async (to, token) => {
     await transporter.sendMail(mailOptions);
     console.log(`Verification email sent to ${to}`);
   } catch (error) {
-    // console.error(`Error sending email to ${to}:`, error);
-    console.error("==== EMAIL ERROR START ====");
-    console.error(error); // 전체 에러 출력
-    console.error("code:", error.code);
-    console.error("command:", error.command);
-    console.error("response:", error.response);
-    console.error("==== EMAIL ERROR END ====");
+    console.error(`Error sending email to ${to}:`, error);
     throw new Error("이메일 발송에 실패했습니다.");
   }
 };
