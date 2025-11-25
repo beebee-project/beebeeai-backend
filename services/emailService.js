@@ -20,12 +20,11 @@ const sendVerificationEmail = async (to, token) => {
     html: `
       <h2>BeeBee AI에 가입해 주셔서 감사합니다!</h2>
       <p>아래 버튼을 클릭하여 이메일 인증을 완료해 주세요.</p>
+      
       <a href="${verificationLink}" 
          style="background-color: #ffc800; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
          이메일 인증하기
       </a>
-      <p>만약 위 버튼이 동작하지 않으면, 아래 링크를 브라우저에 복사하여 붙여넣어 주세요:</p>
-      <p>${verificationLink}</p>
     `,
   };
 
