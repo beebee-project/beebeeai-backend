@@ -64,8 +64,8 @@ exports.createCheckout = async (req, res) => {
     // 현재는 PRO 월 구독 9,000원만 있다고 가정
     const amount = 4900;
 
-    const successUrl = `${PUBLIC_ORIGIN}/success.html?provider=${PROVIDER}`;
-    const failUrl = `${PUBLIC_ORIGIN}/fail.html?provider=${PROVIDER}`;
+    const successUrl = `${PUBLIC_ORIGIN}/success.html`;
+    const failUrl = `${PUBLIC_ORIGIN}/fail.html`;
 
     const session = await paymentService.createCheckoutSession({
       userId: String(user._id),
@@ -88,6 +88,7 @@ exports.createCheckout = async (req, res) => {
       customerName: session.customerName,
       successUrl: session.successUrl,
       failUrl: session.failUrl,
+      customerKey: String(user._id),
     });
   } catch (err) {
     console.error("createCheckout error:", err);
