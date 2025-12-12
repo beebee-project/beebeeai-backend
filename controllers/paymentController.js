@@ -64,8 +64,8 @@ exports.createCheckout = async (req, res) => {
     // 현재는 PRO 월 구독 9,000원만 있다고 가정
     const amount = 4900;
 
-    const successUrl = `${PUBLIC_ORIGIN}/?pg=success&provider=${PROVIDER}`;
-    const failUrl = `${PUBLIC_ORIGIN}/?pg=fail&provider=${PROVIDER}`;
+    const successUrl = `${PUBLIC_ORIGIN}/success.html?provider=${PROVIDER}`;
+    const failUrl = `${PUBLIC_ORIGIN}/fail.html?provider=${PROVIDER}`;
 
     const session = await paymentService.createCheckoutSession({
       userId: String(user._id),
