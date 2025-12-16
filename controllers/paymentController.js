@@ -101,6 +101,30 @@ exports.createCheckout = async (req, res) => {
   }
 };
 
+await Payment.updateOne(
+  { orderId: session.orderId },
+  {
+    $setOnInsert: {
+      userId: String(user._id),
+      orderId: session.orderId,
+      amount: session.amount,
+      currency: session.currency,
+      provider: session.provider,
+      status: "READY",
+      createdAt: new Date(),
+    },
+    $set: {
+      // 혹시 같은 orderId 재요청 시 최신값 반영
+      amount: session.amount,
+      currency: session.currency,
+      provider: session.provider,
+      status: "READY",
+      updatedAt: new Date(),
+    },
+  },
+  { upsert: true }
+);
+
 // 결제 승인: successUrl로 리다이렉트된 후, 프론트에서 호출
 // body: { paymentKey, orderId, amount }
 exports.confirmPayment = async (req, res) => {
