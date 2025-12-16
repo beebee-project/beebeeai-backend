@@ -1,5 +1,6 @@
 const paymentService = require("../services/paymentService");
 const User = require("../models/User");
+const Payment = require("../models/Payment");
 
 const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
 const CURRENCY = process.env.CURRENCY || "KRW";
@@ -89,6 +90,7 @@ exports.createCheckout = async (req, res) => {
       successUrl: session.successUrl,
       failUrl: session.failUrl,
       customerKey: String(user._id),
+      status: "READY",
     });
   } catch (err) {
     console.error("createCheckout error:", err);
@@ -104,61 +106,92 @@ exports.createCheckout = async (req, res) => {
 exports.confirmPayment = async (req, res) => {
   try {
     const { paymentKey, orderId, amount } = req.body || {};
-
     if (!paymentKey || !orderId || !amount) {
       return res
         .status(400)
         .json({ error: "paymentKey, orderId, amount는 필수입니다." });
     }
 
-    const expectedAmount = 4900;
     const numericAmount = Number(amount);
-
     if (Number.isNaN(numericAmount)) {
       return res
         .status(400)
         .json({ error: "amount 형식이 올바르지 않습니다." });
     }
-    if (numericAmount !== expectedAmount) {
-      return res.status(400).json({
-        error: "요청 금액이 서버 설정 금액과 일치하지 않습니다.",
+
+    // ✅ 1) 우리 DB에서 orderId 검증
+    const pay = await Payment.findOne({ orderId });
+    if (!pay)
+      return res.status(404).json({ error: "존재하지 않는 orderId 입니다." });
+
+    // ✅ 2) 본인 결제인지 확인 (protect 쓰는 구조면 userId 매칭 필수)
+    if (String(pay.userId) !== String(req.user.id)) {
+      return res
+        .status(403)
+        .json({ error: "본인의 결제만 승인할 수 있습니다." });
+    }
+
+    // ✅ 3) 금액 검증(서버 기준)
+    if (numericAmount !== pay.amount) {
+      return res
+        .status(400)
+        .json({ error: "요청 금액이 서버 금액과 일치하지 않습니다." });
+    }
+
+    // ✅ 4) 멱등 처리: 이미 승인 완료면 그대로 성공 반환
+    if (pay.status === "DONE" && pay.paymentKey === paymentKey) {
+      return res.json({
+        ok: true,
+        duplicated: true,
+        orderId: pay.orderId,
+        paymentKey: pay.paymentKey,
+        amount: pay.amount,
       });
     }
 
-    // Toss Payments에 실제 승인 요청
+    // ✅ 5) Toss 승인 호출
     const result = await paymentService.confirmPayment({
       paymentKey,
       orderId,
-      amount: expectedAmount,
+      amount: pay.amount,
     });
 
-    // 유저 플랜 업데이트 (간단히 PRO로 승급)
+    // ✅ 6) Payment 업데이트
+    pay.status = "DONE";
+    pay.paymentKey = result.paymentKey;
+    pay.raw = result.raw;
+    pay.approvedAt = new Date(result.raw?.approvedAt || Date.now());
+    await pay.save();
+
+    // ✅ 7) User 구독 반영 (일단 30일 운영)
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     user.plan = "PRO";
+    user.subscription = {
+      status: "active",
+      startedAt: user.subscription?.startedAt || now,
+      expiresAt,
+      lastPaymentKey: result.paymentKey,
+      lastOrderId: orderId,
+    };
+
     await user.save();
 
     return res.json({
       ok: true,
-      provider: result.provider, // "toss"
-      orderId: result.orderId,
-      amount: result.amount,
+      provider: result.provider,
+      orderId,
+      amount: pay.amount,
       paymentKey: result.paymentKey,
+      subscription: user.subscription,
     });
   } catch (err) {
     console.error("confirmPayment error:", err);
-
-    const tossError = err.response?.data;
-    if (tossError) {
-      console.error("Toss error response:", tossError);
-    }
-
-    res.status(500).json({
-      error: "결제 승인 실패",
-      code: err.code,
-      toss: tossError,
-    });
+    return res.status(500).json({ error: "결제 승인 실패" });
   }
 };
 

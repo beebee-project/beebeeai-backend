@@ -45,6 +45,17 @@ const userSchema = new mongoose.Schema({
     lastReset: { type: Date, default: Date.now },
   },
   plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },
+  subscription: {
+    status: {
+      type: String,
+      enum: ["none", "active", "past_due", "canceled"],
+      default: "none",
+    },
+    startedAt: { type: Date },
+    expiresAt: { type: Date }, // 일단 “월 구독”이라면 30일 만료로 운영(자동결제 붙이면 갱신)
+    lastPaymentKey: { type: String },
+    lastOrderId: { type: String },
+  },
 });
 
 // 비밀번호가 존재하고 변경되었을 때만 암호화
