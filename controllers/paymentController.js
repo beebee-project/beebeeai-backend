@@ -84,10 +84,6 @@ exports.createCheckout = async (req, res) => {
         $setOnInsert: {
           userId: String(user._id),
           orderId: session.orderId,
-          amount: session.amount,
-          currency: session.currency,
-          provider: session.provider,
-          status: "READY",
           createdAt: new Date(),
         },
         $set: {
@@ -100,7 +96,6 @@ exports.createCheckout = async (req, res) => {
       },
       { upsert: true }
     );
-
     return res.json({
       provider: session.provider,
       orderId: session.orderId,
