@@ -62,7 +62,6 @@ exports.createCheckout = async (req, res) => {
     const user = await User.findById(req.user.id).select("name email plan");
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
-    // 현재는 PRO 월 구독 9,000원만 있다고 가정
     const amount = 4900;
 
     const successUrl = `${PUBLIC_ORIGIN}/success.html`;
@@ -79,9 +78,31 @@ exports.createCheckout = async (req, res) => {
       },
     });
 
-    // 프론트에서 Toss Payment Widget에 넘길 데이터
+    await Payment.updateOne(
+      { orderId: session.orderId },
+      {
+        $setOnInsert: {
+          userId: String(user._id),
+          orderId: session.orderId,
+          amount: session.amount,
+          currency: session.currency,
+          provider: session.provider,
+          status: "READY",
+          createdAt: new Date(),
+        },
+        $set: {
+          amount: session.amount,
+          currency: session.currency,
+          provider: session.provider,
+          status: "READY",
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
     return res.json({
-      provider: session.provider, // "toss"
+      provider: session.provider,
       orderId: session.orderId,
       amount: session.amount,
       currency: session.currency,
@@ -94,36 +115,9 @@ exports.createCheckout = async (req, res) => {
     });
   } catch (err) {
     console.error("createCheckout error:", err);
-    res.status(500).json({
-      error: "결제 세션 생성 실패",
-      code: err.code,
-    });
+    res.status(500).json({ error: "결제 세션 생성 실패", code: err.code });
   }
 };
-
-await Payment.updateOne(
-  { orderId: session.orderId },
-  {
-    $setOnInsert: {
-      userId: String(user._id),
-      orderId: session.orderId,
-      amount: session.amount,
-      currency: session.currency,
-      provider: session.provider,
-      status: "READY",
-      createdAt: new Date(),
-    },
-    $set: {
-      // 혹시 같은 orderId 재요청 시 최신값 반영
-      amount: session.amount,
-      currency: session.currency,
-      provider: session.provider,
-      status: "READY",
-      updatedAt: new Date(),
-    },
-  },
-  { upsert: true }
-);
 
 // 결제 승인: successUrl로 리다이렉트된 후, 프론트에서 호출
 // body: { paymentKey, orderId, amount }
@@ -144,7 +138,7 @@ exports.confirmPayment = async (req, res) => {
     }
 
     // ✅ 1) 우리 DB에서 orderId 검증
-    const pay = await Payment.findOne({ orderId });
+    const pay = await Payment.findOne({ orderId, userId: String(req.user.id) });
     if (!pay)
       return res.status(404).json({ error: "존재하지 않는 orderId 입니다." });
 
