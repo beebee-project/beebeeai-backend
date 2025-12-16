@@ -13,8 +13,10 @@ const blockInBeta = (req, res, next) =>
 // 결제/플랜
 router.get("/plans", ctrl.getPlans);
 router.get("/usage", protect, ctrl.getUsage);
-router.post("/checkout", protect, blockInBeta, ctrl.createCheckout);
-router.post("/confirm", protect, blockInBeta, ctrl.confirmPayment);
+router.post("/checkout", protect, ctrl.createCheckout);
+router.post("/confirm", protect, ctrl.confirmPayment);
+// router.post("/checkout", protect, blockInBeta, ctrl.createCheckout);
+// router.post("/confirm", protect, blockInBeta, ctrl.confirmPayment);
 
 // router.post("/webhook", ctrl.webhook); // 필요 시 나중에 활성화
 
