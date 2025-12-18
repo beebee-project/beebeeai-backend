@@ -46,15 +46,16 @@ const userSchema = new mongoose.Schema({
   },
   plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },
   subscription: {
+    customerKey: { type: String },
+    billingKey: { type: String },
     status: {
       type: String,
-      enum: ["none", "active", "past_due", "canceled"],
-      default: "none",
+      enum: ["NONE", "TRIAL", "ACTIVE", "PAST_DUE", "CANCELED"],
+      default: "NONE",
     },
-    startedAt: { type: Date },
-    expiresAt: { type: Date }, // 일단 “월 구독”이라면 30일 만료로 운영(자동결제 붙이면 갱신)
-    lastPaymentKey: { type: String },
-    lastOrderId: { type: String },
+    trialEndsAt: { type: Date },
+    nextChargeAt: { type: Date },
+    lastChargedAt: { type: Date },
   },
 });
 

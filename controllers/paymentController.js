@@ -4,7 +4,7 @@ const Payment = require("../models/Payment");
 
 const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
 const CURRENCY = process.env.CURRENCY || "KRW";
-const isBeta = String(process.env.BETA_MODE).toLowerCase() === "true";
+const isBetaMode = () => String(process.env.BETA_MODE).toLowerCase() === "true";
 const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || "https://beebeeai.kr";
 
 // 사용량 조회
@@ -13,17 +13,20 @@ exports.getUsage = async (req, res) => {
     const user = await User.findById(req.user.id).select("plan usage");
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
+    const plan = paymentService.getEffectivePlan(user.plan);
+
+    const limits =
+      plan === "PRO"
+        ? { formulaConversions: 5000, fileUploads: 5 }
+        : { formulaConversions: 20, fileUploads: 1 };
+
     res.json({
-      plan: user.plan,
+      plan,
       usage: {
         formulaConversions: user?.usage?.formulaConversions ?? 0,
         fileUploads: user?.usage?.fileUploads ?? 0,
       },
-      // 필요하면 추후 limits 확장
-      limits: {
-        formulaConversions: user?.limits?.formulaConversions ?? null,
-        fileUploads: user?.limits?.fileUploads ?? null,
-      },
+      limits,
     });
   } catch (err) {
     console.error("getUsage error:", err);
@@ -36,7 +39,7 @@ exports.getPlans = (req, res) => {
   res.json({
     provider: PROVIDER,
     currency: CURRENCY,
-    betaMode: isBeta,
+    betaMode: isBetaMode(),
     plans: [
       {
         code: "FREE",
@@ -50,7 +53,7 @@ exports.getPlans = (req, res) => {
         price: 4900,
         interval: "month",
         features: ["우선지원", "고급기능"],
-        available: !isBeta, // 베타 중에는 결제 비활성화
+        available: !isBetaMode(),
       },
     ],
   });
