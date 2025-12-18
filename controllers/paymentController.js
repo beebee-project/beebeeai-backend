@@ -183,6 +183,12 @@ exports.confirmPayment = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
+    if (user.subscription?.billingKey) {
+      return res.status(409).json({
+        error: "이미 구독 설정된 계정입니다. 구독 결제 흐름을 사용해주세요.",
+      });
+    }
+
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -208,6 +214,190 @@ exports.confirmPayment = async (req, res) => {
   } catch (err) {
     console.error("confirmPayment error:", err);
     return res.status(500).json({ error: "결제 승인 실패" });
+  }
+};
+
+exports.startSubscription = async (req, res) => {
+  try {
+    // 베타모드면 결제 없이 PRO
+    if (paymentService.isBetaMode()) {
+      await User.findByIdAndUpdate(req.user.id, { plan: "PRO" });
+      return res.json({
+        ok: true,
+        beta: true,
+        plan: "PRO",
+        message: "BETA_MODE=true: 결제 없이 PRO가 활성화되었습니다.",
+      });
+    }
+
+    const customerKey = String(req.user.id);
+
+    return res.json({
+      ok: true,
+      beta: false,
+      customerKey,
+      successUrl:
+        process.env.SUBSCRIPTION_SUCCESS_URL || "https://beebeeai.kr/success", // 네 운영 주소에 맞춰 조정
+      failUrl: process.env.SUBSCRIPTION_FAIL_URL || "https://beebeeai.kr/fail",
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "구독 시작 실패" });
+  }
+};
+
+exports.completeSubscription = async (req, res) => {
+  try {
+    if (paymentService.isBetaMode()) {
+      // 베타모드면 complete를 호출해도 PRO 유지
+      await User.findByIdAndUpdate(req.user.id, { plan: "PRO" });
+      return res.json({ ok: true, beta: true, plan: "PRO" });
+    }
+
+    const { customerKey, authKey } = req.body;
+    if (!customerKey || !authKey) {
+      return res
+        .status(400)
+        .json({ error: "customerKey/authKey가 필요합니다." });
+    }
+
+    // billingKey 발급
+    const issued = await paymentService.issueBillingKey({
+      customerKey,
+      authKey,
+    });
+    if (!issued?.billingKey) {
+      return res.status(500).json({ error: "billingKey 발급 실패" });
+    }
+
+    // 7일 무료체험 -> 체험 종료 시점에 첫 과금
+    const now = new Date();
+    const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const nextChargeAt = trialEndsAt;
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "사용자 없음" });
+
+    user.plan = "PRO";
+    user.subscription = {
+      ...(user.subscription || {}),
+      customerKey,
+      billingKey: issued.billingKey,
+      status: "TRIAL",
+      trialEndsAt,
+      nextChargeAt,
+      lastChargedAt: null,
+    };
+
+    await user.save();
+
+    return res.json({
+      ok: true,
+      plan: "PRO",
+      trialEndsAt,
+      nextChargeAt,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "구독 완료 처리 실패" });
+  }
+};
+
+exports.cronCharge = async (req, res) => {
+  try {
+    // ✅ 보안: CRON_SECRET
+    const secret = req.headers["x-cron-secret"];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: "Unauthorized cron" });
+    }
+
+    // ✅ 베타모드면 청구 자체를 하지 않음
+    if (paymentService.isBetaMode()) {
+      return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
+    }
+
+    const now = new Date();
+
+    // 금액/상품명은 env로 빼두는 걸 추천 (없으면 기본값 사용)
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
+    const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
+
+    // ✅ 청구 대상 조회
+    const targets = await User.find(
+      {
+        plan: "PRO",
+        "subscription.billingKey": { $exists: true, $ne: null },
+        "subscription.nextChargeAt": { $lte: now },
+        "subscription.status": { $ne: "CANCELED" },
+      },
+      "_id subscription"
+    ).lean();
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const u of targets) {
+      const userId = String(u._id);
+      const customerKey = u.subscription?.customerKey || userId;
+      const billingKey = u.subscription?.billingKey;
+
+      if (!billingKey) continue;
+
+      // ✅ orderId는 매 청구마다 유니크해야 함
+      const orderId = `sub-${userId}-${Date.now()}`;
+
+      try {
+        await paymentService.chargeBillingKey({
+          customerKey,
+          billingKey,
+          amount,
+          orderId,
+          orderName,
+        });
+
+        const nextChargeAt = paymentService.addMonths(now, 1);
+
+        await User.updateOne(
+          { _id: u._id },
+          {
+            $set: {
+              "subscription.status": "ACTIVE",
+              "subscription.lastChargedAt": now,
+              "subscription.nextChargeAt": nextChargeAt,
+              // customerKey가 비어있던 케이스 정리
+              "subscription.customerKey": customerKey,
+            },
+          }
+        );
+
+        successCount += 1;
+      } catch (e) {
+        failCount += 1;
+
+        await User.updateOne(
+          { _id: u._id },
+          {
+            $set: {
+              "subscription.status": "PAST_DUE",
+              "subscription.lastChargeError": String(
+                e?.response?.data?.message || e?.message || e
+              ).slice(0, 500),
+            },
+          }
+        );
+      }
+    }
+
+    return res.json({
+      ok: true,
+      now,
+      targets: targets.length,
+      successCount,
+      failCount,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Cron charge failed" });
   }
 };
 

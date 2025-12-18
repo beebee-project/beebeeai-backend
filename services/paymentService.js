@@ -40,3 +40,7 @@ exports.parseAndVerifyWebhook = (req) =>
 exports.isBetaMode = isBetaMode;
 exports.getEffectivePlan = getEffectivePlan;
 exports.addMonths = addMonths;
+
+// ✅ 구독(빌링키) 기능
+exports.issueBillingKey = (args) => selectGateway().issueBillingKey?.(args);
+exports.chargeBillingKey = (args) => selectGateway().chargeBillingKey?.(args);

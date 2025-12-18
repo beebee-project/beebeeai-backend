@@ -1,4 +1,5 @@
 const axios = require("axios");
+const tossClient = require("../../config/tossClient");
 
 const SECRET_KEY = process.env.TOSS_SECRET_KEY;
 const CURRENCY = process.env.CURRENCY || "KRW";
@@ -62,4 +63,30 @@ exports.confirmPayment = async ({ paymentKey, orderId, amount }) => {
     paymentKey: data.paymentKey,
     raw: data,
   };
+};
+
+// ✅ billingKey 발급: authKey -> billingKey
+// Toss Billing API: POST /v1/billing/authorizations/{authKey}
+exports.issueBillingKey = async ({ customerKey, authKey }) => {
+  const res = await tossClient.post(`/v1/billing/authorizations/${authKey}`, {
+    customerKey,
+  });
+  return res.data; // { billingKey, customerKey, ... }
+};
+
+// ✅ billingKey로 청구(묶음 C에서 사용): POST /v1/billing/{billingKey}
+exports.chargeBillingKey = async ({
+  customerKey,
+  billingKey,
+  amount,
+  orderId,
+  orderName,
+}) => {
+  const res = await tossClient.post(`/v1/billing/${billingKey}`, {
+    customerKey,
+    amount,
+    orderId,
+    orderName,
+  });
+  return res.data;
 };
