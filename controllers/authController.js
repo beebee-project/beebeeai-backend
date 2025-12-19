@@ -204,6 +204,25 @@ exports.withdraw = async (req, res, next) => {
       return res.status(401).json({ message: "비밀번호가 올바르지 않습니다." });
     }
 
+    // ✅ 구독 중이면 탈퇴 불가(먼저 해지 유도)
+    const sub = user.subscription || {};
+    const status = sub.status;
+
+    const isSubscribed =
+      status === "TRIAL" ||
+      status === "ACTIVE" ||
+      status === "PAST_DUE" ||
+      status === "CANCELED_PENDING"; // 유료 해지 예약 중(만료일까지 사용)
+
+    if (isSubscribed) {
+      return res.status(409).json({
+        message:
+          "구독 중인 계정은 탈퇴할 수 없습니다. 먼저 구독 해지를 진행해주세요.",
+        code: "SUBSCRIPTION_ACTIVE",
+        status,
+      });
+    }
+
     const now = new Date();
 
     // ✅ 탈퇴 = 즉시 이용 종료 + 즉시 청구 중단
