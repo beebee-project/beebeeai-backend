@@ -195,7 +195,7 @@ exports.confirmPayment = async (req, res) => {
 
     user.plan = "PRO";
     user.subscription = {
-      status: "active",
+      status: "ACTIVE",
       startedAt: user.subscription?.startedAt || now,
       expiresAt,
       lastPaymentKey: result.paymentKey,
