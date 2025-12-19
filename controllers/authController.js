@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -175,4 +176,63 @@ exports.googleCallback = (req, res) => {
   const token = signToken(req.user._id);
   const frontendURL = process.env.FRONTEND_URL;
   res.redirect(`${frontendURL}/?token=${token}`);
+};
+
+exports.withdraw = async (req, res, next) => {
+  try {
+    const { password } = req.body || {};
+    if (!password) {
+      return res.status(400).json({ message: "비밀번호를 입력해주세요." });
+    }
+
+    // password가 select:false일 수 있으니 +password로 가져오기
+    const user = await User.findById(req.user.id).select(
+      "+password email name plan subscription"
+    );
+    if (!user) return res.status(404).json({ message: "사용자 없음" });
+
+    // 소셜 로그인 등 password 없는 계정 처리
+    if (!user.password) {
+      return res.status(400).json({
+        message:
+          "비밀번호가 설정되지 않은 계정입니다. 비밀번호 설정 후 탈퇴할 수 있습니다.",
+      });
+    }
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) {
+      return res.status(401).json({ message: "비밀번호가 올바르지 않습니다." });
+    }
+
+    const now = new Date();
+
+    // ✅ 탈퇴 = 즉시 이용 종료 + 즉시 청구 중단
+    user.plan = "FREE";
+    user.subscription = {
+      ...(user.subscription || {}),
+      status: "CANCELED",
+      canceledAt: now,
+      endedAt: now,
+      nextChargeAt: null, // ✅ cron 청구 트리거 제거
+      cancelAtPeriodEnd: false,
+    };
+
+    // ✅ soft delete + 익명화(권장)
+    user.isDeleted = true;
+    user.deletedAt = now;
+
+    // email unique 충돌 방지
+    if (user.email) user.email = `deleted_${user._id}@deleted.local`;
+    if (user.name) user.name = "deleted";
+
+    // password 제거(선택) - 이후 로그인 불가
+    user.password = undefined;
+
+    await user.save();
+
+    // JWT는 서버가 강제 폐기하기 어려움(무상태) -> 프론트에서 토큰 삭제/로그아웃 처리 권장
+    return res.json({ ok: true, message: "회원 탈퇴가 완료되었습니다." });
+  } catch (error) {
+    next(error);
+  }
 };

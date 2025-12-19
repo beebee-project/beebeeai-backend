@@ -7,10 +7,9 @@ router.get("/plans", ctrl.getPlans);
 router.get("/usage", protect, ctrl.getUsage);
 router.post("/checkout", protect, ctrl.createCheckout);
 router.post("/confirm", protect, ctrl.confirmPayment);
-// ✅ 구독(빌링키) start/complete
 router.post("/subscription/start", protect, ctrl.startSubscription);
 router.post("/subscription/complete", protect, ctrl.completeSubscription);
-// ✅ Cron: nextChargeAt 지난 구독자 자동 청구
+router.post("/subscription/cancel", protect, ctrl.cancelSubscription);
 router.post("/cron/charge", ctrl.cronCharge);
 
 // router.post("/webhook", ctrl.webhook); // 필요 시 나중에 활성화

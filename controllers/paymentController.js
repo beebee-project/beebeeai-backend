@@ -1,6 +1,7 @@
 const paymentService = require("../services/paymentService");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
+const bcrypt = require("bcryptjs");
 
 const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
 const CURRENCY = process.env.CURRENCY || "KRW";
@@ -305,30 +306,61 @@ exports.completeSubscription = async (req, res) => {
 
 exports.cronCharge = async (req, res) => {
   try {
-    // ✅ 보안: CRON_SECRET
     const secret = req.headers["x-cron-secret"];
     if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: "Unauthorized cron" });
     }
 
-    // ✅ 베타모드면 청구 자체를 하지 않음
+    // 베타모드면 청구/정리 모두 스킵(원하면 정리만 수행하도록 바꿔도 됨)
     if (paymentService.isBetaMode()) {
       return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
     }
 
     const now = new Date();
 
-    // 금액/상품명은 env로 빼두는 걸 추천 (없으면 기본값 사용)
+    // (1) 만료 처리: TRIAL 해지(CANCELED)인데 체험 종료됨 -> FREE로 다운그레이드
+    const trialEnded = await User.updateMany(
+      {
+        plan: "PRO",
+        "subscription.status": "CANCELED",
+        "subscription.trialEndsAt": { $ne: null, $lte: now },
+      },
+      {
+        $set: {
+          plan: "FREE",
+          "subscription.endedAt": now,
+        },
+      }
+    );
+
+    // (2) 만료 처리: 유료 해지 예약(CANCELED_PENDING)인데 nextChargeAt(=이용 만료일) 지남 -> FREE로 다운그레이드
+    const paidEnded = await User.updateMany(
+      {
+        plan: "PRO",
+        "subscription.status": "CANCELED_PENDING",
+        "subscription.nextChargeAt": { $ne: null, $lte: now },
+      },
+      {
+        $set: {
+          plan: "FREE",
+          "subscription.status": "CANCELED", // 최종 종료 상태로 정리
+          "subscription.endedAt": now,
+          "subscription.nextChargeAt": null,
+        },
+      }
+    );
+
+    // 구독 청구 금액/상품명
     const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
-    // ✅ 청구 대상 조회
+    // (3) 청구 대상 조회: ACTIVE/PAST_DUE만 청구하고, CANCELED/CANCELED_PENDING은 제외
     const targets = await User.find(
       {
         plan: "PRO",
         "subscription.billingKey": { $exists: true, $ne: null },
-        "subscription.nextChargeAt": { $lte: now },
-        "subscription.status": { $ne: "CANCELED" },
+        "subscription.nextChargeAt": { $ne: null, $lte: now },
+        "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
       },
       "_id subscription"
     ).lean();
@@ -340,10 +372,8 @@ exports.cronCharge = async (req, res) => {
       const userId = String(u._id);
       const customerKey = u.subscription?.customerKey || userId;
       const billingKey = u.subscription?.billingKey;
-
       if (!billingKey) continue;
 
-      // ✅ orderId는 매 청구마다 유니크해야 함
       const orderId = `sub-${userId}-${Date.now()}`;
 
       try {
@@ -364,9 +394,9 @@ exports.cronCharge = async (req, res) => {
               "subscription.status": "ACTIVE",
               "subscription.lastChargedAt": now,
               "subscription.nextChargeAt": nextChargeAt,
-              // customerKey가 비어있던 케이스 정리
               "subscription.customerKey": customerKey,
             },
+            $unset: { "subscription.lastChargeError": "" },
           }
         );
 
@@ -391,6 +421,10 @@ exports.cronCharge = async (req, res) => {
     return res.json({
       ok: true,
       now,
+      cleaned: {
+        trialEnded: trialEnded?.modifiedCount ?? trialEnded?.nModified ?? 0,
+        paidEnded: paidEnded?.modifiedCount ?? paidEnded?.nModified ?? 0,
+      },
       targets: targets.length,
       successCount,
       failCount,
@@ -403,3 +437,73 @@ exports.cronCharge = async (req, res) => {
 
 // 웹훅은 나중에 필요해지면 구현
 // exports.webhook = async (req, res) => { ... };
+
+exports.cancelSubscription = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password)
+      return res.status(400).json({ error: "password is required" });
+
+    // password 비교하려면 password 필드를 select해야 함 (스키마에서 select:false인 경우)
+    const user = await User.findById(req.user.id).select(
+      "+password plan subscription"
+    );
+    if (!user) return res.status(404).json({ error: "사용자 없음" });
+
+    // 소셜 로그인 등으로 password가 없을 수 있음
+    if (!user.password) {
+      return res.status(400).json({
+        error:
+          "비밀번호가 설정되지 않은 계정입니다. 비밀번호 설정 후 해지할 수 있습니다.",
+      });
+    }
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok)
+      return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
+
+    // 이미 해지 상태면 idempotent 처리
+    if (user.subscription?.status === "CANCELED") {
+      return res.json({ ok: true, status: "CANCELED" });
+    }
+    if (user.subscription?.status === "CANCELED_PENDING") {
+      return res.json({ ok: true, status: "CANCELED_PENDING" });
+    }
+
+    const now = new Date();
+    const sub = user.subscription || {};
+
+    const inTrial =
+      sub.status === "TRIAL" &&
+      sub.trialEndsAt &&
+      new Date(sub.trialEndsAt) > now;
+
+    let savedStatus = "CANCELED";
+
+    if (inTrial) {
+      user.subscription = {
+        ...sub,
+        status: "CANCELED",
+        canceledAt: now,
+        nextChargeAt: null,
+        cancelAtPeriodEnd: false,
+      };
+      savedStatus = "CANCELED";
+    } else {
+      user.subscription = {
+        ...sub,
+        status: "CANCELED_PENDING",
+        canceledAt: now,
+        cancelAtPeriodEnd: true,
+        // nextChargeAt 유지
+      };
+      savedStatus = "CANCELED_PENDING";
+    }
+
+    await user.save();
+    return res.json({ ok: true, status: savedStatus });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "구독 해지 실패" });
+  }
+};

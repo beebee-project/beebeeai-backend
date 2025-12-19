@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const passport = require("passport");
 const authController = require("../controllers/authController");
+const protect = require("../middleware/authMiddleware");
 
 // 이메일 관련 라우트
 router.post("/signup", authController.signup);
@@ -9,6 +10,9 @@ router.get("/verify-email/:token", authController.verifyEmail);
 router.post("/login", authController.login);
 router.post("/forgot-password", authController.forgotPassword);
 router.patch("/reset-password/:token", authController.resetPassword);
+
+// 회원 탈퇴 (로그인 필요)
+router.post("/withdraw", protect, authController.withdraw);
 
 // 1. 사용자가 '구글 로그인' 버튼을 눌렀을 때 호출될 경로
 router.get(
