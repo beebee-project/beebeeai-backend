@@ -206,7 +206,7 @@ exports.withdraw = async (req, res, next) => {
 
     // ✅ 구독 중이면 탈퇴 불가(먼저 해지 유도)
     const sub = user.subscription || {};
-    const status = sub.status;
+    const status = String(sub.status || "").toUpperCase();
 
     const isSubscribed =
       status === "TRIAL" ||
