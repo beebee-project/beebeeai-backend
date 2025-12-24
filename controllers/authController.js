@@ -180,40 +180,25 @@ exports.googleCallback = (req, res) => {
 
 exports.withdraw = async (req, res, next) => {
   try {
-    const { password, confirmText } = req.body || {};
+    const { confirmText } = req.body || {};
+
+    if (
+      String(confirmText || "")
+        .trim()
+        .toUpperCase() !== "DELETE"
+    ) {
+      return res.status(400).json({
+        code: "CONFIRM_DELETE_REQUIRED",
+        message: '회원 탈퇴를 진행하려면 "DELETE"를 입력해주세요.',
+      });
+    }
 
     const user = await User.findById(req.user.id).select(
-      "+password email name plan subscription"
+      "email name plan subscription"
     );
     if (!user) return res.status(404).json({ message: "사용자 없음" });
 
-    // ✅ 비밀번호가 있으면 비밀번호로 확인
-    if (user.password) {
-      if (!password) {
-        return res.status(400).json({ message: "비밀번호를 입력해주세요." });
-      }
-      const ok = await bcrypt.compare(password, user.password);
-      if (!ok) {
-        return res
-          .status(401)
-          .json({ message: "비밀번호가 올바르지 않습니다." });
-      }
-    } else {
-      // ✅ 소셜 로그인(비밀번호 없음): DELETE 입력으로 확인
-      if (
-        String(confirmText || "")
-          .trim()
-          .toUpperCase() !== "DELETE"
-      ) {
-        return res.status(400).json({
-          message:
-            '소셜 로그인 계정 탈퇴를 진행하려면 "DELETE"를 입력해주세요.',
-          code: "CONFIRM_DELETE_REQUIRED",
-        });
-      }
-    }
-
-    // ✅ 구독 중이면 탈퇴 불가(먼저 해지 유도)
+    // ✅ 구독/체험/해지예약 중이면 탈퇴 불가(유지)
     const sub = user.subscription || {};
     const status = String(sub.status || "").toUpperCase();
 
@@ -221,14 +206,11 @@ exports.withdraw = async (req, res, next) => {
       status === "TRIAL" ||
       status === "ACTIVE" ||
       status === "PAST_DUE" ||
-      status === "CANCELED_PENDING"; // 유료 해지 예약 중(만료일까지 사용)
+      status === "CANCELED_PENDING";
 
     if (isSubscribed) {
-      // ✅ 만료일 추정: CANCELED_PENDING/ACTIVE/PAST_DUE는 nextChargeAt, TRIAL은 trialEndsAt
       const expiresAt =
-        status === "TRIAL"
-          ? sub.trialEndsAt
-          : sub.nextChargeAt || sub.expiresAt || null;
+        status === "TRIAL" ? sub.trialEndsAt : sub.nextChargeAt || null;
 
       const expiresText = expiresAt
         ? new Date(expiresAt).toLocaleString("ko-KR", {
@@ -237,44 +219,38 @@ exports.withdraw = async (req, res, next) => {
         : null;
 
       return res.status(409).json({
-        message: expiresText
-          ? `구독(또는 무료 체험) 이용 중인 계정은 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
-          : "구독(또는 무료 체험) 이용 중인 계정은 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
         code: "SUBSCRIPTION_ACTIVE",
         status,
         expiresAt,
+        message: expiresText
+          ? `구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
+          : "구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
       });
     }
 
     const now = new Date();
 
-    // ✅ 탈퇴 = 즉시 이용 종료 + 즉시 청구 중단
+    // ✅ soft delete 권장
+    user.isDeleted = true;
+    user.deletedAt = now;
     user.plan = "FREE";
+
     user.subscription = {
       ...(user.subscription || {}),
       status: "CANCELED",
       canceledAt: now,
       endedAt: now,
-      nextChargeAt: null, // ✅ cron 청구 트리거 제거
+      nextChargeAt: null,
       cancelAtPeriodEnd: false,
     };
 
-    // ✅ soft delete + 익명화(권장)
-    user.isDeleted = true;
-    user.deletedAt = now;
-
-    // email unique 충돌 방지
     if (user.email) user.email = `deleted_${user._id}@deleted.local`;
     if (user.name) user.name = "deleted";
 
-    // password 제거(선택) - 이후 로그인 불가
-    user.password = undefined;
-
     await user.save();
 
-    // JWT는 서버가 강제 폐기하기 어려움(무상태) -> 프론트에서 토큰 삭제/로그아웃 처리 권장
     return res.json({ ok: true, message: "회원 탈퇴가 완료되었습니다." });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
