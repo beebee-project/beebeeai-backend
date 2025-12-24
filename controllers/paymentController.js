@@ -63,8 +63,19 @@ exports.getPlans = (req, res) => {
 // 결제 시작: 프론트에서 Toss Payment Widget 띄우기 전에 호출
 exports.createCheckout = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("name email plan");
+    const user = await User.findById(req.user.id).select(
+      "name email plan subscription"
+    );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
+
+    // ✅ 이미 구독/체험/해지예약 중이면 checkout 막기
+    if (paymentService.isSubscriptionActive(user.subscription)) {
+      return res.status(409).json({
+        error: "이미 구독(또는 무료체험) 진행 중입니다.",
+        code: "SUBSCRIPTION_ALREADY_ACTIVE",
+        status: user.subscription?.status,
+      });
+    }
 
     const amount = 4900;
 
@@ -360,7 +371,7 @@ exports.cronCharge = async (req, res) => {
         plan: "PRO",
         "subscription.billingKey": { $exists: true, $ne: null },
         "subscription.nextChargeAt": { $ne: null, $lte: now },
-        "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
+        "subscription.status": { $in: ["TRIAL", "ACTIVE", "PAST_DUE"] },
       },
       "_id subscription"
     ).lean();

@@ -50,12 +50,25 @@ const userSchema = new mongoose.Schema({
     billingKey: { type: String },
     status: {
       type: String,
-      enum: ["NONE", "TRIAL", "ACTIVE", "PAST_DUE", "CANCELED"],
+      enum: [
+        "NONE",
+        "TRIAL",
+        "ACTIVE",
+        "PAST_DUE",
+        "CANCELED_PENDING",
+        "CANCELED",
+      ],
       default: "NONE",
     },
+    startedAt: { type: Date },
     trialEndsAt: { type: Date },
     nextChargeAt: { type: Date },
     lastChargedAt: { type: Date },
+    cancelAtPeriodEnd: { type: Boolean },
+    canceledAt: { type: Date },
+    endedAt: { type: Date },
+    lastPaymentKey: { type: String },
+    lastOrderId: { type: String },
   },
 });
 
