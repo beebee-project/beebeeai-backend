@@ -545,6 +545,3 @@ exports.cancelSubscription = async (req, res) => {
     return res.status(500).json({ error: "구독 해지 실패" });
   }
 };
-
-exports.isSubscriptionLocked = isSubscriptionLocked;
-exports.isSubscriptionActive = isSubscriptionActive;
