@@ -200,31 +200,29 @@ exports.withdraw = async (req, res, next) => {
 
     // ✅ 구독/체험/해지예약 중이면 탈퇴 불가(유지)
     const sub = user.subscription || {};
-    const status = String(sub.status || "").toUpperCase();
+    const status = String(sub.status || "NONE").toUpperCase();
 
     const isSubscribed =
       status === "TRIAL" ||
       status === "ACTIVE" ||
       status === "PAST_DUE" ||
-      status === "CANCELED_PENDING";
+      status === "CANCELED_PENDING"; // 기간말 해지(만료일까지 사용)
 
     if (isSubscribed) {
       const expiresAt =
-        status === "TRIAL" ? sub.trialEndsAt : sub.nextChargeAt || null;
-
-      const expiresText = expiresAt
-        ? new Date(expiresAt).toLocaleString("ko-KR", {
-            timeZone: "Asia/Seoul",
-          })
-        : null;
+        sub.expiresAt || sub.nextChargeAt || sub.trialEndsAt || null;
 
       return res.status(409).json({
+        message: expiresAt
+          ? `구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료(${new Date(
+              expiresAt
+            ).toLocaleString("ko-KR", {
+              timeZone: "Asia/Seoul",
+            })}) 후 탈퇴할 수 있습니다.`
+          : "구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
         code: "SUBSCRIPTION_ACTIVE",
         status,
         expiresAt,
-        message: expiresText
-          ? `구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
-          : "구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
       });
     }
 

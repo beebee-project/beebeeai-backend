@@ -455,30 +455,48 @@ exports.cancelSubscription = async (req, res) => {
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
     const sub = user.subscription || {};
-    const status = String(sub.status || "").toUpperCase();
-    const now = new Date();
+    const status = String(sub.status || "NONE").toUpperCase();
 
-    // ✅ 이미 해지 완료
+    const hasAnySubscriptionSignal = !!(
+      sub.billingKey ||
+      sub.customerKey ||
+      sub.startedAt ||
+      sub.trialEndsAt ||
+      sub.nextChargeAt
+    );
+
+    if (!hasAnySubscriptionSignal && status === "NONE") {
+      return res.status(409).json({
+        ok: false,
+        code: "NO_SUBSCRIPTION",
+        message: "현재 구독 중이 아닙니다.",
+        status: "NONE",
+      });
+    }
+
+    // ✅ 이미 완전 해지라면 idempotent
     if (status === "CANCELED") {
       return res.json({
         ok: true,
         code: "ALREADY_CANCELED",
-        status: "CANCELED",
         message: "이미 구독 해지가 완료된 상태입니다.",
+        status,
       });
     }
 
-    // ✅ 이미 해지 예약(기간말 해지)
+    // ✅ 기간말 해지(이미 접수됨)도 idempotent
     if (status === "CANCELED_PENDING") {
       return res.json({
         ok: true,
         code: "ALREADY_CANCELED_PENDING",
-        status: "CANCELED_PENDING",
-        expiresAt: sub.nextChargeAt || null,
         message:
           "이미 구독 해지가 접수되었습니다. 이용 만료일까지 사용 가능합니다.",
+        status,
+        expiresAt: sub.expiresAt || sub.nextChargeAt || null,
       });
     }
+
+    const now = new Date();
 
     // ✅ 무료 체험 중 해지: 체험은 끝까지 사용, 과금만 막기
     const inTrial =
@@ -490,8 +508,9 @@ exports.cancelSubscription = async (req, res) => {
         status: "CANCELED",
         canceledAt: now,
         endedAt: now,
-        nextChargeAt: null, // ✅ 체험 후 과금 방지
+        nextChargeAt: null,
         cancelAtPeriodEnd: false,
+        expiresAt: sub.trialEndsAt,
       };
       await user.save();
 
