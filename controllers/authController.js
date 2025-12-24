@@ -180,16 +180,38 @@ exports.googleCallback = (req, res) => {
 
 exports.withdraw = async (req, res, next) => {
   try {
-    const { password } = req.body || {};
-    if (!password) {
-      return res.status(400).json({ message: "비밀번호를 입력해주세요." });
-    }
+    const { password, confirmText } = req.body || {};
 
-    // password가 select:false일 수 있으니 +password로 가져오기
     const user = await User.findById(req.user.id).select(
       "+password email name plan subscription"
     );
     if (!user) return res.status(404).json({ message: "사용자 없음" });
+
+    // ✅ 비밀번호가 있으면 비밀번호로 확인
+    if (user.password) {
+      if (!password) {
+        return res.status(400).json({ message: "비밀번호를 입력해주세요." });
+      }
+      const ok = await bcrypt.compare(password, user.password);
+      if (!ok) {
+        return res
+          .status(401)
+          .json({ message: "비밀번호가 올바르지 않습니다." });
+      }
+    } else {
+      // ✅ 소셜 로그인(비밀번호 없음): DELETE 입력으로 확인
+      if (
+        String(confirmText || "")
+          .trim()
+          .toUpperCase() !== "DELETE"
+      ) {
+        return res.status(400).json({
+          message:
+            '소셜 로그인 계정 탈퇴를 진행하려면 "DELETE"를 입력해주세요.',
+          code: "CONFIRM_DELETE_REQUIRED",
+        });
+      }
+    }
 
     // 소셜 로그인 등 password 없는 계정 처리
     if (!user.password) {

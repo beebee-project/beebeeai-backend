@@ -451,9 +451,7 @@ exports.cronCharge = async (req, res) => {
 
 exports.cancelSubscription = async (req, res) => {
   try {
-    const { password } = req.body;
-    if (!password)
-      return res.status(400).json({ error: "password is required" });
+    const { password } = req.body || {};
 
     // password 비교하려면 password 필드를 select해야 함 (스키마에서 select:false인 경우)
     const user = await User.findById(req.user.id).select(
@@ -461,58 +459,94 @@ exports.cancelSubscription = async (req, res) => {
     );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
+    const sub = user.subscription || {};
+    const status = String(sub.status || "").toUpperCase();
+    const now = new Date();
+
+    // ✅ 이미 해지 완료 상태: 멱등 처리 + 분류 메시지
+    if (status === "CANCELED") {
+      return res.json({
+        ok: true,
+        code: "ALREADY_CANCELED",
+        status: "CANCELED",
+        message: "이미 구독 해지가 완료된 상태입니다.",
+      });
+    }
+
+    // ✅ 이미 해지 예약(기간말 해지) 상태: 멱등 처리 + 분류 메시지
+    if (status === "CANCELED_PENDING") {
+      return res.json({
+        ok: true,
+        code: "ALREADY_CANCELED_PENDING",
+        status: "CANCELED_PENDING",
+        expiresAt: sub.nextChargeAt || null, // 만료일(= nextChargeAt 유지)
+        message:
+          "이미 구독 해지가 접수되었습니다. 이용 만료일까지 사용 가능합니다.",
+      });
+    }
+
+    // ✅ 여기서부터는 “해지 처리”를 실제로 해야 하는 상태(TRIAL/ACTIVE/PAST_DUE 등)
     // 소셜 로그인 등으로 password가 없을 수 있음
     if (!user.password) {
       return res.status(400).json({
         error:
           "비밀번호가 설정되지 않은 계정입니다. 비밀번호 설정 후 해지할 수 있습니다.",
+        code: "PASSWORD_NOT_SET",
       });
     }
 
+    if (!password) {
+      return res.status(400).json({ error: "password is required" });
+    }
+
     const ok = await bcrypt.compare(password, user.password);
-    if (!ok)
+    if (!ok) {
       return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
-
-    // 이미 해지 상태면 idempotent 처리
-    if (user.subscription?.status === "CANCELED") {
-      return res.json({ ok: true, status: "CANCELED" });
-    }
-    if (user.subscription?.status === "CANCELED_PENDING") {
-      return res.json({ ok: true, status: "CANCELED_PENDING" });
     }
 
-    const now = new Date();
-    const sub = user.subscription || {};
-
+    // ✅ 무료 체험 중 해지: 체험은 끝까지 사용, 과금은 절대 발생하면 안 됨
     const inTrial =
-      sub.status === "TRIAL" &&
-      sub.trialEndsAt &&
-      new Date(sub.trialEndsAt) > now;
-
-    let savedStatus = "CANCELED";
+      status === "TRIAL" && sub.trialEndsAt && new Date(sub.trialEndsAt) > now;
 
     if (inTrial) {
       user.subscription = {
         ...sub,
         status: "CANCELED",
         canceledAt: now,
-        nextChargeAt: null,
+        endedAt: now,
+        nextChargeAt: null, // ✅ 체험 끝에 과금 절대 방지
         cancelAtPeriodEnd: false,
       };
-      savedStatus = "CANCELED";
-    } else {
-      user.subscription = {
-        ...sub,
-        status: "CANCELED_PENDING",
-        canceledAt: now,
-        cancelAtPeriodEnd: true,
-        // nextChargeAt 유지
-      };
-      savedStatus = "CANCELED_PENDING";
+
+      await user.save();
+      return res.json({
+        ok: true,
+        code: "CANCELED_TRIAL",
+        status: "CANCELED",
+        expiresAt: sub.trialEndsAt || null, // 체험 만료일까지 사용 가능(표시용)
+        message:
+          "무료 체험 해지가 완료되었습니다. 체험 종료일까지 이용 가능합니다.",
+      });
     }
 
+    // ✅ 유료/그 외: 기간말 해지(=다음 결제일부터 자동결제 중단, 만료일까지 사용)
+    user.subscription = {
+      ...sub,
+      status: "CANCELED_PENDING",
+      canceledAt: now,
+      cancelAtPeriodEnd: true,
+      // nextChargeAt 유지 (이용 만료일 역할)
+    };
+
     await user.save();
-    return res.json({ ok: true, status: savedStatus });
+
+    return res.json({
+      ok: true,
+      code: "CANCELED_PENDING",
+      status: "CANCELED_PENDING",
+      expiresAt: user.subscription.nextChargeAt || null,
+      message: "구독 해지가 접수되었습니다. 이용 만료일까지 사용 가능합니다.",
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "구독 해지 실패" });
