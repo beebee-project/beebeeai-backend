@@ -213,19 +213,6 @@ exports.withdraw = async (req, res, next) => {
       }
     }
 
-    // 소셜 로그인 등 password 없는 계정 처리
-    if (!user.password) {
-      return res.status(400).json({
-        message:
-          "비밀번호가 설정되지 않은 계정입니다. 비밀번호 설정 후 탈퇴할 수 있습니다.",
-      });
-    }
-
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) {
-      return res.status(401).json({ message: "비밀번호가 올바르지 않습니다." });
-    }
-
     // ✅ 구독 중이면 탈퇴 불가(먼저 해지 유도)
     const sub = user.subscription || {};
     const status = String(sub.status || "").toUpperCase();
