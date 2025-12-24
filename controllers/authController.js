@@ -194,45 +194,59 @@ exports.withdraw = async (req, res, next) => {
     }
 
     const user = await User.findById(req.user.id).select(
-      "email name plan subscription"
+      "email name plan subscription isDeleted"
     );
     if (!user) return res.status(404).json({ message: "사용자 없음" });
 
-    // ✅ 구독/체험/해지예약 중이면 탈퇴 불가(유지)
+    // 이미 탈퇴된 계정 idempotent
+    if (user.isDeleted) {
+      return res.json({ ok: true, message: "이미 탈퇴 처리된 계정입니다." });
+    }
+
     const sub = user.subscription || {};
     const status = String(sub.status || "NONE").toUpperCase();
 
+    // ✅ 구독/체험 “신호”가 하나라도 있는지 (빈 객체면 false)
+    const hasAnySubscriptionSignal = Boolean(
+      sub.billingKey ||
+        sub.customerKey ||
+        sub.startedAt ||
+        sub.trialEndsAt ||
+        sub.nextChargeAt ||
+        sub.expiresAt
+    );
+
+    // ✅ 탈퇴 차단 상태(정책상 유지)
+    const lockStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
     const isSubscribed =
-      status === "TRIAL" ||
-      status === "ACTIVE" ||
-      status === "PAST_DUE" ||
-      status === "CANCELED_PENDING"; // 기간말 해지(만료일까지 사용)
+      hasAnySubscriptionSignal && lockStatuses.includes(status);
 
     if (isSubscribed) {
       const expiresAt =
         sub.expiresAt || sub.nextChargeAt || sub.trialEndsAt || null;
+      const expiresText = expiresAt
+        ? new Date(expiresAt).toLocaleString("ko-KR", {
+            timeZone: "Asia/Seoul",
+          })
+        : null;
 
       return res.status(409).json({
-        message: expiresAt
-          ? `구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료(${new Date(
-              expiresAt
-            ).toLocaleString("ko-KR", {
-              timeZone: "Asia/Seoul",
-            })}) 후 탈퇴할 수 있습니다.`
-          : "구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
         code: "SUBSCRIPTION_ACTIVE",
         status,
         expiresAt,
+        message: expiresText
+          ? `구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
+          : "구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
       });
     }
 
+    // ---- 여기부터 탈퇴 진행 ----
     const now = new Date();
-
-    // ✅ soft delete 권장
     user.isDeleted = true;
     user.deletedAt = now;
     user.plan = "FREE";
 
+    // (선택) subscription 정리: 아예 비워도 됨
     user.subscription = {
       ...(user.subscription || {}),
       status: "CANCELED",
