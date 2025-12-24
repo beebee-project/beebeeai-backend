@@ -62,6 +62,7 @@ exports.getPlans = (req, res) => {
 
 // 결제 시작: 프론트에서 Toss Payment Widget 띄우기 전에 호출
 exports.createCheckout = async (req, res) => {
+  console.log("paymentService keys:", Object.keys(paymentService));
   try {
     const user = await User.findById(req.user.id).select(
       "name email plan subscription"
@@ -546,3 +547,6 @@ exports.cancelSubscription = async (req, res) => {
     return res.status(500).json({ error: "구독 해지 실패" });
   }
 };
+
+exports.isSubscriptionLocked = isSubscriptionLocked;
+exports.isSubscriptionActive = isSubscriptionActive;
