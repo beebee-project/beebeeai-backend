@@ -31,22 +31,22 @@ function selectGateway() {
   }
 }
 
-function isSubscriptionLocked(sub = {}, now = new Date()) {
-  const status = String(sub.status || "").toUpperCase();
+function isSubscriptionActive(sub = {}, now = new Date()) {
+  const status = String(sub?.status || "").toUpperCase();
 
-  // ✅ 구독 시작/결제 플로우를 막아야 하는 상태들
+  // 결제 시작/재구독을 막아야 하는 상태들
   const lockedStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
 
   if (lockedStatuses.includes(status)) return true;
 
-  // (선택) 혹시 status가 비어있어도 nextChargeAt/trialEndsAt가 미래면 막고 싶다면:
-  // if (sub.nextChargeAt && new Date(sub.nextChargeAt) > now) return true;
-  // if (sub.trialEndsAt && new Date(sub.trialEndsAt) > now) return true;
+  // (선택) status가 비어있더라도 날짜가 미래면 잠금 처리하고 싶으면 아래 활성화
+  // if (sub?.trialEndsAt && new Date(sub.trialEndsAt) > now) return true;
+  // if (sub?.nextChargeAt && new Date(sub.nextChargeAt) > now) return true;
 
   return false;
 }
 
-exports.isSubscriptionLocked = isSubscriptionLocked;
+exports.isSubscriptionActive = isSubscriptionActive;
 exports.createCheckoutSession = (args) =>
   selectGateway().createCheckoutSession(args);
 exports.confirmPayment = (args) => selectGateway().confirmPayment(args);

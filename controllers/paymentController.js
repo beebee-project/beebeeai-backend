@@ -60,9 +60,8 @@ exports.getPlans = (req, res) => {
   });
 };
 
-// 결제 시작: 프론트에서 Toss Payment Widget 띄우기 전에 호출
+// 결제 시작
 exports.createCheckout = async (req, res) => {
-  console.log("paymentService keys:", Object.keys(paymentService));
   try {
     const user = await User.findById(req.user.id).select(
       "name email plan subscription"
@@ -130,8 +129,7 @@ exports.createCheckout = async (req, res) => {
   }
 };
 
-// 결제 승인: successUrl로 리다이렉트된 후, 프론트에서 호출
-// body: { paymentKey, orderId, amount }
+// 결제 승인
 exports.confirmPayment = async (req, res) => {
   try {
     const { paymentKey, orderId, amount } = req.body || {};
