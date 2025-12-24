@@ -215,11 +215,25 @@ exports.withdraw = async (req, res, next) => {
       status === "CANCELED_PENDING"; // 유료 해지 예약 중(만료일까지 사용)
 
     if (isSubscribed) {
+      // ✅ 만료일 추정: CANCELED_PENDING/ACTIVE/PAST_DUE는 nextChargeAt, TRIAL은 trialEndsAt
+      const expiresAt =
+        status === "TRIAL"
+          ? sub.trialEndsAt
+          : sub.nextChargeAt || sub.expiresAt || null;
+
+      const expiresText = expiresAt
+        ? new Date(expiresAt).toLocaleString("ko-KR", {
+            timeZone: "Asia/Seoul",
+          })
+        : null;
+
       return res.status(409).json({
-        message:
-          "구독 중인 계정은 탈퇴할 수 없습니다. 먼저 구독 해지를 진행해주세요.",
+        message: expiresText
+          ? `구독(또는 무료 체험) 이용 중인 계정은 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
+          : "구독(또는 무료 체험) 이용 중인 계정은 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
         code: "SUBSCRIPTION_ACTIVE",
         status,
+        expiresAt,
       });
     }
 
