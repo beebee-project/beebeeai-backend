@@ -46,6 +46,12 @@ function isSubscriptionActive(sub = {}, now = new Date()) {
   return false;
 }
 
+function getNow() {
+  const s = process.env.PAYMENTS_NOW;
+  return s ? new Date(s) : new Date();
+}
+
+module.exports.getNow = getNow;
 exports.isSubscriptionActive = isSubscriptionActive;
 exports.createCheckoutSession = (args) =>
   selectGateway().createCheckoutSession(args);
@@ -57,6 +63,6 @@ exports.isBetaMode = isBetaMode;
 exports.getEffectivePlan = getEffectivePlan;
 exports.addMonths = addMonths;
 
-// ✅ 구독(빌링키) 기능
+// 구독(빌링키) 기능
 exports.issueBillingKey = (args) => selectGateway().issueBillingKey?.(args);
 exports.chargeBillingKey = (args) => selectGateway().chargeBillingKey?.(args);
