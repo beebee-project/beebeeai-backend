@@ -1,62 +1,60 @@
-const free = require("./paymentGateway/freeBeta");
 const toss = require("./paymentGateway/toss");
+const freeBeta = require("./paymentGateway/freeBeta");
 
-function isBetaMode() {
-  return String(process.env.BETA_MODE).toLowerCase() === "true";
+// BETA_MODE=true면 결제 게이트웨이 대신 freeBeta 사용
+function selectGateway() {
+  const beta =
+    String(process.env.BETA_MODE || "false").toLowerCase() === "true";
+  const provider = String(process.env.PG_PROVIDER || "toss").toLowerCase();
+  if (beta) return freeBeta;
+  if (provider === "toss") return toss;
+  return toss;
 }
 
-function getEffectivePlan(userPlan) {
-  // 베타면 결제 없이 PRO
-  if (isBetaMode()) return "PRO";
-  return userPlan || "FREE";
+// ✅ 운영/테스트에서 날짜 강제이동용(선택)
+function getNow() {
+  const v = process.env.PAYMENTS_NOW;
+  if (!v) return new Date();
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? new Date() : d;
 }
 
 function addMonths(date, months) {
   const d = new Date(date);
   const day = d.getDate();
-
   d.setMonth(d.getMonth() + months);
 
-  // 말일 보정 (예: 1/31 → 2/28 or 2/29)
+  // 월말 보정(예: 1/31 + 1month => 3/03 같은 문제 방지)
   if (d.getDate() < day) d.setDate(0);
   return d;
 }
 
-function selectGateway() {
-  switch (String(process.env.PG_PROVIDER).toLowerCase()) {
-    case "toss":
-      return toss;
-    default:
-      return free;
-  }
+// 구독 중복 락 판정: "다시 구독 시작" 막는 기준
+function isSubscriptionLocked(sub = {}) {
+  const status = String(sub.status || "NONE").toUpperCase();
+  return ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
 }
 
-function isSubscriptionActive(sub = {}, now = new Date()) {
-  const status = String(sub?.status || "").toUpperCase();
-
-  // 결제 시작/재구독을 막아야 하는 상태들
-  const lockedStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
-
-  if (lockedStatuses.includes(status)) return true;
-
-  // (선택) status가 비어있더라도 날짜가 미래면 잠금 처리하고 싶으면 아래 활성화
-  // if (sub?.trialEndsAt && new Date(sub.trialEndsAt) > now) return true;
-  // if (sub?.nextChargeAt && new Date(sub.nextChargeAt) > now) return true;
-
-  return false;
+// 해지 불필요(이미 해지 상태) 판정
+function isAlreadyCanceled(sub = {}) {
+  const status = String(sub.status || "NONE").toUpperCase();
+  return ["CANCELED", "CANCELED_PENDING"].includes(status);
 }
 
-exports.isSubscriptionActive = isSubscriptionActive;
-exports.createCheckoutSession = (args) =>
-  selectGateway().createCheckoutSession(args);
-exports.confirmPayment = (args) => selectGateway().confirmPayment(args);
-exports.cancelPayment = (args) => selectGateway().cancelPayment?.(args);
-exports.parseAndVerifyWebhook = (req) =>
-  selectGateway().parseAndVerifyWebhook?.(req);
-exports.isBetaMode = isBetaMode;
-exports.getEffectivePlan = getEffectivePlan;
-exports.addMonths = addMonths;
+module.exports = {
+  selectGateway,
+  getNow,
+  isSubscriptionLocked,
+  isSubscriptionActive,
+  addMonths,
+  isAlreadyCanceled,
 
-// 구독(빌링키) 기능
-exports.issueBillingKey = (args) => selectGateway().issueBillingKey?.(args);
-exports.chargeBillingKey = (args) => selectGateway().chargeBillingKey?.(args);
+  // 아래는 게이트웨이로 그대로 위임
+  createCheckoutSession: (args) => selectGateway().createCheckoutSession(args),
+  confirmPayment: (args) => selectGateway().confirmPayment(args),
+
+  // ✅ 정기결제(빌링키) 플로우
+  startSubscription: (args) => selectGateway().startSubscription(args),
+  completeSubscription: (args) => selectGateway().completeSubscription(args),
+  chargeBillingKey: (args) => selectGateway().chargeBillingKey(args),
+};

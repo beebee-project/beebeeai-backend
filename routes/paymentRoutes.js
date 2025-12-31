@@ -1,17 +1,30 @@
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
-const ctrl = require("../controllers/paymentController");
+const paymentController = require("../controllers/paymentController");
 
-// 결제/플랜
-router.get("/plans", ctrl.getPlans);
-router.get("/usage", protect, ctrl.getUsage);
-router.post("/checkout", protect, ctrl.createCheckout);
-router.post("/confirm", protect, ctrl.confirmPayment);
-router.post("/subscription/start", protect, ctrl.startSubscription);
-router.post("/subscription/complete", protect, ctrl.completeSubscription);
-router.post("/subscription/cancel", protect, ctrl.cancelSubscription);
-router.post("/cron/charge", ctrl.cronCharge);
+// 정기결제 시작: customerKey 기반으로 Toss 결제창(빌링) 오픈
+router.post(
+  "/subscription/start",
+  protect,
+  paymentController.startSubscription
+);
 
-// router.post("/webhook", ctrl.webhook); // 필요 시 나중에 활성화
+// 정기결제 완료: success 페이지에서 authKey 받아 billingKey 발급/첫 결제/구독 활성화
+router.post(
+  "/subscription/complete",
+  protect,
+  paymentController.completeSubscription
+);
+
+// 구독 해지(기간말 해지)
+router.post(
+  "/subscription/cancel",
+  protect,
+  paymentController.cancelSubscription
+);
+
+// cron: nextChargeAt 도래한 ACTIVE 대상 월 과금
+router.post("/cron/charge", paymentController.cronCharge); // CRON_SECRET 등으로 보호
 
 module.exports = router;
