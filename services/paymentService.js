@@ -35,6 +35,13 @@ function isSubscriptionLocked(sub = {}) {
   return ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
 }
 
+// "이미 구독/체험/해지예약 중" 여부 (프론트/컨트롤러에서 쓰기 좋게 별칭 제공)
+function isSubscriptionActive(sub = {}) {
+  const status = String(sub.status || "NONE").toUpperCase();
+  // 무료체험(TRIAL)을 완전히 제거했더라도, 남아있을 수 있으니 안전하게 포함
+  return ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
+}
+
 // 해지 불필요(이미 해지 상태) 판정
 function isAlreadyCanceled(sub = {}) {
   const status = String(sub.status || "NONE").toUpperCase();
@@ -45,6 +52,7 @@ module.exports = {
   selectGateway,
   getNow,
   isSubscriptionLocked,
+  isSubscriptionActive,
   addMonths,
   isAlreadyCanceled,
 
