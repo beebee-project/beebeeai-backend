@@ -46,12 +46,6 @@ function isSubscriptionActive(sub = {}, now = new Date()) {
   return false;
 }
 
-function getNow() {
-  const s = process.env.PAYMENTS_NOW;
-  return s ? new Date(s) : new Date();
-}
-
-module.exports.getNow = getNow;
 exports.isSubscriptionActive = isSubscriptionActive;
 exports.createCheckoutSession = (args) =>
   selectGateway().createCheckoutSession(args);
