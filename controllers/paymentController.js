@@ -334,6 +334,3 @@ exports.cronCharge = async (req, res) => {
     return res.status(500).json({ ok: false, error: "cronCharge failed" });
   }
 };
-
-exports.isSubscriptionLocked = isSubscriptionLocked;
-exports.isSubscriptionActive = isSubscriptionActive;
