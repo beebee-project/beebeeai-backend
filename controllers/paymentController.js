@@ -31,7 +31,7 @@ exports.startSubscription = async (req, res) => {
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
     // ✅ 중복 구독 시작 방지
-    if (isSubscriptionLocked(user.subscription)) {
+    if (paymentService.isSubscriptionLocked(user.subscription)) {
       return res.status(409).json({
         error: "이미 구독(또는 결제 실패/해지예약) 상태입니다.",
         code: "SUBSCRIPTION_LOCKED",
