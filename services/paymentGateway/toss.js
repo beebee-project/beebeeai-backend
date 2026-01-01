@@ -1,59 +1,92 @@
+const axios = require("axios");
 const tossClient = require("../../config/tossClient");
 
-// 1) 빌링 결제 시작(결제창 열기용 payload 생성)
-async function createBillingCheckoutSession({
-  customerKey,
-  orderId,
+const SECRET_KEY = process.env.TOSS_SECRET_KEY;
+const CURRENCY = process.env.CURRENCY || "KRW";
+
+function getAuthHeader() {
+  if (!SECRET_KEY) throw new Error("TOSS_SECRET_KEY is missing");
+  const encoded = Buffer.from(`${SECRET_KEY}:`, "utf8").toString("base64");
+  return `Basic ${encoded}`;
+}
+
+exports.createCheckoutSession = async ({
+  userId,
   amount,
   successUrl,
   failUrl,
-  orderName,
-  customerName,
-}) {
-  // 여기서 Toss 결제창으로 넘길 값 반환(프론트에서 toss SDK로 호출)
+  meta,
+}) => {
+  // 위젯은 “세션 생성 API”가 따로 있는 게 아니라,
+  // 우리가 orderId/amount/successUrl/failUrl을 만들어서 프론트에 내려주면 됨.
+  const orderId = `beebeeai-${Date.now()}-${String(userId).slice(-4)}`;
+
   return {
     provider: "toss",
-    paymentType: "BILLING",
-    customerKey,
     orderId,
     amount,
-    orderName,
-    customerName,
+    currency: CURRENCY,
+    orderName: meta?.orderName,
+    customerName: meta?.customerName,
     successUrl,
     failUrl,
   };
-}
+};
 
-// 2) authKey -> billingKey 발급
-async function issueBillingKey({ customerKey, authKey }) {
-  // 예시: tossClient.issueBillingKey(...)
-  // return { billingKey, customerKey, raw }
-  return tossClient.issueBillingKey({ customerKey, authKey });
-}
+exports.confirmPayment = async ({ paymentKey, orderId, amount }) => {
+  const r = await axios.post(
+    "https://api.tosspayments.com/v1/payments/confirm",
+    { paymentKey, orderId, amount },
+    {
+      headers: {
+        Authorization: getAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      timeout: 15000,
+    }
+  );
 
-// 3) billingKey로 첫 결제(또는 정기결제) 승인(자동결제)
-async function chargeWithBillingKey({
-  billingKey,
-  customerKey,
-  orderId,
-  amount,
-  orderName,
-  customerEmail,
-  customerName,
-}) {
-  return tossClient.chargeBillingKey({
-    billingKey,
+  const data = r.data;
+
+  // DONE이 아니면 실패 처리(원하면 더 세밀하게)
+  if (data.status && data.status !== "DONE") {
+    const err = new Error(`Payment not DONE: ${data.status}`);
+    err.code = "TOSS_NOT_DONE";
+    err.response = { data };
+    throw err;
+  }
+
+  return {
+    provider: "toss",
+    orderId: data.orderId,
+    amount: data.totalAmount ?? amount,
+    paymentKey: data.paymentKey,
+    raw: data,
+  };
+};
+
+// ✅ billingKey 발급: authKey -> billingKey
+// Toss Billing API: POST /v1/billing/authorizations/{authKey}
+exports.issueBillingKey = async ({ customerKey, authKey }) => {
+  const res = await tossClient.post(`/v1/billing/authorizations/${authKey}`, {
     customerKey,
-    orderId,
-    amount,
-    orderName,
-    customerEmail,
-    customerName,
   });
-}
+  return res.data; // { billingKey, customerKey, ... }
+};
 
-module.exports = {
-  createBillingCheckoutSession,
-  issueBillingKey,
-  chargeWithBillingKey,
+// ✅ billingKey로 청구(묶음 C에서 사용): POST /v1/billing/{billingKey}
+exports.chargeBillingKey = async ({
+  customerKey,
+  billingKey,
+  amount,
+  orderId,
+  orderName,
+}) => {
+  const res = await tossClient.post(`/v1/billing/${billingKey}`, {
+    customerKey,
+    amount,
+    orderId,
+    orderName,
+  });
+  return res.data;
 };
