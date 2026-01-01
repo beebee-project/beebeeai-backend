@@ -1,183 +1,453 @@
-const crypto = require("crypto");
+const paymentService = require("../services/paymentService");
 const User = require("../models/User");
-const Payment = require("../models/Payment"); // 너 프로젝트 Payment 모델에 맞춰 경로 수정
-const {
-  addMonths,
-  isSubscriptionLocked,
-  isAlreadyCanceled,
-} = require("../services/paymentService");
+const Payment = require("../models/Payment");
+const bcrypt = require("bcryptjs");
 
-// 게이트웨이 (toss만 쓸 거면 바로 require해도 됨)
-const toss = require("../services/paymentGateway/toss");
+const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
+const CURRENCY = process.env.CURRENCY || "KRW";
+const isBetaMode = () => String(process.env.BETA_MODE).toLowerCase() === "true";
+const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || "https://beebeeai.kr";
 
-const PUBLIC_ORIGIN = process.env.PUBLIC_ORIGIN || "https://www.beebeeai.kr";
-const CRON_SECRET = process.env.CRON_SECRET || "";
+// 사용량 조회
+exports.getUsage = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("plan usage");
+    if (!user) return res.status(404).json({ error: "사용자 없음" });
 
-function makeOrderId(prefix = "beebeeai") {
-  // 충돌 적게
-  return `${prefix}-${Date.now()}-${crypto.randomBytes(2).toString("hex")}`;
-}
+    const plan = paymentService.getEffectivePlan(user.plan);
 
-/**
- * POST /api/payments/subscription/start
- * - 결제창을 열기 위한 세션(필요값)을 만들어서 프론트에 전달
- * - "이미 구독중"이면 막음
- */
-exports.startSubscription = async (req, res) => {
+    const limits =
+      plan === "PRO"
+        ? { formulaConversions: 5000, fileUploads: 5 }
+        : { formulaConversions: 20, fileUploads: 1 };
+
+    res.json({
+      plan,
+      usage: {
+        formulaConversions: user?.usage?.formulaConversions ?? 0,
+        fileUploads: user?.usage?.fileUploads ?? 0,
+      },
+      limits,
+    });
+  } catch (err) {
+    console.error("getUsage error:", err);
+    res.status(500).json({ error: "사용량 조회 실패" });
+  }
+};
+
+// 플랜 목록
+exports.getPlans = (req, res) => {
+  res.json({
+    provider: PROVIDER,
+    currency: CURRENCY,
+    betaMode: isBetaMode(),
+    plans: [
+      {
+        code: "FREE",
+        price: 0,
+        interval: "month",
+        features: ["NL→Sheet"],
+        available: true,
+      },
+      {
+        code: "PRO",
+        price: 4900,
+        interval: "month",
+        features: ["우선지원", "고급기능"],
+        available: !isBetaMode(),
+      },
+    ],
+  });
+};
+
+// 결제 시작
+exports.createCheckout = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select(
       "name email plan subscription"
     );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
-    // ✅ 중복 구독 시작 방지
-    if (isSubscriptionLocked(user.subscription)) {
+    // ✅ 이미 구독/체험/해지예약 중이면 checkout 막기
+    if (paymentService.isSubscriptionActive(user.subscription)) {
       return res.status(409).json({
-        error: "이미 구독(또는 결제 실패/해지예약) 상태입니다.",
-        code: "SUBSCRIPTION_LOCKED",
+        error: "이미 구독(또는 무료체험) 진행 중입니다.",
+        code: "SUBSCRIPTION_ALREADY_ACTIVE",
         status: user.subscription?.status,
       });
     }
 
     const amount = 4900;
-    const orderId = makeOrderId();
 
-    // success/fail은 네가 만들어둔 success.html/fail.html로
     const successUrl = `${PUBLIC_ORIGIN}/success.html`;
     const failUrl = `${PUBLIC_ORIGIN}/fail.html`;
 
-    const session = await toss.createBillingCheckoutSession({
-      customerKey: String(user._id),
-      orderId,
+    const session = await paymentService.createCheckoutSession({
+      userId: String(user._id),
       amount,
       successUrl,
       failUrl,
-      orderName: "BeeBee AI PRO (월 정기 결제)",
-      customerName: user.name || user.email,
+      meta: {
+        orderName: "BeeBee AI PRO (월 정기 결제)",
+        customerName: user.name || user.email,
+      },
     });
 
-    // Payment READY 저장(선택이지만 추천)
     await Payment.updateOne(
-      { orderId },
+      { orderId: session.orderId },
       {
         $setOnInsert: {
           userId: String(user._id),
-          orderId,
+          orderId: session.orderId,
           createdAt: new Date(),
         },
         $set: {
-          amount,
-          currency: "KRW",
-          provider: "toss",
+          amount: session.amount,
+          currency: session.currency,
+          provider: session.provider,
           status: "READY",
           updatedAt: new Date(),
         },
       },
       { upsert: true }
     );
-
-    return res.json(session);
-  } catch (e) {
-    console.error("startSubscription error:", e);
-    return res.status(500).json({ error: "구독 결제 시작 실패" });
+    return res.json({
+      provider: session.provider,
+      orderId: session.orderId,
+      amount: session.amount,
+      currency: session.currency,
+      orderName: session.orderName,
+      customerName: session.customerName,
+      successUrl: session.successUrl,
+      failUrl: session.failUrl,
+      customerKey: String(user._id),
+      status: "READY",
+    });
+  } catch (err) {
+    console.error("createCheckout error:", err);
+    res.status(500).json({ error: "결제 세션 생성 실패", code: err.code });
   }
 };
 
-/**
- * POST /api/payments/subscription/complete
- * - success.html에서 authKey를 받아서 호출
- * - billingKey 발급 -> billingKey로 첫 결제 -> User 구독 ACTIVE 세팅
- */
-exports.completeSubscription = async (req, res) => {
+// 결제 승인
+exports.confirmPayment = async (req, res) => {
   try {
-    const { authKey, orderId } = req.body || {};
-    if (!authKey || !orderId) {
-      return res.status(400).json({ error: "authKey, orderId는 필수입니다." });
+    const { paymentKey, orderId, amount } = req.body || {};
+    if (!paymentKey || !orderId || !amount) {
+      return res
+        .status(400)
+        .json({ error: "paymentKey, orderId, amount는 필수입니다." });
     }
 
-    const user = await User.findById(req.user.id).select(
-      "name email plan subscription"
-    );
-    if (!user) return res.status(404).json({ error: "사용자 없음" });
-
-    // ✅ 이미 구독이면 complete도 막아야 “중복 결제”가 안남
-    if (isSubscriptionLocked(user.subscription)) {
-      return res.status(409).json({
-        error: "이미 구독 상태입니다.",
-        code: "SUBSCRIPTION_LOCKED",
-        status: user.subscription?.status,
-      });
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount)) {
+      return res
+        .status(400)
+        .json({ error: "amount 형식이 올바르지 않습니다." });
     }
 
-    // ✅ Payment 검증(본인 orderId인지)
-    const pay = await Payment.findOne({ orderId, userId: String(user._id) });
+    // ✅ 1) 우리 DB에서 orderId 검증
+    const pay = await Payment.findOne({ orderId, userId: String(req.user.id) });
     if (!pay)
       return res.status(404).json({ error: "존재하지 않는 orderId 입니다." });
-    if (pay.status === "DONE") {
+
+    // ✅ 2) 본인 결제인지 확인 (protect 쓰는 구조면 userId 매칭 필수)
+    if (String(pay.userId) !== String(req.user.id)) {
+      return res
+        .status(403)
+        .json({ error: "본인의 결제만 승인할 수 있습니다." });
+    }
+
+    // ✅ 3) 금액 검증(서버 기준)
+    if (numericAmount !== pay.amount) {
+      return res
+        .status(400)
+        .json({ error: "요청 금액이 서버 금액과 일치하지 않습니다." });
+    }
+
+    // ✅ 4) 멱등 처리: 이미 승인 완료면 그대로 성공 반환
+    if (pay.status === "DONE" && pay.paymentKey === paymentKey) {
       return res.json({
         ok: true,
         duplicated: true,
-        subscription: user.subscription,
+        orderId: pay.orderId,
+        paymentKey: pay.paymentKey,
+        amount: pay.amount,
       });
     }
 
-    // 1) billingKey 발급
-    const issued = await toss.issueBillingKey({
-      customerKey: String(user._id),
-      authKey,
-    });
-    const billingKey = issued.billingKey;
-
-    // 2) billingKey로 첫 결제 (즉시 1회 결제)
-    const charge = await toss.chargeWithBillingKey({
-      billingKey,
-      customerKey: String(user._id),
-      orderId, // 첫 결제 orderId는 start에서 만든 걸 그대로 사용
+    // ✅ 5) Toss 승인 호출
+    const result = await paymentService.confirmPayment({
+      paymentKey,
+      orderId,
       amount: pay.amount,
-      orderName: "BeeBee AI PRO (월 정기 결제)",
-      customerEmail: user.email,
-      customerName: user.name || user.email,
     });
 
-    // 3) Payment DONE 업데이트
+    // ✅ 6) Payment 업데이트
     pay.status = "DONE";
-    pay.paymentKey = charge.paymentKey || charge.raw?.paymentKey;
-    pay.raw = charge.raw || charge;
-    pay.approvedAt = new Date(charge.raw?.approvedAt || Date.now());
-    pay.updatedAt = new Date();
+    pay.paymentKey = result.paymentKey;
+    pay.raw = result.raw;
+    pay.approvedAt = new Date(result.raw?.approvedAt || Date.now());
     await pay.save();
 
-    // 4) User 구독 활성화 + 다음 결제일 1개월
+    // ✅ 7) User 구독 반영 (일단 30일 운영)
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "사용자 없음" });
+
+    if (user.subscription?.billingKey) {
+      return res.status(409).json({
+        error: "이미 구독 설정된 계정입니다. 구독 결제 흐름을 사용해주세요.",
+      });
+    }
+
     const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     user.plan = "PRO";
     user.subscription = {
-      customerKey: String(user._id),
-      billingKey,
       status: "ACTIVE",
-      startedAt: now,
-      lastChargedAt: now,
-      nextChargeAt: addMonths(now, 1),
-      lastPaymentKey: pay.paymentKey,
+      startedAt: user.subscription?.startedAt || now,
+      expiresAt,
+      lastPaymentKey: result.paymentKey,
       lastOrderId: orderId,
-      cancelAtPeriodEnd: false,
-      canceledAt: null,
-      endedAt: null,
     };
 
     await user.save();
 
-    return res.json({ ok: true, subscription: user.subscription });
-  } catch (e) {
-    console.error("completeSubscription error:", e);
-    return res.status(500).json({ error: "구독 결제 완료 처리 실패" });
+    return res.json({
+      ok: true,
+      provider: result.provider,
+      orderId,
+      amount: pay.amount,
+      paymentKey: result.paymentKey,
+      subscription: user.subscription,
+    });
+  } catch (err) {
+    console.error("confirmPayment error:", err);
+    return res.status(500).json({ error: "결제 승인 실패" });
   }
 };
 
-/**
- * POST /api/payments/subscription/cancel
- * - “기간말 해지(CANCELED_PENDING)” 기본
- * - 이미 해지 상태면 "이미 해지됨"으로 멱등 처리
- */
+exports.startSubscription = async (req, res) => {
+  try {
+    // 베타모드면 결제 없이 PRO
+    if (paymentService.isBetaMode()) {
+      await User.findByIdAndUpdate(req.user.id, { plan: "PRO" });
+      return res.json({
+        ok: true,
+        beta: true,
+        plan: "PRO",
+        message: "BETA_MODE=true: 결제 없이 PRO가 활성화되었습니다.",
+      });
+    }
+
+    const customerKey = String(req.user.id);
+
+    return res.json({
+      ok: true,
+      beta: false,
+      customerKey,
+      successUrl:
+        process.env.SUBSCRIPTION_SUCCESS_URL || "https://beebeeai.kr/success", // 네 운영 주소에 맞춰 조정
+      failUrl: process.env.SUBSCRIPTION_FAIL_URL || "https://beebeeai.kr/fail",
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "구독 시작 실패" });
+  }
+};
+
+exports.completeSubscription = async (req, res) => {
+  try {
+    if (paymentService.isBetaMode()) {
+      // 베타모드면 complete를 호출해도 PRO 유지
+      await User.findByIdAndUpdate(req.user.id, { plan: "PRO" });
+      return res.json({ ok: true, beta: true, plan: "PRO" });
+    }
+
+    const { customerKey, authKey } = req.body;
+    if (!customerKey || !authKey) {
+      return res
+        .status(400)
+        .json({ error: "customerKey/authKey가 필요합니다." });
+    }
+
+    // billingKey 발급
+    const issued = await paymentService.issueBillingKey({
+      customerKey,
+      authKey,
+    });
+    if (!issued?.billingKey) {
+      return res.status(500).json({ error: "billingKey 발급 실패" });
+    }
+
+    // 7일 무료체험 -> 체험 종료 시점에 첫 과금
+    const now = new Date();
+    const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const nextChargeAt = trialEndsAt;
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "사용자 없음" });
+
+    user.plan = "PRO";
+    user.subscription = {
+      ...(user.subscription || {}),
+      customerKey,
+      billingKey: issued.billingKey,
+      status: "TRIAL",
+      trialEndsAt,
+      nextChargeAt,
+      lastChargedAt: null,
+    };
+
+    await user.save();
+
+    return res.json({
+      ok: true,
+      plan: "PRO",
+      trialEndsAt,
+      nextChargeAt,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "구독 완료 처리 실패" });
+  }
+};
+
+exports.cronCharge = async (req, res) => {
+  try {
+    const secret = req.headers["x-cron-secret"];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: "Unauthorized cron" });
+    }
+
+    // 베타모드면 청구/정리 모두 스킵(원하면 정리만 수행하도록 바꿔도 됨)
+    if (paymentService.isBetaMode()) {
+      return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
+    }
+
+    const now = new Date();
+
+    // (1) 만료 처리: TRIAL 해지(CANCELED)인데 체험 종료됨 -> FREE로 다운그레이드
+    const trialEnded = await User.updateMany(
+      {
+        plan: "PRO",
+        "subscription.status": "CANCELED",
+        "subscription.trialEndsAt": { $ne: null, $lte: now },
+      },
+      {
+        $set: {
+          plan: "FREE",
+          "subscription.endedAt": now,
+        },
+      }
+    );
+
+    // (2) 만료 처리: 유료 해지 예약(CANCELED_PENDING)인데 nextChargeAt(=이용 만료일) 지남 -> FREE로 다운그레이드
+    const paidEnded = await User.updateMany(
+      {
+        plan: "PRO",
+        "subscription.status": "CANCELED_PENDING",
+        "subscription.nextChargeAt": { $ne: null, $lte: now },
+      },
+      {
+        $set: {
+          plan: "FREE",
+          "subscription.status": "CANCELED", // 최종 종료 상태로 정리
+          "subscription.endedAt": now,
+          "subscription.nextChargeAt": null,
+        },
+      }
+    );
+
+    // 구독 청구 금액/상품명
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
+    const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
+
+    // (3) 청구 대상 조회: ACTIVE/PAST_DUE만 청구하고, CANCELED/CANCELED_PENDING은 제외
+    const targets = await User.find(
+      {
+        plan: "PRO",
+        "subscription.billingKey": { $exists: true, $ne: null },
+        "subscription.nextChargeAt": { $ne: null, $lte: now },
+        "subscription.status": { $in: ["TRIAL", "ACTIVE", "PAST_DUE"] },
+      },
+      "_id subscription"
+    ).lean();
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const u of targets) {
+      const userId = String(u._id);
+      const customerKey = u.subscription?.customerKey || userId;
+      const billingKey = u.subscription?.billingKey;
+      if (!billingKey) continue;
+
+      const orderId = `sub-${userId}-${Date.now()}`;
+
+      try {
+        await paymentService.chargeBillingKey({
+          customerKey,
+          billingKey,
+          amount,
+          orderId,
+          orderName,
+        });
+
+        const nextChargeAt = paymentService.addMonths(now, 1);
+
+        await User.updateOne(
+          { _id: u._id },
+          {
+            $set: {
+              "subscription.status": "ACTIVE",
+              "subscription.lastChargedAt": now,
+              "subscription.nextChargeAt": nextChargeAt,
+              "subscription.customerKey": customerKey,
+            },
+            $unset: { "subscription.lastChargeError": "" },
+          }
+        );
+
+        successCount += 1;
+      } catch (e) {
+        failCount += 1;
+
+        await User.updateOne(
+          { _id: u._id },
+          {
+            $set: {
+              "subscription.status": "PAST_DUE",
+              "subscription.lastChargeError": String(
+                e?.response?.data?.message || e?.message || e
+              ).slice(0, 500),
+            },
+          }
+        );
+      }
+    }
+
+    return res.json({
+      ok: true,
+      now,
+      cleaned: {
+        trialEnded: trialEnded?.modifiedCount ?? trialEnded?.nModified ?? 0,
+        paidEnded: paidEnded?.modifiedCount ?? paidEnded?.nModified ?? 0,
+      },
+      targets: targets.length,
+      successCount,
+      failCount,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Cron charge failed" });
+  }
+};
+
+// 웹훅은 나중에 필요해지면 구현
+// exports.webhook = async (req, res) => { ... };
+
 exports.cancelSubscription = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("plan subscription");
@@ -186,151 +456,92 @@ exports.cancelSubscription = async (req, res) => {
     const sub = user.subscription || {};
     const status = String(sub.status || "NONE").toUpperCase();
 
-    // ✅ 구독 자체가 없는 경우
-    if (status === "NONE" || !sub.billingKey) {
-      return res.status(400).json({
+    const hasAnySubscriptionSignal = !!(
+      sub.billingKey ||
+      sub.customerKey ||
+      sub.startedAt ||
+      sub.trialEndsAt ||
+      sub.nextChargeAt
+    );
+
+    if (!hasAnySubscriptionSignal && status === "NONE") {
+      return res.status(409).json({
         ok: false,
-        code: "NOT_SUBSCRIBED",
+        code: "NO_SUBSCRIPTION",
         message: "현재 구독 중이 아닙니다.",
+        status: "NONE",
+      });
+    }
+
+    // ✅ 이미 완전 해지라면 idempotent
+    if (status === "CANCELED") {
+      return res.json({
+        ok: true,
+        code: "ALREADY_CANCELED",
+        message: "이미 구독 해지가 완료된 상태입니다.",
         status,
       });
     }
 
-    // ✅ 이미 해지된 경우(멱등)
-    if (isAlreadyCanceled(sub)) {
+    // ✅ 기간말 해지(이미 접수됨)도 idempotent
+    if (status === "CANCELED_PENDING") {
       return res.json({
         ok: true,
-        code: "ALREADY_CANCELED",
-        message: "이미 구독 해지(또는 해지 예약) 상태입니다.",
+        code: "ALREADY_CANCELED_PENDING",
+        message:
+          "이미 구독 해지가 접수되었습니다. 이용 만료일까지 사용 가능합니다.",
         status,
+        expiresAt: sub.expiresAt || sub.nextChargeAt || null,
       });
     }
 
     const now = new Date();
 
-    // ✅ 기간말 해지: nextChargeAt(다음 결제일) 이후 자동 종료되도록
+    // ✅ 무료 체험 중 해지: 체험은 끝까지 사용, 과금만 막기
+    const inTrial =
+      status === "TRIAL" && sub.trialEndsAt && new Date(sub.trialEndsAt) > now;
+
+    if (inTrial) {
+      user.subscription = {
+        ...sub,
+        status: "CANCELED",
+        canceledAt: now,
+        endedAt: now,
+        nextChargeAt: null,
+        cancelAtPeriodEnd: false,
+        expiresAt: sub.trialEndsAt,
+      };
+      await user.save();
+
+      return res.json({
+        ok: true,
+        code: "CANCELED_TRIAL",
+        status: "CANCELED",
+        expiresAt: sub.trialEndsAt || null,
+        message:
+          "무료 체험 해지가 완료되었습니다. 체험 종료일까지 이용 가능합니다.",
+      });
+    }
+
+    // ✅ 유료/기타: 기간말 해지(만료일까지 사용)
     user.subscription = {
       ...sub,
       status: "CANCELED_PENDING",
-      cancelAtPeriodEnd: true,
       canceledAt: now,
-      // nextChargeAt은 "이용 만료일"처럼 유지(너가 원한 UX)
+      cancelAtPeriodEnd: true,
+      // nextChargeAt 유지 = 만료일까지 사용
     };
-
     await user.save();
 
     return res.json({
       ok: true,
-      status: user.subscription.status,
-      nextChargeAt: user.subscription.nextChargeAt,
+      code: "CANCELED_PENDING",
+      status: "CANCELED_PENDING",
+      expiresAt: user.subscription.nextChargeAt || null,
       message: "구독 해지가 접수되었습니다. 이용 만료일까지 사용 가능합니다.",
     });
   } catch (e) {
-    console.error("cancelSubscription error:", e);
+    console.error(e);
     return res.status(500).json({ error: "구독 해지 실패" });
-  }
-};
-
-/**
- * POST /api/payments/cron/charge
- * - ACTIVE 이고 nextChargeAt <= now 인 대상 월 과금
- * - CRON_SECRET 헤더로 보호 권장
- */
-exports.cronCharge = async (req, res) => {
-  try {
-    const secret = req.headers["x-cron-secret"];
-    if (CRON_SECRET && secret !== CRON_SECRET) {
-      return res.status(401).json({ ok: false, error: "Unauthorized" });
-    }
-
-    const now = new Date();
-
-    // 대상: ACTIVE + billingKey 있고 nextChargeAt 도래
-    const targets = await User.find({
-      "subscription.status": "ACTIVE",
-      "subscription.billingKey": { $exists: true, $ne: "" },
-      "subscription.nextChargeAt": { $lte: now },
-    }).select("_id email name subscription plan");
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const user of targets) {
-      const sub = user.subscription || {};
-      try {
-        const orderId = makeOrderId();
-
-        // 결제 시도
-        const charge = await toss.chargeWithBillingKey({
-          billingKey: sub.billingKey,
-          customerKey: String(user._id),
-          orderId,
-          amount: 4900,
-          orderName: "BeeBee AI PRO (월 정기 결제)",
-          customerEmail: user.email,
-          customerName: user.name || user.email,
-        });
-
-        // Payment 기록(선택)
-        await Payment.updateOne(
-          { orderId },
-          {
-            $setOnInsert: {
-              userId: String(user._id),
-              orderId,
-              createdAt: new Date(),
-            },
-            $set: {
-              amount: 4900,
-              currency: "KRW",
-              provider: "toss",
-              status: "DONE",
-              paymentKey: charge.paymentKey || charge.raw?.paymentKey,
-              raw: charge.raw || charge,
-              approvedAt: new Date(charge.raw?.approvedAt || Date.now()),
-              updatedAt: new Date(),
-            },
-          },
-          { upsert: true }
-        );
-
-        // 구독 갱신: 다음 결제일 1개월
-        const chargedAt = new Date();
-        user.subscription = {
-          ...sub,
-          status: "ACTIVE",
-          lastChargedAt: chargedAt,
-          nextChargeAt: addMonths(chargedAt, 1),
-          lastOrderId: orderId,
-          lastPaymentKey: charge.paymentKey || charge.raw?.paymentKey,
-        };
-        user.plan = "PRO";
-        await user.save();
-
-        successCount++;
-      } catch (err) {
-        console.error("cronCharge user fail:", String(user._id), err);
-
-        // 실패 처리
-        user.subscription = {
-          ...sub,
-          status: "PAST_DUE",
-        };
-        await user.save();
-
-        failCount++;
-      }
-    }
-
-    return res.json({
-      ok: true,
-      now,
-      targets: targets.length,
-      successCount,
-      failCount,
-    });
-  } catch (e) {
-    console.error("cronCharge error:", e);
-    return res.status(500).json({ ok: false, error: "cronCharge failed" });
   }
 };
