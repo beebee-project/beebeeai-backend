@@ -11,14 +11,6 @@ function selectGateway() {
   return toss;
 }
 
-// ✅ 운영/테스트에서 날짜 강제이동용(선택)
-function getNow() {
-  const v = process.env.PAYMENTS_NOW;
-  if (!v) return new Date();
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? new Date() : d;
-}
-
 function addMonths(date, months) {
   const d = new Date(date);
   const day = d.getDate();
@@ -29,16 +21,9 @@ function addMonths(date, months) {
   return d;
 }
 
-// 구독 중복 락 판정: "다시 구독 시작" 막는 기준
-function isSubscriptionLocked(sub = {}) {
-  const status = String(sub.status || "NONE").toUpperCase();
-  return ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
-}
-
 // "이미 구독/체험/해지예약 중" 여부 (프론트/컨트롤러에서 쓰기 좋게 별칭 제공)
 function isSubscriptionActive(sub = {}) {
   const status = String(sub.status || "NONE").toUpperCase();
-  // 무료체험(TRIAL)을 완전히 제거했더라도, 남아있을 수 있으니 안전하게 포함
   return ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
 }
 
@@ -50,8 +35,6 @@ function isAlreadyCanceled(sub = {}) {
 
 module.exports = {
   selectGateway,
-  getNow,
-  isSubscriptionLocked,
   isSubscriptionActive,
   addMonths,
   isAlreadyCanceled,
