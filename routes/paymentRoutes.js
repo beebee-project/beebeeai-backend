@@ -1,30 +1,42 @@
-const express = require("express");
-const router = express.Router();
+const router = require("express").Router();
 const { protect } = require("../middleware/authMiddleware");
-const paymentController = require("../controllers/paymentController");
+const ctrl = require("../controllers/paymentController");
 
-// 정기결제 시작: customerKey 기반으로 Toss 결제창(빌링) 오픈
+const isBeta = String(process.env.BETA_MODE || "").toLowerCase() === "true";
+const blockInBeta = (req, res, next) =>
+  isBeta
+    ? res
+        .status(403)
+        .json({ error: "베타 기간에는 결제가 비활성화되어 있습니다." })
+    : next();
+
+// ✅ 기존(프론트가 이미 호출 중인) 라우트 복구
+router.get("/plans", ctrl.getPlans);
+router.get("/usage", protect, ctrl.getUsage);
+router.post("/checkout", protect, blockInBeta, ctrl.createCheckout);
+router.post("/confirm", protect, blockInBeta, ctrl.confirmPayment);
+
+// ✅ 정기결제(빌링키) 라우트 유지
 router.post(
   "/subscription/start",
   protect,
-  paymentController.startSubscription
+  blockInBeta,
+  ctrl.startSubscription
 );
-
-// 정기결제 완료: success 페이지에서 authKey 받아 billingKey 발급/첫 결제/구독 활성화
 router.post(
   "/subscription/complete",
   protect,
-  paymentController.completeSubscription
+  blockInBeta,
+  ctrl.completeSubscription
 );
-
-// 구독 해지(기간말 해지)
 router.post(
   "/subscription/cancel",
   protect,
-  paymentController.cancelSubscription
+  blockInBeta,
+  ctrl.cancelSubscription
 );
 
-// cron: nextChargeAt 도래한 ACTIVE 대상 월 과금
-router.post("/cron/charge", paymentController.cronCharge); // CRON_SECRET 등으로 보호
+// cron
+router.post("/cron/charge", ctrl.cronCharge);
 
 module.exports = router;
