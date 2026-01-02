@@ -217,7 +217,7 @@ exports.withdraw = async (req, res, next) => {
     );
 
     // ✅ 탈퇴 차단 상태(정책상 유지)
-    const lockStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
+    const lockStatuses = ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
     const isSubscribed =
       hasAnySubscriptionSignal && lockStatuses.includes(status);
 
@@ -235,8 +235,8 @@ exports.withdraw = async (req, res, next) => {
         status,
         expiresAt,
         message: expiresText
-          ? `구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
-          : "구독(또는 무료 체험) 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
+          ? `구독 이용 중에는 탈퇴할 수 없습니다. 이용 만료일(${expiresText}) 이후 탈퇴할 수 있습니다.`
+          : "구독 이용 중에는 탈퇴할 수 없습니다. 이용 만료 후 탈퇴할 수 있습니다.",
       });
     }
 

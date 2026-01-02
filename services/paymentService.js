@@ -35,7 +35,7 @@ function isSubscriptionActive(sub = {}, now = new Date()) {
   const status = String(sub?.status || "").toUpperCase();
 
   // 결제 시작/재구독을 막아야 하는 상태들
-  const lockedStatuses = ["TRIAL", "ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
+  const lockedStatuses = ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
 
   if (lockedStatuses.includes(status)) return true;
 
