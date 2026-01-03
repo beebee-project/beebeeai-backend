@@ -5,6 +5,26 @@ const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
 const CURRENCY = process.env.CURRENCY || "KRW";
 const isBetaMode = () => String(process.env.BETA_MODE).toLowerCase() === "true";
 
+function ensureAbsoluteUrl(url, fallbackOrigin) {
+  // url이 "www.xxx" 같이 스킴 없이 들어오면 fallbackOrigin 붙여서 보정
+  // url이 "/path"면 fallbackOrigin + url
+  if (!url) return null;
+
+  const trimmed = String(url).trim();
+
+  // 이미 절대 URL이면 그대로
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  // "www.beebeeai.kr/..." 형태면 https:// 붙여주기
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+
+  // "/success.html" 형태면 origin 붙여주기
+  if (trimmed.startsWith("/")) return `${fallbackOrigin}${trimmed}`;
+
+  // 그 외는 origin + "/" + url
+  return `${fallbackOrigin}/${trimmed}`;
+}
+
 // 사용량 조회
 exports.getUsage = async (req, res) => {
   try {
@@ -100,15 +120,41 @@ exports.startSubscription = async (req, res) => {
 
     const customerKey = String(req.user.id);
 
+    // 기준 origin (환경변수로 통일 권장)
+    const origin =
+      (process.env.PUBLIC_ORIGIN &&
+        ensureAbsoluteUrl(process.env.PUBLIC_ORIGIN, "https://beebeeai.kr")) ||
+      "https://beebeeai.kr";
+
+    // env에서 받은 URL을 '절대 URL'로 강제 보정
+    const successUrl = ensureAbsoluteUrl(
+      process.env.SUBSCRIPTION_SUCCESS_URL || `${origin}/success.html`,
+      origin
+    );
+    const failUrl = ensureAbsoluteUrl(
+      process.env.SUBSCRIPTION_FAIL_URL || `${origin}/fail.html`,
+      origin
+    );
+
+    // 최종 형식 검증: 여기서 걸리면 Toss로 보내기 전에 서버가 막아줌
+    try {
+      new URL(successUrl);
+      new URL(failUrl);
+    } catch (e) {
+      console.error("Invalid subscription URLs:", { successUrl, failUrl });
+      return res.status(500).json({
+        error: "Invalid subscription success/fail URL",
+        successUrl,
+        failUrl,
+      });
+    }
+
     return res.json({
       ok: true,
       beta: false,
       customerKey,
-      successUrl:
-        process.env.SUBSCRIPTION_SUCCESS_URL ||
-        "https://beebeeai.kr/success.html",
-      failUrl:
-        process.env.SUBSCRIPTION_FAIL_URL || "https://beebeeai.kr/fail.html",
+      successUrl,
+      failUrl,
     });
   } catch (e) {
     console.error(e);
