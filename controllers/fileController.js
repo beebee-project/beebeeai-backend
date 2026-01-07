@@ -4,7 +4,7 @@ const User = require("../models/User");
 
 const storage = new Storage();
 const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
-const { bumpUsage } = require("../services/usageService");
+const { bumpUsage, assertCanUse } = require("../services/usageService");
 
 exports.upload = async (req, res) => {
   const saved = await saveToStorage(req);
@@ -37,6 +37,16 @@ exports.uploadFile = async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "파일이 업로드되지 않았습니다." });
+    }
+
+    try {
+      await assertCanUse(req.user.id, "fileUploads", 1);
+    } catch (e) {
+      return res.status(e.status || 429).json({
+        error: "Usage limit exceeded",
+        code: e.code || "LIMIT_EXCEEDED",
+        ...e.meta,
+      });
     }
 
     const user = req.user;
@@ -76,6 +86,9 @@ exports.uploadFile = async (req, res, next) => {
       };
       user.uploadedFiles.push(newFile);
       await user.save();
+
+      // ✅ '횟수' 기준이므로 업로드 성공 1회 카운트
+      await bumpUsage(req.user.id, "fileUploads", 1);
 
       res.status(201).json(user.uploadedFiles);
     });

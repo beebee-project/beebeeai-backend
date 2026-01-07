@@ -11,7 +11,7 @@ const textFunctionBuilder = require("../builders/textFunctions");
 const arrayFunctionBuilder = require("../builders/arrayFunctions");
 const direct = require("../builders/direct");
 
-const { bumpUsage } = require("../services/usageService");
+const { bumpUsage, assertCanUse } = require("../services/usageService");
 
 /* ---------------------------------------------
  * Lazy singletons (OpenAI / GCS Bucket)
@@ -924,6 +924,19 @@ exports.handleConversion = async (req, res, next) => {
     } = req.body || {};
     if (!message || !conversionType) {
       return res.status(400).json({ result: "요청 정보가 부족합니다." });
+    }
+
+    // ✅ 변환 한도 체크 (FREE면 10회)
+    if (req.user?.id) {
+      try {
+        await assertCanUse(req.user.id, "formulaConversions", 1);
+      } catch (e) {
+        return res.status(e.status || 429).json({
+          error: "Usage limit exceeded",
+          code: e.code || "LIMIT_EXCEEDED",
+          ...e.meta,
+        });
+      }
     }
 
     // 0) 캐시 로드 (나중에 intent랑 같이 쓸 것)
