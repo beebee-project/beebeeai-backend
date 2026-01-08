@@ -12,6 +12,6 @@ router.post("/subscription/complete", protect, ctrl.completeSubscription);
 router.post("/subscription/cancel", protect, ctrl.cancelSubscription);
 router.post("/cron/charge", ctrl.cronCharge);
 
-// router.post("/webhook", ctrl.webhook); // 필요 시 나중에 활성화
+router.post("/webhook", ctrl.webhook);
 
 module.exports = router;

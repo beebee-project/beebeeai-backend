@@ -1,5 +1,6 @@
 const paymentService = require("../services/paymentService");
 const User = require("../models/User");
+const tossClient = require("../config/tossClient");
 
 const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
 const CURRENCY = process.env.CURRENCY || "KRW";
@@ -338,9 +339,6 @@ exports.cronCharge = async (req, res) => {
   }
 };
 
-// 웹훅은 나중에 필요해지면 구현
-// exports.webhook = async (req, res) => { ... };
-
 exports.cancelSubscription = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("plan subscription");
@@ -410,5 +408,92 @@ exports.cancelSubscription = async (req, res) => {
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: "구독 해지 실패" });
+  }
+};
+
+exports.webhook = async (req, res) => {
+  try {
+    // 1) 빠르게 ACK (PG 재시도 방지)
+    //    -> 여기선 바로 응답하지 않고, 아래 로직까지 처리 후 200 줘도 됨.
+    const body = req.body || {};
+
+    // 2) 토스 웹훅 payload는 형태가 다양할 수 있어서 방어적으로 추출
+    const paymentKey =
+      body.paymentKey || body.data?.paymentKey || body.resource?.paymentKey;
+    const orderId =
+      body.orderId || body.data?.orderId || body.resource?.orderId;
+    const customerKey =
+      body.customerKey || body.data?.customerKey || body.resource?.customerKey;
+
+    // billingKey 이벤트가 따로 오는 경우 대비 (없으면 무시)
+    const billingKey =
+      body.billingKey || body.data?.billingKey || body.resource?.billingKey;
+
+    // paymentKey도 billingKey도 없으면 일단 OK (다른 이벤트일 수 있음)
+    if (!paymentKey && !billingKey) {
+      return res.json({ ok: true, ignored: true });
+    }
+
+    // 3) 사용자 식별: 너는 customerKey를 userId로 쓰고 있음(startSubscription에서 req.user.id) :contentReference[oaicite:5]{index=5}
+    let userId = null;
+
+    if (customerKey) userId = String(customerKey);
+
+    // cronCharge에서 만든 orderId는 sub-<userId>-<ts> 형태 :contentReference[oaicite:6]{index=6}
+    if (!userId && typeof orderId === "string" && orderId.startsWith("sub-")) {
+      const parts = orderId.split("-");
+      if (parts.length >= 3) userId = parts[1];
+    }
+
+    if (!userId) {
+      // 식별 못 해도 200은 주되 로그만 남김
+      console.log("[webhook] cannot resolve userId", { orderId, customerKey });
+      return res.json({ ok: true, unresolved: true });
+    }
+
+    const user = await User.findById(userId).select("plan subscription");
+    if (!user) return res.json({ ok: true, noUser: true });
+
+    // 4) 중복 방지(idempotent): 이미 처리한 paymentKey면 바로 OK
+    if (paymentKey && user.subscription?.lastPaymentKey === paymentKey) {
+      return res.json({ ok: true, duplicate: true });
+    }
+
+    // 5) 토스에 조회해서 상태 확정 (payload를 믿지 않음)
+    let payment = null;
+    if (paymentKey) {
+      const r = await tossClient.get(`/v1/payments/${paymentKey}`);
+      payment = r.data;
+    }
+
+    // 6) DB 반영 규칙 (MVP)
+    // - DONE: PRO 유지/ACTIVE 유지 + lastPaymentKey/lastOrderId 갱신
+    // - 그 외: PAST_DUE로 내려서 결제 실패 상태 표시(운영 정책에 따라 조정 가능)
+    if (payment) {
+      const status = String(payment.status || "").toUpperCase();
+
+      user.subscription = { ...(user.subscription || {}) };
+      user.subscription.lastPaymentKey =
+        paymentKey || user.subscription.lastPaymentKey;
+      user.subscription.lastOrderId =
+        payment.orderId || orderId || user.subscription.lastOrderId;
+
+      if (status === "DONE") {
+        user.plan = "PRO";
+        user.subscription.status = "ACTIVE";
+        user.subscription.lastChargedAt = new Date();
+      } else {
+        user.subscription.status = "PAST_DUE";
+        user.subscription.lastChargeError = `webhook status=${status}`;
+      }
+
+      await user.save();
+    }
+
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("[webhook] error", e);
+    // PG는 2xx 아니면 재시도할 수 있으니, MVP에서는 200으로 받고 내부 로깅으로 확인하는 것도 방법
+    return res.status(200).json({ ok: true, error: true });
   }
 };
