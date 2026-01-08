@@ -108,7 +108,7 @@ exports.confirmPayment = async (req, res) => {
 
 exports.startSubscription = async (req, res) => {
   try {
-    // 베타모드면 결제 없이 PRO
+    // 0) 베타모드면 결제 없이 PRO
     if (paymentService.isBetaMode()) {
       await User.findByIdAndUpdate(req.user.id, { plan: "PRO" });
       return res.json({
@@ -119,6 +119,56 @@ exports.startSubscription = async (req, res) => {
       });
     }
 
+    // ✅ [추가] 1) 유저/구독 상태 확인 (중복 구독 방지 + 해지 후 기간 종료 시 재구독 허용)
+    const user = await User.findById(req.user.id).select("plan subscription");
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const now = new Date();
+    const sub = user.subscription || {};
+
+    // 1-1) 이미 활성/연체면 재구독(중복) 차단
+    if (["ACTIVE", "PAST_DUE"].includes(sub.status)) {
+      return res.status(409).json({
+        ok: false,
+        error: "이미 구독 중입니다.",
+        code: "SUBSCRIPTION_ALREADY_ACTIVE",
+        status: sub.status,
+      });
+    }
+
+    // 1-2) 해지 예약 상태면:
+    // - 아직 기간 남아있으면 차단
+    // - 기간 끝났으면 만료 확정 처리 후 재구독 허용
+    if (sub.status === "CANCELED_PENDING" && sub.cancelAtPeriodEnd) {
+      const endAt = sub.nextChargeAt ? new Date(sub.nextChargeAt) : null;
+
+      // 기간이 남아있으면 차단
+      if (endAt && now < endAt) {
+        return res.status(409).json({
+          ok: false,
+          error:
+            "해지 예약 상태입니다. 남은 이용기간 종료 후 재구독할 수 있습니다.",
+          code: "SUBSCRIPTION_CANCEL_PENDING",
+          status: sub.status,
+          endsAt: endAt.toISOString(),
+        });
+      }
+
+      // ✅ 기간이 끝났으면 만료 확정 (billingKey는 유지)
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            plan: "FREE",
+            "subscription.status": "CANCELED",
+            "subscription.cancelAtPeriodEnd": false,
+          },
+          // billingKey/customerKey는 유지 (A 정책)
+        }
+      );
+    }
+
+    // ✅ [기존] 2) customerKey 생성
     const customerKey = String(req.user.id);
 
     // 기준 origin (환경변수로 통일 권장)
@@ -150,6 +200,7 @@ exports.startSubscription = async (req, res) => {
       });
     }
 
+    // ✅ [기존] 3) 프론트가 위젯 호출에 필요한 값 반환
     return res.json({
       ok: true,
       beta: false,
@@ -221,6 +272,19 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
+  // 0) 보안: 무조건 먼저 검증 (✅ 중요)
+  const secret = req.headers["x-cron-secret"];
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized cron" });
+  }
+
+  // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
+  if (paymentService.isBetaMode()) {
+    return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
+  }
+
+  const now = new Date();
+
   function kstYYYYMMDD(date) {
     const dtf = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Seoul",
@@ -228,47 +292,38 @@ exports.cronCharge = async (req, res) => {
       month: "2-digit",
       day: "2-digit",
     });
-    // en-CA => "YYYY-MM-DD"
-    return dtf.format(date).replaceAll("-", "");
+    return dtf.format(date).replaceAll("-", ""); // "YYYYMMDD"
   }
 
   try {
-    console.log("[cronCharge] hit", new Date().toISOString());
+    console.log("[cronCharge] hit", now.toISOString());
 
-    const secret = req.headers["x-cron-secret"];
-    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-      return res.status(401).json({ error: "Unauthorized cron" });
-    }
-
-    // 베타모드면 청구/정리 모두 스킵(원하면 정리만 수행하도록 바꿔도 됨)
-    if (paymentService.isBetaMode()) {
-      return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
-    }
-
-    const now = new Date();
-
-    // (2) 만료 처리: 유료 해지 예약(CANCELED_PENDING)인데 nextChargeAt(=이용 만료일) 지남 -> FREE로 다운그레이드
-    const paidEnded = await User.updateMany(
+    // 1) 만료 확정 처리 (✅ 중복 제거 + 보안검증 이후 실행)
+    // - 해지 예약인데 기간이 끝난 유저를 FREE + CANCELED로 확정
+    // - A정책: billingKey/customerKey는 유지
+    const expiredCanceled = await User.updateMany(
       {
-        plan: "PRO",
         "subscription.status": "CANCELED_PENDING",
+        "subscription.cancelAtPeriodEnd": true,
         "subscription.nextChargeAt": { $ne: null, $lte: now },
       },
       {
         $set: {
           plan: "FREE",
-          "subscription.status": "CANCELED", // 최종 종료 상태로 정리
+          "subscription.status": "CANCELED",
+          "subscription.cancelAtPeriodEnd": false,
           "subscription.endedAt": now,
+          // 정책적으로 nextChargeAt은 "더 이상 청구 없음"이므로 null로 정리 추천
           "subscription.nextChargeAt": null,
         },
       }
     );
 
-    // 구독 청구 금액/상품명
+    // 2) 구독 청구 금액/상품명
     const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
-    // (3) 청구 대상 조회: ACTIVE/PAST_DUE만 청구하고, CANCELED/CANCELED_PENDING은 제외
+    // 3) 청구 대상 조회: ACTIVE/PAST_DUE + nextChargeAt 도래 + billingKey 존재
     const targets = await User.find(
       {
         plan: "PRO",
@@ -290,13 +345,15 @@ exports.cronCharge = async (req, res) => {
       const billingKey = u.subscription?.billingKey;
       if (!billingKey) continue;
 
-      // 이번 청구 회차 키: nextChargeAt 기준으로 고정
+      // 이번 청구 회차 기준: nextChargeAt
       const due = u.subscription?.nextChargeAt
         ? new Date(u.subscription.nextChargeAt)
         : now;
-      const periodKey = kstYYYYMMDD(due);
 
-      // ✅ (보강) 이미 같은 회차에 성공 처리된 기록이 있으면 스킵 (DB 기반 2중 방지)
+      const periodKey = kstYYYYMMDD(due);
+      const orderId = `sub-${userId}-${periodKey}`;
+
+      // ✅ 이미 같은 회차 성공 처리된 경우 스킵 (DB 기반 2중 방지)
       if (
         u.subscription?.lastChargeKey === periodKey &&
         u.subscription?.lastChargedAt
@@ -304,13 +361,11 @@ exports.cronCharge = async (req, res) => {
         continue;
       }
 
-      // ✅ 회차마다 동일한 orderId (멱등성 핵심)
-      const orderId = `sub-${userId}-${periodKey}`;
-
-      // ✅ 동시 실행 방지 락(짧게 잡고, 끝나면 해제)
+      // ✅ 동시 실행 방지 락
       const lock = await User.updateOne(
         {
           _id: u._id,
+          // 같은 periodKey로 이미 락이 잡혀있으면 못 들어오게
           "subscription.chargeLockKey": { $ne: periodKey },
           "subscription.nextChargeAt": { $ne: null, $lte: now },
           "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
@@ -324,10 +379,7 @@ exports.cronCharge = async (req, res) => {
         }
       );
 
-      if (!lock?.modifiedCount) {
-        // 이미 같은 회차가 처리 중/처리됨
-        continue;
-      }
+      if (!lock?.modifiedCount) continue;
 
       try {
         await paymentService.chargeBillingKey({
@@ -339,7 +391,8 @@ exports.cronCharge = async (req, res) => {
           idempotencyKey: orderId, // ✅ toss.js에서 Idempotency-Key 헤더로 사용
         });
 
-        const nextChargeAt = paymentService.addMonths(now, 1);
+        // ✅ 다음 청구일은 now가 아니라 due 기준으로 (드리프트 방지)
+        const nextChargeAt = paymentService.addMonths(due, 1);
 
         await User.updateOne(
           { _id: u._id },
@@ -383,7 +436,8 @@ exports.cronCharge = async (req, res) => {
       ok: true,
       now,
       cleaned: {
-        paidEnded: paidEnded?.modifiedCount ?? paidEnded?.nModified ?? 0,
+        expiredCanceled:
+          expiredCanceled?.modifiedCount ?? expiredCanceled?.nModified ?? 0,
       },
       targets: targets.length,
       successCount,
@@ -391,7 +445,7 @@ exports.cronCharge = async (req, res) => {
     });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: "Cron charge failed" });
+    return res.status(500).json({ error: "Cron charge failed" });
   }
 };
 
