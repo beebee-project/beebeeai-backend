@@ -912,6 +912,26 @@ async function extractIntentWithLLM(
   }
 }
 
+function shouldCountConversion(result) {
+  if (typeof result !== "string") return false;
+  const t = result.trim();
+  if (!t) return false;
+
+  // ❌ 에러 수식은 카운트 제외
+  if (/^=ERROR\s*\(/i.test(t)) return false;
+
+  // ✅ 정상 Excel/Sheets 수식
+  if (t.startsWith("=")) return true;
+
+  // ✅ SQL 등 텍스트 결과도 허용하고 싶으면 (현재 프론트 isFormula 기준과 맞춤)
+  if (/^(SELECT|WITH)\b/i.test(t)) return true;
+
+  // ✅ Notion/기타 텍스트 포맷(현재 프론트에서 prop( 포함이면 코드블록 처리)
+  if (t.includes("prop(")) return true;
+
+  return false;
+}
+
 /* ---------------------------------------------
  * 메인 컨버전 핸들러
  * -------------------------------------------*/
@@ -997,7 +1017,9 @@ exports.handleConversion = async (req, res, next) => {
     });
     const cachedFormula = cacheData.normalized?.[cacheKey];
     if (cachedFormula) {
-      if (req.user?.id) await bumpUsage(req.user.id, "formulaConversions", 1);
+      if (req.user?.id && shouldCountConversion(cachedFormula)) {
+        await bumpUsage(req.user.id, "formulaConversions", 1);
+      }
       return res.json({ result: cachedFormula });
     }
 
@@ -1047,7 +1069,9 @@ exports.handleConversion = async (req, res, next) => {
     if (!isFileAttached && direct?.canHandleWithoutFile?.(intent)) {
       const f = direct.buildFormula(intent);
       if (f) {
-        if (req.user?.id) await bumpUsage(req.user.id, "formulaConversions", 1);
+        if (req.user?.id && shouldCountConversion(f)) {
+          await bumpUsage(req.user.id, "formulaConversions", 1);
+        }
         return res.json({ result: f });
       }
     }
@@ -1075,7 +1099,9 @@ exports.handleConversion = async (req, res, next) => {
     cacheData.normalized[cacheKey] = finalFormula;
     formulaUtils.writeCache(cacheData, conversionType);
 
-    if (req.user?.id) await bumpUsage(req.user.id, "formulaConversions", 1);
+    if (req.user?.id && shouldCountConversion(finalFormula)) {
+      await bumpUsage(req.user.id, "formulaConversions", 1);
+    }
     return res.json({ result: finalFormula });
   } catch (err) {
     console.error("[handleConversion][error]", err);
