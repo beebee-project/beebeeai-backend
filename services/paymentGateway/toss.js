@@ -8,8 +8,6 @@ exports.createCheckoutSession = async ({
   failUrl,
   meta,
 }) => {
-  // 위젯은 “세션 생성 API”가 따로 있는 게 아니라,
-  // 우리가 orderId/amount/successUrl/failUrl을 만들어서 프론트에 내려주면 됨.
   const orderId = `beebeeai-${Date.now()}-${String(userId).slice(-4)}`;
 
   return {
@@ -42,19 +40,32 @@ exports.issueBillingKey = async ({ customerKey, authKey }) => {
   return res.data; // { billingKey, customerKey, ... }
 };
 
-// ✅ billingKey로 청구(묶음 C에서 사용): POST /v1/billing/{billingKey}
+// ✅ billingKey로 청구: POST /v1/billing/{billingKey}
 exports.chargeBillingKey = async ({
-  customerKey,
   billingKey,
+  customerKey,
   amount,
   orderId,
   orderName,
+  idempotencyKey,
 }) => {
-  const res = await tossClient.post(`/v1/billing/${billingKey}`, {
+  const url = "/v1/billing/" + encodeURIComponent(billingKey);
+
+  const payload = {
     customerKey,
     amount,
     orderId,
     orderName,
-  });
+    currency: CURRENCY,
+  };
+
+  const config = {};
+  if (idempotencyKey) {
+    config.headers = {
+      "Idempotency-Key": String(idempotencyKey),
+    };
+  }
+
+  const res = await tossClient.post(url, payload, config);
   return res.data;
 };

@@ -50,9 +50,25 @@ const userSchema = new mongoose.Schema({
     billingKey: { type: String },
     status: {
       type: String,
-      enum: ["NONE", "ACTIVE", "PAST_DUE", "CANCELED_PENDING", "CANCELED"],
-      default: "NONE",
+      enum: [
+        "NONE",
+        "ACTIVE",
+        "PAST_DUE",
+        "CANCELED_PENDING",
+        "CANCELED",
+        "INACTIVE",
+      ],
+      default: "INACTIVE",
     },
+    // ✅ 중복 결제 방지/운영 안정성용 필드들
+    lastChargeKey: { type: String },
+    lastOrderId: { type: String },
+    lastChargeAttemptAt: { type: Date },
+    lastChargeError: { type: String },
+
+    // ✅ 동시 실행(중복 호출) 방지용 락
+    chargeLockKey: { type: String },
+
     startedAt: { type: Date },
     nextChargeAt: { type: Date },
     lastChargedAt: { type: Date },
@@ -60,7 +76,6 @@ const userSchema = new mongoose.Schema({
     canceledAt: { type: Date },
     endedAt: { type: Date },
     lastPaymentKey: { type: String },
-    lastOrderId: { type: String },
   },
 });
 

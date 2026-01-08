@@ -221,6 +221,17 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
+  function kstYYYYMMDD(date) {
+    const dtf = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    // en-CA => "YYYY-MM-DD"
+    return dtf.format(date).replaceAll("-", "");
+  }
+
   try {
     console.log("[cronCharge] hit", new Date().toISOString());
 
@@ -279,7 +290,44 @@ exports.cronCharge = async (req, res) => {
       const billingKey = u.subscription?.billingKey;
       if (!billingKey) continue;
 
-      const orderId = `sub-${userId}-${Date.now()}`;
+      // 이번 청구 회차 키: nextChargeAt 기준으로 고정
+      const due = u.subscription?.nextChargeAt
+        ? new Date(u.subscription.nextChargeAt)
+        : now;
+      const periodKey = kstYYYYMMDD(due);
+
+      // ✅ (보강) 이미 같은 회차에 성공 처리된 기록이 있으면 스킵 (DB 기반 2중 방지)
+      if (
+        u.subscription?.lastChargeKey === periodKey &&
+        u.subscription?.lastChargedAt
+      ) {
+        continue;
+      }
+
+      // ✅ 회차마다 동일한 orderId (멱등성 핵심)
+      const orderId = `sub-${userId}-${periodKey}`;
+
+      // ✅ 동시 실행 방지 락(짧게 잡고, 끝나면 해제)
+      const lock = await User.updateOne(
+        {
+          _id: u._id,
+          "subscription.chargeLockKey": { $ne: periodKey },
+          "subscription.nextChargeAt": { $ne: null, $lte: now },
+          "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
+        },
+        {
+          $set: {
+            "subscription.chargeLockKey": periodKey,
+            "subscription.lastOrderId": orderId,
+            "subscription.lastChargeAttemptAt": now,
+          },
+        }
+      );
+
+      if (!lock?.modifiedCount) {
+        // 이미 같은 회차가 처리 중/처리됨
+        continue;
+      }
 
       try {
         await paymentService.chargeBillingKey({
@@ -288,6 +336,7 @@ exports.cronCharge = async (req, res) => {
           amount,
           orderId,
           orderName,
+          idempotencyKey: orderId, // ✅ toss.js에서 Idempotency-Key 헤더로 사용
         });
 
         const nextChargeAt = paymentService.addMonths(now, 1);
@@ -300,8 +349,12 @@ exports.cronCharge = async (req, res) => {
               "subscription.lastChargedAt": now,
               "subscription.nextChargeAt": nextChargeAt,
               "subscription.customerKey": customerKey,
+              "subscription.lastChargeKey": periodKey,
             },
-            $unset: { "subscription.lastChargeError": "" },
+            $unset: {
+              "subscription.lastChargeError": "",
+              "subscription.chargeLockKey": "",
+            },
           }
         );
 
@@ -317,6 +370,9 @@ exports.cronCharge = async (req, res) => {
               "subscription.lastChargeError": String(
                 e?.response?.data?.message || e?.message || e
               ).slice(0, 500),
+            },
+            $unset: {
+              "subscription.chargeLockKey": "",
             },
           }
         );

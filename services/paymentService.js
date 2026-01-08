@@ -1,5 +1,5 @@
 const free = require("./paymentGateway/freeBeta");
-const toss = require("./paymentGateway/toss");
+const gateway = require("./paymentGateway/toss");
 
 function isBetaMode() {
   return String(process.env.BETA_MODE).toLowerCase() === "true";
@@ -25,7 +25,7 @@ function addMonths(date, months) {
 function selectGateway() {
   switch (String(process.env.PG_PROVIDER).toLowerCase()) {
     case "toss":
-      return toss;
+      return gateway;
     default:
       return free;
   }
@@ -59,4 +59,20 @@ exports.addMonths = addMonths;
 
 // 구독(빌링키) 기능
 exports.issueBillingKey = (args) => selectGateway().issueBillingKey?.(args);
-exports.chargeBillingKey = (args) => selectGateway().chargeBillingKey?.(args);
+exports.chargeBillingKey = async ({
+  billingKey,
+  customerKey,
+  amount,
+  orderId,
+  orderName,
+  idempotencyKey,
+}) => {
+  return gateway.chargeBillingKey({
+    billingKey,
+    customerKey,
+    amount,
+    orderId,
+    orderName,
+    idempotencyKey,
+  });
+};
