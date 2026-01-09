@@ -76,15 +76,6 @@ const userSchema = new mongoose.Schema({
     canceledAt: { type: Date },
     endedAt: { type: Date },
     lastPaymentKey: { type: String },
-    isDeleted: { type: Boolean, default: false },
-    deletedAt: { type: Date, default: null },
-    purgeAt: { type: Date, default: null },
-    deletedEmail: { type: String, default: null },
-
-    authIdentity: {
-      emailHash: { type: String, default: null, index: true },
-      googleId: { type: String, default: null, index: true },
-    },
   },
 });
 
@@ -120,4 +111,5 @@ userSchema.methods.createPasswordResetToken = function () {
   return resetToken;
 };
 
-module.exports = mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema);
+module.exports = User;
