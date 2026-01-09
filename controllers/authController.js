@@ -246,15 +246,12 @@ exports.withdraw = async (req, res, next) => {
     user.deletedAt = now;
     user.plan = "FREE";
 
-    // (선택) subscription 정리: 아예 비워도 됨
-    user.subscription = {
-      ...(user.subscription || {}),
-      status: "CANCELED",
-      canceledAt: now,
-      endedAt: now,
-      nextChargeAt: null,
-      cancelAtPeriodEnd: false,
-    };
+    user.subscription = user.subscription || {};
+    user.subscription.status = "CANCELED";
+    user.subscription.canceledAt = now;
+    user.subscription.endedAt = now;
+    user.subscription.nextChargeAt = null;
+    user.subscription.cancelAtPeriodEnd = false;
 
     if (user.email) user.email = `deleted_${user._id}@deleted.local`;
     if (user.name) user.name = "deleted";
