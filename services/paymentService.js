@@ -1,6 +1,14 @@
 const free = require("./paymentGateway/freeBeta");
 const gateway = require("./paymentGateway/toss");
 
+function getProvider() {
+  return String(process.env.PG_PROVIDER || "toss").toLowerCase();
+}
+
+function getCurrency() {
+  return process.env.CURRENCY || "KRW";
+}
+
 function isBetaMode() {
   return String(process.env.BETA_MODE).toLowerCase() === "true";
 }
@@ -23,7 +31,7 @@ function addMonths(date, months) {
 }
 
 function selectGateway() {
-  switch (String(process.env.PG_PROVIDER).toLowerCase()) {
+  switch (getProvider()) {
     case "toss":
       return gateway;
     default:
@@ -53,6 +61,8 @@ exports.confirmPayment = (args) => selectGateway().confirmPayment(args);
 exports.cancelPayment = (args) => selectGateway().cancelPayment?.(args);
 exports.parseAndVerifyWebhook = (req) =>
   selectGateway().parseAndVerifyWebhook?.(req);
+exports.getProvider = getProvider;
+exports.getCurrency = getCurrency;
 exports.isBetaMode = isBetaMode;
 exports.getEffectivePlan = getEffectivePlan;
 exports.addMonths = addMonths;

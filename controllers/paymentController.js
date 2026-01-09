@@ -2,10 +2,6 @@ const paymentService = require("../services/paymentService");
 const User = require("../models/User");
 const tossClient = require("../config/tossClient");
 
-const PROVIDER = String(process.env.PG_PROVIDER || "toss").toLowerCase();
-const CURRENCY = process.env.CURRENCY || "KRW";
-const isBetaMode = () => String(process.env.BETA_MODE).toLowerCase() === "true";
-
 function ensureAbsoluteUrl(url, fallbackOrigin) {
   // url이 "www.xxx" 같이 스킴 없이 들어오면 fallbackOrigin 붙여서 보정
   // url이 "/path"면 fallbackOrigin + url
@@ -59,6 +55,9 @@ exports.getPlans = (req, res) => {
     provider: PROVIDER,
     currency: CURRENCY,
     betaMode: isBetaMode(),
+    provider: paymentService.getProvider(),
+    currency: paymentService.getCurrency(),
+    betaMode: paymentService.isBetaMode(),
     plans: [
       {
         code: "FREE",
@@ -72,7 +71,7 @@ exports.getPlans = (req, res) => {
         price: 4900,
         interval: "month",
         features: ["우선지원", "고급기능"],
-        available: !isBetaMode(),
+        available: !paymentService.isBetaMode(),
       },
     ],
   });
@@ -272,6 +271,11 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
+  const secret = req.headers["x-cron-secret"];
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized cron" });
+  }
+
   const now = new Date();
 
   function kstYYYYMMDD(date) {
