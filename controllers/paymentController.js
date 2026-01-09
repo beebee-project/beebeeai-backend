@@ -268,24 +268,7 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
-  // 0) 보안: 무조건 먼저 검증 (✅ 중요)
-  // const secret = req.headers["x-cron-secret"];
-  // if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-  //   return res.status(401).json({ error: "Unauthorized cron" });
-  // }
-
   const now = new Date();
-
-  const purged = await User.deleteMany({
-    isDeleted: true,
-    purgeAt: { $ne: null, $lte: now },
-  });
-  console.log("[cronCharge] purged deleted users:", purged.deletedCount);
-
-  // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
-  if (paymentService.isBetaMode()) {
-    return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
-  }
 
   function kstYYYYMMDD(date) {
     const dtf = new Intl.DateTimeFormat("en-CA", {
@@ -298,6 +281,21 @@ exports.cronCharge = async (req, res) => {
   }
 
   try {
+    // ✅ 30일 만료 후 완전 삭제(Soft delete -> Hard delete)
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const purgeResult = await User.deleteMany({
+      isDeleted: true,
+      deletedAt: { $ne: null, $lte: cutoff },
+    });
+
+    console.log("[cronCharge] purged users:", purgeResult.deletedCount ?? 0);
+
+    // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
+    if (paymentService.isBetaMode()) {
+      return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
+    }
+
     console.log("[cronCharge] hit", now.toISOString());
 
     // 1) 만료 확정 처리 (✅ 중복 제거 + 보안검증 이후 실행)
