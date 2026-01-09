@@ -74,14 +74,14 @@ const userSchema = new mongoose.Schema({
     endedAt: { type: Date },
     lastPaymentKey: { type: String },
 
-    isDeleted: { type: Boolean, default: false, index: true },
-    deletedAt: { type: Date, default: null },
-    purgeAt: { type: Date, default: null, index: true },
+    // isDeleted: { type: Boolean, default: false, index: true },
+    // deletedAt: { type: Date, default: null },
+    // purgeAt: { type: Date, default: null, index: true },
 
-    authIdentity: {
-      emailHash: { type: String, default: null, index: true },
-      googleId: { type: String, default: null, index: true },
-    },
+    // authIdentity: {
+    //   emailHash: { type: String, default: null, index: true },
+    //   googleId: { type: String, default: null, index: true },
+    // },
   },
 });
 
