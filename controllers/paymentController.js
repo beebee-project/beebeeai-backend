@@ -46,7 +46,6 @@ exports.getUsage = async (req, res) => {
         fileUploads: user?.usage?.fileUploads ?? 0,
       },
       limits,
-      caps,
     });
   } catch (err) {
     console.error("getUsage error:", err);
