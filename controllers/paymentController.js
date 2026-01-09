@@ -442,6 +442,7 @@ exports.cronCharge = async (req, res) => {
       targets: targets.length,
       successCount,
       failCount,
+      purgedDeletedUsers: purgeResult.deletedCount ?? 0,
     });
   } catch (e) {
     console.error(e);
