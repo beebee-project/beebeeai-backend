@@ -272,11 +272,15 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
-  // 0) 보안: 무조건 먼저 검증 (✅ 중요)
-  const secret = req.headers["x-cron-secret"];
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: "Unauthorized cron" });
-  }
+  // ✅ 30일 만료 후 완전 삭제(Soft delete -> Hard delete)
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const purgeResult = await User.deleteMany({
+    isDeleted: true,
+    deletedAt: { $ne: null, $lte: cutoff },
+  });
+
+  console.log("[cronCharge] purged users:", purgeResult.deletedCount ?? 0);
 
   // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
   if (paymentService.isBetaMode()) {
@@ -442,6 +446,7 @@ exports.cronCharge = async (req, res) => {
       targets: targets.length,
       successCount,
       failCount,
+      purgedDeletedUsers: purgeResult.deletedCount ?? 0,
     });
   } catch (e) {
     console.error(e);
@@ -544,12 +549,10 @@ exports.webhook = async (req, res) => {
       return res.json({ ok: true, ignored: true });
     }
 
-    // 3) 사용자 식별: 너는 customerKey를 userId로 쓰고 있음(startSubscription에서 req.user.id) :contentReference[oaicite:5]{index=5}
     let userId = null;
 
     if (customerKey) userId = String(customerKey);
 
-    // cronCharge에서 만든 orderId는 sub-<userId>-<ts> 형태 :contentReference[oaicite:6]{index=6}
     if (!userId && typeof orderId === "string" && orderId.startsWith("sub-")) {
       const parts = orderId.split("-");
       if (parts.length >= 3) userId = parts[1];
