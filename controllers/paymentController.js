@@ -36,8 +36,8 @@ exports.getUsage = async (req, res) => {
 
     const limits =
       plan === "PRO"
-        ? { formulaConversions: 5000, fileUploads: 5 }
-        : { formulaConversions: 20, fileUploads: 1 };
+        ? { formulaConversions: null, fileUploads: 5 }
+        : { formulaConversions: 10, fileUploads: 1 };
 
     res.json({
       plan,
@@ -46,6 +46,7 @@ exports.getUsage = async (req, res) => {
         fileUploads: user?.usage?.fileUploads ?? 0,
       },
       limits,
+      caps,
     });
   } catch (err) {
     console.error("getUsage error:", err);
@@ -272,11 +273,15 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
-  // 0) 보안: 무조건 먼저 검증 (✅ 중요)
-  const secret = req.headers["x-cron-secret"];
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: "Unauthorized cron" });
-  }
+  // ✅ 30일 만료 후 완전 삭제(Soft delete -> Hard delete)
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const purgeResult = await User.deleteMany({
+    isDeleted: true,
+    deletedAt: { $ne: null, $lte: cutoff },
+  });
+
+  console.log("[cronCharge] purged users:", purgeResult.deletedCount ?? 0);
 
   // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
   if (paymentService.isBetaMode()) {
@@ -442,6 +447,7 @@ exports.cronCharge = async (req, res) => {
       targets: targets.length,
       successCount,
       failCount,
+      purgedDeletedUsers: purgeResult.deletedCount ?? 0,
     });
   } catch (e) {
     console.error(e);
@@ -539,12 +545,12 @@ exports.webhook = async (req, res) => {
     const billingKey =
       body.billingKey || body.data?.billingKey || body.resource?.billingKey;
 
-    // paymentKey도 billingKey도 없으면 일단 OK (다른 이벤트일 수 있음)
+    // paymentKey도 billingKey도 없으면 일단 OK
     if (!paymentKey && !billingKey) {
       return res.json({ ok: true, ignored: true });
     }
 
-    // 3) 사용자 식별: 너는 customerKey를 userId로 쓰고 있음(startSubscription에서 req.user.id) :contentReference[oaicite:5]{index=5}
+    // 3) 사용자 식별
     let userId = null;
 
     if (customerKey) userId = String(customerKey);
