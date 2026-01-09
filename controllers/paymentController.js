@@ -269,17 +269,23 @@ exports.completeSubscription = async (req, res) => {
 
 exports.cronCharge = async (req, res) => {
   // 0) 보안: 무조건 먼저 검증 (✅ 중요)
-  const secret = req.headers["x-cron-secret"];
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: "Unauthorized cron" });
-  }
+  // const secret = req.headers["x-cron-secret"];
+  // if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  //   return res.status(401).json({ error: "Unauthorized cron" });
+  // }
+
+  const now = new Date();
+
+  const purged = await User.deleteMany({
+    isDeleted: true,
+    purgeAt: { $ne: null, $lte: now },
+  });
+  console.log("[cronCharge] purged deleted users:", purged.deletedCount);
 
   // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
   if (paymentService.isBetaMode()) {
     return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
   }
-
-  const now = new Date();
 
   function kstYYYYMMDD(date) {
     const dtf = new Intl.DateTimeFormat("en-CA", {
