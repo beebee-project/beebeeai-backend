@@ -16,9 +16,9 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
   },
+
   password: {
     type: String,
-
     minlength: 6,
     select: false,
   },
@@ -27,34 +27,54 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "사용자",
   },
+
   googleId: {
     type: String,
   },
-  // ✅ 탈퇴/재가입 금지(30일)용
-  isDeleted: { type: Boolean, default: false },
-  deletedAt: { type: Date, default: null },
-  purgeAt: { type: Date, default: null },
-  authIdentity: {
-    emailHash: { type: String, index: true },
-  },
+
   isVerified: {
     type: Boolean,
     default: false,
   },
+
   emailVerificationToken: String,
   emailVerificationExpires: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
+
+  // ===========================
+  // 파일 & 사용량
+  // ===========================
   uploadedFiles: [fileSchema],
+
   usage: {
     formulaConversions: { type: Number, default: 0 },
     fileUploads: { type: Number, default: 0 },
     lastReset: { type: Date, default: Date.now },
   },
+
   plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },
+
+  // ===========================
+  // 탈퇴 / 재가입 차단 (A안 핵심)
+  // ===========================
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+  purgeAt: { type: Date, default: null, index: true },
+
+  // 재가입 차단 & 외부 로그인 매칭
+  authIdentity: {
+    emailHash: { type: String, default: null, index: true },
+    googleId: { type: String, default: null, index: true },
+  },
+
+  // ===========================
+  // 구독 정보 (결제 전용)
+  // ===========================
   subscription: {
     customerKey: { type: String },
     billingKey: { type: String },
+
     status: {
       type: String,
       enum: [
@@ -67,13 +87,12 @@ const userSchema = new mongoose.Schema({
       ],
       default: "INACTIVE",
     },
-    // ✅ 중복 결제 방지/운영 안정성용 필드들
+
+    // 중복 결제 방지 & 안정성
     lastChargeKey: { type: String },
     lastOrderId: { type: String },
     lastChargeAttemptAt: { type: Date },
     lastChargeError: { type: String },
-
-    // ✅ 동시 실행(중복 호출) 방지용 락
     chargeLockKey: { type: String },
 
     startedAt: { type: Date },

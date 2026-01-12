@@ -37,17 +37,36 @@ exports.signup = async (req, res, next) => {
         .json({ message: "이메일과 비밀번호를 모두 입력해주세요." });
     }
 
-    const existingUser = await User.findOne({ email });
+    const normalized = normalizeEmail(email);
+    const eHash = emailHash(normalized);
+    const now = new Date();
+
+    // ✅ 30일 이내 탈퇴 이력이 있으면 재가입 차단
+    const blocked = await User.findOne({
+      isDeleted: true,
+      purgeAt: { $ne: null, $gt: now },
+      "authIdentity.emailHash": eHash,
+    }).select("purgeAt");
+
+    if (blocked) {
+      return res.status(409).json({
+        code: "REJOIN_BLOCKED",
+        purgeAt: blocked.purgeAt,
+        message: "탈퇴한 계정은 30일 동안 재가입이 불가능합니다.",
+      });
+    }
+
+    const existingUser = await User.findOne({ email: normalized });
     if (existingUser && existingUser.isVerified) {
       return res.status(400).json({ message: "이미 사용 중인 이메일입니다." });
     }
     if (existingUser && !existingUser.isVerified) {
-      await User.deleteOne({ email });
+      await User.deleteOne({ email: normalized });
     }
 
     const name = req.body.name || email.split("@")[0];
 
-    const newUser = new User({ name, email, password });
+    const newUser = new User({ name, email: normalized, password });
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save();
 
@@ -206,7 +225,7 @@ exports.withdraw = async (req, res, next) => {
     }
 
     const user = await User.findById(req.user.id).select(
-      "email name plan subscription isDeleted"
+      "email name plan subscription isDeleted authIdentity purgeAt deletedAt"
     );
     if (!user) return res.status(404).json({ message: "사용자 없음" });
 
@@ -255,15 +274,22 @@ exports.withdraw = async (req, res, next) => {
     // ---- 여기부터 탈퇴 진행 ----
     const now = new Date();
 
-    // ✅ 탈퇴/재가입 금지 표식(30일)
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const purgeAt = new Date(now.getTime() + THIRTY_DAYS_MS);
+
+    // ✅ 원 이메일 hash 저장(재가입 차단키)
     const originalEmail = normalizeEmail(user.email);
+    user.authIdentity = user.authIdentity || {};
+    if (originalEmail) user.authIdentity.emailHash = emailHash(originalEmail);
+
+    // ✅ 탈퇴/재가입 금지 표식(30일)
     if (originalEmail) {
       user.authIdentity = user.authIdentity || {};
       user.authIdentity.emailHash = emailHash(originalEmail);
     }
     user.isDeleted = true;
     user.deletedAt = now;
-    user.purgeAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    user.purgeAt = purgeAt;
     user.plan = "FREE";
 
     // ✅ subscription은 "통째 재대입" 금지: 필드만 변경(지뢰 제거)
@@ -280,7 +306,13 @@ exports.withdraw = async (req, res, next) => {
 
     await user.save();
 
-    return res.json({ ok: true, message: "회원 탈퇴가 완료되었습니다." });
+    return res.json({
+      ok: true,
+      code: "WITHDRAWN",
+      message:
+        "회원 탈퇴가 완료되었습니다. 30일 후 계정 정보가 완전 삭제됩니다.",
+      purgeAt,
+    });
   } catch (err) {
     next(err);
   }

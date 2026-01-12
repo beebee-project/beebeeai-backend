@@ -474,7 +474,10 @@ exports.cancelSubscription = async (req, res) => {
       sub.nextChargeAt
     );
 
-    if (!hasAnySubscriptionSignal && status === "NONE") {
+    if (
+      !hasAnySubscriptionSignal &&
+      (status === "NONE" || status === "INACTIVE")
+    ) {
       return res.status(409).json({
         ok: false,
         code: "NO_SUBSCRIPTION",
