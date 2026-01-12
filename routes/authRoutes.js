@@ -21,11 +21,28 @@ router.get(
 );
 
 // 2. 구글 로그인 성공 후, 구글이 리디렉션할 경로 (callback)
-router.get(
-  "/google/callback",
-  passport.authenticate("google", { failureRedirect: "/", session: false }),
-  authController.googleCallback
-);
+router.get("/google/callback", (req, res, next) => {
+  passport.authenticate("google", { session: false }, (err, user, info) => {
+    const frontendURL = process.env.FRONTEND_URL;
+
+    if (err) return next(err);
+
+    // ✅ 재가입 차단 UX
+    if (!user && info?.code === "REJOIN_BLOCKED") {
+      const until = info?.purgeAt ? encodeURIComponent(info.purgeAt) : "";
+      return res.redirect(
+        `${frontendURL}/?authError=REJOIN_BLOCKED&until=${until}`
+      );
+    }
+
+    if (!user) {
+      return res.redirect(`${frontendURL}/?authError=GOOGLE_LOGIN_FAILED`);
+    }
+
+    req.user = user;
+    return authController.googleCallback(req, res);
+  })(req, res, next);
+});
 
 router.get("/health", (req, res) => {
   res.json({ status: "ok" });

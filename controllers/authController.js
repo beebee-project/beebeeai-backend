@@ -13,6 +13,18 @@ function normalizeEmail(raw) {
     .toLowerCase();
 }
 
+function sha256(input) {
+  return crypto.createHash("sha256").update(String(input)).digest("hex");
+}
+
+function fmtKST(date) {
+  try {
+    return new Date(date).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+  } catch {
+    return null;
+  }
+}
+
 // 역추적 어려운 HMAC 추천 (REJOIN_PEPPER 없으면 JWT_SECRET fallback)
 function emailHash(email) {
   const key = process.env.REJOIN_PEPPER || process.env.JWT_SECRET || "fallback";
@@ -37,36 +49,38 @@ exports.signup = async (req, res, next) => {
         .json({ message: "이메일과 비밀번호를 모두 입력해주세요." });
     }
 
-    const normalized = normalizeEmail(email);
-    const eHash = emailHash(normalized);
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const emailHash = sha256(normalizedEmail);
     const now = new Date();
 
-    // ✅ 30일 이내 탈퇴 이력이 있으면 재가입 차단
+    // ✅ 30일 재가입 차단(탈퇴 계정이 purgeAt 이전이면 차단)
     const blocked = await User.findOne({
       isDeleted: true,
       purgeAt: { $ne: null, $gt: now },
-      "authIdentity.emailHash": eHash,
+      "authIdentity.emailHash": emailHash,
     }).select("purgeAt");
 
-    if (blocked) {
+    if (blocked?.purgeAt) {
       return res.status(409).json({
         code: "REJOIN_BLOCKED",
         purgeAt: blocked.purgeAt,
-        message: "탈퇴한 계정은 30일 동안 재가입이 불가능합니다.",
+        message: `탈퇴 후 30일 동안 동일 이메일로 재가입이 불가능합니다. (재가입 가능: ${fmtKST(
+          blocked.purgeAt
+        )})`,
       });
     }
 
-    const existingUser = await User.findOne({ email: normalized });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser && existingUser.isVerified) {
       return res.status(400).json({ message: "이미 사용 중인 이메일입니다." });
     }
     if (existingUser && !existingUser.isVerified) {
-      await User.deleteOne({ email: normalized });
+      await User.deleteOne({ email: normalizedEmail });
     }
 
-    const name = req.body.name || email.split("@")[0];
+    const name = req.body.name || normalizedEmail.split("@")[0];
 
-    const newUser = new User({ name, email: normalized, password });
+    const newUser = new User({ name, email: normalizedEmail, password });
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save();
 
@@ -125,7 +139,30 @@ exports.login = async (req, res, next) => {
         .json({ message: "이메일과 비밀번호를 입력해주세요." });
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    const normalizedEmail = String(email).toLowerCase().trim();
+    const emailHash = sha256(normalizedEmail);
+    const now = new Date();
+
+    // ✅ 30일 재가입 차단: 탈퇴한 이메일이면 로그인 시도도 안내 UX로 막기
+    const blocked = await User.findOne({
+      isDeleted: true,
+      purgeAt: { $ne: null, $gt: now },
+      "authIdentity.emailHash": emailHash,
+    }).select("purgeAt");
+
+    if (blocked?.purgeAt) {
+      return res.status(409).json({
+        code: "REJOIN_BLOCKED",
+        purgeAt: blocked.purgeAt,
+        message: `탈퇴 후 30일 동안 동일 이메일로 로그인/재가입이 불가능합니다. (가능: ${fmtKST(
+          blocked.purgeAt
+        )})`,
+      });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "+password"
+    );
 
     if (!user || !(await user.comparePassword(password))) {
       return res
@@ -282,11 +319,6 @@ exports.withdraw = async (req, res, next) => {
     user.authIdentity = user.authIdentity || {};
     if (originalEmail) user.authIdentity.emailHash = emailHash(originalEmail);
 
-    // ✅ 탈퇴/재가입 금지 표식(30일)
-    if (originalEmail) {
-      user.authIdentity = user.authIdentity || {};
-      user.authIdentity.emailHash = emailHash(originalEmail);
-    }
     user.isDeleted = true;
     user.deletedAt = now;
     user.purgeAt = purgeAt;

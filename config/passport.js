@@ -50,6 +50,7 @@ module.exports = function (passport) {
               until: blocked.purgeAt
                 ? new Date(blocked.purgeAt).toISOString()
                 : null,
+              message: "탈퇴 후 30일 동안 동일 이메일로 재가입이 불가능합니다.",
             });
           }
 
