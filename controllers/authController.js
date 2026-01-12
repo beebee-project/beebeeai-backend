@@ -7,6 +7,18 @@ const {
   sendPasswordResetEmail,
 } = require("../services/emailService");
 
+function normalizeEmail(raw) {
+  return String(raw || "")
+    .trim()
+    .toLowerCase();
+}
+
+// 역추적 어려운 HMAC 추천 (REJOIN_PEPPER 없으면 JWT_SECRET fallback)
+function emailHash(email) {
+  const key = process.env.REJOIN_PEPPER || process.env.JWT_SECRET || "fallback";
+  return crypto.createHmac("sha256", key).update(email).digest("hex");
+}
+
 // JWT 생성 함수
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -242,10 +254,19 @@ exports.withdraw = async (req, res, next) => {
 
     // ---- 여기부터 탈퇴 진행 ----
     const now = new Date();
+
+    // ✅ 탈퇴/재가입 금지 표식(30일)
+    const originalEmail = normalizeEmail(user.email);
+    if (originalEmail) {
+      user.authIdentity = user.authIdentity || {};
+      user.authIdentity.emailHash = emailHash(originalEmail);
+    }
     user.isDeleted = true;
     user.deletedAt = now;
+    user.purgeAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     user.plan = "FREE";
 
+    // ✅ subscription은 "통째 재대입" 금지: 필드만 변경(지뢰 제거)
     user.subscription = user.subscription || {};
     user.subscription.status = "CANCELED";
     user.subscription.canceledAt = now;
@@ -253,6 +274,7 @@ exports.withdraw = async (req, res, next) => {
     user.subscription.nextChargeAt = null;
     user.subscription.cancelAtPeriodEnd = false;
 
+    // ✅ PII 최소화: 이메일 변경
     if (user.email) user.email = `deleted_${user._id}@deleted.local`;
     if (user.name) user.name = "deleted";
 

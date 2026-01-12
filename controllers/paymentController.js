@@ -268,12 +268,30 @@ exports.completeSubscription = async (req, res) => {
 };
 
 exports.cronCharge = async (req, res) => {
-  // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
-  if (paymentService.isBetaMode()) {
-    return res.json({ ok: true, skipped: true, reason: "BETA_MODE=true" });
+  const now = new Date();
+
+  // 🔹 PURGE (30일 지난 탈퇴 계정 물리 삭제) - 실패해도 cron은 계속
+  let purged = 0;
+  try {
+    const r = await User.deleteMany({
+      isDeleted: true,
+      purgeAt: { $ne: null, $lte: now },
+    });
+    purged = r?.deletedCount ?? 0;
+    console.log("[cronCharge] purged users:", purged);
+  } catch (e) {
+    console.error("[cronCharge] purge failed (non-fatal):", e);
   }
 
-  const now = new Date();
+  // 베타모드면 청구/정리 모두 스킵(원하면 정리만 하게 변경 가능)
+  if (paymentService.isBetaMode()) {
+    return res.json({
+      ok: true,
+      skipped: true,
+      reason: "BETA_MODE=true",
+      purged,
+    });
+  }
 
   function kstYYYYMMDD(date) {
     const dtf = new Intl.DateTimeFormat("en-CA", {
@@ -425,6 +443,7 @@ exports.cronCharge = async (req, res) => {
     return res.json({
       ok: true,
       now,
+      purged,
       cleaned: {
         expiredCanceled:
           expiredCanceled?.modifiedCount ?? expiredCanceled?.nModified ?? 0,

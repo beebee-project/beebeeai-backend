@@ -30,6 +30,13 @@ const userSchema = new mongoose.Schema({
   googleId: {
     type: String,
   },
+  // ✅ 탈퇴/재가입 금지(30일)용
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date, default: null },
+  purgeAt: { type: Date, default: null },
+  authIdentity: {
+    emailHash: { type: String, index: true },
+  },
   isVerified: {
     type: Boolean,
     default: false,
@@ -78,6 +85,8 @@ const userSchema = new mongoose.Schema({
     lastPaymentKey: { type: String },
   },
 });
+
+userSchema.index({ isDeleted: 1, purgeAt: 1 });
 
 // 비밀번호가 존재하고 변경되었을 때만 암호화
 userSchema.pre("save", async function (next) {

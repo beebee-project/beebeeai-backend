@@ -1,5 +1,18 @@
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const crypto = require("crypto");
 const User = require("../models/User");
+
+function normalizeEmail(raw) {
+  return String(raw || "")
+    .trim()
+    .toLowerCase();
+}
+
+// 역추적 어려운 HMAC 추천 (REJOIN_PEPPER 없으면 JWT_SECRET fallback)
+function emailHash(email) {
+  const key = process.env.REJOIN_PEPPER || process.env.JWT_SECRET || "fallback";
+  return crypto.createHmac("sha256", key).update(email).digest("hex");
+}
 
 module.exports = function (passport) {
   passport.use(
@@ -12,13 +25,32 @@ module.exports = function (passport) {
       async (accessToken, refreshToken, profile, done) => {
         try {
           const rawEmail = profile?.emails?.[0]?.value || "";
-          const email = String(rawEmail).trim().toLowerCase();
+          const email = normalizeEmail(rawEmail);
           const googleId = String(profile?.id || "");
           const name = profile?.displayName || "사용자";
 
           if (!email) {
-            // 이메일이 없으면 계정 연동/생성이 불가(정책적으로 실패 처리 추천)
+            // 이메일이 없으면 계정 연동/생성이 불가
             return done(new Error("Google account has no email"), null);
+          }
+
+          // ✅ [추가] 30일 재가입 금지(탈퇴 후 purgeAt 이전)
+          const now = new Date();
+          const blocked = await User.findOne({
+            isDeleted: true,
+            purgeAt: { $ne: null, $gt: now },
+            "authIdentity.emailHash": emailHash(email),
+          }).select("purgeAt");
+
+          if (blocked) {
+            // passport에서는 에러를 던지기보다 "인증 실패"로 처리하는 게 안전
+            // (라우터에서 failureRedirect로 보내짐)
+            return done(null, false, {
+              code: "REJOIN_BLOCKED",
+              until: blocked.purgeAt
+                ? new Date(blocked.purgeAt).toISOString()
+                : null,
+            });
           }
 
           // 1) 이메일로 기존 계정 찾기
@@ -29,7 +61,6 @@ module.exports = function (passport) {
             if (!user.googleId || user.googleId !== googleId) {
               user.googleId = googleId;
               if (!user.name) user.name = name;
-              // 구글 로그인 성공 시 검증 처리 정책(원하면 true)
               user.isVerified = true;
               await user.save();
             }

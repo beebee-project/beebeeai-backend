@@ -59,8 +59,10 @@ async function getUsageSummary(userId) {
 }
 
 async function bumpUsage(userId, field, delta) {
-  const user = await User.findById(userId).select("plan usage");
+  const user = await User.findById(userId).select("plan usage isDeleted");
   if (!user) throw new Error("User not found");
+
+  if (user.isDeleted) return { skipped: true };
   if (!user.usage)
     user.usage = {
       formulaConversions: 0,
@@ -79,8 +81,17 @@ async function bumpUsage(userId, field, delta) {
 }
 
 async function assertCanUse(userId, field, amount = 1) {
-  const user = await User.findById(userId).select("plan subscription usage");
+  const user = await User.findById(userId).select(
+    "plan subscription usage isDeleted purgeAt"
+  );
   if (!user) throw new Error("User not found");
+
+  if (user.isDeleted) {
+    const err = new Error("ACCOUNT_DELETED");
+    err.status = 403;
+    err.code = "ACCOUNT_DELETED";
+    throw err;
+  }
 
   // 월 리셋 동일 로직
   if (!user.usage) {
