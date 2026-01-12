@@ -29,7 +29,7 @@ router.get("/google/callback", (req, res, next) => {
 
     // ✅ 재가입 차단 UX
     if (!user && info?.code === "REJOIN_BLOCKED") {
-      const until = info?.purgeAt ? encodeURIComponent(info.purgeAt) : "";
+      const until = info?.until ? encodeURIComponent(info.until) : "";
       return res.redirect(
         `${frontendURL}/?authError=REJOIN_BLOCKED&until=${until}`
       );
