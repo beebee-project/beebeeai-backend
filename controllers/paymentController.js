@@ -60,6 +60,7 @@ exports.getUsage = async (req, res) => {
     res.json({
       plan,
       subscriptionStatus: isSubscribed ? status : "INACTIVE",
+      betaMode: paymentService.isBetaMode(), // false 변겅 시 제거
       isSubscribed,
       usage: {
         formulaConversions: user?.usage?.formulaConversions ?? 0,
