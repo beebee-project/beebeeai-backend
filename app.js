@@ -10,6 +10,7 @@ const authRoutes = require("./routes/authRoutes");
 const fileRoutes = require("./routes/fileRoutes");
 const convertRoutes = require("./routes/convertRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const macroRoutes = require("./routes/macroRoutes");
 
 // 앱 초기화
 const app = express();
@@ -67,6 +68,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/convert", convertRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/macro", macroRoutes);
 
 // 에러 핸들러
 app.use(errorHandler);
