@@ -1,11 +1,31 @@
 const User = require("../models/User");
 const paymentService = require("./paymentService");
 
+function hasSubscriptionSignal(sub = {}) {
+  return Boolean(
+    sub?.billingKey ||
+      sub?.customerKey ||
+      sub?.startedAt ||
+      sub?.trialEndsAt ||
+      sub?.nextChargeAt
+  );
+}
+
+function isSubscriptionActiveStrict(sub = {}) {
+  const status = String(sub.status || "NONE").toUpperCase();
+  return (
+    hasSubscriptionSignal(sub) &&
+    ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status)
+  );
+}
+
 function getEffectivePlanFromUser(user) {
   const base = paymentService.getEffectivePlan(user.plan || "FREE");
-  if (base === "PRO") return "PRO"; // BETA_MODE=true면 여기서 끝
-  // 베타가 아니면, 구독 상태를 보고 PRO 판정(안전장치)
-  if (paymentService.isSubscriptionActive(user.subscription)) return "PRO";
+  // ✅ 베타모드일 때만 plan(PRO)을 그대로 인정
+  if (paymentService.isBetaMode() && base === "PRO") return "PRO";
+  // ✅ 베타모드가 아니면 "구독 시그널 + status"일 때만 PRO
+  if (isSubscriptionActiveStrict(user.subscription || {})) return "PRO";
+
   return "FREE";
 }
 
@@ -27,7 +47,7 @@ function needMonthlyReset(lastReset, now = new Date()) {
 }
 
 async function getUsageSummary(userId) {
-  const user = await User.findById(userId).select("plan usage");
+  const user = await User.findById(userId).select("plan usage subscription");
   if (!user) throw new Error("User not found");
 
   let changed = false;
@@ -59,7 +79,9 @@ async function getUsageSummary(userId) {
 }
 
 async function bumpUsage(userId, field, delta) {
-  const user = await User.findById(userId).select("plan usage isDeleted");
+  const user = await User.findById(userId).select(
+    "plan usage subscription isDeleted"
+  );
   if (!user) throw new Error("User not found");
 
   if (user.isDeleted) return { skipped: true };

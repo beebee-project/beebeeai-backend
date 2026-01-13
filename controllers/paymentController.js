@@ -25,10 +25,32 @@ function ensureAbsoluteUrl(url, fallbackOrigin) {
 // 사용량 조회
 exports.getUsage = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("plan usage");
+    const user = await User.findById(req.user.id).select(
+      "plan usage subscription"
+    );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
-    const plan = paymentService.getEffectivePlan(user.plan);
+    // ✅ 구독 시그널 기반 "실제 구독" 판정 (베타 잔재 방어)
+    const sub = user.subscription || {};
+    const status = String(sub.status || "NONE").toUpperCase();
+    const hasSignal = !!(
+      sub.billingKey ||
+      sub.customerKey ||
+      sub.startedAt ||
+      sub.trialEndsAt ||
+      sub.nextChargeAt
+    );
+
+    const isSubscribed =
+      hasSignal && ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
+
+    // BETA_MODE=true면 plan(PRO)을 존중할 수 있지만,
+    // BETA_MODE=false에서는 subscription signal 없으면 무조건 FREE로 처리
+    const plan = paymentService.isBetaMode()
+      ? paymentService.getEffectivePlan(user.plan)
+      : isSubscribed
+      ? "PRO"
+      : "FREE";
 
     const limits =
       plan === "PRO"
@@ -37,6 +59,8 @@ exports.getUsage = async (req, res) => {
 
     res.json({
       plan,
+      subscriptionStatus: isSubscribed ? status : "INACTIVE",
+      isSubscribed,
       usage: {
         formulaConversions: user?.usage?.formulaConversions ?? 0,
         fileUploads: user?.usage?.fileUploads ?? 0,
