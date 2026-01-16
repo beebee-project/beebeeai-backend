@@ -1009,6 +1009,7 @@ exports.handleConversion = async (req, res, next) => {
     const userKey = req.user?.id ? `u:${req.user.id}` : `anon:${req.ip}`;
     const targetRangeSig = null; // TODO: wire from UI when available (e.g. selected column/range)
 
+    let cacheHit = false;
     if (intentCache.isEnabled()) {
       const { key } = buildIntentCacheKey({
         version: 1,
@@ -1022,24 +1023,20 @@ exports.handleConversion = async (req, res, next) => {
       });
       _dbgIntentCacheKey = key;
 
-      let cacheHit = false;
       const cached = await intentCache.get(key);
 
       if (cached && cached.intent && typeof cached.intent === "object") {
+        cacheHit = true;
         console.log("[intentCache] HIT", key.slice(0, 8));
         intent = { ...intent, ...cached.intent };
       } else {
         console.log("[intentCache] MISS", key.slice(0, 8));
       }
-      const skipLLMOnHit = process.env.INTENT_CACHE_SKIP_LLM_ON_HIT === "1";
-
-      if (openai && !(skipLLMOnHit && cacheHit)) {
-        // extractIntentWithLLM(...)
-      }
     }
 
-    // ✅ LLM 호출 (NOTE: few-shot 저장/재사용 비활성화)
-    if (openai) {
+    // ✅ LLM 호출 (single place)
+    const skipLLMOnHit = process.env.INTENT_CACHE_SKIP_LLM_ON_HIT === "1";
+    if (openai && !(skipLLMOnHit && cacheHit)) {
       const llm = await extractIntentWithLLM(
         openai,
         message,

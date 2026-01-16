@@ -11,10 +11,10 @@ async function getOrBuildAllSheetsData(fileBuffer) {
   const hash = md5Buffer(fileBuffer);
   const cacheKey = `sheetsMeta_${hash}`;
 
-  // const cached = await readMetaCache(cacheKey);
-  // if (cached && cached.allSheetsData) {
-  //   return { fileHash: hash, allSheetsData: cached.allSheetsData };
-  // }
+  const cached = await readMetaCache(cacheKey);
+  if (cached && cached.allSheetsData) {
+    return { fileHash: hash, allSheetsData: cached.allSheetsData };
+  }
 
   const workbook = XLSX.read(fileBuffer, { type: "buffer" });
   const allSheetsData = buildAllSheetsData(workbook);
