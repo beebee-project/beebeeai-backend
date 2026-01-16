@@ -111,33 +111,67 @@ async function getSignedUrl(gcsName, { minutes = 5, dispositionName } = {}) {
   return url;
 }
 
-const META_CACHE_DIR = path.join(__dirname, "..", "meta-cache");
-if (!fs.existsSync(META_CACHE_DIR)) {
-  fs.mkdirSync(META_CACHE_DIR, { recursive: true });
+// =========================================================
+// Meta cache (A안): in-memory only, TTL 30 minutes
+// - NO disk writes
+// - Cleared on restart/redeploy (intended)
+// =========================================================
+const META_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes (fixed per decision)
+const META_CACHE_MAX = Number(process.env.META_CACHE_MAX || "500"); // safety cap
+const _metaMem = new Map(); // key -> { value, expiresAt, touchedAt }
+
+function _now() {
+  return Date.now();
 }
 
-function metaCachePath(key) {
-  return path.join(META_CACHE_DIR, `${key}.json`);
+function _gcMetaMem() {
+  // opportunistic GC: remove expired first, then trim oldest if over capacity
+  const now = _now();
+  for (const [k, e] of _metaMem.entries()) {
+    if (!e || e.expiresAt <= now) _metaMem.delete(k);
+  }
+  if (_metaMem.size <= META_CACHE_MAX) return;
+
+  // trim by oldest touchedAt
+  const entries = Array.from(_metaMem.entries());
+  entries.sort((a, b) => (a[1].touchedAt || 0) - (b[1].touchedAt || 0));
+  const overflow = _metaMem.size - META_CACHE_MAX;
+  for (let i = 0; i < overflow; i++) {
+    _metaMem.delete(entries[i][0]);
+  }
 }
 
 async function readMetaCache(key) {
-  const p = metaCachePath(key);
   try {
-    if (!fs.existsSync(p)) return null;
-    const raw = await fs.promises.readFile(p, "utf8");
-    return JSON.parse(raw);
+    const e = _metaMem.get(key);
+    if (!e) return null;
+    const now = _now();
+    if (e.expiresAt <= now) {
+      _metaMem.delete(key);
+      return null;
+    }
+    e.touchedAt = now;
+    return e.value;
   } catch (e) {
-    console.error("readMetaCache error:", e);
+    console.error("readMetaCache(mem) error:", e);
     return null;
+  } finally {
+    _gcMetaMem();
   }
 }
 
 async function writeMetaCache(key, value) {
-  const p = metaCachePath(key);
   try {
-    await fs.promises.writeFile(p, JSON.stringify(value, null, 2), "utf8");
+    const now = _now();
+    _metaMem.set(key, {
+      value,
+      expiresAt: now + META_CACHE_TTL_MS,
+      touchedAt: now,
+    });
   } catch (e) {
-    console.error("writeMetaCache error:", e);
+    console.error("writeMetaCache(mem) error:", e);
+  } finally {
+    _gcMetaMem();
   }
 }
 
