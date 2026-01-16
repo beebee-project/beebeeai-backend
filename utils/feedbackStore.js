@@ -1,12 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const FEEDBACK_PATH = path.join(DATA_DIR, "feedback.json");
-
-function ensureDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+const FEEDBACK_PATH = path.join(process.cwd(), "feedback.json"); // ✅ 루트에 저장
+const MAX_ITEMS = Number(process.env.FEEDBACK_MAX_ITEMS || "5000");
 
 function readAll() {
   try {
@@ -20,20 +16,16 @@ function readAll() {
 }
 
 function writeAll(arr) {
-  ensureDir();
   const tmp = `${FEEDBACK_PATH}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(arr, null, 2), "utf8");
   fs.renameSync(tmp, FEEDBACK_PATH);
 }
 
-function appendFeedback(event, maxItems = 5000) {
+function appendFeedback(event) {
   const all = readAll();
   all.push(event);
-  const pruned = all.length > maxItems ? all.slice(-maxItems) : all;
+  const pruned = all.length > MAX_ITEMS ? all.slice(-MAX_ITEMS) : all;
   writeAll(pruned);
 }
 
-module.exports = {
-  FEEDBACK_PATH,
-  appendFeedback,
-};
+module.exports = { FEEDBACK_PATH, appendFeedback };

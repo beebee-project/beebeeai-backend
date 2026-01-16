@@ -677,35 +677,42 @@ function resolveOp(op) {
  * 파일 전처리 유틸
  * -------------------------------------------*/
 async function loadAndPreprocessFromBucketIfPossible(user, fileName) {
-  console.log("[loadAndPreprocess] user?.id:", user?.id);
-  console.log("[loadAndPreprocess] fileName:", fileName);
+  const logLP = shouldLogCache();
+  if (logLP) console.log("[loadAndPreprocess] user?.id:", user?.id);
+  if (logLP) console.log("[loadAndPreprocess] fileName:", fileName);
 
   const bucket = getBucket();
-  console.log("[loadAndPreprocess] bucket exists?:", !!bucket);
+  if (logLP) console.log("[loadAndPreprocess] bucket exists?:", !!bucket);
 
   if (!bucket || !user || !fileName) {
-    console.log("[loadAndPreprocess] early return (no bucket/user/fileName)");
+    if (logLP)
+      console.log("[loadAndPreprocess] early return (no bucket/user/fileName)");
     return { isFileAttached: false, preprocessed: null };
   }
 
-  console.log("[loadAndPreprocess] user.uploadedFiles:", user?.uploadedFiles);
+  if (logLP)
+    console.log("[loadAndPreprocess] user.uploadedFiles:", user?.uploadedFiles);
   const fileInfo = user.uploadedFiles?.find((f) => f.originalName === fileName);
-  console.log("[loadAndPreprocess] fileInfo:", fileInfo);
+  if (logLP) console.log("[loadAndPreprocess] fileInfo:", fileInfo);
 
   if (!fileInfo) {
-    console.log("[loadAndPreprocess] early return (fileInfo not found)");
+    if (logLP)
+      console.log("[loadAndPreprocess] early return (fileInfo not found)");
     return { isFileAttached: false, preprocessed: null };
   }
 
   const file = bucket.file(fileInfo.gcsName);
   const [buffer] = await file.download();
-  console.log("[loadAndPreprocess] downloaded buffer length:", buffer.length);
+  if (logLP)
+    console.log("[loadAndPreprocess] downloaded buffer length:", buffer.length);
 
   const { fileHash, allSheetsData } = await getOrBuildAllSheetsData(buffer);
-  console.log(
-    "[loadAndPreprocess] got allSheetsData keys:",
-    Object.keys(allSheetsData || {})
-  );
+  if (logLP) {
+    console.log(
+      "[loadAndPreprocess] got allSheetsData keys:",
+      Object.keys(preprocessed?.allSheetsData || {})
+    );
+  }
 
   return {
     isFileAttached: true,
@@ -1228,52 +1235,43 @@ exports.handleConversion = async (req, res, next) => {
 exports.handleFeedback = async (req, res, next) => {
   try {
     const {
-      // 프론트 표준: reason 단일 필드로 통일
-      reason,
-      // 기존 필드들(호환): result/formula 둘 중 하나로 들어올 수 있음
-      formula,
-      result,
-      // 원문 질문
       message,
-      // "정확함/수정 필요" (boolean)
-      isHelpful,
-      // context (있으면 저장)
+      result, // 프론트 표준: result로 보냄
+      formula, // 호환
+      isHelpful, // true=정확함, false=수정 필요
+      reason, // ✅ 단일 필드
       conversionType = "Excel/Google Sheets",
       fileName,
     } = req.body || {};
 
-    const finalMessage = typeof message === "string" ? message.trim() : "";
-    const finalResult =
-      (typeof formula === "string" && formula.trim()) ||
+    const msg = typeof message === "string" ? message.trim() : "";
+    const out =
       (typeof result === "string" && result.trim()) ||
+      (typeof formula === "string" && formula.trim()) ||
       "";
-    const finalReason = typeof reason === "string" ? reason.trim() : "";
+    const why = typeof reason === "string" ? reason.trim() : "";
 
-    if (!finalMessage || !finalResult) {
+    if (!msg || !out) {
       return res.status(400).json({ error: "message and result are required" });
     }
-
-    // ✅ 규칙: '수정 필요'(isHelpful=false)면 reason 필수
-    if (isHelpful === false && !finalReason) {
+    // ✅ '수정 필요'(isHelpful=false)면 reason 필수
+    if (isHelpful === false && !why) {
       return res
         .status(400)
         .json({ error: "reason is required when isHelpful is false" });
     }
 
-    const event = {
+    appendFeedback({
       ts: new Date().toISOString(),
       userId: req.user?.id ? String(req.user.id) : null,
       ip: req.ip || null,
       conversionType,
       fileName: fileName || null,
-      message: finalMessage,
-      result: finalResult,
+      message: msg,
+      result: out,
       isHelpful: isHelpful === true ? true : isHelpful === false ? false : null,
-      // reason 단일 저장 (정확함일 때는 null 가능)
-      reason: finalReason || null,
-    };
-
-    appendFeedback(event);
+      reason: why || null,
+    });
 
     return res.status(200).json({ message: "피드백이 저장되었습니다." });
   } catch (error) {
