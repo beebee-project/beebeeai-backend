@@ -1,15 +1,25 @@
-// -----------------------------
-// Storage selection:
-// 1) Redis (if REDIS_URL and ioredis installed)
-// 2) In-memory Map (fallback)
-// -----------------------------
+/**
+ * Intent Cache (Redis + Memory fallback)
+ * - Default: DISABLED
+ * - Stores INTENT ONLY (never formula/script)
+ */
 
 const CACHE_PREFIX = "intent_cache:";
 
+// ============================
+// Enable switch (FIXED)
+// ============================
+function isEnabled() {
+  return process.env.INTENT_CACHE_ENABLED === "1";
+}
+
+// ============================
+// Redis (optional)
+// ============================
 let _redis = null;
 let _redisInitTried = false;
 
-function _tryInitRedis() {
+function tryInitRedis() {
   if (_redisInitTried) return _redis;
   _redisInitTried = true;
 
@@ -17,77 +27,71 @@ function _tryInitRedis() {
   if (!url) return null;
 
   try {
-    // optional dependency
-    // npm i ioredis
     const Redis = require("ioredis");
     _redis = new Redis(url, {
       maxRetriesPerRequest: 1,
       enableReadyCheck: true,
       lazyConnect: true,
     });
-    // best-effort connect (non-blocking on first use)
+
     _redis.connect().catch(() => {});
     return _redis;
   } catch (e) {
-    console.warn(
-      "[intentCache] Redis not available (install ioredis or set REDIS_URL):",
-      e?.message || e
-    );
+    console.warn("[intentCache] Redis init failed:", e?.message || e);
     _redis = null;
     return null;
   }
 }
 
-// In-memory L1 cache with TTL
-// key -> { value: any, exp: number }
-const _mem = new Map();
+// ============================
+// In-memory fallback (L1)
+// ============================
+const mem = new Map();
 
-function _nowMs() {
+function now() {
   return Date.now();
 }
 
-function _memGet(k) {
-  const hit = _mem.get(k);
+function memGet(key) {
+  const hit = mem.get(key);
   if (!hit) return null;
-  if (hit.exp && hit.exp <= _nowMs()) {
-    _mem.delete(k);
+  if (hit.exp && hit.exp < now()) {
+    mem.delete(key);
     return null;
   }
-  return hit.value ?? null;
+  return hit.value;
 }
 
-function _memSet(k, v, ttlSec) {
+function memSet(key, value, ttlSec) {
   const ttl = Number(ttlSec || 0);
-  const exp = ttl > 0 ? _nowMs() + ttl * 1000 : 0;
-  _mem.set(k, { value: v, exp });
+  const exp = ttl > 0 ? now() + ttl * 1000 : 0;
+  mem.set(key, { value, exp });
 }
 
-function _k(key) {
+function k(key) {
   return `${CACHE_PREFIX}${key}`;
 }
 
-/**
- * @param {string} key
- * @returns {Promise<{intent: object, meta?: object} | null>}
- */
+// ============================
+// Public API
+// ============================
 async function get(key) {
-  if (!isEnabled()) return null;
-  if (!key) return null;
+  if (!isEnabled() || !key) return null;
 
-  // 1) L1 memory
-  const memHit = _memGet(key);
-  if (memHit) return memHit;
+  // 1️⃣ memory
+  const m = memGet(key);
+  if (m) return m;
 
-  // 2) Redis
-  const r = _tryInitRedis();
+  // 2️⃣ redis
+  const r = tryInitRedis();
   if (!r) return null;
 
   try {
-    const raw = await r.get(_k(key));
+    const raw = await r.get(k(key));
     if (!raw) return null;
+
     const parsed = JSON.parse(raw);
-    // hydrate L1 with a short TTL to reduce redis chatter
-    _memSet(key, parsed, 30);
+    memSet(key, parsed, 30); // short L1 ttl
     return parsed;
   } catch (e) {
     console.warn("[intentCache.get] error:", e?.message || e);
@@ -95,26 +99,17 @@ async function get(key) {
   }
 }
 
-/**
- * @param {string} key
- * @param {{intent: object, meta?: object}} value
- * @param {number} ttlSec
- * @returns {Promise<boolean>}
- */
 async function set(key, value, ttlSec = 600) {
-  if (!isEnabled()) return false;
-  if (!key || !value || typeof value !== "object") return false;
+  if (!isEnabled() || !key || !value) return false;
 
-  // write L1 always
-  _memSet(key, value, Math.min(Number(ttlSec || 0), 60) || 30);
+  // memory always
+  memSet(key, value, Math.min(ttlSec, 60));
 
-  // write Redis if available
-  const r = _tryInitRedis();
+  const r = tryInitRedis();
   if (!r) return true;
 
   try {
-    const ttl = Math.max(1, Number(ttlSec || 600));
-    await r.set(_k(key), JSON.stringify(value), "EX", ttl);
+    await r.set(k(key), JSON.stringify(value), "EX", ttlSec);
     return true;
   } catch (e) {
     console.warn("[intentCache.set] error:", e?.message || e);
@@ -122,4 +117,8 @@ async function set(key, value, ttlSec = 600) {
   }
 }
 
-module.exports = { isEnabled, get, set };
+module.exports = {
+  isEnabled,
+  get,
+  set,
+};
