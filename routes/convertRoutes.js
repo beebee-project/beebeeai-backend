@@ -5,6 +5,6 @@ const { protect } = require("../middleware/authMiddleware");
 
 router.post("/", protect, convertController.handleConversion);
 
-router.post("/feedback", convertController.handleFeedback);
+router.post("/feedback", protect, convertController.handleFeedback);
 
 module.exports = router;

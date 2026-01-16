@@ -17,6 +17,7 @@ const direct = require("../builders/direct");
 const { bumpUsage, assertCanUse } = require("../services/usageService");
 
 const { shouldLogCache } = require("../utils/cacheLog");
+const { appendFeedback } = require("../utils/feedbackStore");
 
 /* ---------------------------------------------
  * Lazy singletons (OpenAI / GCS Bucket)
@@ -1226,7 +1227,55 @@ exports.handleConversion = async (req, res, next) => {
  * -------------------------------------------*/
 exports.handleFeedback = async (req, res, next) => {
   try {
-    return res.status(200).json({ message: "피드백이 접수되었습니다." });
+    const {
+      // 프론트 표준: reason 단일 필드로 통일
+      reason,
+      // 기존 필드들(호환): result/formula 둘 중 하나로 들어올 수 있음
+      formula,
+      result,
+      // 원문 질문
+      message,
+      // "정확함/수정 필요" (boolean)
+      isHelpful,
+      // context (있으면 저장)
+      conversionType = "Excel/Google Sheets",
+      fileName,
+    } = req.body || {};
+
+    const finalMessage = typeof message === "string" ? message.trim() : "";
+    const finalResult =
+      (typeof formula === "string" && formula.trim()) ||
+      (typeof result === "string" && result.trim()) ||
+      "";
+    const finalReason = typeof reason === "string" ? reason.trim() : "";
+
+    if (!finalMessage || !finalResult) {
+      return res.status(400).json({ error: "message and result are required" });
+    }
+
+    // ✅ 규칙: '수정 필요'(isHelpful=false)면 reason 필수
+    if (isHelpful === false && !finalReason) {
+      return res
+        .status(400)
+        .json({ error: "reason is required when isHelpful is false" });
+    }
+
+    const event = {
+      ts: new Date().toISOString(),
+      userId: req.user?.id ? String(req.user.id) : null,
+      ip: req.ip || null,
+      conversionType,
+      fileName: fileName || null,
+      message: finalMessage,
+      result: finalResult,
+      isHelpful: isHelpful === true ? true : isHelpful === false ? false : null,
+      // reason 단일 저장 (정확함일 때는 null 가능)
+      reason: finalReason || null,
+    };
+
+    appendFeedback(event);
+
+    return res.status(200).json({ message: "피드백이 저장되었습니다." });
   } catch (error) {
     next(error);
   }
