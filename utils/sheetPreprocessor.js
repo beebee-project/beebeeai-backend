@@ -24,6 +24,10 @@ async function getOrBuildAllSheetsData(fileBuffer) {
     return { fileHash: hash, allSheetsData: cached.allSheetsData };
   }
 
+  if (logMetaCache) {
+    console.log("[metaCache] MISS", hash.slice(0, 8));
+  }
+
   const workbook = XLSX.read(fileBuffer, { type: "buffer" });
   const allSheetsData = buildAllSheetsData(workbook);
 
