@@ -1261,7 +1261,7 @@ exports.handleFeedback = async (req, res, next) => {
         .json({ error: "reason is required when isHelpful is false" });
     }
 
-    appendFeedback({
+    const saved = await appendFeedback({
       ts: new Date().toISOString(),
       userId: req.user?.id ? String(req.user.id) : null,
       ip: req.ip || null,
@@ -1273,7 +1273,7 @@ exports.handleFeedback = async (req, res, next) => {
       reason: why || null,
     });
 
-    return res.status(200).json({ message: "피드백이 저장되었습니다." });
+    return res.status(200).json({ message: "피드백이 저장되었습니다.", saved });
   } catch (error) {
     next(error);
   }
