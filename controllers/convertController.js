@@ -1022,12 +1022,19 @@ exports.handleConversion = async (req, res, next) => {
       });
       _dbgIntentCacheKey = key;
 
+      let cacheHit = false;
       const cached = await intentCache.get(key);
+
       if (cached && cached.intent && typeof cached.intent === "object") {
         console.log("[intentCache] HIT", key.slice(0, 8));
         intent = { ...intent, ...cached.intent };
       } else {
         console.log("[intentCache] MISS", key.slice(0, 8));
+      }
+      const skipLLMOnHit = process.env.INTENT_CACHE_SKIP_LLM_ON_HIT === "1";
+
+      if (openai && !(skipLLMOnHit && cacheHit)) {
+        // extractIntentWithLLM(...)
       }
     }
 
