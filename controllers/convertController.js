@@ -16,6 +16,8 @@ const direct = require("../builders/direct");
 
 const { bumpUsage, assertCanUse } = require("../services/usageService");
 
+const { shouldLogCache } = require("../utils/cacheLog");
+
 /* ---------------------------------------------
  * Lazy singletons (OpenAI / GCS Bucket)
  * -------------------------------------------*/
@@ -1055,11 +1057,15 @@ exports.handleConversion = async (req, res, next) => {
 
       if (cached && cached.intent && typeof cached.intent === "object") {
         _dbgCacheHit = true;
-        console.log("[intentCache] HIT", key.slice(0, 8));
+        if (shouldLogCache()) {
+          console.log("[intentCache] HIT", key.slice(0, 8));
+        }
         intent = { ...intent, ...cached.intent };
       } else {
         _dbgCacheHit = false;
-        console.log("[intentCache] MISS", key.slice(0, 8));
+        if (shouldLogCache()) {
+          console.log("[intentCache] MISS", key.slice(0, 8));
+        }
       }
     }
 
