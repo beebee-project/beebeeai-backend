@@ -1,6 +1,9 @@
 const { cleanAIResponse } = require("../utils/responseHelper");
 const formulaUtils = require("../utils/formulaUtils");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
+const { buildIntentCacheKey } = require("../utils/intentCacheKeyBuilder");
+const { makeSheetStateSig } = require("../utils/sheetStateSig");
+const intentCache = require("../services/intentCache");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -218,66 +221,66 @@ const DEFAULT_FORMAT_OPTIONS = {
   coerce_number: true,
 };
 
-function summarizeIntentForCache(intent = {}) {
-  const op = (intent.operation || "").toLowerCase();
+// function summarizeIntentForCache(intent = {}) {
+//   const op = (intent.operation || "").toLowerCase();
 
-  const headerHints = [
-    intent.header_hint,
-    intent.return_hint,
-    intent.lookup_hint,
-  ]
-    .filter(Boolean)
-    .map((s) => String(s).trim().toLowerCase())
-    .sort()
-    .join("|");
+//   const headerHints = [
+//     intent.header_hint,
+//     intent.return_hint,
+//     intent.lookup_hint,
+//   ]
+//     .filter(Boolean)
+//     .map((s) => String(s).trim().toLowerCase())
+//     .sort()
+//     .join("|");
 
-  // 조건(target + operator 위주로 요약, 값은 캐시에 크게 중요하지 않다고 가정)
-  const conds = (intent.conditions || []).map((c) => {
-    if (c && typeof c === "object" && c.logical_operator) {
-      return `G:${c.logical_operator}`;
-    }
-    const t =
-      typeof c?.target === "string"
-        ? c.target.toLowerCase()
-        : c?.target?.header?.toLowerCase?.() || "";
-    const op = c?.operator || "=";
-    return `C:${t}:${op}`;
-  });
+//   // 조건(target + operator 위주로 요약, 값은 캐시에 크게 중요하지 않다고 가정)
+//   const conds = (intent.conditions || []).map((c) => {
+//     if (c && typeof c === "object" && c.logical_operator) {
+//       return `G:${c.logical_operator}`;
+//     }
+//     const t =
+//       typeof c?.target === "string"
+//         ? c.target.toLowerCase()
+//         : c?.target?.header?.toLowerCase?.() || "";
+//     const op = c?.operator || "=";
+//     return `C:${t}:${op}`;
+//   });
 
-  const windowSig = intent.window
-    ? [
-        intent.window.type || "",
-        intent.window.size || "",
-        (intent.window.date_header || "").toLowerCase(),
-      ].join(":")
-    : "";
+//   const windowSig = intent.window
+//     ? [
+//         intent.window.type || "",
+//         intent.window.size || "",
+//         (intent.window.date_header || "").toLowerCase(),
+//       ].join(":")
+//     : "";
 
-  return [op, headerHints, conds.sort().join("&"), windowSig].join("||");
-}
+//   return [op, headerHints, conds.sort().join("&"), windowSig].join("||");
+// }
 
-function buildCacheKey({ message, fileHash, allSheetsData, intent }) {
-  const normalizedMessage = String(message || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+// function buildCacheKey({ message, fileHash, allSheetsData, intent }) {
+//   const normalizedMessage = String(message || "")
+//     .trim()
+//     .toLowerCase()
+//     .replace(/\s+/g, " ");
 
-  const headers = [];
-  if (allSheetsData) {
-    Object.values(allSheetsData).forEach((sheetInfo) => {
-      Object.keys(sheetInfo.metaData || {}).forEach((h) => headers.push(h));
-    });
-  }
-  headers.sort();
+//   const headers = [];
+//   if (allSheetsData) {
+//     Object.values(allSheetsData).forEach((sheetInfo) => {
+//       Object.keys(sheetInfo.metaData || {}).forEach((h) => headers.push(h));
+//     });
+//   }
+//   headers.sort();
 
-  const intentSig = summarizeIntentForCache(intent || {});
+//   const intentSig = summarizeIntentForCache(intent || {});
 
-  return [
-    normalizedMessage,
-    intentSig || "no-intent",
-    fileHash || "nofile",
-    headers.join("|") || "noheaders",
-  ].join("||");
-}
+//   return [
+//     normalizedMessage,
+//     intentSig || "no-intent",
+//     fileHash || "nofile",
+//     headers.join("|") || "noheaders",
+//   ].join("||");
+// }
 
 /* ---------------------------------------------
  * 로컬 의도 추론 (LLM 미사용 시 폴백)
@@ -936,12 +939,18 @@ function shouldCountConversion(result) {
  * 메인 컨버전 핸들러
  * -------------------------------------------*/
 exports.handleConversion = async (req, res, next) => {
+  // ---- debug-safe holders (so logging never crashes) ----
+  let _dbgMessage = null;
+  let _dbgIntent = null;
+  let _dbgIntentCacheKey = null;
+
   try {
     const {
       message,
       fileName,
       conversionType = "Excel/Google Sheets",
     } = req.body || {};
+    _dbgMessage = message || null;
     if (!message || !conversionType) {
       return res.status(400).json({ result: "요청 정보가 부족합니다." });
     }
@@ -959,15 +968,13 @@ exports.handleConversion = async (req, res, next) => {
       }
     }
 
-    // 0) 캐시 로드 (나중에 intent랑 같이 쓸 것)
-    const cacheData = formulaUtils.readCache(conversionType);
-
     // 1) 파일 전처리(옵션)
     const { isFileAttached, preprocessed } =
       await loadAndPreprocessFromBucketIfPossible(req.user, fileName);
 
     const fileHash = preprocessed?.fileHash || null;
     const allSheetsData = preprocessed?.allSheetsData || null;
+    const sheetStateSig = makeSheetStateSig(allSheetsData);
 
     // 2) 메타 힌트(LLM용)
     let metaHintForModel = "No file data provided.";
@@ -987,13 +994,50 @@ exports.handleConversion = async (req, res, next) => {
     let intent = buildLocalIntentFromText(message);
     const openai = getOpenAI();
 
-    // ✅ few-shot까지 고려한 LLM 호출 (아래 B에서 다시 수정)
+    // ---------------------------------------------
+    // Intent Cache (SKELETON) - default OFF
+    // ---------------------------------------------
+    // NOTE:
+    // - Cache stores INTENT ONLY (never formula/script).
+    // - Key must include context to avoid cross-file leakage.
+    //
+    // Enable later by setting: INTENT_CACHE_ENABLED=1
+    // ---------------------------------------------
+    const modelName = "gpt-4o-mini";
+    const intentSchemaVersion = "intent-v1";
+    const builderType = conversionType || "Excel/Google Sheets";
+    const userKey = req.user?.id ? `u:${req.user.id}` : `anon:${req.ip}`;
+    const targetRangeSig = null; // TODO: wire from UI when available (e.g. selected column/range)
+
+    if (intentCache.isEnabled()) {
+      const { key } = buildIntentCacheKey({
+        version: 1,
+        builderType,
+        model: modelName,
+        schemaVersion: intentSchemaVersion,
+        userKey,
+        prompt: message,
+        sheetStateSig: `${fileHash || "nofile"}|${sheetStateSig}`,
+        targetRangeSig,
+      });
+      _dbgIntentCacheKey = key;
+
+      const cached = await intentCache.get(key);
+      if (cached && cached.intent && typeof cached.intent === "object") {
+        console.log("[intentCache] HIT", key.slice(0, 8));
+        intent = { ...intent, ...cached.intent };
+      } else {
+        console.log("[intentCache] MISS", key.slice(0, 8));
+      }
+    }
+
+    // ✅ LLM 호출 (NOTE: few-shot 저장/재사용 비활성화)
     if (openai) {
       const llm = await extractIntentWithLLM(
         openai,
         message,
         metaHintForModel,
-        cacheData.fewShots || []
+        [] // fewShots disabled (no persistence)
       );
 
       if (llm && typeof llm === "object") {
@@ -1007,20 +1051,21 @@ exports.handleConversion = async (req, res, next) => {
 
     intent = normalizeLookupIntent(intent);
     intent.raw_message = message;
+    _dbgIntent = intent;
 
-    // 3.5) ✅ Intent까지 포함한 캐시 키로 조회
-    const cacheKey = buildCacheKey({
-      message,
-      fileHash,
-      allSheetsData,
-      intent,
-    });
-    const cachedFormula = cacheData.normalized?.[cacheKey];
-    if (cachedFormula) {
-      if (req.user?.id && shouldCountConversion(cachedFormula)) {
-        await bumpUsage(req.user.id, "formulaConversions", 1);
-      }
-      return res.json({ result: cachedFormula });
+    // store intent only (SKELETON)
+    if (intentCache.isEnabled() && _dbgIntentCacheKey) {
+      await intentCache.set(
+        _dbgIntentCacheKey,
+        {
+          intent,
+          meta: {
+            model: modelName,
+            schema: intentSchemaVersion,
+          },
+        },
+        600 // 10 min TTL (tune later)
+      );
     }
 
     // 4) 컨텍스트 구성 + 자동 열 매핑
@@ -1094,11 +1139,6 @@ exports.handleConversion = async (req, res, next) => {
       );
     }
 
-    // ✅ 캐시에 저장
-    cacheData.normalized = cacheData.normalized || {};
-    cacheData.normalized[cacheKey] = finalFormula;
-    formulaUtils.writeCache(cacheData, conversionType);
-
     if (req.user?.id && shouldCountConversion(finalFormula)) {
       await bumpUsage(req.user.id, "formulaConversions", 1);
     }
@@ -1106,11 +1146,15 @@ exports.handleConversion = async (req, res, next) => {
   } catch (err) {
     console.error("[handleConversion][error]", err);
     next(err);
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[INTENT_DEBUG] message:", message);
-    console.log("[INTENT_DEBUG] intent:", JSON.stringify(intent, null, 2));
+  } finally {
+    // ✅ 절대 크래시 나지 않는 디버그 로그
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[INTENT_DEBUG] message:", _dbgMessage);
+      console.log(
+        "[INTENT_DEBUG] intent:",
+        JSON.stringify(_dbgIntent, null, 2)
+      );
+    }
   }
 };
 
@@ -1119,38 +1163,7 @@ exports.handleConversion = async (req, res, next) => {
  * -------------------------------------------*/
 exports.handleFeedback = async (req, res, next) => {
   try {
-    const {
-      message,
-      intent,
-      formula,
-      isHelpful,
-      conversionType = "Excel/Google Sheets",
-    } = req.body || {};
-
-    // 최소 정보가 없으면 그냥 통과 (기존 API와의 호환)
-    if (!message || !intent || !formula) {
-      return res.status(200).json({ message: "피드백이 저장되었습니다." });
-    }
-
-    const cacheData = formulaUtils.readCache(conversionType);
-    cacheData.fewShots = cacheData.fewShots || [];
-
-    cacheData.fewShots.push({
-      message,
-      intent,
-      formula,
-      isHelpful: isHelpful !== false, // 기본 true 취급
-      ts: new Date().toISOString(),
-    });
-
-    // 너무 커지지 않게 최근 N개만 유지 (예: 50개)
-    if (cacheData.fewShots.length > 50) {
-      cacheData.fewShots = cacheData.fewShots.slice(-50);
-    }
-
-    formulaUtils.writeCache(cacheData, conversionType);
-
-    return res.status(200).json({ message: "피드백이 저장되었습니다." });
+    return res.status(200).json({ message: "피드백이 접수되었습니다." });
   } catch (error) {
     next(error);
   }

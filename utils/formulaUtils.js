@@ -1,4 +1,3 @@
-const fs = require("fs");
 const XLSX = require("xlsx");
 const { buildAllSheetsData } = require("./sheetMetaBuilder");
 
@@ -290,36 +289,14 @@ function fallbackNotFoundArg(ctxOrDefault) {
 }
 
 /* =========================================
-   캐시 IO
+   캐시 IO (DISABLED)
 ========================================= */
-const cacheFilePaths = {
-  "Excel/Google Sheets": "cache-excel.json",
-};
-
 function readCache(conversionType) {
-  const cacheFilePath = cacheFilePaths[conversionType];
-  const def = { normalized: {}, direct: {} };
-  if (!cacheFilePath) return def;
-  try {
-    if (fs.existsSync(cacheFilePath)) {
-      const data = fs.readFileSync(cacheFilePath, "utf8");
-      const parsed = JSON.parse(data);
-      return { ...def, ...parsed };
-    }
-  } catch (e) {
-    console.error(`캐시 읽기 오류(${cacheFilePath}):`, e);
-  }
-  return def;
+  return { normalized: {}, direct: {}, fewShots: [] };
 }
 
 function writeCache(cacheData, conversionType) {
-  const cacheFilePath = cacheFilePaths[conversionType];
-  if (!cacheFilePath) return;
-  try {
-    fs.writeFileSync(cacheFilePath, JSON.stringify(cacheData, null, 2), "utf8");
-  } catch (e) {
-    console.error(`캐시 쓰기 오류(${cacheFilePath}):`, e);
-  }
+  return;
 }
 
 /* =========================================
