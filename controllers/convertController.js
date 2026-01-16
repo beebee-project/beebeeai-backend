@@ -1258,9 +1258,9 @@ exports.handleFeedback = async (req, res, next) => {
     }
     // ✅ '수정 필요'(isHelpful=false)면 reason 필수
     if (isHelpful === false && !why) {
-      return res
-        .status(400)
-        .json({ error: "수정이 필요한 이유를 알려주세요." });
+      return res.status(400).json({
+        error: "어떤 부분이 수정이 필요한지 알려주시면 도움이 됩니다.",
+      });
     }
 
     const saved = await appendFeedback({
