@@ -11,6 +11,7 @@ async function getOrBuildAllSheetsData(fileBuffer) {
   const hash = md5Buffer(fileBuffer);
   const cacheKey = `sheetsMeta_${hash}`;
 
+  // ✅ Enable meta-cache read (performance)
   const cached = await readMetaCache(cacheKey);
   if (cached && cached.allSheetsData) {
     return { fileHash: hash, allSheetsData: cached.allSheetsData };

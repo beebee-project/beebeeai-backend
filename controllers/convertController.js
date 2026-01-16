@@ -943,6 +943,30 @@ exports.handleConversion = async (req, res, next) => {
   let _dbgMessage = null;
   let _dbgIntent = null;
   let _dbgIntentCacheKey = null;
+  let _dbgCacheHit = null;
+
+  // ---- timing (ms) ----
+  const _t0 = process.hrtime.bigint();
+  let _tPreStart = null,
+    _tPreEnd = null;
+  let _tIntentStart = null,
+    _tIntentEnd = null;
+  let _tBuildStart = null,
+    _tBuildEnd = null;
+
+  function _ms(a, b) {
+    if (!a || !b) return null;
+    return Number(b - a) / 1e6;
+  }
+
+  function _shouldLogTiming() {
+    // Dev: always
+    if (process.env.NODE_ENV !== "production") return true;
+    // Prod: sample (default 1%)
+    const rate = Number(process.env.CONVERT_TIMING_LOG_RATE || "0.01");
+    if (!(rate > 0)) return false;
+    return Math.random() < rate;
+  }
 
   try {
     const {
@@ -969,8 +993,10 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     // 1) 파일 전처리(옵션)
+    _tPreStart = process.hrtime.bigint();
     const { isFileAttached, preprocessed } =
       await loadAndPreprocessFromBucketIfPossible(req.user, fileName);
+    _tPreEnd = process.hrtime.bigint();
 
     const fileHash = preprocessed?.fileHash || null;
     const allSheetsData = preprocessed?.allSheetsData || null;
@@ -993,6 +1019,8 @@ exports.handleConversion = async (req, res, next) => {
     // 3) 의도 추출 (OpenAI 있으면 LLM, 없으면 로컬)
     let intent = buildLocalIntentFromText(message);
     const openai = getOpenAI();
+
+    _tIntentStart = process.hrtime.bigint();
 
     // ---------------------------------------------
     // Intent Cache (SKELETON) - default OFF
@@ -1026,17 +1054,18 @@ exports.handleConversion = async (req, res, next) => {
       const cached = await intentCache.get(key);
 
       if (cached && cached.intent && typeof cached.intent === "object") {
-        cacheHit = true;
+        _dbgCacheHit = true;
         console.log("[intentCache] HIT", key.slice(0, 8));
         intent = { ...intent, ...cached.intent };
       } else {
+        _dbgCacheHit = false;
         console.log("[intentCache] MISS", key.slice(0, 8));
       }
     }
 
     // ✅ LLM 호출 (single place)
     const skipLLMOnHit = process.env.INTENT_CACHE_SKIP_LLM_ON_HIT === "1";
-    if (openai && !(skipLLMOnHit && cacheHit)) {
+    if (openai && !(skipLLMOnHit && _dbgCacheHit === true)) {
       const llm = await extractIntentWithLLM(
         openai,
         message,
@@ -1057,6 +1086,8 @@ exports.handleConversion = async (req, res, next) => {
     intent.raw_message = message;
     _dbgIntent = intent;
 
+    _tIntentEnd = process.hrtime.bigint();
+
     // store intent only (SKELETON)
     if (intentCache.isEnabled() && _dbgIntentCacheKey) {
       await intentCache.set(
@@ -1073,6 +1104,7 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     // 4) 컨텍스트 구성 + 자동 열 매핑
+    _tBuildStart = process.hrtime.bigint();
     const context = { intent, formulaBuilder };
     if (isFileAttached && allSheetsData) {
       const hasHints = !!(
@@ -1142,6 +1174,7 @@ exports.handleConversion = async (req, res, next) => {
         formulaBuilder._buildConditionPairs
       );
     }
+    _tBuildEnd = process.hrtime.bigint();
 
     if (req.user?.id && shouldCountConversion(finalFormula)) {
       await bumpUsage(req.user.id, "formulaConversions", 1);
@@ -1151,6 +1184,26 @@ exports.handleConversion = async (req, res, next) => {
     console.error("[handleConversion][error]", err);
     next(err);
   } finally {
+    if (_shouldLogTiming()) {
+      const tTotal = _ms(_t0, process.hrtime.bigint());
+      const tPre = _ms(_tPreStart, _tPreEnd);
+      const tIntent = _ms(_tIntentStart, _tIntentEnd);
+      const tBuild = _ms(_tBuildStart, _tBuildEnd);
+      const user = req.user?.id ? String(req.user.id) : "anon";
+      const file =
+        req.body && req.body.fileName ? String(req.body.fileName) : "-";
+      const cache =
+        _dbgCacheHit === true ? "HIT" : _dbgCacheHit === false ? "MISS" : "NA";
+      console.log(
+        `[convert.timing] total=${tTotal?.toFixed?.(
+          1
+        )}ms preprocess=${tPre?.toFixed?.(1)}ms intent=${tIntent?.toFixed?.(
+          1
+        )}ms build=${tBuild?.toFixed?.(
+          1
+        )}ms cache=${cache} user=${user} file=${file}`
+      );
+    }
     // ✅ 절대 크래시 나지 않는 디버그 로그
     if (process.env.NODE_ENV !== "production") {
       console.log("[INTENT_DEBUG] message:", _dbgMessage);
