@@ -1252,13 +1252,15 @@ exports.handleFeedback = async (req, res, next) => {
     const why = typeof reason === "string" ? reason.trim() : "";
 
     if (!msg || !out) {
-      return res.status(400).json({ error: "message and result are required" });
+      return res
+        .status(400)
+        .json({ error: "질문 내용과 결과가 모두 필요합니다." });
     }
     // ✅ '수정 필요'(isHelpful=false)면 reason 필수
     if (isHelpful === false && !why) {
       return res
         .status(400)
-        .json({ error: "reason is required when isHelpful is false" });
+        .json({ error: "수정 필요의 경우, 이유가 필요합니다." });
     }
 
     const saved = await appendFeedback({
