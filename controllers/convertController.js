@@ -710,7 +710,7 @@ async function loadAndPreprocessFromBucketIfPossible(user, fileName) {
   if (logLP) {
     console.log(
       "[loadAndPreprocess] got allSheetsData keys:",
-      Object.keys(preprocessed?.allSheetsData || {})
+      Object.keys(allSheetsData || {})
     );
   }
 
