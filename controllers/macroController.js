@@ -2,6 +2,7 @@ const macroService = require("../macro/index");
 const { assertCanUse, bumpUsage } = require("../services/usageService");
 const { writeRequestLog } = require("../services/requestLogService");
 const crypto = require("crypto");
+const { classifyReason } = require("../utils/reasonClassifier");
 
 function isUnsupportedMacro(result) {
   // 1) intent 기반
@@ -21,16 +22,19 @@ exports.generateMacro = async (req, res) => {
     const { prompt, target } = req.body;
 
     if (!prompt) {
+      const rawReason = "MISSING_PROMPT";
+      const reasonNorm = classifyReason({ reason: rawReason, prompt });
       await writeRequestLog({
         traceId,
         userId: req.user?.id,
         route: "/macro/generate",
         engine: target || "macro",
         status: "fail",
-        reason: "MISSING_PROMPT",
+        reason: reasonNorm,
         isFallback: false,
         prompt,
         latencyMs: Date.now() - startedAt,
+        debugMeta: { rawReason },
       });
       return res.status(400).json({ error: "prompt is required" });
     }
@@ -45,17 +49,20 @@ exports.generateMacro = async (req, res) => {
 
     // ✅ 미지원/실패는 성공으로 치지 않음
     if (isUnsupportedMacro(result)) {
+      const rawReason = "UNSUPPORTED_MACRO";
+      const reasonNorm = classifyReason({ reason: rawReason, prompt, result });
+
       await writeRequestLog({
         traceId,
         userId: req.user?.id,
         route: "/macro/generate",
         engine: target || "macro",
         status: "fail",
-        reason: "UNSUPPORTED_MACRO",
+        reason: reasonNorm,
         isFallback: true,
         prompt,
         latencyMs: Date.now() - startedAt,
-        debugMeta: { intentType: result?.intent?.type },
+        debugMeta: { rawReason, intentType: result?.intent?.type },
       });
       return res.status(422).json({
         code: "UNSUPPORTED_MACRO",
@@ -64,35 +71,44 @@ exports.generateMacro = async (req, res) => {
       });
     }
 
-    // ✅ 성공 시 카운트 증가
-    if (req.user?.id) {
+    // ✅ 성공 로그는 항상 남기기(운영 지표 목적). 카운트만 로그인 유저에 한해 증가.
+    {
+      const rawReason = "OK";
+      const reasonNorm = classifyReason({ reason: rawReason, prompt, result });
       await writeRequestLog({
         traceId,
         userId: req.user?.id,
         route: "/macro/generate",
         engine: target || "macro",
         status: "success",
-        reason: "OK",
+        reason: reasonNorm,
         isFallback: false,
         prompt,
         latencyMs: Date.now() - startedAt,
+        debugMeta: { rawReason },
       });
+    }
+
+    if (req.user?.id) {
       await bumpUsage(req.user.id, "formulaConversions", 1);
     }
 
     res.json(result);
   } catch (e) {
+    const { prompt, target } = req.body || {};
+    const rawReason = e?.code || "MACRO_FAILED";
+    const reasonNorm = classifyReason({ reason: rawReason, prompt, error: e });
     await writeRequestLog({
       traceId,
       userId: req.user?.id,
       route: "/macro/generate",
       engine: target || "macro",
       status: "fail",
-      reason: e?.code || "MACRO_FAILED",
+      reason: reasonNorm,
       isFallback: false,
       prompt,
       latencyMs: Date.now() - startedAt,
-      debugMeta: { status: e?.status, message: e?.message },
+      debugMeta: { rawReason, status: e?.status, message: e?.message },
     });
     console.error("[generateMacro] error:", e);
     const status = e?.status || 500;
