@@ -4,6 +4,8 @@ const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const { buildIntentCacheKey } = require("../utils/intentCacheKeyBuilder");
 const { makeSheetStateSig } = require("../utils/sheetStateSig");
 const intentCache = require("../services/intentCache");
+const { writeRequestLog } = require("../services/requestLogService");
+const crypto = require("crypto");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -986,6 +988,11 @@ exports.handleConversion = async (req, res, next) => {
     return Math.random() < rate;
   }
 
+  const traceId = crypto.randomUUID
+    ? crypto.randomUUID()
+    : crypto.randomBytes(16).toString("hex");
+  const startedAt = Date.now();
+
   try {
     const {
       message,
@@ -1175,6 +1182,18 @@ exports.handleConversion = async (req, res, next) => {
         if (req.user?.id && shouldCountConversion(f)) {
           await bumpUsage(req.user.id, "formulaConversions", 1);
         }
+        await writeRequestLog({
+          traceId,
+          userId: req.user?.id,
+          route: "/convert",
+          engine: "formula",
+          status: "success",
+          reason: "OK",
+          isFallback: false,
+          prompt: message,
+          latencyMs: Date.now() - startedAt,
+          debugMeta: { cacheHit: _dbgCacheHit, intentOp: intent?.operation },
+        });
         return res.json({ result: f });
       }
     }
@@ -1201,8 +1220,36 @@ exports.handleConversion = async (req, res, next) => {
     if (req.user?.id && shouldCountConversion(finalFormula)) {
       await bumpUsage(req.user.id, "formulaConversions", 1);
     }
+    await writeRequestLog({
+      traceId,
+      userId: req.user?.id,
+      route: "/convert",
+      engine: "formula",
+      status: shouldCountConversion(finalFormula) ? "success" : "fail",
+      reason: shouldCountConversion(finalFormula)
+        ? "OK"
+        : String(finalFormula || "").startsWith("=ERROR(")
+          ? "ERROR_FORMULA"
+          : "UNKNOWN",
+      isFallback: false,
+      prompt: message,
+      latencyMs: Date.now() - startedAt,
+      debugMeta: { cacheHit: _dbgCacheHit, intentOp: intent?.operation },
+    });
     return res.json({ result: finalFormula });
   } catch (err) {
+    await writeRequestLog({
+      traceId,
+      userId: req.user?.id,
+      route: "/convert",
+      engine: "formula",
+      status: "fail",
+      reason: "EXCEPTION",
+      isFallback: false,
+      prompt: _dbgMessage || "",
+      latencyMs: Date.now() - startedAt,
+      debugMeta: { error: err?.message, stack: err?.stack?.slice?.(0, 500) },
+    });
     console.error("[handleConversion][error]", err);
     next(err);
   } finally {
