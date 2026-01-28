@@ -323,16 +323,37 @@ function indexToColumnLetter(idx) {
 
 function bestHeaderInSheet(sheetInfo, sheetName, termSet, operation) {
   const MINIMUM_SCORE_THRESHOLD = 10;
+  // ambiguity(불확실) 판단을 위한 Top-2 추적
+  // gap이 작으면 "그럴듯하게 틀림" 위험이 큼 → 상위에서 ERROR/확인 유도
+  const AMBIGUOUS_GAP_THRESHOLD = 12; // 초기값(보수적). 운영 피드백으로 튜닝
+
   let best = { header: "", score: -1, col: null };
+  let runnerUp = { header: "", score: -1, col: null };
 
   const meta = sheetInfo.metaData || {};
   for (const [header, metaInfo] of Object.entries(meta)) {
     const s = scoreColumn(sheetName, header, metaInfo, termSet, operation);
-    if (s > best.score) best = { header, score: s, col: metaInfo };
+    if (s > best.score) {
+      runnerUp = best;
+      best = { header, score: s, col: metaInfo };
+    } else if (s > runnerUp.score) {
+      runnerUp = { header, score: s, col: metaInfo };
+    }
   }
   if (best.score < MINIMUM_SCORE_THRESHOLD)
-    return { header: "", score: 0, col: null };
-  return best;
+    return {
+      header: "",
+      score: 0,
+      col: null,
+      runnerUp: null,
+      gap: 0,
+      isAmbiguous: false,
+    };
+
+  const gap = best.score - (runnerUp?.score ?? -1);
+  const isAmbiguous = !!(runnerUp?.col && gap < AMBIGUOUS_GAP_THRESHOLD);
+
+  return { ...best, runnerUp, gap, isAmbiguous };
 }
 
 function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
@@ -349,6 +370,11 @@ function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
       columnLetter: colMeta.columnLetter,
       startRow: colMeta.startRow || sheetInfo.startRow,
       lastDataRow: colMeta.lastRow || sheetInfo.lastDataRow,
+      // ambiguity info (Top-2)
+      isAmbiguous: !!cand.isAmbiguous,
+      ambiguityGap: cand.gap ?? 0,
+      runnerUpHeader: cand.runnerUp?.header || null,
+      runnerUpColumnLetter: cand.runnerUp?.col?.columnLetter || null,
     };
 
     if (!winner || hit.score > winner.score) winner = hit;

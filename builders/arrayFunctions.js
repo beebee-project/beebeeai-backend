@@ -51,6 +51,43 @@ function _dateVal(iso) {
   return `DATEVALUE(${_q(iso)})`;
 }
 
+// ---------- Step2: normalize/coerce helpers ----------
+function _trimText(expr) {
+  // 숫자/빈값/날짜 모두 문자열로 안전 변환 후 TRIM
+  return `TRIM(${expr}&"")`;
+}
+
+function _normText(expr, cs) {
+  // case-insensitive면 LOWER 적용
+  const t = _trimText(expr);
+  return cs ? t : `LOWER(${t})`;
+}
+
+function _coerceNumber(expr) {
+  // "00123" 같은 문자열 숫자를 숫자로
+  // 실패하면 원본 유지(에러 방지)
+  return `IFERROR(VALUE(${_trimText(expr)}), ${expr})`;
+}
+
+function _coerceDate(expr) {
+  // 텍스트 날짜면 DATEVALUE로, 이미 날짜/시리얼이면 원본 유지
+  return `IFERROR(DATEVALUE(${_trimText(expr)}), ${expr})`;
+}
+
+function _isSheetsContext(ctx) {
+  // ctx / intent에 "Sheets" 힌트가 있으면 Sheets로 간주
+  const it = ctx?.intent || {};
+  const hint = String(
+    it.engine ||
+      it.platform ||
+      it.target_app ||
+      it.conversionType ||
+      ctx?.conversionType ||
+      ""
+  ).toLowerCase();
+  return hint.includes("sheet");
+}
+
 // ---------- 텍스트 연산 보조(케이스 민감도 토글) ----------
 function _hasCaseInsensInlineFlag(pattern) {
   const p = String(pattern || "");
@@ -75,21 +112,30 @@ function _stripCaseInsensInlineFlag(pattern) {
 }
 
 function _containsExpr(colA1, needle, cs) {
+  // Step2: 공백/타입 혼합 안정화 (TRIM + &"")
+  const colN = _normText(colA1, cs);
+  const ndl = cs ? String(needle ?? "") : String(needle ?? "").toLowerCase();
   return cs
-    ? `ISNUMBER(FIND(${_q(needle)}, ${colA1}))`
-    : `ISNUMBER(SEARCH(${_q(needle)}, ${colA1}))`;
+    ? `ISNUMBER(FIND(${_q(ndl)}, ${colN}))`
+    : `ISNUMBER(SEARCH(${_q(ndl)}, ${colN}))`;
 }
 
 function _startsWithExpr(colA1, needle, cs) {
+  const colN = _normText(colA1, cs);
+  const ndl = cs ? String(needle ?? "") : String(needle ?? "").toLowerCase();
+  const q = _q(ndl);
   return cs
-    ? `EXACT(LEFT(${colA1}, LEN(${_q(needle)})), ${_q(needle)})`
-    : `LOWER(LEFT(${colA1}, LEN(${_q(needle)})))=LOWER(${_q(needle)})`;
+    ? `EXACT(LEFT(${colN}, LEN(${q})), ${q})`
+    : `LEFT(${colN}, LEN(${q}))=${q}`;
 }
 
 function _endsWithExpr(colA1, needle, cs) {
+  const colN = _normText(colA1, cs);
+  const ndl = cs ? String(needle ?? "") : String(needle ?? "").toLowerCase();
+  const q = _q(ndl);
   return cs
-    ? `EXACT(RIGHT(${colA1}, LEN(${_q(needle)})), ${_q(needle)})`
-    : `LOWER(RIGHT(${colA1}, LEN(${_q(needle)})))=LOWER(${_q(needle)})`;
+    ? `EXACT(RIGHT(${colN}, LEN(${q})), ${q})`
+    : `RIGHT(${colN}, LEN(${q}))=${q}`;
 }
 
 function _regexMatchExpr(colA1, pattern, cs, strict) {
@@ -106,10 +152,18 @@ function _normRange(rg) {
 // --- Build concatenated normalized key vector from multiple ranges ---
 function _concatKeyVector(ranges, sep = "|") {
   if (!Array.isArray(ranges) || !ranges.length) return null;
+  // Step3-2: 복합키 안정화
+  // - BYROW의 r는 "현재 행" 배열이므로 ROW(r)을 그대로 INDEX에 넣으면(절대행번호) 범위 시작행/형태에 따라 흔들릴 수 있음
+  // - i = 현재행의 상대 인덱스(1부터)로 계산해서 모든 range에 동일하게 적용
+  // - 각 키 파트는 TRIM + UPPER + 문자열 강제(&"")로 타입/공백 혼합을 안정화
+  const base = ranges[0];
   const parts = ranges
-    .map((rg) => `UPPER(TRIM("")&TRIM(""&INDEX(${rg}, ROW(r))))`)
+    .map((rg) => `UPPER(TRIM(INDEX(${rg}, i)&""))`)
     .join(`&${_q(sep)}&`);
-  return `BYROW(${ranges[0]}, LAMBDA(r, ${parts}))`;
+
+  // i: base 범위의 첫 셀을 기준으로 현재 행의 상대 인덱스
+  // ROW(r)은 현재 행의 절대 행번호 → base의 시작행을 빼서 1부터 만드는 방식
+  return `BYROW(${base}, LAMBDA(r, LET(i, ROW(r)-ROW(INDEX(${base}, 1, 1))+1, ${parts})))`;
 }
 
 // 공통: 기본 대상 범위 해석
@@ -147,6 +201,9 @@ const arrayFunctionBuilder = {
     const returnRangeSingle = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 
     // 1) 조건 마스크 (AND/*, OR/+)
+    // Step2: regex가 Excel에서 불가하므로, 필요 시 조기에 ERROR 반환
+    let earlyError = null;
+    const isSheets = _isSheetsContext(ctx);
     const condNodes = Array.isArray(intent.conditions) ? intent.conditions : [];
     const masks = condNodes
       .map((cond) => {
@@ -158,15 +215,22 @@ const arrayFunctionBuilder = {
           "lookup"
         );
         if (!bestCol?.col) return null;
+        // Step1 연계: 열 후보가 모호하면 오답 대신 중단
+        if (bestCol.isAmbiguous) {
+          earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
+          return null;
+        }
         const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
 
         const rawOp = String(cond.operator || "=").toLowerCase();
         const op = _normalizeOp(rawOp);
         const rawVal = cond.value;
 
-        if (_isISODate(rawVal)) return `${colA1}${op}${_dateVal(rawVal)}`;
+        // Step2: 날짜/숫자 비교는 열 값을 안전 coercion
+        if (_isISODate(rawVal))
+          return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
         if (_isNumericLiteral(rawVal))
-          return `${colA1}${op}${String(rawVal).replace(/,/g, "")}`;
+          return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
 
         const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
         if (["contains", "포함"].includes(rawOp))
@@ -180,26 +244,53 @@ const arrayFunctionBuilder = {
           Array.isArray(cond.values) &&
           cond.values.length
         ) {
-          const alts = cond.values.map(
-            (v) => `${colA1}=${_isNumericLiteral(v) ? String(v) : _q(v)}`
-          );
-          return `(${alts.join(" + ")})>0`;
+          // Step2: IN은 MATCH 기반(텍스트는 TRIM/LOWER 정규화)
+          const colN = _normText(colA1, cs);
+          const values = cond.values.map((v) => {
+            if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
+            const s = cs
+              ? String(v ?? "").trim()
+              : String(v ?? "")
+                  .trim()
+                  .toLowerCase();
+            return _q(s);
+          });
+          return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
         }
         if (rawOp === "between" && cond.min != null && cond.max != null) {
-          const L = _isNumericLiteral(cond.min)
-            ? String(cond.min)
-            : _dateVal(String(cond.min));
-          const R = _isNumericLiteral(cond.max)
-            ? String(cond.max)
-            : _dateVal(String(cond.max));
-          return `(${colA1}>=${L})*(${colA1}<=${R})`;
+          const isNum =
+            _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
+          const isDate = _isISODate(cond.min) && _isISODate(cond.max);
+          if (isNum) {
+            const L = String(cond.min).replace(/,/g, "");
+            const R = String(cond.max).replace(/,/g, "");
+            const left = _coerceNumber(colA1);
+            return `(${left}>=${L})*(${left}<=${R})`;
+          }
+          if (isDate) {
+            const L = _dateVal(String(cond.min));
+            const R = _dateVal(String(cond.max));
+            const left = _coerceDate(colA1);
+            return `(${left}>=${L})*(${left}<=${R})`;
+          }
+          // fallback
+          const L = _q(cond.min);
+          const R = _q(cond.max);
+          const left = _trimText(colA1);
+          return `(${left}>=${L})*(${left}<=${R})`;
         }
         if (["matches", "regex"].includes(rawOp)) {
+          // Step2: REGEXMATCH는 Sheets 전용으로 운영(Excel이면 안전하게 중단)
+          if (!isSheets) {
+            earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
+            return null;
+          }
           const strict =
             (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
           return _regexMatchExpr(colA1, rawVal, cs, strict);
         }
-        return `${colA1}${op}${_q(rawVal)}`;
+        // Step2: 문자열 비교도 TRIM 기반으로 안정화
+        return `${_trimText(colA1)}${op}${_q(rawVal)}`;
       })
       .filter(Boolean);
 
@@ -220,13 +311,18 @@ const arrayFunctionBuilder = {
               "lookup"
             );
             if (!bestCol?.col) return null;
+            if (bestCol.isAmbiguous) {
+              earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
+              return null;
+            }
             const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
             const rawOp = String(cond.operator || "=").toLowerCase();
             const op = _normalizeOp(rawOp);
             const rawVal = cond.value;
-            if (_isISODate(rawVal)) return `${colA1}${op}${_dateVal(rawVal)}`;
+            if (_isISODate(rawVal))
+              return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
             if (_isNumericLiteral(rawVal))
-              return `${colA1}${op}${String(rawVal).replace(/,/g, "")}`;
+              return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
             const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
             if (["contains", "포함"].includes(rawOp))
               return _containsExpr(colA1, rawVal, cs);
@@ -239,26 +335,49 @@ const arrayFunctionBuilder = {
               Array.isArray(cond.values) &&
               cond.values.length
             ) {
-              const alts = cond.values.map(
-                (v) => `${colA1}=${_isNumericLiteral(v) ? String(v) : _q(v)}`
-              );
-              return `(${alts.join(" + ")})>0`;
+              const colN = _normText(colA1, cs);
+              const values = cond.values.map((v) => {
+                if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
+                const s = cs
+                  ? String(v ?? "").trim()
+                  : String(v ?? "")
+                      .trim()
+                      .toLowerCase();
+                return _q(s);
+              });
+              return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
             }
             if (rawOp === "between" && cond.min != null && cond.max != null) {
-              const L = _isNumericLiteral(cond.min)
-                ? String(cond.min)
-                : _dateVal(String(cond.min));
-              const R = _isNumericLiteral(cond.max)
-                ? String(cond.max)
-                : _dateVal(String(cond.max));
-              return `(${colA1}>=${L})*(${colA1}<=${R})`;
+              const isNum =
+                _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
+              const isDate = _isISODate(cond.min) && _isISODate(cond.max);
+              if (isNum) {
+                const L = String(cond.min).replace(/,/g, "");
+                const R = String(cond.max).replace(/,/g, "");
+                const left = _coerceNumber(colA1);
+                return `(${left}>=${L})*(${left}<=${R})`;
+              }
+              if (isDate) {
+                const L = _dateVal(String(cond.min));
+                const R = _dateVal(String(cond.max));
+                const left = _coerceDate(colA1);
+                return `(${left}>=${L})*(${left}<=${R})`;
+              }
+              const L = _q(cond.min);
+              const R = _q(cond.max);
+              const left = _trimText(colA1);
+              return `(${left}>=${L})*(${left}<=${R})`;
             }
             if (["matches", "regex"].includes(rawOp)) {
+              if (!isSheets) {
+                earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
+                return null;
+              }
               const strict =
                 (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
               return _regexMatchExpr(colA1, rawVal, cs, strict);
             }
-            return `${colA1}${op}${_q(rawVal)}`;
+            return `${_trimText(colA1)}${op}${_q(rawVal)}`;
           })
           .filter(Boolean);
         const useOR = String(g.logical || "AND").toUpperCase() === "OR";
@@ -306,6 +425,7 @@ const arrayFunctionBuilder = {
 
     const finalMask = (combinedMask || "TRUE") + blankMaskExpr; // 조건 없을 때도 TRUE에서 시작
     let maskExpr = finalMask;
+    if (earlyError) return earlyError;
 
     // 2) 조인(inner/left) 및 오른쪽 열 픽업
     const joins = Array.isArray(intent.joins) ? intent.joins : [];
@@ -342,10 +462,11 @@ const arrayFunctionBuilder = {
       }
       if (!leftRanges.length || !rightRanges.length) continue;
 
+      // Step3: JOIN 존재 마스크를 "행 단위(MAP)"로 고정 (배열 MATCH 흔들림 방지)
       const joinMasks = leftRanges.map((lr, i) => {
         const L = _normRange(lr);
         const R = _normRange(rightRanges[i]);
-        return `ISNUMBER(MATCH(${L}, ${R}, 0))`;
+        return `MAP(${L}, LAMBDA(k, ISNUMBER(MATCH(k, ${R}, 0))))`;
       });
       const joinMaskExpr = joinMasks.join(" * ");
       const joinType = String(j.type || "inner").toLowerCase();
@@ -369,14 +490,15 @@ const arrayFunctionBuilder = {
           const L = _normRange(leftRanges[0]);
           const R = _normRange(rightRanges[0]);
           rightPickExprs.push(
-            `XLOOKUP(${L}, ${R}, ${retRange}, ${notFoundFill}, 0)`
+            // Step3: 픽업도 "행 단위(MAP)"로 고정
+            `MAP(${L}, LAMBDA(k, XLOOKUP(k, ${R}, ${retRange}, ${notFoundFill}, 0)))`
           );
         } else {
           const leftKeyVec = _concatKeyVector(leftRanges);
           const rightKeyVec = _concatKeyVector(rightRanges);
           if (leftKeyVec && rightKeyVec) {
             rightPickExprs.push(
-              `XLOOKUP(${leftKeyVec}, ${rightKeyVec}, ${retRange}, ${notFoundFill}, 0)`
+              `MAP(${leftKeyVec}, LAMBDA(k, XLOOKUP(k, ${rightKeyVec}, ${retRange}, ${notFoundFill}, 0)))`
             );
           }
         }
@@ -548,12 +670,12 @@ const arrayFunctionBuilder = {
       (agg === "sum"
         ? `SUM(${param})`
         : agg === "max"
-        ? `MAX(${param})`
-        : agg === "min"
-        ? `MIN(${param})`
-        : agg === "avg"
-        ? `AVERAGE(${param})`
-        : `SUM(${param})`);
+          ? `MAX(${param})`
+          : agg === "min"
+            ? `MIN(${param})`
+            : agg === "avg"
+              ? `AVERAGE(${param})`
+              : `SUM(${param})`);
     return `=BYROW(${range}, LAMBDA(${param}, ${body}))`;
   },
   bycol: function (ctx) {
@@ -566,12 +688,12 @@ const arrayFunctionBuilder = {
       (agg === "sum"
         ? `SUM(${param})`
         : agg === "max"
-        ? `MAX(${param})`
-        : agg === "min"
-        ? `MIN(${param})`
-        : agg === "avg"
-        ? `AVERAGE(${param})`
-        : `MAX(${param})`);
+          ? `MAX(${param})`
+          : agg === "min"
+            ? `MIN(${param})`
+            : agg === "avg"
+              ? `AVERAGE(${param})`
+              : `MAX(${param})`);
     return `=BYCOL(${range}, LAMBDA(${param}, ${body}))`;
   },
   map: function (ctx) {
@@ -579,8 +701,8 @@ const arrayFunctionBuilder = {
     const arrSpecs = Array.isArray(it.arrays)
       ? it.arrays
       : it.array
-      ? [it.array]
-      : [];
+        ? [it.array]
+        : [];
     if (!arrSpecs.length) return `=ERROR("MAP: arrays 파라미터가 필요합니다.")`;
     const normalized = arrSpecs.map((s) => _broadcastToColumn(s, ctx));
     const { vectors } = _alignManyToColumn(normalized, ctx);
@@ -770,6 +892,8 @@ function pipeSortIfRequested(ctx, intent, expr, selectedIndexMap) {
         "lookup"
       );
       if (!lCol?.col || !rCol?.col) continue;
+      // ✅ join 키가 모호하면 조인 자체가 "그럴듯하게 틀림"을 만들기 쉬움 → 스킵
+      if (lCol.isAmbiguous || rCol.isAmbiguous) continue;
       leftRanges.push(
         `'${ctx.bestReturn.sheetName}'!${lCol.col.columnLetter}${sheetInfo.startRow}:${lCol.col.columnLetter}${sheetInfo.lastDataRow}`
       );
@@ -793,7 +917,8 @@ function pipeSortIfRequested(ctx, intent, expr, selectedIndexMap) {
         rightRanges.length === 1
           ? _normRange(rightRanges[0])
           : _concatKeyVector(rightRanges);
-      return `=LET(LK, ${Lvec}, RK, ${Rvec}, SV, XLOOKUP(LK, RK, ${rightSortRange},,0), SORTBY(${expr}, SV, ${order}))`;
+      // Step3: 조인 기반 sortKey도 행 단위로 안정화
+      return `=LET(LK, ${Lvec}, RK, ${Rvec}, SV, MAP(LK, LAMBDA(k, XLOOKUP(k, RK, ${rightSortRange}, , 0))), SORTBY(${expr}, SV, ${order}))`;
     }
   }
   return `=${expr}`;

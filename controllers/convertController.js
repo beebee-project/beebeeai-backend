@@ -608,6 +608,14 @@ const formulaBuilder = {
         );
         if (!best) return null;
 
+        // ✅ 불확실(Top2 gap 좁음)하면 "그럴듯하게 틀림" 방지를 위해 즉시 중단
+        if (best.isAmbiguous) {
+          const candA = best.header || "후보1";
+          const candB = best.runnerUpHeader || "후보2";
+          ctx.__errorFormula = `=ERROR("조건 열이 모호합니다: '${candA}' 또는 '${candB}' 중 선택이 필요합니다.")`;
+          return null;
+        }
+
         const range = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
 
         const op = c.operator || "=";
@@ -1355,12 +1363,15 @@ async function convert(nl, options = {}, meta = {}) {
   const op = resolveOp(ctx.intent?.operation);
   if (!op) return '=ERROR("알 수 없는 operation 입니다.")';
 
-  return formulaBuilder[op](
+  const built = formulaBuilder[op](
     ctx,
     (v, o) =>
       formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
     formulaBuilder._buildConditionPairs
   );
+  // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
+  if (ctx.__errorFormula) return ctx.__errorFormula;
+  return built;
 }
 
 module.exports.convert = convert;
