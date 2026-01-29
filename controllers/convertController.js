@@ -7,6 +7,8 @@ const intentCache = require("../services/intentCache");
 const { writeRequestLog } = require("../services/requestLogService");
 const crypto = require("crypto");
 const { classifyReason } = require("../utils/reasonClassifier");
+const { validateFormula } = require("../utils/outputValidator");
+const { buildDebugMeta } = require("../utils/debugMetaBuilder");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -333,7 +335,7 @@ function buildLocalIntentFromText(text = "") {
   // ✅ 1. Lookup / 조회 패턴 감지
   // 예: "홍길동의 매출", "이름으로 점수 찾기"
   const lookupMatch = s.match(
-    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i
+    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
   );
   if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
     intent.operation = "xlookup";
@@ -354,7 +356,7 @@ function buildLocalIntentFromText(text = "") {
     intent.conditions = [];
     // 단순 조건 키워드 추출 ("서울", "지점", "카테고리")
     const condMatch = s.match(
-      /(지역|지점|카테고리|부서|분류|도시|날짜|월|년도|날)/
+      /(지역|지점|카테고리|부서|분류|도시|날짜|월|년도|날)/,
     );
     if (condMatch) {
       intent.conditions.push({
@@ -412,7 +414,7 @@ function buildLocalIntentFromText(text = "") {
   // 예: "최근 7일 매출", "지난달 평균 매출"
   if (/최근|지난|이번|오늘|yesterday|today|month|week|day/.test(s)) {
     const numMatch = s.match(
-      /([0-9]+)\s*(일|day|days|주|week|weeks|달|month|months)/
+      /([0-9]+)\s*(일|day|days|주|week|weeks|달|month|months)/,
     );
     const size = numMatch ? parseInt(numMatch[1], 10) : 7;
     intent.window = { type: "days", size, date_header: "날짜" };
@@ -607,7 +609,7 @@ const formulaBuilder = {
         const best = formulaUtils.findBestColumnAcrossSheets(
           allSheetsData,
           term,
-          "lookup"
+          "lookup",
         );
         if (!best) return null;
 
@@ -721,7 +723,7 @@ async function loadAndPreprocessFromBucketIfPossible(user, fileName) {
   if (logLP) {
     console.log(
       "[loadAndPreprocess] got allSheetsData keys:",
-      Object.keys(allSheetsData || {})
+      Object.keys(allSheetsData || {}),
     );
   }
 
@@ -878,7 +880,7 @@ Only follow the JSON structure shown above. For each new user request, return ex
 
 function buildFewShotBlock(fewShots = []) {
   const good = (fewShots || []).filter(
-    (fs) => fs && fs.isHelpful !== false && fs.intent && fs.message
+    (fs) => fs && fs.isHelpful !== false && fs.intent && fs.message,
   );
 
   // 최근 5개 정도만 사용
@@ -904,7 +906,7 @@ async function extractIntentWithLLM(
   openai,
   message,
   metaHintForModel,
-  fewShots = []
+  fewShots = [],
 ) {
   const fewShotText = buildFewShotBlock(fewShots);
 
@@ -1034,11 +1036,11 @@ exports.handleConversion = async (req, res, next) => {
       const allHeaders = new Set();
       Object.values(allSheetsData).forEach((sheetInfo) => {
         Object.keys(sheetInfo.metaData || {}).forEach((h) =>
-          allHeaders.add(`'${h}'`)
+          allHeaders.add(`'${h}'`),
         );
       });
       metaHintForModel = `The file contains columns like: [${Array.from(
-        allHeaders
+        allHeaders,
       ).join(", ")}]`;
     }
 
@@ -1100,7 +1102,7 @@ exports.handleConversion = async (req, res, next) => {
         openai,
         message,
         metaHintForModel,
-        [] // fewShots disabled (no persistence)
+        [], // fewShots disabled (no persistence)
       );
 
       if (llm && typeof llm === "object") {
@@ -1129,7 +1131,7 @@ exports.handleConversion = async (req, res, next) => {
             schema: intentSchemaVersion,
           },
         },
-        600 // 10 min TTL (tune later)
+        600, // 10 min TTL (tune later)
       );
     }
 
@@ -1154,7 +1156,7 @@ exports.handleConversion = async (req, res, next) => {
           searchTerms,
           {
             sameSheetBonus: 0.5,
-          }
+          },
         );
 
         const bestReturn = joint.return;
@@ -1180,6 +1182,11 @@ exports.handleConversion = async (req, res, next) => {
     if (!isFileAttached && direct?.canHandleWithoutFile?.(intent)) {
       const f = direct.buildFormula(intent);
       if (f) {
+        // ✅ 6-1: 출력 검증(Direct도 동일 적용)
+        const v = validateFormula(f);
+        const safeOut = v.ok
+          ? f
+          : `=ERROR("결과 검증에 실패했습니다. (direct) 다시 시도해 주세요.")`;
         if (req.user?.id && shouldCountConversion(f)) {
           await bumpUsage(req.user.id, "formulaConversions", 1);
         }
@@ -1187,7 +1194,7 @@ exports.handleConversion = async (req, res, next) => {
         const reasonNorm = classifyReason({
           reason: rawReason,
           prompt: message,
-          result: f,
+          result: safeOut,
         });
         await writeRequestLog({
           traceId,
@@ -1199,13 +1206,21 @@ exports.handleConversion = async (req, res, next) => {
           isFallback: false,
           prompt: message,
           latencyMs: Date.now() - startedAt,
-          debugMeta: {
+          debugMeta: buildDebugMeta({
+            rawReason,
             cacheHit: _dbgCacheHit,
             intentOp: intent?.operation,
-            rawReason,
-          },
+            intentCacheKey: _dbgIntentCacheKey,
+            validator: v,
+            timing: {
+              preprocess: _ms(_tPreStart, _tPreEnd),
+              intent: _ms(_tIntentStart, _tIntentEnd),
+              build: _ms(_tBuildStart, _tBuildEnd),
+              total: Date.now() - startedAt,
+            },
+          }),
         });
-        return res.json({ result: f });
+        return res.json({ result: safeOut });
       }
     }
 
@@ -1223,7 +1238,7 @@ exports.handleConversion = async (req, res, next) => {
         formulaBuilder,
         context,
         formulaBuilder._formatValue,
-        formulaBuilder._buildConditionPairs
+        formulaBuilder._buildConditionPairs,
       );
     }
     _tBuildEnd = process.hrtime.bigint();
@@ -1242,6 +1257,13 @@ exports.handleConversion = async (req, res, next) => {
       prompt: message,
       result: finalFormula,
     });
+
+    // ✅ 6-1: 최종 출력 검증(깨진 수식/따옴표/괄호 불일치 차단)
+    const v = validateFormula(finalFormula);
+    const safeFinal = v.ok
+      ? finalFormula
+      : `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
+
     await writeRequestLog({
       traceId,
       userId: req.user?.id,
@@ -1249,16 +1271,24 @@ exports.handleConversion = async (req, res, next) => {
       engine: "formula",
       status: shouldCountConversion(finalFormula) ? "success" : "fail",
       reason: reasonNorm,
-      isFallback: false,
+      isFallback: v.ok ? false : true,
       prompt: message,
       latencyMs: Date.now() - startedAt,
-      debugMeta: {
+      debugMeta: buildDebugMeta({
+        rawReason,
         cacheHit: _dbgCacheHit,
         intentOp: intent?.operation,
-        rawReason,
-      },
+        intentCacheKey: _dbgIntentCacheKey,
+        validator: v,
+        timing: {
+          preprocess: _ms(_tPreStart, _tPreEnd),
+          intent: _ms(_tIntentStart, _tIntentEnd),
+          build: _ms(_tBuildStart, _tBuildEnd),
+          total: Date.now() - startedAt,
+        },
+      }),
     });
-    return res.json({ result: finalFormula });
+    return res.json({ result: safeFinal });
   } catch (err) {
     const rawReason = "EXCEPTION";
     const reasonNorm = classifyReason({
@@ -1276,11 +1306,20 @@ exports.handleConversion = async (req, res, next) => {
       isFallback: false,
       prompt: _dbgMessage || "",
       latencyMs: Date.now() - startedAt,
-      debugMeta: {
+      debugMeta: buildDebugMeta({
         rawReason,
-        error: err?.message,
-        stack: err?.stack?.slice?.(0, 500),
-      },
+        cacheHit: _dbgCacheHit,
+        intentOp: _dbgIntent?.operation,
+        intentCacheKey: _dbgIntentCacheKey,
+        validator: null,
+        timing: {
+          preprocess: _ms(_tPreStart, _tPreEnd),
+          intent: _ms(_tIntentStart, _tIntentEnd),
+          build: _ms(_tBuildStart, _tBuildEnd),
+          total: Date.now() - startedAt,
+        },
+        extra: { error: err?.message, stack: err?.stack?.slice?.(0, 500) },
+      }),
     });
     console.error("[handleConversion][error]", err);
     next(err);
@@ -1297,12 +1336,12 @@ exports.handleConversion = async (req, res, next) => {
         _dbgCacheHit === true ? "HIT" : _dbgCacheHit === false ? "MISS" : "NA";
       console.log(
         `[convert.timing] total=${tTotal?.toFixed?.(
-          1
+          1,
         )}ms preprocess=${tPre?.toFixed?.(1)}ms intent=${tIntent?.toFixed?.(
-          1
+          1,
         )}ms build=${tBuild?.toFixed?.(
-          1
-        )}ms cache=${cache} user=${user} file=${file}`
+          1,
+        )}ms cache=${cache} user=${user} file=${file}`,
       );
     }
     // ✅ 절대 크래시 나지 않는 디버그 로그
@@ -1310,7 +1349,7 @@ exports.handleConversion = async (req, res, next) => {
       console.log("[INTENT_DEBUG] message:", _dbgMessage);
       console.log(
         "[INTENT_DEBUG] intent:",
-        JSON.stringify(_dbgIntent, null, 2)
+        JSON.stringify(_dbgIntent, null, 2),
       );
     }
   }
@@ -1412,7 +1451,7 @@ async function convert(nl, options = {}, meta = {}) {
         searchTerms,
         {
           sameSheetBonus: 0.5,
-        }
+        },
       );
 
       const bestReturn = joint?.return || null;
@@ -1446,7 +1485,7 @@ async function convert(nl, options = {}, meta = {}) {
     ctx,
     (v, o) =>
       formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
-    formulaBuilder._buildConditionPairs
+    formulaBuilder._buildConditionPairs,
   );
   // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
   if (ctx.__errorFormula) return ctx.__errorFormula;

@@ -3,6 +3,8 @@ const { assertCanUse, bumpUsage } = require("../services/usageService");
 const { writeRequestLog } = require("../services/requestLogService");
 const crypto = require("crypto");
 const { classifyReason } = require("../utils/reasonClassifier");
+const { validateMacroResult } = require("../utils/outputValidator");
+const { buildDebugMeta } = require("../utils/debugMetaBuilder");
 
 function isUnsupportedMacro(result) {
   // 1) intent 기반
@@ -62,12 +64,47 @@ exports.generateMacro = async (req, res) => {
         isFallback: true,
         prompt,
         latencyMs: Date.now() - startedAt,
-        debugMeta: { rawReason, intentType: result?.intent?.type },
+        debugMeta: buildDebugMeta({
+          rawReason,
+          validator: null,
+          timing: { total: Date.now() - startedAt },
+          extra: { intentType: result?.intent?.type },
+        }),
       });
       return res.status(422).json({
         code: "UNSUPPORTED_MACRO",
         message:
           "현재 요청은 매크로 생성에서 지원하지 않습니다. 좀 더 구체적으로 입력해 주세요.",
+      });
+    }
+
+    // ✅ 6-1: 결과 코드 검증(Office Scripts/AppScript)
+    const v = validateMacroResult(target, result);
+    if (!v.ok) {
+      const rawReason = "VALIDATION_FAILED";
+      const reasonNorm = classifyReason({ reason: rawReason, prompt, result });
+      await writeRequestLog({
+        traceId,
+        userId: req.user?.id,
+        route: "/macro/generate",
+        engine: target || "macro",
+        status: "fail",
+        reason: reasonNorm,
+        isFallback: true,
+        prompt,
+        latencyMs: Date.now() - startedAt,
+        debugMeta: buildDebugMeta({
+          rawReason,
+          validator: v,
+          timing: { total: Date.now() - startedAt },
+          extra: { intentType: result?.intent?.type },
+        }),
+      });
+      return res.status(422).json({
+        code: "VALIDATION_FAILED",
+        message:
+          "결과 검증에 실패했습니다. 요청을 더 구체적으로 작성해 주세요.",
+        meta: { issues: v.issues },
       });
     }
 
@@ -85,7 +122,11 @@ exports.generateMacro = async (req, res) => {
         isFallback: false,
         prompt,
         latencyMs: Date.now() - startedAt,
-        debugMeta: { rawReason },
+        debugMeta: buildDebugMeta({
+          rawReason,
+          validator: v,
+          timing: { total: Date.now() - startedAt },
+        }),
       });
     }
 
@@ -108,7 +149,12 @@ exports.generateMacro = async (req, res) => {
       isFallback: false,
       prompt,
       latencyMs: Date.now() - startedAt,
-      debugMeta: { rawReason, status: e?.status, message: e?.message },
+      debugMeta: buildDebugMeta({
+        rawReason,
+        validator: null,
+        timing: { total: Date.now() - startedAt },
+        extra: { status: e?.status, message: e?.message },
+      }),
     });
     console.error("[generateMacro] error:", e);
     const status = e?.status || 500;

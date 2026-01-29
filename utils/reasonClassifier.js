@@ -67,6 +67,7 @@ function classifyReason(args = {}) {
 
   // 3) 명시적 미지원
   if (rawReason === "UNSUPPORTED_MACRO") return REASONS.UNSUPPORTED_OPERATION;
+  if (rawReason === "VALIDATION_FAILED") return REASONS.VALIDATION_ERROR;
 
   // 4) convert에서 ERROR_FORMULA / UNKNOWN일 때 result 메시지로 더 세분
   if (rawReason === "ERROR_FORMULA" || rawReason === "UNKNOWN" || !rawReason) {
