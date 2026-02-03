@@ -1,3 +1,4 @@
+console.log("[cron-entry] dailySummaryCron loaded");
 const cron = require("node-cron");
 const mongoose = require("mongoose");
 const { computeDailySummary } = require("../services/dailySummaryService");
