@@ -30,9 +30,20 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
+    res.header("Vary", "Origin");
   }
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  );
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, x-cron-secret",
+  );
+
+  // ✅ 프리플라이트는 무조건 즉시 종료(204) → 15초 502 차단
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
@@ -46,7 +57,11 @@ const corsMiddleware = cors({
   credentials: true,
 });
 app.use(corsMiddleware);
-app.options("*", corsMiddleware);
+// ✅ 웹 서버에서는 내부 cron을 기본 OFF
+// Railway Cron은 HTTP endpoint(/cron/...) 호출로 돌리자.
+if (process.env.RUN_INTERNAL_CRON === "1") {
+  startDailySummaryCron();
+}
 
 // 바디 파서
 app.use(express.json({ limit: "50mb" }));
@@ -74,8 +89,6 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/macro", macroRoutes);
 app.use("/admin", adminRoutes);
 app.use("/cron", cronRoutes);
-
-startDailySummaryCron();
 
 // 에러 핸들러
 app.use(errorHandler);
