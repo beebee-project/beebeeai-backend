@@ -26,36 +26,27 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:3000",
 ]);
 
-// ✅ preflight(OPTIONS)는 무조건 빠르게 204로 종료 (502/timeout 방지)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
-    res.header("Vary", "Origin");
   }
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, x-cron-secret",
-  );
-  if (req.method === "OPTIONS") return res.sendStatus(204);
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   next();
 });
 
-// cors 패키지는 “헤더 셋”은 위에서 처리하므로 간단히만
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
-      return cb(null, false);
-    },
-    credentials: true,
-  }),
-);
+const corsMiddleware = cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+});
+app.use(corsMiddleware);
+app.options("*", corsMiddleware);
 
 // 바디 파서
 app.use(express.json({ limit: "50mb" }));
