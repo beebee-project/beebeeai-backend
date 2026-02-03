@@ -53,12 +53,11 @@ const corsMiddleware = cors({
     return cb(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-cron-secret"],
   credentials: true,
 });
 app.use(corsMiddleware);
 // ✅ 웹 서버에서는 내부 cron을 기본 OFF
-// Railway Cron은 HTTP endpoint(/cron/...) 호출로 돌리자.
 if (process.env.RUN_INTERNAL_CRON === "1") {
   startDailySummaryCron();
 }
