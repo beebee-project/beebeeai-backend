@@ -24,37 +24,39 @@ const ALLOWED_ORIGINS = new Set([
   "https://beebeeai.kr",
   "https://www.beebeeai.kr",
   "http://localhost:3000",
-  "https://beebeeai-frontend-production.up.railway.app",
 ]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Vary", "Origin");
+  }
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  );
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, x-cron-secret",
+  );
+
+  // ✅ 프리플라이트는 무조건 즉시 종료(204) → 15초 502 차단
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 const corsMiddleware = cors({
   origin: (origin, cb) => {
-    // Postman/서버-서버(Origin 없음) 허용
-    if (!origin) return cb(null, true);
-
-    // 정확 매칭
-    if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
-
-    // ✅ 운영 편의: https://*.beebeeai.kr 허용
-    try {
-      const { protocol, hostname } = new URL(origin);
-      if (protocol === "https:" && hostname.endsWith(".beebeeai.kr")) {
-        return cb(null, true);
-      }
-    } catch (_) {}
-
-    // ❗ 절대 Error 던지지 말기 (브라우저에서만 CORS 차단)
-    console.warn("[CORS BLOCKED]", origin);
-    return cb(null, false);
+    if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-cron-secret"],
   credentials: true,
-  optionsSuccessStatus: 204,
 });
 app.use(corsMiddleware);
-// ✅ 모든 OPTIONS 요청은 cors가 204로 응답하도록 명시
-app.options("*", corsMiddleware);
 // ✅ 웹 서버에서는 내부 cron을 기본 OFF
 if (process.env.RUN_INTERNAL_CRON === "1") {
   startDailySummaryCron();
