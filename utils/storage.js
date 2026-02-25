@@ -29,7 +29,7 @@ if (!fs.existsSync(KEY_FILE_PATH)) {
   fs.writeFileSync(
     KEY_FILE_PATH,
     process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
-    "utf8"
+    "utf8",
   );
 }
 

@@ -51,17 +51,17 @@ exports.uploadFile = async (req, res, next) => {
 
     const user = req.user;
     const originalName = Buffer.from(req.file.originalname, "latin1").toString(
-      "utf8"
+      "utf8",
     );
 
     const existingFile = user.uploadedFiles.find(
-      (f) => f.originalName === originalName
+      (f) => f.originalName === originalName,
     );
     if (existingFile) {
       await bucket.file(existingFile.gcsName).delete();
 
       user.uploadedFiles = user.uploadedFiles.filter(
-        (f) => f.originalName !== originalName
+        (f) => f.originalName !== originalName,
       );
     }
 
@@ -106,7 +106,7 @@ exports.downloadFile = async (req, res, next) => {
     const { originalName } = req.params;
 
     const fileInfo = user.uploadedFiles.find(
-      (f) => f.originalName === originalName
+      (f) => f.originalName === originalName,
     );
 
     if (!fileInfo) {
@@ -118,7 +118,7 @@ exports.downloadFile = async (req, res, next) => {
     const encodedFilename = encodeURIComponent(fileInfo.originalName);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename*=UTF-8''${encodedFilename}`
+      `attachment; filename*=UTF-8''${encodedFilename}`,
     );
 
     bucket.file(fileInfo.gcsName).createReadStream().pipe(res);
@@ -134,7 +134,7 @@ exports.deleteFile = async (req, res, next) => {
     const { originalName } = req.params;
 
     const fileInfo = user.uploadedFiles.find(
-      (f) => f.originalName === originalName
+      (f) => f.originalName === originalName,
     );
 
     if (!fileInfo) {
@@ -146,7 +146,7 @@ exports.deleteFile = async (req, res, next) => {
     await bucket.file(fileInfo.gcsName).delete();
 
     user.uploadedFiles = user.uploadedFiles.filter(
-      (f) => f.originalName !== originalName
+      (f) => f.originalName !== originalName,
     );
     await user.save();
 
