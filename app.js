@@ -24,6 +24,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://beebeeai.kr",
   "https://www.beebeeai.kr",
   "http://localhost:3000",
+  "https://beebeeai-frontend-production.up.railway.app",
 ]);
 
 app.use((req, res, next) => {
@@ -49,8 +50,9 @@ app.use((req, res, next) => {
 
 const corsMiddleware = cors({
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"));
+    if (!origin) return cb(null, true); // 서버-서버 요청 허용
+    if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+    return cb(null, false); // Error 던지지 않음
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-cron-secret"],
