@@ -5,6 +5,69 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
+// ✅ 누락돼서 런타임 크래시 나던 함수: 최소 구현으로 추가
+// 목적: vector_if / 논리 벡터 생성 흐름에서 ReferenceError 제거
+// - 동일 헤더(같은 컬럼)에서 여러 조건을 AND/OR로 묶는 케이스 처리
+function buildIfVectorSameHeaderLogic(ctx, formatValue) {
+  const it = ctx.intent || {};
+  const c = it.condition || it.conditions || null;
+  if (!c) return null;
+
+  const logicalOp = (c.logical_operator || c.logicalOp || "AND").toUpperCase();
+  const conds = c.conditions || [];
+  if (!Array.isArray(conds) || conds.length < 1) return null;
+
+  // 동일 header/hint인지 확인
+  const firstHint =
+    conds[0]?.hint || conds[0]?.header || conds[0]?.target_header;
+  if (!firstHint) return null;
+  for (const x of conds) {
+    const h = x?.hint || x?.header || x?.target_header;
+    if (!h || String(h) !== String(firstHint)) return null;
+  }
+
+  const ref =
+    refFromHeaderSpec(ctx, firstHint) ||
+    refFromHeaderSpec(ctx, {
+      header: firstHint,
+      sheet: ctx.bestReturn?.sheetName,
+    });
+  const rng = ref?.range;
+  if (!rng) return null;
+
+  const joiner = logicalOp === "OR" ? "+" : "*";
+  const wrapBool = (expr) => `N(${expr})`; // TRUE/FALSE → 1/0
+
+  // 단일 조건을 (rng op value) 형태로
+  const one = (x) => {
+    const op = (x.operator || x.op || "=").trim();
+    const vRaw = x.value ?? x.val ?? x.right ?? "";
+    const v = formatValue(vRaw);
+    if (op === "between" && Array.isArray(x.values) && x.values.length >= 2) {
+      const v1 = formatValue(x.values[0]);
+      const v2 = formatValue(x.values[1]);
+      return `(${rng}>=${v1})*(${rng}<=${v2})`;
+    }
+    // 기본 비교
+    if (op === "=") return `(${rng}=${v})`;
+    if (op === "!=") return `(${rng}<>${v})`;
+    if (op === ">") return `(${rng}>${v})`;
+    if (op === ">=") return `(${rng}>=${v})`;
+    if (op === "<") return `(${rng}<${v})`;
+    if (op === "<=") return `(${rng}<=${v})`;
+    return `(${rng}=${v})`;
+  };
+
+  const condExpr =
+    conds.length === 1
+      ? one(conds[0])
+      : conds.map((x) => wrapBool(one(x))).join(joiner);
+
+  const t = formatValue(it.value_if_true ?? "TRUE");
+  const f = formatValue(it.value_if_false ?? "FALSE");
+  return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0,"",IF(${condExpr}, ${t}, ${f})))`;
+}
+
 // --- NEW: 객체/배열 호환용 시트 배열 변환
 function _sheetsArray(allSheetsData) {
   if (!allSheetsData) return [];

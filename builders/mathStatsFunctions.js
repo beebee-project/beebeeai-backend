@@ -1042,6 +1042,74 @@ const mathStatsFunctionBuilder = {
   },
 };
 
+// ✅ 런타임에서 "_buildArgExtRecord is not defined"가 터지는 케이스가 있어서
+// argmax/argmin을 안전한 인라인 구현으로 "최종 오버라이드" (중복 정의/스코프 이슈 방지)
+mathStatsFunctionBuilder.argmax_record = function (
+  ctx,
+  formatValue,
+  buildConditionPairs,
+) {
+  const it = ctx.intent || {};
+  const v = refFromHeaderSpec(
+    ctx,
+    it.value_header || it.header_hint || "",
+  )?.range;
+  const r = refFromHeaderSpec(
+    ctx,
+    it.return_header || it.return_hint || "",
+  )?.range;
+  if (!v) return `=ERROR("argmax_record: value 열을 찾을 수 없습니다.")`;
+  if (!r) return `=ERROR("argmax_record: return 열을 찾을 수 없습니다.")`;
+
+  const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
+  const vf = pairs.length
+    ? `FILTER(${v}, ${pairs
+        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+        .filter(Boolean)
+        .join(", ")})`
+    : v;
+  const rf = pairs.length
+    ? `FILTER(${r}, ${pairs
+        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+        .filter(Boolean)
+        .join(", ")})`
+    : r;
+  return `=LET(_v,${vf},_r,${rf},_x,MAX(_v),XLOOKUP(_x,_v,_r))`;
+};
+
+mathStatsFunctionBuilder.argmin_record = function (
+  ctx,
+  formatValue,
+  buildConditionPairs,
+) {
+  const it = ctx.intent || {};
+  const v = refFromHeaderSpec(
+    ctx,
+    it.value_header || it.header_hint || "",
+  )?.range;
+  const r = refFromHeaderSpec(
+    ctx,
+    it.return_header || it.return_hint || "",
+  )?.range;
+  if (!v) return `=ERROR("argmin_record: value 열을 찾을 수 없습니다.")`;
+  if (!r) return `=ERROR("argmin_record: return 열을 찾을 수 없습니다.")`;
+
+  const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
+  const vf = pairs.length
+    ? `FILTER(${v}, ${pairs
+        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+        .filter(Boolean)
+        .join(", ")})`
+    : v;
+  const rf = pairs.length
+    ? `FILTER(${r}, ${pairs
+        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+        .filter(Boolean)
+        .join(", ")})`
+    : r;
+  return `=LET(_v,${vf},_r,${rf},_x,MIN(_v),XLOOKUP(_x,_v,_r))`;
+};
+
 function _wrapGroupByWithMaker(keyRef, makeInnerWithK) {
   return `=MAP(UNIQUE(${keyRef.range}), LAMBDA(k, ${makeInnerWithK("k")}))`;
 }
