@@ -174,7 +174,7 @@ function _joinMapN(leftValRef, leftKeyRef, rights, bodyFn) {
   const lets = rights
     .map(
       (r, i) =>
-        `${r.as || `r${i + 1}`}, XLOOKUP(k, ${r.key.range}, ${r.val.range})`
+        `${r.as || `r${i + 1}`}, XLOOKUP(k, ${r.key.range}, ${r.val.range})`,
     )
     .join(", ");
   const symNames = rights.map((r, i) => r.as || `r${i + 1}`);
@@ -205,13 +205,13 @@ function between(it) {
     const minExpr = /[\(\)]/.test(minScalar || "")
       ? `(${minScalar})`
       : minScalar
-      ? formatValue(minScalar)
-      : formatValue(it.min);
+        ? formatValue(minScalar)
+        : formatValue(it.min);
     const maxExpr = /[\(\)]/.test(maxScalar || "")
       ? `(${maxScalar})`
       : maxScalar
-      ? formatValue(maxScalar)
-      : formatValue(it.max);
+        ? formatValue(maxScalar)
+        : formatValue(it.max);
 
     if (leftRange) {
       const expr = `BYROW(${leftRange}, LAMBDA(x, AND(x${ge}${minExpr}, x${le}${maxExpr})))`;
@@ -262,7 +262,7 @@ function exists(it) {
       evalSubIntentToScalar(
         ctx,
         formatValue,
-        it.target || it.left || it.value
+        it.target || it.left || it.value,
       ) ||
       it.target_cell ||
       null;
@@ -322,6 +322,10 @@ function _rewriteCondToParams(condition, headerList, formatValue) {
     return "TRUE";
   }
   return walk(condition);
+}
+
+function buildIfArithTwoColsVsCol(_ctx, _formatValue) {
+  return null;
 }
 
 // =============================
@@ -476,7 +480,7 @@ const logicalFunctionBuilder = {
         formulaBuilder,
         innerCtx,
         formatValue,
-        formulaBuilder._buildConditionPairs
+        formulaBuilder._buildConditionPairs,
       )
       .substring(1);
     return `=IFERROR(${valueFormula}, ${errorVal})`;
@@ -489,7 +493,7 @@ const logicalFunctionBuilder = {
     if (valueOperation && formulaBuilder[valueOperation]) {
       const valueFormula = formulaBuilder[valueOperation](
         ctx,
-        formatValue
+        formatValue,
       ).substring(1);
       return `=IFNA(${valueFormula}, ${errorVal})`;
     }
@@ -511,7 +515,7 @@ function _buildLogicVector(ctx, formatValue, logicalOp) {
       ...ctx,
       intent: { condition: c, value_if_true: "TRUE", value_if_false: "FALSE" },
     },
-    (x) => x
+    (x) => x,
   );
   if (same) return `=${same.slice(1)}`.replace(/IF\(/g, "");
 
@@ -526,7 +530,7 @@ function _buildLogicVector(ctx, formatValue, logicalOp) {
           value_if_false: "FALSE",
         },
       },
-      (x) => x
+      (x) => x,
     );
     if (asIf) return `=${asIf.slice(1)}`.replace(/IF\(/g, "");
   }
@@ -539,7 +543,7 @@ logicalFunctionBuilder.and = (ctx, formatValue) => {
   const conditionStr = _buildConditionString(
     { logical_operator: "AND", conditions: ctx.intent.conditions || [] },
     formatValue,
-    ctx
+    ctx,
   );
   return `=${conditionStr}`;
 };
@@ -550,7 +554,7 @@ logicalFunctionBuilder.or = (ctx, formatValue) => {
   const conditionStr = _buildConditionString(
     { logical_operator: "OR", conditions: ctx.intent.conditions || [] },
     formatValue,
-    ctx
+    ctx,
   );
   return `=${conditionStr}`;
 };
@@ -560,7 +564,7 @@ logicalFunctionBuilder.not = (ctx, formatValue) => {
   if (it.conditions?.length) {
     const inner = logicalFunctionBuilder.and(
       { ...ctx, intent: { conditions: it.conditions } },
-      formatValue
+      formatValue,
     );
     return `=NOT(${inner.slice(1)})`;
   }
@@ -569,7 +573,7 @@ logicalFunctionBuilder.not = (ctx, formatValue) => {
     const L = _ref(c.target.header, ctx);
     if (L) {
       return `=BYROW(${L.range}, LAMBDA(l, NOT(l${_op(c.operator)}${formatValue(
-        c.value
+        c.value,
       )})))`;
     }
   }
@@ -665,7 +669,7 @@ logicalFunctionBuilder.choose = (ctx, formatValue) => {
     const keyCol = refFromHeaderSpec(ctx, it.row_selector.hint);
     const idxCol = refFromHeaderSpec(
       ctx,
-      idxH || it.index_num_header || "인덱스"
+      idxH || it.index_num_header || "인덱스",
     );
     if (keyCol && idxCol) {
       const keyVal = formatValue(it.row_selector.value);
@@ -716,7 +720,7 @@ function buildIfRow(ctx, formatValue) {
       keyForL,
       keyForR,
       R,
-      (l, rv) => `IF(${l}${op}${rv}, ${t}, ${f})`
+      (l, rv) => `IF(${l}${op}${rv}, ${t}, ${f})`,
     );
   }
   if (L && !R) {
@@ -750,12 +754,12 @@ function buildIfVectorTwoCols(ctx, formatValue) {
     const leftKey =
       refFromHeaderSpec(
         ctx,
-        join?.left_key || { header: join, sheet: L?.sheetName }
+        join?.left_key || { header: join, sheet: L?.sheetName },
       ) || refFromHeaderSpec(ctx, { header: join, sheet: L?.sheetName });
     const rightKey =
       refFromHeaderSpec(
         ctx,
-        join?.right_key || { header: join, sheet: R?.sheetName }
+        join?.right_key || { header: join, sheet: R?.sheetName },
       ) || refFromHeaderSpec(ctx, { header: join, sheet: R?.sheetName });
 
     if (leftKey && rightKey) {
@@ -764,7 +768,7 @@ function buildIfVectorTwoCols(ctx, formatValue) {
         leftKey,
         rightKey,
         R,
-        (l, rv) => `IF(${l}${op}${rv}, ${t}, ${f})`
+        (l, rv) => `IF(${l}${op}${rv}, ${t}, ${f})`,
       );
     }
   }
@@ -809,7 +813,7 @@ function buildIfThresholds(ctx, formatValue) {
   const cases = ths
     .map(
       (th) =>
-        `l${_op(th.operator)}${formatValue(th.value)}, ${formatValue(th.label)}`
+        `l${_op(th.operator)}${formatValue(th.value)}, ${formatValue(th.label)}`,
     )
     .join(", ");
   const def = it.value_if_false != null ? formatValue(it.value_if_false) : '""';
@@ -923,13 +927,13 @@ function buildIfCompute(ctx, formatValue) {
   expr = expr.replace(
     /\b([a-z_][a-z0-9_]*)\s+IN\s+\{([^}]+)\}/gi,
     (_, v, list) =>
-      `ISNUMBER(XMATCH(${v}, ${_toArrayConst(list.split(/\s*,\s*/))}))`
+      `ISNUMBER(XMATCH(${v}, ${_toArrayConst(list.split(/\s*,\s*/))}))`,
   );
   const firstParam = keys[0].toLowerCase();
   expr = expr.replace(
     /\{([^}]+)\}/g,
     (_, list) =>
-      `ISNUMBER(XMATCH(${firstParam}, ${_toArrayConst(list.split(/\s*,\s*/))}))`
+      `ISNUMBER(XMATCH(${firstParam}, ${_toArrayConst(list.split(/\s*,\s*/))}))`,
   );
   const t = formatValue(it.value_if_true ?? "");
   const f = formatValue(it.value_if_false ?? "");
@@ -941,7 +945,7 @@ function buildIfCompute(ctx, formatValue) {
   const firstCell = refs[0].cell;
   const singleExpr = expr.replace(
     new RegExp(`\\b${firstParam}\\b`, "g"),
-    firstCell
+    firstCell,
   );
   return `=IF((${singleExpr}), ${t}, ${f})`;
 }

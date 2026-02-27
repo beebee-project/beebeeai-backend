@@ -15,7 +15,8 @@ function _ensureConditionPairs(ctx, buildConditionPairs) {
 }
 
 function _buildFilterCall(targetRange, conditionPairs) {
-  if (!conditionPairs.length) return targetRange;
+  // ✅ 조건 없이 FILTER를 쓰면 '그럴듯한 오답'이 나올 수 있어 명시 실패
+  if (!conditionPairs.length) return `ERROR("FILTER: 조건이 비어 있습니다.")`;
   const clauses = [];
   for (let i = 0; i < conditionPairs.length; i += 2) {
     const rng = conditionPairs[i];
@@ -49,7 +50,7 @@ function _evalSubExprToRange(ctx, formatValue, node) {
               typeof crit === "string"
                 ? formatValue(crit)
                 : formatValue(String(crit))
-            }`
+            }`,
           );
         }
       }
@@ -111,13 +112,21 @@ const mathStatsFunctionBuilder = {
       ctx,
       intent,
       buildConditionPairs,
-      formatValue
+      formatValue,
     );
     if (ctx.intent?.group_by) {
       const keyRef =
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+      // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
+      if (String(ctx.engine).toLowerCase().includes("sheet")) {
+        const key = keyRef.range;
+        const val = sumRange;
+        return `=QUERY({${key},${val}},
+"select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
+0)`;
+      }
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
           ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -142,7 +151,7 @@ const mathStatsFunctionBuilder = {
       ctx,
       intent,
       buildConditionPairs,
-      formatValue
+      formatValue,
     );
     if (conditionPairs.length === 0) {
       return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
@@ -152,6 +161,14 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+      // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
+      if (String(ctx.engine).toLowerCase().includes("sheet")) {
+        const key = keyRef.range;
+        const val = sumRange;
+        return `=QUERY({${key},${val}},
+"select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
+0)`;
+      }
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
           ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -172,7 +189,7 @@ const mathStatsFunctionBuilder = {
       ctx,
       intent,
       buildConditionPairs,
-      formatValue
+      formatValue,
     );
     if (conditionPairs.length === 0) {
       return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
@@ -182,6 +199,14 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+      // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
+      if (String(ctx.engine).toLowerCase().includes("sheet")) {
+        const key = keyRef.range;
+        const val = sumRange;
+        return `=QUERY({${key},${val}},
+"select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
+0)`;
+      }
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
           ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -303,7 +328,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `MEDIAN(${filteredK})`;
       };
@@ -334,7 +359,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `STDEV.S(${filteredK})`;
       };
@@ -361,7 +386,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `STDEV.P(${filteredK})`;
       };
@@ -388,7 +413,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `VAR.S(${filteredK})`;
       };
@@ -415,7 +440,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `VAR.P(${filteredK})`;
       };
@@ -444,7 +469,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `PERCENTILE.INC(${filteredK}, ${K})`;
       };
@@ -473,7 +498,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           tgt,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `QUARTILE.INC(${filteredK}, ${Q})`;
       };
@@ -554,12 +579,12 @@ const mathStatsFunctionBuilder = {
       const leftKey =
         refFromHeaderSpec(
           ctx,
-          join?.left_key || { header: join, sheet: vr.sheetName }
+          join?.left_key || { header: join, sheet: vr.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: vr.sheetName });
       const rightKey =
         refFromHeaderSpec(
           ctx,
-          join?.right_key || { header: join, sheet: wr.sheetName }
+          join?.right_key || { header: join, sheet: wr.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: wr.sheetName });
       if (leftKey && rightKey) {
         const wAligned = `XLOOKUP(${leftKey.range}, ${rightKey.range}, ${wr.range})`;
@@ -581,12 +606,12 @@ const mathStatsFunctionBuilder = {
       const xKey =
         refFromHeaderSpec(
           ctx,
-          join?.left_key || { header: join, sheet: xr.sheetName }
+          join?.left_key || { header: join, sheet: xr.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: xr.sheetName });
       const yKey =
         refFromHeaderSpec(
           ctx,
-          join?.right_key || { header: join, sheet: yr.sheetName }
+          join?.right_key || { header: join, sheet: yr.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: yr.sheetName });
       if (xKey && yKey) {
         const yAligned = `XLOOKUP(${xKey.range}, ${yKey.range}, ${yr.range})`;
@@ -646,12 +671,12 @@ const mathStatsFunctionBuilder = {
       const leftKey =
         refFromHeaderSpec(
           ctx,
-          join?.left_key || { header: join, sheet: vSheet }
+          join?.left_key || { header: join, sheet: vSheet },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: vSheet });
       const rightKey =
         refFromHeaderSpec(
           ctx,
-          join?.right_key || { header: join, sheet: wSheet }
+          join?.right_key || { header: join, sheet: wSheet },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: wSheet });
 
       if (leftKey && rightKey && wExpr) {
@@ -663,7 +688,7 @@ const mathStatsFunctionBuilder = {
       ctx,
       it,
       buildConditionPairs,
-      formatValue
+      formatValue,
     );
     if (conditionPairs.length) {
       const clauses = [];
@@ -754,7 +779,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const filteredK = _buildFilterCall(
           srcRange,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `PERCENTRANK.INC(${filteredK}, ${xExpr})`;
       };
@@ -783,12 +808,12 @@ const mathStatsFunctionBuilder = {
       const xKey =
         refFromHeaderSpec(
           ctx,
-          join?.left_key || { header: join, sheet: xR?.sheetName }
+          join?.left_key || { header: join, sheet: xR?.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: xR?.sheetName });
       const yKey =
         refFromHeaderSpec(
           ctx,
-          join?.right_key || { header: join, sheet: yR?.sheetName }
+          join?.right_key || { header: join, sheet: yR?.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: yR?.sheetName });
       if (xKey && yKey) {
         yExpr = `XLOOKUP(${xKey.range}, ${yKey.range}, ${yExpr})`;
@@ -811,11 +836,11 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const xK = _buildFilterCall(
           xExpr,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         const yK = _buildFilterCall(
           yExpr,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `SLOPE(${yK}, ${xK})`;
       };
@@ -845,12 +870,12 @@ const mathStatsFunctionBuilder = {
       const xKey =
         refFromHeaderSpec(
           ctx,
-          join?.left_key || { header: join, sheet: xR?.sheetName }
+          join?.left_key || { header: join, sheet: xR?.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: xR?.sheetName });
       const yKey =
         refFromHeaderSpec(
           ctx,
-          join?.right_key || { header: join, sheet: yR?.sheetName }
+          join?.right_key || { header: join, sheet: yR?.sheetName },
         ) || refFromHeaderSpec(ctx, { header: join, sheet: yR?.sheetName });
       if (xKey && yKey) {
         yExpr = `XLOOKUP(${xKey.range}, ${yKey.range}, ${yExpr})`;
@@ -873,11 +898,11 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         const xK = _buildFilterCall(
           xExpr,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         const yK = _buildFilterCall(
           yExpr,
-          pairsPlus.split(", ").filter(Boolean)
+          pairsPlus.split(", ").filter(Boolean),
         );
         return `INTERCEPT(${yK}, ${xK})`;
       };

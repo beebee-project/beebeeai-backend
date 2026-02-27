@@ -584,6 +584,16 @@ const formulaBuilder = {
   _formatValue: (val, opts = {}) => formulaUtils.formatValue(val, { ...opts }), // 정책은 상위에서 주입
 
   _buildConditionPairs: function (ctx) {
+    const isISODate = (v) =>
+      typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim());
+    const isoToDateExpr = (iso) => {
+      const [y, m, d] = String(iso)
+        .trim()
+        .split("-")
+        .map((x) => parseInt(x, 10));
+      if (!y || !m || !d) return null;
+      return `DATE(${y},${m},${d})`;
+    };
     const { intent, allSheetsData } = ctx;
     if (!allSheetsData) return [];
     if (!intent?.conditions?.length) return [];
@@ -629,9 +639,23 @@ const formulaBuilder = {
         // 값도 반드시 포매터를 통과시켜 따옴표/숫자 처리
         const val = formulaBuilder._formatValue(rawVal);
 
-        if (op !== "=" && rawVal != null && !isNaN(rawVal)) {
-          return `${range}, "${op}${rawVal}"`;
+        // ✅ 비교 연산자 처리 (숫자/날짜/문자 모두)
+        if (op && op !== "=" && rawVal != null) {
+          // 1) ISO 날짜: ">="&DATE(2023,1,1)
+          if (isISODate(rawVal)) {
+            const dExpr = isoToDateExpr(rawVal);
+            if (dExpr) return `${range}, "${op}"&${dExpr}`;
+          }
+          // 2) 숫자: ">=100"
+          if (!isNaN(rawVal) && rawVal !== "") {
+            return `${range}, "${op}${rawVal}"`;
+          }
+          // 3) 문자열: ">=영업" 같은 건 잘 쓰진 않지만 일단 지원
+          //    -> "${op}"&"문자"
+          return `${range}, "${op}"&${val}`;
         }
+
+        // 기본: "=" 비교
         return `${range}, ${val}`;
       })
       .filter(Boolean);

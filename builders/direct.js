@@ -1,6 +1,10 @@
 const { parseExplicitCellOrRange } = require("../utils/formulaUtils");
 
 // === 유틸 ===
+function isCellRef(v) {
+  return /^[A-Z]{1,3}[0-9]{1,7}$/i.test(String(v || "").trim());
+}
+
 function getRangeOrCell(it) {
   if (it?.range) return it.range;
   if (it?.target_cell) return it.target_cell;
@@ -12,6 +16,7 @@ function wrap(v) {
   if (v == null) return '""';
   if (typeof v === "number") return String(v);
   if (typeof v === "string") {
+    if (isCellRef(v)) return v.trim();
     if (/^".*"$/.test(v)) return v;
     return `"${v}"`;
   }
@@ -321,7 +326,7 @@ function formula(ctx) {
   if (
     ctx.engine === "excel" &&
     /\b(IMPORTRANGE|IMPORTHTML|IMPORTXML|IMPORTDATA|GOOGLEFINANCE|REGEXMATCH|REGEXEXTRACT|REGEXREPLACE)\b/i.test(
-      eq
+      eq,
     )
   ) {
     return '=ERROR("이 수식은 Google Sheets 전용 함수가 포함되어 Excel 엔진에서 지원되지 않습니다.")';
