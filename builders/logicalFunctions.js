@@ -5,6 +5,63 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
+// ✅ (누락) 두 개의 서로 다른 헤더(컬럼) 조건을 AND/OR로 묶어 벡터 IF 생성
+// 예: 부서="영업" AND 직급="과장" 인 경우 TRUE/FALSE 벡터 만들기
+function buildIfVectorTwoHeadersLogic(ctx, formatValue) {
+  const it = ctx.intent || {};
+  const c = it.condition || it.conditions || null;
+  if (!c) return null;
+
+  const logicalOp = String(
+    c.logical_operator || c.logicalOp || "AND",
+  ).toUpperCase();
+  const conds = c.conditions || [];
+  if (!Array.isArray(conds) || conds.length !== 2) return null;
+
+  const toRange = (x) => {
+    const hint = x?.hint || x?.header || x?.target_header;
+    if (!hint) return null;
+    const ref =
+      refFromHeaderSpec(ctx, hint) ||
+      refFromHeaderSpec(ctx, {
+        header: hint,
+        sheet: ctx.bestReturn?.sheetName,
+      });
+    return ref?.range || null;
+  };
+
+  const r1 = toRange(conds[0]);
+  const r2 = toRange(conds[1]);
+  if (!r1 || !r2) return null;
+
+  const one = (rng, x) => {
+    const op = String(x.operator || x.op || "=").trim();
+    const vRaw = x.value ?? x.val ?? x.right ?? "";
+    const v = formatValue(vRaw);
+    if (op === "=") return `(${rng}=${v})`;
+    if (op === "!=") return `(${rng}<>${v})`;
+    if (op === ">") return `(${rng}>${v})`;
+    if (op === ">=") return `(${rng}>=${v})`;
+    if (op === "<") return `(${rng}<${v})`;
+    if (op === "<=") return `(${rng}<=${v})`;
+    return `(${rng}=${v})`;
+  };
+
+  // TRUE/FALSE → 1/0 캐스팅
+  const wrapBool = (expr) => `N(${expr})`;
+  const e1 = wrapBool(one(r1, conds[0]));
+  const e2 = wrapBool(one(r2, conds[1]));
+
+  // AND: 곱, OR: 합(둘 중 하나라도 1이면 TRUE)
+  const comb = logicalOp === "OR" ? `(${e1}+${e2})>0` : `(${e1}*${e2})=1`;
+
+  const t = formatValue(it.value_if_true ?? "TRUE");
+  const f = formatValue(it.value_if_false ?? "FALSE");
+
+  // 기준 컬럼은 r1로 빈값 처리
+  return `=ARRAYFORMULA(IF(LEN(TRIM(${r1}&""))=0,"",IF(${comb}, ${t}, ${f})))`;
+}
+
 // ✅ 누락돼서 런타임 크래시 나던 함수: 최소 구현으로 추가
 // 목적: vector_if / 논리 벡터 생성 흐름에서 ReferenceError 제거
 // - 동일 헤더(같은 컬럼)에서 여러 조건을 AND/OR로 묶는 케이스 처리

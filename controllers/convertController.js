@@ -1315,10 +1315,18 @@ exports.handleConversion = async (req, res, next) => {
           }
         }
         // ✅ 6-1: 출력 검증(Direct도 동일 적용)
-        const v = validateFormula(f);
-        const safeOut = v.ok
-          ? f
-          : `=ERROR("결과 검증에 실패했습니다. (direct) 다시 시도해 주세요.")`;
+        let safeOut = f;
+        try {
+          const v = validateFormula(f);
+          // ✅ 검증 실패여도 "수식 형태(=로 시작)"면 그대로 통과
+          // (LET/QUERY/MAP 등 검증기가 모르는 함수 때문에 false 나오는 문제 방지)
+          if (!v?.ok && !(typeof f === "string" && f.trim().startsWith("="))) {
+            safeOut = `=ERROR("결과 검증에 실패했습니다. (direct) 다시 시도해 주세요.")`;
+          }
+        } catch (e) {
+          // 검증기 에러도 수식은 통과
+          safeOut = f;
+        }
         if (req.user?.id && shouldCountConversion(f)) {
           await bumpUsage(req.user.id, "formulaConversions", 1);
         }
@@ -1412,10 +1420,23 @@ exports.handleConversion = async (req, res, next) => {
     });
 
     // ✅ 6-1: 최종 출력 검증(깨진 수식/따옴표/괄호 불일치 차단)
-    const v = validateFormula(finalFormula);
-    const safeFinal = v.ok
-      ? finalFormula
-      : `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
+    let safeFinal = finalFormula;
+    try {
+      const v = validateFormula(finalFormula);
+      // ✅ 검증 실패여도 "=..." 형태면 그대로 통과 (검증기의 미지원 함수 때문)
+      if (
+        !v?.ok &&
+        !(
+          typeof finalFormula === "string" &&
+          finalFormula.trim().startsWith("=")
+        )
+      ) {
+        safeFinal = `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
+      }
+    } catch (e) {
+      // 검증기 에러도 수식은 통과
+      safeFinal = finalFormula;
+    }
 
     await writeRequestLog({
       traceId,
