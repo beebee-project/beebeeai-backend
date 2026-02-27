@@ -4,6 +4,90 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
+function _isSheets(ctx) {
+  return String(ctx.engine || ctx.platform || "")
+    .toLowerCase()
+    .includes("sheet");
+}
+
+function _pickValueRange(ctx, it) {
+  // metric/value 대상 열(최대/최소 기준)
+  const h =
+    it.value_header ||
+    it.metric_header ||
+    it.header_hint ||
+    it.value_hint ||
+    null;
+  const r =
+    (h ? refFromHeaderSpec(ctx, h) : null) ||
+    (h
+      ? refFromHeaderSpec(ctx, { header: h, sheet: ctx.bestReturn?.sheetName })
+      : null) ||
+    null;
+  if (r) return r.range;
+  if (ctx.bestReturn)
+    return `'${ctx.bestReturn.sheetName}'!${ctx.bestReturn.columnLetter}${ctx.bestReturn.startRow}:${ctx.bestReturn.columnLetter}${ctx.bestReturn.lastDataRow}`;
+  return null;
+}
+
+function _pickReturnRange(ctx, it) {
+  // 반환할 열(이름/항목 등)
+  const h =
+    it.return_header ||
+    it.return_hint ||
+    it.lookup_hint || // 사용자가 "누구/어떤 항목"을 물을 때 흔히 여기로 들어옴
+    null;
+  const r =
+    (h ? refFromHeaderSpec(ctx, h) : null) ||
+    (h
+      ? refFromHeaderSpec(ctx, { header: h, sheet: ctx.bestReturn?.sheetName })
+      : null) ||
+    null;
+  if (r) return r.range;
+  if (ctx.bestLookup)
+    return `'${ctx.bestLookup.sheetName}'!${ctx.bestLookup.columnLetter}${ctx.bestLookup.startRow}:${ctx.bestLookup.columnLetter}${ctx.bestLookup.lastDataRow}`;
+  return null;
+}
+
+function _buildArgExtRecord(
+  ctx,
+  formatValue,
+  buildConditionPairs,
+  mode /* "MAX"|"MIN" */,
+) {
+  const it = ctx.intent || {};
+  const vRange = _pickValueRange(ctx, it);
+  const rRange = _pickReturnRange(ctx, it);
+  if (!vRange) return `=ERROR("${mode}: 기준(value) 열을 찾을 수 없습니다.")`;
+  if (!rRange) return `=ERROR("${mode}: 반환(return) 열을 찾을 수 없습니다.")`;
+
+  const pairs = _collectPairs(ctx, it, buildConditionPairs, formatValue);
+
+  // group_by 처리: 그룹별로 "그룹 내 최대/최소값을 가진 return"을 벡터로 반환
+  if (ctx.intent?.group_by) {
+    const keyRef =
+      refFromHeaderSpec(ctx, ctx.intent.group_by) ||
+      refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+    if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+
+    const basePairs = pairs || [];
+    const inner = (kSym) => {
+      const pairsPlus = basePairs.length
+        ? basePairs.concat([keyRef.range, kSym])
+        : [keyRef.range, kSym];
+      const vF = _buildFilterCall(vRange, pairsPlus);
+      const rF = _buildFilterCall(rRange, pairsPlus);
+      // 중복 최대/최소면 첫 번째 레코드 반환
+      return `LET(_v, ${vF}, _r, ${rF}, _x, ${mode}(_v), XLOOKUP(_x, _v, _r))`;
+    };
+    return _wrapGroupByWithMaker(keyRef, inner);
+  }
+
+  const vF = pairs.length ? _buildFilterCall(vRange, pairs) : vRange;
+  const rF = pairs.length ? _buildFilterCall(rRange, pairs) : rRange;
+  return `=LET(_v, ${vF}, _r, ${rF}, _x, ${mode}(_v), XLOOKUP(_x, _v, _r))`;
+}
+
 function _targetRangeFromBest(bestReturn) {
   return `'${bestReturn.sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 }
@@ -218,6 +302,65 @@ const mathStatsFunctionBuilder = {
     return `=COUNTIFS(${conditionPairs.join(", ")})`;
   },
 
+  // ✅ 최대/최소 값이 있는 레코드 반환(예: 최고 연봉자의 이름)
+  // intent:
+  //  - value_header/header_hint: 기준 값 열(예: 연봉)
+  //  - return_header/return_hint: 반환 열(예: 이름)
+  argmax_record: function (ctx, formatValue, buildConditionPairs) {
+    const it = ctx.intent || {};
+    const v = refFromHeaderSpec(
+      ctx,
+      it.value_header || it.header_hint || "",
+    )?.range;
+    const r = refFromHeaderSpec(
+      ctx,
+      it.return_header || it.return_hint || "",
+    )?.range;
+    if (!v) return `=ERROR("argmax_record: value 열을 찾을 수 없습니다.")`;
+    if (!r) return `=ERROR("argmax_record: return 열을 찾을 수 없습니다.")`;
+    const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
+    const vf = pairs.length
+      ? `FILTER(${v}, ${pairs
+          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+          .filter(Boolean)
+          .join(", ")})`
+      : v;
+    const rf = pairs.length
+      ? `FILTER(${r}, ${pairs
+          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+          .filter(Boolean)
+          .join(", ")})`
+      : r;
+    return `=LET(_v,${vf},_r,${rf},_x,MAX(_v),XLOOKUP(_x,_v,_r))`;
+  },
+  argmin_record: function (ctx, formatValue, buildConditionPairs) {
+    const it = ctx.intent || {};
+    const v = refFromHeaderSpec(
+      ctx,
+      it.value_header || it.header_hint || "",
+    )?.range;
+    const r = refFromHeaderSpec(
+      ctx,
+      it.return_header || it.return_hint || "",
+    )?.range;
+    if (!v) return `=ERROR("argmin_record: value 열을 찾을 수 없습니다.")`;
+    if (!r) return `=ERROR("argmin_record: return 열을 찾을 수 없습니다.")`;
+    const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
+    const vf = pairs.length
+      ? `FILTER(${v}, ${pairs
+          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+          .filter(Boolean)
+          .join(", ")})`
+      : v;
+    const rf = pairs.length
+      ? `FILTER(${r}, ${pairs
+          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
+          .filter(Boolean)
+          .join(", ")})`
+      : r;
+    return `=LET(_v,${vf},_r,${rf},_x,MIN(_v),XLOOKUP(_x,_v,_r))`;
+  },
+
   counta: function (ctx, formatValue, buildConditionPairs) {
     const { intent, bestReturn } = ctx;
     const tgt = _targetRangeFromBest(bestReturn);
@@ -270,6 +413,14 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+
+      // ✅ Google Sheets: group_by 집계는 QUERY 강제
+      if (_isSheets(ctx)) {
+        const key = keyRef.range;
+        const val = sumRange;
+        return `=QUERY({${key},${val}},"select Col1,sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",0)`;
+      }
+
       const inner = (kSym) => {
         const pairsPlus = pairs.length
           ? `${pairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -295,6 +446,12 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+      // ✅ Google Sheets: group_by 평균은 QUERY 강제
+      if (_isSheets(ctx)) {
+        const key = keyRef.range;
+        const val = avgRange;
+        return `=QUERY({${key},${val}},"select Col1,avg(Col2) where Col1 is not null group by Col1 label avg(Col2) ''",0)`;
+      }
       const inner = (kSym) => {
         const pairsPlus = pairs.length
           ? `${pairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -786,6 +943,17 @@ const mathStatsFunctionBuilder = {
       return _wrapGroupByWithMaker(keyRef, inner);
     }
     return `=PERCENTRANK.INC(${filtered}, ${xExpr})`;
+  },
+
+  // ✅ "최대/최소값을 가진 레코드(이름/항목)" 반환
+  // - 예: "가장 큰 매출을 기록한 고객명"
+  // intent 예시:
+  // { operation:"argmax_record", header_hint:"매출", return_hint:"고객명", conditions:[...] }
+  argmax_record: function (ctx, formatValue, buildConditionPairs) {
+    return _buildArgExtRecord(ctx, formatValue, buildConditionPairs, "MAX");
+  },
+  argmin_record: function (ctx, formatValue, buildConditionPairs) {
+    return _buildArgExtRecord(ctx, formatValue, buildConditionPairs, "MIN");
   },
 
   slope: function (ctx, formatValue, buildConditionPairs) {

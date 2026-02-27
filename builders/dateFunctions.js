@@ -20,10 +20,10 @@ function date_relative(
   offsetDays = 0,
   mode = "calendar",
   holidays,
-  weekend_mask
+  weekend_mask,
 ) {
   const b = _scalarFromDate(base, ctx, (v) =>
-    ctx.formulaBuilder._formatValue(v)
+    ctx.formulaBuilder._formatValue(v),
   );
   const n = Number(offsetDays || 0);
   if (!b) return `ERROR("date_relative: 기준일 해석 실패")`;
@@ -60,7 +60,7 @@ function _scalarFromDate(spec, ctx, formatValue = (x) => JSON.stringify(x)) {
   if (/^(TODAY|NOW)\(\)$/i.test(s)) return s.toUpperCase();
   if (
     /^(DATE|EOMONTH|EDATE|WORKDAY|WORKDAY\.INTL|NETWORKDAYS|NETWORKDAYS\.INTL)\(/i.test(
-      s
+      s,
     )
   )
     return s;
@@ -83,13 +83,13 @@ function _targetCellOrRange(ctx) {
     const r = hint
       ? refFromHeaderSpec(ctx, hint)
       : ctx.bestReturn
-      ? refFromHeaderSpec(
-          ctx,
-          ctx.bestReturn.header ||
-            ctx.bestReturn.header_hint ||
-            ctx.bestReturn.columnLetter
-        )
-      : null;
+        ? refFromHeaderSpec(
+            ctx,
+            ctx.bestReturn.header ||
+              ctx.bestReturn.header_hint ||
+              ctx.bestReturn.columnLetter,
+          )
+        : null;
     if (r) return { isRange: true, range: r.range, sheetName: r.sheetName };
   }
   if (hint) {
@@ -129,7 +129,7 @@ function _selectCellByRowSelector(ctx, headerSpec) {
   const keyCol = refFromHeaderSpec(ctx, it.row_selector.hint);
   const tgtCol = refFromHeaderSpec(
     ctx,
-    headerSpec || it.date_header || it.header_hint
+    headerSpec || it.date_header || it.header_hint,
   );
   if (!keyCol || !tgtCol) return null;
   const keyVal =
@@ -152,13 +152,13 @@ function _routeDateUnary(t, innerFromD, rowPickExpr) {
 /* ===== Week/Weekend Presets & Mappers ===== */
 function _mapWeekStartOptions(intent) {
   const raw = String(
-    intent?.week_start || intent?.return_type || ""
+    intent?.week_start || intent?.return_type || "",
   ).toLowerCase();
   if (raw === "iso")
     return { weekdayRT: 2, weeknumFN: "ISOWEEKNUM", weeknumRT: null };
   const idx = { sun: 1, mon: 2, tue: 3, wed: 4, thu: 5, fri: 6, sat: 7 }[raw];
   const weekdayRT =
-    raw === "mon" ? 2 : raw === "sun" ? 1 : intent?.return_type ?? 2;
+    raw === "mon" ? 2 : raw === "sun" ? 1 : (intent?.return_type ?? 2);
   let weeknumFN = "WEEKNUM";
   let weeknumRT = intent?.return_type ?? 21;
   if (idx) {
@@ -166,18 +166,18 @@ function _mapWeekStartOptions(intent) {
       raw === "mon"
         ? 11
         : raw === "tue"
-        ? 12
-        : raw === "wed"
-        ? 13
-        : raw === "thu"
-        ? 14
-        : raw === "fri"
-        ? 15
-        : raw === "sat"
-        ? 16
-        : raw === "sun"
-        ? 17
-        : 21;
+          ? 12
+          : raw === "wed"
+            ? 13
+            : raw === "thu"
+              ? 14
+              : raw === "fri"
+                ? 15
+                : raw === "sat"
+                  ? 16
+                  : raw === "sun"
+                    ? 17
+                    : 21;
   }
   return { weekdayRT, weeknumFN, weeknumRT };
 }
@@ -201,13 +201,13 @@ function _anchorOrPick(
   it,
   ctx,
   formatValue,
-  { fallbackToday = true, headerForPick = null } = {}
+  { fallbackToday = true, headerForPick = null } = {},
 ) {
   const a = _scalarFromDate(it?.anchor_date, ctx, formatValue);
   if (a) return a;
   const picked = _selectCellByRowSelector(
     ctx,
-    headerForPick || it?.date_header || it?.header_hint
+    headerForPick || it?.date_header || it?.header_hint,
   );
   if (picked) return picked;
   const s = _scalarFromDate(it?.start_date, ctx, formatValue);
@@ -218,6 +218,47 @@ function _anchorOrPick(
 const dateFunctionBuilder = {
   today: () => `=TODAY()`,
   now: () => `=NOW()`,
+
+  /**
+   * 근속년수(입사일 기반): TODAY()-입사일 을 연 단위로 환산
+   * - Sheets: ARRAYFORMULA
+   * - Excel: BYROW + LAMBDA
+   *
+   * intent:
+   *  - date_header | target_header | header_hint : 입사일 열 힌트
+   *  - precision : 반올림 자리수(기본 1)
+   */
+  tenure_years(ctx, formatValue) {
+    const it = ctx.intent || {};
+    const isSheets =
+      String(it.platform || it.engine || "").toLowerCase() === "sheets";
+    const precision =
+      it.precision != null && !isNaN(it.precision) ? Number(it.precision) : 1;
+
+    const hdr =
+      it.date_header ||
+      it.target_header ||
+      it.header_hint ||
+      it.start_date_header ||
+      "입사일";
+
+    const ref =
+      refFromHeaderSpec(ctx, {
+        header: hdr,
+        sheet: ctx.bestReturn?.sheetName,
+      }) || refFromHeaderSpec(ctx, hdr);
+
+    const rng = ref?.range;
+    if (!rng) return `=ERROR("근속년수: 입사일 열을 찾을 수 없습니다.")`;
+
+    // 빈값은 "" 유지
+    const core = `ROUND((TODAY()-d)/365.25, ${precision})`;
+
+    if (isSheets) {
+      return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0, "", ROUND((TODAY()-${rng})/365.25, ${precision})))`;
+    }
+    return `=BYROW(${rng}, LAMBDA(d, IF(LEN(TRIM(d&""))=0, "", ${core})))`;
+  },
 
   year(ctx) {
     const t = _targetCellOrRange(ctx);
@@ -301,7 +342,7 @@ const dateFunctionBuilder = {
       days,
       "workday",
       hol || it.holidays,
-      mask
+      mask,
     );
     return `=${body}`;
   },
@@ -385,7 +426,7 @@ const dateFunctionBuilder = {
       offset_days || 0,
       mode || "calendar",
       holidays,
-      weekend_mask
+      weekend_mask,
     );
     const body = expr.startsWith("=") ? expr.slice(1) : expr;
     return `=${body}`;

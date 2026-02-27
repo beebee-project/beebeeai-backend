@@ -290,14 +290,56 @@ const DEFAULT_FORMAT_OPTIONS = {
 //   ].join("||");
 // }
 
+function _extractTopN(text = "") {
+  const s = String(text || "").toLowerCase();
+  // top 3 / top3 / 상위 3 / 상위3 / 상위 n
+  let m = s.match(/top\s*(\d+)/i);
+  if (m && m[1]) return Math.max(1, parseInt(m[1], 10));
+  m = s.match(/상위\s*(\d+)/i);
+  if (m && m[1]) return Math.max(1, parseInt(m[1], 10));
+  m = s.match(/(\d+)\s*개\s*(?:만|까지)?/i); // "3개", "3개만"
+  if (m && m[1]) return Math.max(1, parseInt(m[1], 10));
+  return null;
+}
+
+function _looksLikeTopN(text = "") {
+  const s = String(text || "").toLowerCase();
+  return /(top\s*\d+|top\d+|상위\s*\d+|상위\d+|top\s*n|상위\s*n)/i.test(s);
+}
+
 /* ---------------------------------------------
  * 로컬 의도 추론 (LLM 미사용 시 폴백)
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
+  // ✅ 테스트에서 실패했던 케이스들(근속/구간분류) 우선 매칭
+  if (/(근속|근속년수|재직|tenure)/.test(s)) return "tenure_years";
+  if (
+    /(구간|분류|버킷|band|bucket)/.test(s) &&
+    /(연봉|salary|급여|금액|소득)/.test(s)
+  )
+    return "band_bucket";
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
+  if (_looksLikeTopN(s)) return "topn";
+  // ✅ "최대/최소(가장 큰/작은) + 항목/이름/레코드" 류는 argmax/argmin 레코드 반환으로
+  //  - 예: "가장 큰 매출의 고객명", "최소값을 가진 나무 이름"
+  if (
+    /(최대|max|highest|가장\s*큰|가장\s*높은)/.test(s) &&
+    /(이름|항목|레코드|row|행|품목|고객|사람)/.test(s)
+  ) {
+    return "argmax_record";
+  }
+  if (
+    /(최소|min|lowest|가장\s*작은|가장\s*낮은)/.test(s) &&
+    /(이름|항목|레코드|row|행|품목|고객|사람)/.test(s)
+  ) {
+    return "argmin_record";
+  }
+  // ✅ 상위 N개/Top N
+  if (/(top\s*\d+|상위\s*\d+|최대\s*\d+개|상위\s*n|top\s*n)/.test(s))
+    return "filter";
   if (/(xlookup|lookup|찾아|조회|검색|참조)/.test(s)) return "xlookup";
   if (/(filter|필터)/.test(s)) return "filter";
   if (/\b(if|조건|만약)\b/.test(s)) return "if";
@@ -598,7 +640,12 @@ const formulaBuilder = {
     if (!allSheetsData) return [];
     if (!intent?.conditions?.length) return [];
 
-    return intent.conditions
+    // ✅ IMPORTANT:
+    //  - mathStatsFunctions/_buildFilterCall 등은 conditionPairs를
+    //    [range1, crit1, range2, crit2, ...] "교차 배열"로 기대한다.
+    //  - 기존 구현은 ["range, crit", ...] 형태라 FILTER/그룹 로직에서 깨질 수 있음.
+    const out = [];
+    (intent.conditions || [])
       .map((c) => {
         // 1) 어떤 문자열을 헤더 후보로 쓸지 정리
         let headerText = "";
@@ -644,21 +691,26 @@ const formulaBuilder = {
           // 1) ISO 날짜: ">="&DATE(2023,1,1)
           if (isISODate(rawVal)) {
             const dExpr = isoToDateExpr(rawVal);
-            if (dExpr) return `${range}, "${op}"&${dExpr}`;
+            if (dExpr) return [range, `"${op}"&${dExpr}`];
           }
-          // 2) 숫자: ">=100"
-          if (!isNaN(rawVal) && rawVal !== "") {
-            return `${range}, "${op}${rawVal}"`;
+          // 2) 숫자: ">=1234" 같은 criteria string literal
+          if (rawVal != null && !isNaN(rawVal)) {
+            return [range, `"${op}${rawVal}"`];
           }
-          // 3) 문자열: ">=영업" 같은 건 잘 쓰진 않지만 일단 지원
-          //    -> "${op}"&"문자"
-          return `${range}, "${op}"&${val}`;
+          // 3) 기타(문자 등): ">="&"마케팅" 같은 형태 (일반적이진 않지만 일관성 유지)
+          return [range, `"${op}"&${val}`];
         }
 
         // 기본: "=" 비교
-        return `${range}, ${val}`;
+        return [range, val];
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .forEach((pair) => {
+        if (Array.isArray(pair) && pair.length === 2) {
+          out.push(pair[0], pair[1]);
+        }
+      });
+    return out;
   },
 };
 Object.assign(formulaBuilder, logicalFunctionBuilder);
@@ -701,6 +753,35 @@ const OP_ALIASES = {
   sortby: "sortby",
   regexmatch: "regexmatch",
   textsplit: "textsplit",
+  topngrouped: "topn_grouped",
+  topn: "topn",
+
+  // ✅ 근속(입사일 기반)
+  tenure_years: "tenure_years",
+  tenureyears: "tenure_years",
+  tenure: "tenure_years",
+  years_of_service: "tenure_years",
+
+  // ✅ 연봉 구간/버킷 분류
+  band_bucket: "band_bucket",
+  bandbucket: "band_bucket",
+  bucket: "band_bucket",
+  salary_band: "band_bucket",
+  salary_bucket: "band_bucket",
+
+  // ✅ 최대/최소 레코드 반환(항목/이름 등)
+  argmaxrecord: "argmax_record",
+  argmax_record: "argmax_record",
+  maxrecord: "argmax_record",
+  max_record: "argmax_record",
+  highestrecord: "argmax_record",
+  bestrecord: "argmax_record",
+
+  argminrecord: "argmin_record",
+  argmin_record: "argmin_record",
+  minrecord: "argmin_record",
+  min_record: "argmin_record",
+  lowestrecord: "argmin_record",
 };
 
 function resolveOp(op) {
@@ -776,7 +857,8 @@ Core fields (always consider):
       The main action. Examples:
         "sum", "sumifs", "average", "averageifs", "countifs",
         "lookup", "xlookup", "filter", "if", "sortby",
-        "textjoin", "textsplit", "regexmatch", "regexreplace".
+        "textjoin", "textsplit", "regexmatch", "regexreplace",
+        "argmax_record", "argmin_record".
       Choose the most appropriate single operation.
 
   - engine (optional): "excel" | "sheets"
@@ -1206,6 +1288,32 @@ exports.handleConversion = async (req, res, next) => {
     if (!isFileAttached && direct?.canHandleWithoutFile?.(intent)) {
       const f = direct.buildFormula(intent);
       if (f) {
+        // ✅ 메시지 기반 operation 보정 (LLM intent가 애매하게 filter로 올 때를 방지)
+        // - TopN: "마케팅 부서 연봉 Top3" 같은 케이스
+        const deduced = _deduceOp(message || "");
+        if (deduced === "topn") {
+          // LLM이 filter/formula로 뱉어도 topn으로 교정
+          if (
+            !intent?.operation ||
+            ["filter", "formula"].includes(
+              String(intent.operation).toLowerCase(),
+            )
+          ) {
+            intent.operation = "topn";
+          }
+          const n = _extractTopN(message || "");
+          if (n && !intent.top_n) intent.top_n = n;
+
+          // topn에서 "정렬 기준"이 비어있으면 header_hint를 정렬 기준으로 사용
+          // (예: "연봉 Top3" → header_hint="연봉")
+          if (
+            !intent.order_by &&
+            !intent.order_by_header &&
+            intent.header_hint
+          ) {
+            intent.order_by_header = intent.header_hint;
+          }
+        }
         // ✅ 6-1: 출력 검증(Direct도 동일 적용)
         const v = validateFormula(f);
         const safeOut = v.ok
@@ -1249,6 +1357,27 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     // 6) 빌더 호출
+    // ---------------------------------------------
+    // TopN (Grouped) 자동 라우팅
+    // - LLM/로컬 intent가 filter로 떨어져도, group_by + sort + limit이면 topn_grouped로 승격
+    // ---------------------------------------------
+    try {
+      const it = intent || {};
+      const hasGroup = !!it.group_by;
+      const hasSort = !!(it.sort_by || it.order_by);
+      const hasN =
+        it.top_n != null ||
+        it.limit != null ||
+        it.n != null ||
+        it.count != null;
+
+      if (hasGroup && hasSort && hasN) {
+        it.operation = "topn_grouped";
+        intent = it;
+      }
+    } catch (e) {
+      // ignore (never block conversion)
+    }
     const opKey = resolveOp(intent.operation);
     const builder = opKey && formulaBuilder[opKey];
 
