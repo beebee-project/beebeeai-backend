@@ -255,7 +255,8 @@ const dateFunctionBuilder = {
     const core = `ROUND((TODAY()-d)/365.25, ${precision})`;
 
     if (isSheets) {
-      return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0, "", ROUND((TODAY()-${rng})/365.25, ${precision})))`;
+      // ✅ 정확한 만 근속년수 계산
+      return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0,"",DATEDIF(${rng},TODAY(),"Y")))`;
     }
     return `=BYROW(${rng}, LAMBDA(d, IF(LEN(TRIM(d&""))=0, "", ${core})))`;
   },

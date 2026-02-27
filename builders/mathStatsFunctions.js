@@ -49,45 +49,6 @@ function _pickReturnRange(ctx, it) {
   return null;
 }
 
-function _buildArgExtRecord(
-  ctx,
-  formatValue,
-  buildConditionPairs,
-  mode /* "MAX"|"MIN" */,
-) {
-  const it = ctx.intent || {};
-  const vRange = _pickValueRange(ctx, it);
-  const rRange = _pickReturnRange(ctx, it);
-  if (!vRange) return `=ERROR("${mode}: 기준(value) 열을 찾을 수 없습니다.")`;
-  if (!rRange) return `=ERROR("${mode}: 반환(return) 열을 찾을 수 없습니다.")`;
-
-  const pairs = _collectPairs(ctx, it, buildConditionPairs, formatValue);
-
-  // group_by 처리: 그룹별로 "그룹 내 최대/최소값을 가진 return"을 벡터로 반환
-  if (ctx.intent?.group_by) {
-    const keyRef =
-      refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-      refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
-    if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-
-    const basePairs = pairs || [];
-    const inner = (kSym) => {
-      const pairsPlus = basePairs.length
-        ? basePairs.concat([keyRef.range, kSym])
-        : [keyRef.range, kSym];
-      const vF = _buildFilterCall(vRange, pairsPlus);
-      const rF = _buildFilterCall(rRange, pairsPlus);
-      // 중복 최대/최소면 첫 번째 레코드 반환
-      return `LET(_v, ${vF}, _r, ${rF}, _x, ${mode}(_v), XLOOKUP(_x, _v, _r))`;
-    };
-    return _wrapGroupByWithMaker(keyRef, inner);
-  }
-
-  const vF = pairs.length ? _buildFilterCall(vRange, pairs) : vRange;
-  const rF = pairs.length ? _buildFilterCall(rRange, pairs) : rRange;
-  return `=LET(_v, ${vF}, _r, ${rF}, _x, ${mode}(_v), XLOOKUP(_x, _v, _r))`;
-}
-
 function _targetRangeFromBest(bestReturn) {
   return `'${bestReturn.sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 }
@@ -100,7 +61,7 @@ function _ensureConditionPairs(ctx, buildConditionPairs) {
 
 function _buildFilterCall(targetRange, conditionPairs) {
   // ✅ 조건 없이 FILTER를 쓰면 '그럴듯한 오답'이 나올 수 있어 명시 실패
-  if (!conditionPairs.length) return `ERROR("FILTER: 조건이 비어 있습니다.")`;
+  if (!conditionPairs.length) return `=ERROR("FILTER: 조건이 비어 있습니다.")`;
   const clauses = [];
   for (let i = 0; i < conditionPairs.length; i += 2) {
     const rng = conditionPairs[i];
@@ -248,7 +209,7 @@ const mathStatsFunctionBuilder = {
       // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
       if (String(ctx.engine).toLowerCase().includes("sheet")) {
         const key = keyRef.range;
-        const val = sumRange;
+        const val = avgRange;
         return `=QUERY({${key},${val}},
 "select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
 0)`;
@@ -286,7 +247,7 @@ const mathStatsFunctionBuilder = {
       // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
       if (String(ctx.engine).toLowerCase().includes("sheet")) {
         const key = keyRef.range;
-        const val = sumRange;
+        const val = _targetRangeFromBest(ctx.bestReturn);
         return `=QUERY({${key},${val}},
 "select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
 0)`;
