@@ -1315,16 +1315,17 @@ exports.handleConversion = async (req, res, next) => {
           }
         }
         // ✅ 6-1: 출력 검증(Direct도 동일 적용)
+        let v = { ok: true, reason: "SKIP_OR_FAIL_OPEN" };
         let safeOut = f;
         try {
-          const v = validateFormula(f);
-          // ✅ 검증 실패여도 "수식 형태(=로 시작)"면 그대로 통과
-          // (LET/QUERY/MAP 등 검증기가 모르는 함수 때문에 false 나오는 문제 방지)
+          v = validateFormula(f);
+          // ✅ 검증 실패여도 수식 형태(=로 시작)면 그대로 통과
           if (!v?.ok && !(typeof f === "string" && f.trim().startsWith("="))) {
             safeOut = `=ERROR("결과 검증에 실패했습니다. (direct) 다시 시도해 주세요.")`;
           }
         } catch (e) {
-          // 검증기 에러도 수식은 통과
+          // 검증기 오류는 fail-open(수식 통과)
+          v = { ok: true, reason: "VALIDATOR_THROWN" };
           safeOut = f;
         }
         if (req.user?.id && shouldCountConversion(f)) {
@@ -1420,10 +1421,11 @@ exports.handleConversion = async (req, res, next) => {
     });
 
     // ✅ 6-1: 최종 출력 검증(깨진 수식/따옴표/괄호 불일치 차단)
+    let v = { ok: true, reason: "SKIP_OR_FAIL_OPEN" };
     let safeFinal = finalFormula;
     try {
-      const v = validateFormula(finalFormula);
-      // ✅ 검증 실패여도 "=..." 형태면 그대로 통과 (검증기의 미지원 함수 때문)
+      v = validateFormula(finalFormula);
+      // ✅ 검증 실패여도 수식 형태(=로 시작)면 그대로 통과 (LET/QUERY/MAP 등 검증기 미지원 대응)
       if (
         !v?.ok &&
         !(
@@ -1434,7 +1436,8 @@ exports.handleConversion = async (req, res, next) => {
         safeFinal = `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
       }
     } catch (e) {
-      // 검증기 에러도 수식은 통과
+      // 검증기 오류는 fail-open(수식 통과)
+      v = { ok: true, reason: "VALIDATOR_THROWN" };
       safeFinal = finalFormula;
     }
 
@@ -1445,7 +1448,7 @@ exports.handleConversion = async (req, res, next) => {
       engine: "formula",
       status: shouldCountConversion(finalFormula) ? "success" : "fail",
       reason: reasonNorm,
-      isFallback: v.ok ? false : true,
+      isFallback: v?.ok ? false : true,
       prompt: message,
       latencyMs: Date.now() - startedAt,
       debugMeta: buildDebugMeta({
