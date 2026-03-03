@@ -134,9 +134,6 @@ const mathStatsFunctionBuilder = {
 
   average: function (ctx, formatValue, buildConditionPairs) {
     const { intent, bestReturn } = ctx;
-    if (!intent.conditions || intent.conditions.length === 0) {
-      return this._buildSimpleAggregate("average", ctx);
-    }
     const avgRange = _targetRangeFromBest(bestReturn);
     const conditionPairs = _collectPairs(
       ctx,
@@ -144,51 +141,58 @@ const mathStatsFunctionBuilder = {
       buildConditionPairs,
       formatValue,
     );
-    if (conditionPairs.length === 0) {
-      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
-    }
     if (ctx.intent?.group_by) {
       const keyRef =
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const inner = (kSym) => {
-        const pairsPlus = conditionPairs.length
-          ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
-          : `${keyRef.range}, ${kSym}`;
+        // ✅ 조건이 없으면 AVERAGEIF, 조건이 있으면 AVERAGEIFS
+        if (!conditionPairs.length) {
+          return `AVERAGEIF(${keyRef.range}, ${kSym}, ${avgRange})`;
+        }
+        const pairsPlus = `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`;
         return `AVERAGEIFS(${avgRange}, ${pairsPlus})`;
       };
       return _wrapGroupByWithMaker(keyRef, inner);
+    }
+    // group_by가 없을 때만 단일 평균
+    if (!intent.conditions || intent.conditions.length === 0) {
+      return this._buildSimpleAggregate("average", ctx);
+    }
+    if (conditionPairs.length === 0) {
+      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     }
     return `=AVERAGEIFS(${avgRange}, ${conditionPairs.join(", ")})`;
   },
 
   count: function (ctx, formatValue, buildConditionPairs) {
     const { intent } = ctx;
-    if (!intent.conditions || intent.conditions.length === 0) {
-      return this._buildSimpleAggregate("count", ctx);
-    }
     const conditionPairs = _collectPairs(
       ctx,
       intent,
       buildConditionPairs,
       formatValue,
     );
-    if (conditionPairs.length === 0) {
-      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
-    }
     if (ctx.intent?.group_by) {
       const keyRef =
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const inner = (kSym) => {
-        const pairsPlus = conditionPairs.length
-          ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
-          : `${keyRef.range}, ${kSym}`;
+        // ✅ 조건이 없으면 key만으로 COUNTIFS
+        if (!conditionPairs.length) return `COUNTIFS(${keyRef.range}, ${kSym})`;
+        const pairsPlus = `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`;
         return `COUNTIFS(${pairsPlus})`;
       };
       return _wrapGroupByWithMaker(keyRef, inner);
+    }
+    // group_by가 없을 때만 단일 count
+    if (!intent.conditions || intent.conditions.length === 0) {
+      return this._buildSimpleAggregate("count", ctx);
+    }
+    if (conditionPairs.length === 0) {
+      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     }
     return `=COUNTIFS(${conditionPairs.join(", ")})`;
   },
@@ -889,7 +893,13 @@ const mathStatsFunctionBuilder = {
 };
 
 function _wrapGroupByWithMaker(keyRef, makeInnerWithK) {
-  return `=MAP(UNIQUE(${keyRef.range}), LAMBDA(k, ${makeInnerWithK("k")}))`;
+  // ✅ "표" 형태로 반환: [키, 값]
+  // keys: UNIQUE(keyRange)
+  // vals: MAP(keys, LAMBDA(k, inner(k)))
+  // result: HSTACK(keys, vals)
+  return `=LET(keys, UNIQUE(${keyRef.range}), HSTACK(keys, MAP(keys, LAMBDA(k, ${makeInnerWithK(
+    "k",
+  )}))))`;
 }
 const _op = (o) => (o ? String(o) : "=");
 

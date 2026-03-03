@@ -626,6 +626,14 @@ const formulaBuilder = {
         const op = String(c.operator || "=").trim();
         const rawVal = c.value;
 
+        // ✅ 값이 비어있으면 조건으로 만들지 않는다 ("" 조건 생성 방지)
+        if (
+          rawVal == null ||
+          (typeof rawVal === "string" && rawVal.trim() === "")
+        ) {
+          return null;
+        }
+
         // 값도 반드시 포매터를 통과시켜 따옴표/숫자 처리
         const val = formulaBuilder._formatValue(rawVal);
 
