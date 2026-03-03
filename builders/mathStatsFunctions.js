@@ -149,10 +149,10 @@ const mathStatsFunctionBuilder = {
       const inner = (kSym) => {
         // ✅ 조건이 없으면 AVERAGEIF, 조건이 있으면 AVERAGEIFS
         if (!conditionPairs.length) {
-          return `AVERAGEIF(${keyRef.range}, ${kSym}, ${avgRange})`;
+          return `TEXT(ROUND(AVERAGEIF(${keyRef.range}, ${kSym}, ${avgRange}), 0), "0")`;
         }
         const pairsPlus = `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`;
-        return `AVERAGEIFS(${avgRange}, ${pairsPlus})`;
+        return `TEXT(ROUND(AVERAGEIFS(${avgRange}, ${pairsPlus}), 0), "0")`;
       };
       return _wrapGroupByWithMaker(keyRef, inner);
     }
