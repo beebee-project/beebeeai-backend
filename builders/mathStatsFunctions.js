@@ -4,51 +4,6 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
-function _isSheets(ctx) {
-  return String(ctx.engine || ctx.platform || "")
-    .toLowerCase()
-    .includes("sheet");
-}
-
-function _pickValueRange(ctx, it) {
-  // metric/value 대상 열(최대/최소 기준)
-  const h =
-    it.value_header ||
-    it.metric_header ||
-    it.header_hint ||
-    it.value_hint ||
-    null;
-  const r =
-    (h ? refFromHeaderSpec(ctx, h) : null) ||
-    (h
-      ? refFromHeaderSpec(ctx, { header: h, sheet: ctx.bestReturn?.sheetName })
-      : null) ||
-    null;
-  if (r) return r.range;
-  if (ctx.bestReturn)
-    return `'${ctx.bestReturn.sheetName}'!${ctx.bestReturn.columnLetter}${ctx.bestReturn.startRow}:${ctx.bestReturn.columnLetter}${ctx.bestReturn.lastDataRow}`;
-  return null;
-}
-
-function _pickReturnRange(ctx, it) {
-  // 반환할 열(이름/항목 등)
-  const h =
-    it.return_header ||
-    it.return_hint ||
-    it.lookup_hint || // 사용자가 "누구/어떤 항목"을 물을 때 흔히 여기로 들어옴
-    null;
-  const r =
-    (h ? refFromHeaderSpec(ctx, h) : null) ||
-    (h
-      ? refFromHeaderSpec(ctx, { header: h, sheet: ctx.bestReturn?.sheetName })
-      : null) ||
-    null;
-  if (r) return r.range;
-  if (ctx.bestLookup)
-    return `'${ctx.bestLookup.sheetName}'!${ctx.bestLookup.columnLetter}${ctx.bestLookup.startRow}:${ctx.bestLookup.columnLetter}${ctx.bestLookup.lastDataRow}`;
-  return null;
-}
-
 function _targetRangeFromBest(bestReturn) {
   return `'${bestReturn.sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 }
@@ -60,8 +15,7 @@ function _ensureConditionPairs(ctx, buildConditionPairs) {
 }
 
 function _buildFilterCall(targetRange, conditionPairs) {
-  // ✅ 조건 없이 FILTER를 쓰면 '그럴듯한 오답'이 나올 수 있어 명시 실패
-  if (!conditionPairs.length) return `=ERROR("FILTER: 조건이 비어 있습니다.")`;
+  if (!conditionPairs.length) return targetRange;
   const clauses = [];
   for (let i = 0; i < conditionPairs.length; i += 2) {
     const rng = conditionPairs[i];
@@ -164,14 +118,6 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-      // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
-      if (String(ctx.engine).toLowerCase().includes("sheet")) {
-        const key = keyRef.range;
-        const val = sumRange;
-        return `=QUERY({${key},${val}},
-"select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
-0)`;
-      }
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
           ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -206,14 +152,6 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-      // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
-      if (String(ctx.engine).toLowerCase().includes("sheet")) {
-        const key = keyRef.range;
-        const val = avgRange;
-        return `=QUERY({${key},${val}},
-"select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
-0)`;
-      }
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
           ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -244,14 +182,6 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-      // ✅ Google Sheets에서는 group_by를 QUERY로 강제 (안정성 ↑)
-      if (String(ctx.engine).toLowerCase().includes("sheet")) {
-        const key = keyRef.range;
-        const val = _targetRangeFromBest(ctx.bestReturn);
-        return `=QUERY({${key},${val}},
-"select Col1, sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",
-0)`;
-      }
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
           ? `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -261,65 +191,6 @@ const mathStatsFunctionBuilder = {
       return _wrapGroupByWithMaker(keyRef, inner);
     }
     return `=COUNTIFS(${conditionPairs.join(", ")})`;
-  },
-
-  // ✅ 최대/최소 값이 있는 레코드 반환(예: 최고 연봉자의 이름)
-  // intent:
-  //  - value_header/header_hint: 기준 값 열(예: 연봉)
-  //  - return_header/return_hint: 반환 열(예: 이름)
-  argmax_record: function (ctx, formatValue, buildConditionPairs) {
-    const it = ctx.intent || {};
-    const v = refFromHeaderSpec(
-      ctx,
-      it.value_header || it.header_hint || "",
-    )?.range;
-    const r = refFromHeaderSpec(
-      ctx,
-      it.return_header || it.return_hint || "",
-    )?.range;
-    if (!v) return `=ERROR("argmax_record: value 열을 찾을 수 없습니다.")`;
-    if (!r) return `=ERROR("argmax_record: return 열을 찾을 수 없습니다.")`;
-    const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
-    const vf = pairs.length
-      ? `FILTER(${v}, ${pairs
-          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-          .filter(Boolean)
-          .join(", ")})`
-      : v;
-    const rf = pairs.length
-      ? `FILTER(${r}, ${pairs
-          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-          .filter(Boolean)
-          .join(", ")})`
-      : r;
-    return `=LET(_v,${vf},_r,${rf},_x,MAX(_v),XLOOKUP(_x,_v,_r))`;
-  },
-  argmin_record: function (ctx, formatValue, buildConditionPairs) {
-    const it = ctx.intent || {};
-    const v = refFromHeaderSpec(
-      ctx,
-      it.value_header || it.header_hint || "",
-    )?.range;
-    const r = refFromHeaderSpec(
-      ctx,
-      it.return_header || it.return_hint || "",
-    )?.range;
-    if (!v) return `=ERROR("argmin_record: value 열을 찾을 수 없습니다.")`;
-    if (!r) return `=ERROR("argmin_record: return 열을 찾을 수 없습니다.")`;
-    const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
-    const vf = pairs.length
-      ? `FILTER(${v}, ${pairs
-          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-          .filter(Boolean)
-          .join(", ")})`
-      : v;
-    const rf = pairs.length
-      ? `FILTER(${r}, ${pairs
-          .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-          .filter(Boolean)
-          .join(", ")})`
-      : r;
-    return `=LET(_v,${vf},_r,${rf},_x,MIN(_v),XLOOKUP(_x,_v,_r))`;
   },
 
   counta: function (ctx, formatValue, buildConditionPairs) {
@@ -374,14 +245,6 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-
-      // ✅ Google Sheets: group_by 집계는 QUERY 강제
-      if (_isSheets(ctx)) {
-        const key = keyRef.range;
-        const val = sumRange;
-        return `=QUERY({${key},${val}},"select Col1,sum(Col2) where Col1 is not null group by Col1 label sum(Col2) ''",0)`;
-      }
-
       const inner = (kSym) => {
         const pairsPlus = pairs.length
           ? `${pairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -407,12 +270,6 @@ const mathStatsFunctionBuilder = {
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-      // ✅ Google Sheets: group_by 평균은 QUERY 강제
-      if (_isSheets(ctx)) {
-        const key = keyRef.range;
-        const val = avgRange;
-        return `=QUERY({${key},${val}},"select Col1,avg(Col2) where Col1 is not null group by Col1 label avg(Col2) ''",0)`;
-      }
       const inner = (kSym) => {
         const pairsPlus = pairs.length
           ? `${pairs.join(", ")}, ${keyRef.range}, ${kSym}`
@@ -906,17 +763,6 @@ const mathStatsFunctionBuilder = {
     return `=PERCENTRANK.INC(${filtered}, ${xExpr})`;
   },
 
-  // ✅ "최대/최소값을 가진 레코드(이름/항목)" 반환
-  // - 예: "가장 큰 매출을 기록한 고객명"
-  // intent 예시:
-  // { operation:"argmax_record", header_hint:"매출", return_hint:"고객명", conditions:[...] }
-  argmax_record: function (ctx, formatValue, buildConditionPairs) {
-    return _buildArgExtRecord(ctx, formatValue, buildConditionPairs, "MAX");
-  },
-  argmin_record: function (ctx, formatValue, buildConditionPairs) {
-    return _buildArgExtRecord(ctx, formatValue, buildConditionPairs, "MIN");
-  },
-
   slope: function (ctx, formatValue, buildConditionPairs) {
     const it = ctx.intent || {};
     let xExpr = null,
@@ -1040,74 +886,6 @@ const mathStatsFunctionBuilder = {
 
     return `=INTERCEPT(${yF}, ${xF})`;
   },
-};
-
-// ✅ 런타임에서 "_buildArgExtRecord is not defined"가 터지는 케이스가 있어서
-// argmax/argmin을 안전한 인라인 구현으로 "최종 오버라이드" (중복 정의/스코프 이슈 방지)
-mathStatsFunctionBuilder.argmax_record = function (
-  ctx,
-  formatValue,
-  buildConditionPairs,
-) {
-  const it = ctx.intent || {};
-  const v = refFromHeaderSpec(
-    ctx,
-    it.value_header || it.header_hint || "",
-  )?.range;
-  const r = refFromHeaderSpec(
-    ctx,
-    it.return_header || it.return_hint || "",
-  )?.range;
-  if (!v) return `=ERROR("argmax_record: value 열을 찾을 수 없습니다.")`;
-  if (!r) return `=ERROR("argmax_record: return 열을 찾을 수 없습니다.")`;
-
-  const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
-  const vf = pairs.length
-    ? `FILTER(${v}, ${pairs
-        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-        .filter(Boolean)
-        .join(", ")})`
-    : v;
-  const rf = pairs.length
-    ? `FILTER(${r}, ${pairs
-        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-        .filter(Boolean)
-        .join(", ")})`
-    : r;
-  return `=LET(_v,${vf},_r,${rf},_x,MAX(_v),XLOOKUP(_x,_v,_r))`;
-};
-
-mathStatsFunctionBuilder.argmin_record = function (
-  ctx,
-  formatValue,
-  buildConditionPairs,
-) {
-  const it = ctx.intent || {};
-  const v = refFromHeaderSpec(
-    ctx,
-    it.value_header || it.header_hint || "",
-  )?.range;
-  const r = refFromHeaderSpec(
-    ctx,
-    it.return_header || it.return_hint || "",
-  )?.range;
-  if (!v) return `=ERROR("argmin_record: value 열을 찾을 수 없습니다.")`;
-  if (!r) return `=ERROR("argmin_record: return 열을 찾을 수 없습니다.")`;
-
-  const pairs = (buildConditionPairs ? buildConditionPairs(ctx) : []) || [];
-  const vf = pairs.length
-    ? `FILTER(${v}, ${pairs
-        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-        .filter(Boolean)
-        .join(", ")})`
-    : v;
-  const rf = pairs.length
-    ? `FILTER(${r}, ${pairs
-        .map((_, i) => (i % 2 === 0 ? `${pairs[i]}, ${pairs[i + 1]}` : null))
-        .filter(Boolean)
-        .join(", ")})`
-    : r;
-  return `=LET(_v,${vf},_r,${rf},_x,MIN(_v),XLOOKUP(_x,_v,_r))`;
 };
 
 function _wrapGroupByWithMaker(keyRef, makeInnerWithK) {

@@ -219,48 +219,6 @@ const dateFunctionBuilder = {
   today: () => `=TODAY()`,
   now: () => `=NOW()`,
 
-  /**
-   * 근속년수(입사일 기반): TODAY()-입사일 을 연 단위로 환산
-   * - Sheets: ARRAYFORMULA
-   * - Excel: BYROW + LAMBDA
-   *
-   * intent:
-   *  - date_header | target_header | header_hint : 입사일 열 힌트
-   *  - precision : 반올림 자리수(기본 1)
-   */
-  tenure_years(ctx, formatValue) {
-    const it = ctx.intent || {};
-    const isSheets =
-      String(it.platform || it.engine || "").toLowerCase() === "sheets";
-    const precision =
-      it.precision != null && !isNaN(it.precision) ? Number(it.precision) : 1;
-
-    const hdr =
-      it.date_header ||
-      it.target_header ||
-      it.header_hint ||
-      it.start_date_header ||
-      "입사일";
-
-    const ref =
-      refFromHeaderSpec(ctx, {
-        header: hdr,
-        sheet: ctx.bestReturn?.sheetName,
-      }) || refFromHeaderSpec(ctx, hdr);
-
-    const rng = ref?.range;
-    if (!rng) return `=ERROR("근속년수: 입사일 열을 찾을 수 없습니다.")`;
-
-    // 빈값은 "" 유지
-    const core = `ROUND((TODAY()-d)/365.25, ${precision})`;
-
-    if (isSheets) {
-      // ✅ 정확한 만 근속년수 계산
-      return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0,"",DATEDIF(${rng},TODAY(),"Y")))`;
-    }
-    return `=BYROW(${rng}, LAMBDA(d, IF(LEN(TRIM(d&""))=0, "", ${core})))`;
-  },
-
   year(ctx) {
     const t = _targetCellOrRange(ctx);
     const pick = _selectCellByRowSelector(ctx);

@@ -5,126 +5,6 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
-// ✅ (누락) 두 개의 서로 다른 헤더(컬럼) 조건을 AND/OR로 묶어 벡터 IF 생성
-// 예: 부서="영업" AND 직급="과장" 인 경우 TRUE/FALSE 벡터 만들기
-function buildIfVectorTwoHeadersLogic(ctx, formatValue) {
-  const it = ctx.intent || {};
-  const c = it.condition || it.conditions || null;
-  if (!c) return null;
-
-  const logicalOp = String(
-    c.logical_operator || c.logicalOp || "AND",
-  ).toUpperCase();
-  const conds = c.conditions || [];
-  if (!Array.isArray(conds) || conds.length !== 2) return null;
-
-  const toRange = (x) => {
-    const hint = x?.hint || x?.header || x?.target_header;
-    if (!hint) return null;
-    const ref =
-      refFromHeaderSpec(ctx, hint) ||
-      refFromHeaderSpec(ctx, {
-        header: hint,
-        sheet: ctx.bestReturn?.sheetName,
-      });
-    return ref?.range || null;
-  };
-
-  const r1 = toRange(conds[0]);
-  const r2 = toRange(conds[1]);
-  if (!r1 || !r2) return null;
-
-  const one = (rng, x) => {
-    const op = String(x.operator || x.op || "=").trim();
-    const vRaw = x.value ?? x.val ?? x.right ?? "";
-    const v = formatValue(vRaw);
-    if (op === "=") return `(${rng}=${v})`;
-    if (op === "!=") return `(${rng}<>${v})`;
-    if (op === ">") return `(${rng}>${v})`;
-    if (op === ">=") return `(${rng}>=${v})`;
-    if (op === "<") return `(${rng}<${v})`;
-    if (op === "<=") return `(${rng}<=${v})`;
-    return `(${rng}=${v})`;
-  };
-
-  // TRUE/FALSE → 1/0 캐스팅
-  const wrapBool = (expr) => `N(${expr})`;
-  const e1 = wrapBool(one(r1, conds[0]));
-  const e2 = wrapBool(one(r2, conds[1]));
-
-  // AND: 곱, OR: 합(둘 중 하나라도 1이면 TRUE)
-  const comb = logicalOp === "OR" ? `(${e1}+${e2})>0` : `(${e1}*${e2})=1`;
-
-  const t = formatValue(it.value_if_true ?? "TRUE");
-  const f = formatValue(it.value_if_false ?? "FALSE");
-
-  // 기준 컬럼은 r1로 빈값 처리
-  return `=ARRAYFORMULA(IF(LEN(TRIM(${r1}&""))=0,"",IF(${comb}, ${t}, ${f})))`;
-}
-
-// ✅ 누락돼서 런타임 크래시 나던 함수: 최소 구현으로 추가
-// 목적: vector_if / 논리 벡터 생성 흐름에서 ReferenceError 제거
-// - 동일 헤더(같은 컬럼)에서 여러 조건을 AND/OR로 묶는 케이스 처리
-function buildIfVectorSameHeaderLogic(ctx, formatValue) {
-  const it = ctx.intent || {};
-  const c = it.condition || it.conditions || null;
-  if (!c) return null;
-
-  const logicalOp = (c.logical_operator || c.logicalOp || "AND").toUpperCase();
-  const conds = c.conditions || [];
-  if (!Array.isArray(conds) || conds.length < 1) return null;
-
-  // 동일 header/hint인지 확인
-  const firstHint =
-    conds[0]?.hint || conds[0]?.header || conds[0]?.target_header;
-  if (!firstHint) return null;
-  for (const x of conds) {
-    const h = x?.hint || x?.header || x?.target_header;
-    if (!h || String(h) !== String(firstHint)) return null;
-  }
-
-  const ref =
-    refFromHeaderSpec(ctx, firstHint) ||
-    refFromHeaderSpec(ctx, {
-      header: firstHint,
-      sheet: ctx.bestReturn?.sheetName,
-    });
-  const rng = ref?.range;
-  if (!rng) return null;
-
-  const joiner = logicalOp === "OR" ? "+" : "*";
-  const wrapBool = (expr) => `N(${expr})`; // TRUE/FALSE → 1/0
-
-  // 단일 조건을 (rng op value) 형태로
-  const one = (x) => {
-    const op = (x.operator || x.op || "=").trim();
-    const vRaw = x.value ?? x.val ?? x.right ?? "";
-    const v = formatValue(vRaw);
-    if (op === "between" && Array.isArray(x.values) && x.values.length >= 2) {
-      const v1 = formatValue(x.values[0]);
-      const v2 = formatValue(x.values[1]);
-      return `(${rng}>=${v1})*(${rng}<=${v2})`;
-    }
-    // 기본 비교
-    if (op === "=") return `(${rng}=${v})`;
-    if (op === "!=") return `(${rng}<>${v})`;
-    if (op === ">") return `(${rng}>${v})`;
-    if (op === ">=") return `(${rng}>=${v})`;
-    if (op === "<") return `(${rng}<${v})`;
-    if (op === "<=") return `(${rng}<=${v})`;
-    return `(${rng}=${v})`;
-  };
-
-  const condExpr =
-    conds.length === 1
-      ? one(conds[0])
-      : conds.map((x) => wrapBool(one(x))).join(joiner);
-
-  const t = formatValue(it.value_if_true ?? "TRUE");
-  const f = formatValue(it.value_if_false ?? "FALSE");
-  return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0,"",IF(${condExpr}, ${t}, ${f})))`;
-}
-
 // --- NEW: 객체/배열 호환용 시트 배열 변환
 function _sheetsArray(allSheetsData) {
   if (!allSheetsData) return [];
@@ -444,10 +324,6 @@ function _rewriteCondToParams(condition, headerList, formatValue) {
   return walk(condition);
 }
 
-function buildIfArithTwoColsVsCol(_ctx, _formatValue) {
-  return null;
-}
-
 // =============================
 // 논리 함수 본체
 // =============================
@@ -574,24 +450,6 @@ const logicalFunctionBuilder = {
     return `=IF(${condStr}, ${t}, ${f})`;
   },
 
-  band_bucket(ctx) {
-    const it = ctx.intent || {};
-    const hdr = it.value_header || it.target_header || it.header_hint || "연봉";
-    const ref =
-      refFromHeaderSpec(ctx, hdr) ||
-      refFromHeaderSpec(ctx, { header: hdr, sheet: ctx.bestReturn?.sheetName });
-    const rng = ref?.range;
-    if (!rng) return `=ERROR("구간분류: 대상 열을 찾을 수 없습니다.")`;
-
-    const t =
-      Array.isArray(it.thresholds) && it.thresholds.length
-        ? it.thresholds
-        : [4000, 6000, 8000];
-    const [a, b, c] = t.map(Number);
-
-    return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0,"",IF(${rng}<${a},"${a} 미만",IF(${rng}<${b},"${a}~${b - 1}",IF(${rng}<${c},"${b}~${c - 1}","${c} 이상")))))`;
-  },
-
   // 명시적 IFERROR/IFNA 연산자(사용자가 직접 요청한 경우에만 사용)
   iferror: (ctx, formatValue, formulaBuilder) => {
     const { intent } = ctx;
@@ -640,98 +498,6 @@ const logicalFunctionBuilder = {
 
   true: () => `=TRUE()`,
   false: () => `=FALSE()`,
-};
-
-/**
- * 연봉/급여 구간 분류(band/bucket)
- * - Sheets: ARRAYFORMULA
- * - Excel: BYROW + LAMBDA
- *
- * intent:
- *  - value_header | target_header | header_hint : 금액 열 힌트(연봉/급여)
- *  - bands: [{ max: 3000, label:"<3000" }, ...] 형태 지원(옵션)
- *    - 마지막은 max 없이 label만 두면 "그 이상"으로 처리
- *  - thresholds: [3000,5000,7000] 같이 숫자만 주면 기본 라벨 자동 생성
- */
-logicalFunctionBuilder.band_bucket = function (ctx, formatValue) {
-  const it = ctx.intent || {};
-  const isSheets =
-    String(it.platform || it.engine || "").toLowerCase() === "sheets";
-
-  const hdr =
-    it.value_header ||
-    it.target_header ||
-    it.header_hint ||
-    it.amount_header ||
-    "연봉";
-
-  const ref =
-    refFromHeaderSpec(ctx, { header: hdr, sheet: ctx.bestReturn?.sheetName }) ||
-    refFromHeaderSpec(ctx, hdr);
-  const rng = ref?.range;
-  if (!rng) return `=ERROR("구간분류: 대상 금액 열을 찾을 수 없습니다.")`;
-
-  // 1) 밴드 정의 수집
-  let bands = [];
-  if (Array.isArray(it.bands) && it.bands.length) {
-    bands = it.bands
-      .map((b) => ({
-        max: b?.max != null && !isNaN(b.max) ? Number(b.max) : null,
-        label: b?.label != null ? String(b.label) : null,
-      }))
-      .filter((b) => b.label != null || b.max != null);
-  } else if (Array.isArray(it.thresholds) && it.thresholds.length) {
-    const th = it.thresholds
-      .map((n) => (n != null && !isNaN(n) ? Number(n) : null))
-      .filter((n) => n != null)
-      .sort((a, b) => a - b);
-    // 자동 라벨: <t1, t1~t2-1, ... , >=t_last
-    for (let i = 0; i < th.length; i++) {
-      const t = th[i];
-      if (i === 0) bands.push({ max: t, label: `<${t}` });
-      else bands.push({ max: t, label: `${th[i - 1]}~${t - 1}` });
-    }
-    if (th.length) bands.push({ max: null, label: `>=${th[th.length - 1]}` });
-  } else {
-    // 기본(테스트에서 가장 흔한 형태)
-    bands = [
-      { max: 3000, label: "<3000" },
-      { max: 5000, label: "3000~4999" },
-      { max: 7000, label: "5000~6999" },
-      { max: null, label: ">=7000" },
-    ];
-  }
-
-  // 2) 중첩 IF 생성
-  // IF(x<3000,"<3000",IF(x<5000,"3000~4999", ... ))
-  const buildNested = (xSym) => {
-    const usable = bands.slice();
-    // 마지막 catch-all 보장
-    const last = usable.find((b) => b.max == null) || usable[usable.length - 1];
-    const rest = usable.filter((b) => b !== last);
-    let expr = formatValue(last.label ?? "");
-    for (let i = rest.length - 1; i >= 0; i--) {
-      const b = rest[i];
-      const mx = b.max;
-      const lb = formatValue(b.label ?? "");
-      if (mx == null) continue;
-      expr = `IF(${xSym}<${mx}, ${lb}, ${expr})`;
-    }
-    return expr;
-  };
-
-  if (isSheets) {
-    // Sheets: 빈값이면 "", 아니면 분류
-    // 숫자 coercion: VALUE가 텍스트 숫자도 처리
-    const x = `VALUE(${rng})`;
-    return `=ARRAYFORMULA(IF(LEN(TRIM(${rng}&""))=0, "", ${buildNested(x)}))`;
-  }
-
-  // Excel: BYROW로 행 단위
-  // 숫자 coercion: VALUE(d&"") (텍스트/빈값 안전)
-  return `=BYROW(${rng}, LAMBDA(d, IF(LEN(TRIM(d&""))=0, "", ${buildNested(
-    `VALUE(d&"")`,
-  )})))`;
 };
 
 // ===== AND/OR/NOT 및 IS* 계열 =====

@@ -176,197 +176,6 @@ function _resolveRangeOrError(it, ctx) {
   return r;
 }
 
-// ================================
-// FILTER / TOPN 공용: 조건 마스크 생성
-// ================================
-function _buildMaskExprFromIntent(ctx, sheetInfo, sheetName) {
-  const intent = ctx.intent || {};
-  const isSheets = _isSheetsContext(ctx);
-
-  // Step2: regex가 Excel에서 불가하므로, 필요 시 조기에 ERROR 반환
-  let earlyError = null;
-
-  // 1) 기본 conditions
-  const condNodes = Array.isArray(intent.conditions) ? intent.conditions : [];
-  const masks = condNodes
-    .map((cond) => {
-      const termSet = formulaUtils.expandTermsFromText(cond.hint);
-      const bestCol = formulaUtils.bestHeaderInSheet(
-        sheetInfo,
-        sheetName,
-        termSet,
-        "lookup",
-      );
-      if (!bestCol?.col) return null;
-      // Step1 연계: 열 후보가 모호하면 오답 대신 중단
-      if (bestCol.isAmbiguous) {
-        earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${
-          bestCol.runnerUp?.header || "다른 후보"
-        }' 중 선택이 필요합니다.")`;
-        return null;
-      }
-      const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
-
-      const rawOp = String(cond.operator || "=").toLowerCase();
-      const op = _normalizeOp(rawOp);
-      const rawVal = cond.value;
-
-      // 날짜/숫자 비교는 열 값을 안전 coercion
-      if (_isISODate(rawVal))
-        return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
-      if (_isNumericLiteral(rawVal))
-        return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
-
-      const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
-      if (["contains", "포함"].includes(rawOp))
-        return _containsExpr(colA1, rawVal, cs);
-      if (["startswith", "startsWith"].includes(rawOp))
-        return _startsWithExpr(colA1, rawVal, cs);
-      if (["endswith", "endsWith"].includes(rawOp))
-        return _endsWithExpr(colA1, rawVal, cs);
-      if (
-        ["in", "any_of"].includes(rawOp) &&
-        Array.isArray(cond.values) &&
-        cond.values.length
-      ) {
-        // IN은 MATCH 기반(텍스트는 TRIM/LOWER 정규화)
-        const colN = _normText(colA1, cs);
-        const values = cond.values.map((v) => {
-          if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
-          const s = cs
-            ? String(v ?? "").trim()
-            : String(v ?? "")
-                .trim()
-                .toLowerCase();
-          return _q(s);
-        });
-        return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
-      }
-      if (rawOp === "between" && cond.min != null && cond.max != null) {
-        const L = _q(cond.min);
-        const R = _q(cond.max);
-        const left = _trimText(colA1);
-        return `(${left}>=${L})*(${left}<=${R})`;
-      }
-      if (["matches", "regex"].includes(rawOp)) {
-        if (!isSheets) {
-          earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
-          return null;
-        }
-        const strict =
-          (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
-        return _regexMatchExpr(colA1, rawVal, cs, strict);
-      }
-      return `${_trimText(colA1)}${op}${_q(rawVal)}`;
-    })
-    .filter(Boolean);
-
-  // 2) groups 조건 (조건 그룹)
-  const groupMasks = (
-    Array.isArray(intent.condition_groups)
-      ? intent.condition_groups
-      : Array.isArray(intent.groups)
-        ? intent.groups
-        : []
-  )
-    .map((g) => {
-      const items = Array.isArray(g.conditions) ? g.conditions : [];
-      const masksInGroup = items
-        .map((cond) => {
-          const termSet = formulaUtils.expandTermsFromText(cond.hint);
-          const bestCol = formulaUtils.bestHeaderInSheet(
-            sheetInfo,
-            sheetName,
-            termSet,
-            "lookup",
-          );
-          if (!bestCol?.col) return null;
-          if (bestCol.isAmbiguous) {
-            earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${
-              bestCol.runnerUp?.header || "다른 후보"
-            }' 중 선택이 필요합니다.")`;
-            return null;
-          }
-          const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
-          const rawOp = String(cond.operator || "=").toLowerCase();
-          const op = _normalizeOp(rawOp);
-          const rawVal = cond.value;
-          const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
-
-          if (_isISODate(rawVal))
-            return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
-          if (_isNumericLiteral(rawVal))
-            return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
-
-          if (["contains", "포함"].includes(rawOp))
-            return _containsExpr(colA1, rawVal, cs);
-          if (["startswith", "startsWith"].includes(rawOp))
-            return _startsWithExpr(colA1, rawVal, cs);
-          if (["endswith", "endsWith"].includes(rawOp))
-            return _endsWithExpr(colA1, rawVal, cs);
-          if (rawOp === "between" && cond.min != null && cond.max != null) {
-            const L = _q(cond.min);
-            const R = _q(cond.max);
-            const left = _trimText(colA1);
-            return `(${left}>=${L})*(${left}<=${R})`;
-          }
-          if (["matches", "regex"].includes(rawOp)) {
-            if (!isSheets) {
-              earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
-              return null;
-            }
-            const strict =
-              (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
-            return _regexMatchExpr(colA1, rawVal, cs, strict);
-          }
-          return `${_trimText(colA1)}${op}${_q(rawVal)}`;
-        })
-        .filter(Boolean);
-      const useOR = String(g.logical || "AND").toUpperCase() === "OR";
-      return masksInGroup.length
-        ? `(${masksInGroup.join(useOR ? " + " : " * ")})`
-        : null;
-    })
-    .filter(Boolean);
-
-  // 3) 기존 conditions + 그룹 마스크 결합
-  const isOR =
-    String(
-      intent.logical || intent.conditions_logical || "AND",
-    ).toUpperCase() === "OR";
-  const baseMask = masks.length ? `(${masks.join(isOR ? " + " : " * ")})` : "";
-  const groupsLogicalOR =
-    String(intent.groups_logical || "AND").toUpperCase() === "OR";
-  const combinedMask = [baseMask, ...groupMasks]
-    .filter(Boolean)
-    .join(groupsLogicalOR ? " + " : " * ");
-
-  // 4) 빈값(공백) 제외 옵션
-  const blanks = Array.isArray(intent.exclude_blank_in)
-    ? intent.exclude_blank_in
-    : [];
-  const blankMasks = blanks
-    .map((h) => {
-      const termSet = formulaUtils.expandTermsFromText(h);
-      const colInfo = formulaUtils.bestHeaderInSheet(
-        sheetInfo,
-        sheetName,
-        termSet,
-        "lookup",
-      );
-      if (!colInfo?.col) return null;
-      const a1 = `'${sheetName}'!${colInfo.col.columnLetter}${sheetInfo.startRow}:${colInfo.col.columnLetter}${sheetInfo.lastDataRow}`;
-      return `LEN(TRIM(${a1}&""))>0`;
-    })
-    .filter(Boolean);
-  const blankMaskExpr = blankMasks.length
-    ? ` * (${blankMasks.join(" * ")})`
-    : "";
-
-  const finalMask = (combinedMask || "TRUE") + blankMaskExpr; // 조건 없을 때도 TRUE에서 시작
-  return { maskExpr: finalMask, earlyError };
-}
-
 const arrayFunctionBuilder = {
   // ---------------------- FILTER ----------------------
   filter: function (ctx) {
@@ -393,11 +202,229 @@ const arrayFunctionBuilder = {
 
     // 1) 조건 마스크 (AND/*, OR/+)
     // Step2: regex가 Excel에서 불가하므로, 필요 시 조기에 ERROR 반환
-    const { maskExpr, earlyError } = _buildMaskExprFromIntent(
-      ctx,
-      sheetInfo,
-      sheetName,
-    );
+    let earlyError = null;
+    const isSheets = _isSheetsContext(ctx);
+    const condNodes = Array.isArray(intent.conditions) ? intent.conditions : [];
+    const masks = condNodes
+      .map((cond) => {
+        const termSet = formulaUtils.expandTermsFromText(cond.hint);
+        const bestCol = formulaUtils.bestHeaderInSheet(
+          sheetInfo,
+          sheetName,
+          termSet,
+          "lookup",
+        );
+        if (!bestCol?.col) return null;
+        // Step1 연계: 열 후보가 모호하면 오답 대신 중단
+        if (bestCol.isAmbiguous) {
+          earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
+          return null;
+        }
+        const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+
+        const rawOp = String(cond.operator || "=").toLowerCase();
+        const op = _normalizeOp(rawOp);
+        const rawVal = cond.value;
+
+        // Step2: 날짜/숫자 비교는 열 값을 안전 coercion
+        if (_isISODate(rawVal))
+          return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
+        if (_isNumericLiteral(rawVal))
+          return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
+
+        const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+        if (["contains", "포함"].includes(rawOp))
+          return _containsExpr(colA1, rawVal, cs);
+        if (["startswith", "startsWith"].includes(rawOp))
+          return _startsWithExpr(colA1, rawVal, cs);
+        if (["endswith", "endsWith"].includes(rawOp))
+          return _endsWithExpr(colA1, rawVal, cs);
+        if (
+          ["in", "any_of"].includes(rawOp) &&
+          Array.isArray(cond.values) &&
+          cond.values.length
+        ) {
+          // Step2: IN은 MATCH 기반(텍스트는 TRIM/LOWER 정규화)
+          const colN = _normText(colA1, cs);
+          const values = cond.values.map((v) => {
+            if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
+            const s = cs
+              ? String(v ?? "").trim()
+              : String(v ?? "")
+                  .trim()
+                  .toLowerCase();
+            return _q(s);
+          });
+          return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
+        }
+        if (rawOp === "between" && cond.min != null && cond.max != null) {
+          const isNum =
+            _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
+          const isDate = _isISODate(cond.min) && _isISODate(cond.max);
+          if (isNum) {
+            const L = String(cond.min).replace(/,/g, "");
+            const R = String(cond.max).replace(/,/g, "");
+            const left = _coerceNumber(colA1);
+            return `(${left}>=${L})*(${left}<=${R})`;
+          }
+          if (isDate) {
+            const L = _dateVal(String(cond.min));
+            const R = _dateVal(String(cond.max));
+            const left = _coerceDate(colA1);
+            return `(${left}>=${L})*(${left}<=${R})`;
+          }
+          // fallback
+          const L = _q(cond.min);
+          const R = _q(cond.max);
+          const left = _trimText(colA1);
+          return `(${left}>=${L})*(${left}<=${R})`;
+        }
+        if (["matches", "regex"].includes(rawOp)) {
+          // Step2: REGEXMATCH는 Sheets 전용으로 운영(Excel이면 안전하게 중단)
+          if (!isSheets) {
+            earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
+            return null;
+          }
+          const strict =
+            (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
+          return _regexMatchExpr(colA1, rawVal, cs, strict);
+        }
+        // Step2: 문자열 비교도 TRIM 기반으로 안정화
+        return `${_trimText(colA1)}${op}${_q(rawVal)}`;
+      })
+      .filter(Boolean);
+
+    // --- 조건 그룹 ---
+    const groups = Array.isArray(intent.condition_groups)
+      ? intent.condition_groups
+      : [];
+    const groupMasks = groups
+      .map((g) => {
+        const list = Array.isArray(g.conditions) ? g.conditions : [];
+        const masksInGroup = list
+          .map((cond) => {
+            const termSet = formulaUtils.expandTermsFromText(cond.hint);
+            const bestCol = formulaUtils.bestHeaderInSheet(
+              sheetInfo,
+              sheetName,
+              termSet,
+              "lookup",
+            );
+            if (!bestCol?.col) return null;
+            if (bestCol.isAmbiguous) {
+              earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
+              return null;
+            }
+            const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+            const rawOp = String(cond.operator || "=").toLowerCase();
+            const op = _normalizeOp(rawOp);
+            const rawVal = cond.value;
+            if (_isISODate(rawVal))
+              return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
+            if (_isNumericLiteral(rawVal))
+              return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
+            const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+            if (["contains", "포함"].includes(rawOp))
+              return _containsExpr(colA1, rawVal, cs);
+            if (["startswith", "startsWith"].includes(rawOp))
+              return _startsWithExpr(colA1, rawVal, cs);
+            if (["endswith", "endsWith"].includes(rawOp))
+              return _endsWithExpr(colA1, rawVal, cs);
+            if (
+              ["in", "any_of"].includes(rawOp) &&
+              Array.isArray(cond.values) &&
+              cond.values.length
+            ) {
+              const colN = _normText(colA1, cs);
+              const values = cond.values.map((v) => {
+                if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
+                const s = cs
+                  ? String(v ?? "").trim()
+                  : String(v ?? "")
+                      .trim()
+                      .toLowerCase();
+                return _q(s);
+              });
+              return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
+            }
+            if (rawOp === "between" && cond.min != null && cond.max != null) {
+              const isNum =
+                _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
+              const isDate = _isISODate(cond.min) && _isISODate(cond.max);
+              if (isNum) {
+                const L = String(cond.min).replace(/,/g, "");
+                const R = String(cond.max).replace(/,/g, "");
+                const left = _coerceNumber(colA1);
+                return `(${left}>=${L})*(${left}<=${R})`;
+              }
+              if (isDate) {
+                const L = _dateVal(String(cond.min));
+                const R = _dateVal(String(cond.max));
+                const left = _coerceDate(colA1);
+                return `(${left}>=${L})*(${left}<=${R})`;
+              }
+              const L = _q(cond.min);
+              const R = _q(cond.max);
+              const left = _trimText(colA1);
+              return `(${left}>=${L})*(${left}<=${R})`;
+            }
+            if (["matches", "regex"].includes(rawOp)) {
+              if (!isSheets) {
+                earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
+                return null;
+              }
+              const strict =
+                (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
+              return _regexMatchExpr(colA1, rawVal, cs, strict);
+            }
+            return `${_trimText(colA1)}${op}${_q(rawVal)}`;
+          })
+          .filter(Boolean);
+        const useOR = String(g.logical || "AND").toUpperCase() === "OR";
+        return masksInGroup.length
+          ? `(${masksInGroup.join(useOR ? " + " : " * ")})`
+          : null;
+      })
+      .filter(Boolean);
+
+    // 기존 conditions + 그룹 마스크 결합
+    const isOR =
+      String(
+        intent.logical || intent.conditions_logical || "AND",
+      ).toUpperCase() === "OR";
+    const baseMask = masks.length
+      ? `(${masks.join(isOR ? " + " : " * ")})`
+      : "";
+    const groupsLogicalOR =
+      String(intent.groups_logical || "AND").toUpperCase() === "OR";
+    const combinedMask = [baseMask, ...groupMasks]
+      .filter(Boolean)
+      .join(groupsLogicalOR ? " + " : " * ");
+
+    // --- 빈값(공백) 제외 옵션 ---
+    const blanks = Array.isArray(intent.exclude_blank_in)
+      ? intent.exclude_blank_in
+      : [];
+    const blankMasks = blanks
+      .map((h) => {
+        const termSet = formulaUtils.expandTermsFromText(h);
+        const colInfo = formulaUtils.bestHeaderInSheet(
+          sheetInfo,
+          sheetName,
+          termSet,
+          "lookup",
+        );
+        if (!colInfo?.col) return null;
+        const a1 = `'${sheetName}'!${colInfo.col.columnLetter}${sheetInfo.startRow}:${colInfo.col.columnLetter}${sheetInfo.lastDataRow}`;
+        return `LEN(TRIM(${a1}&""))>0`;
+      })
+      .filter(Boolean);
+    const blankMaskExpr = blankMasks.length
+      ? ` * (${blankMasks.join(" * ")})`
+      : "";
+
+    const finalMask = (combinedMask || "TRUE") + blankMaskExpr; // 조건 없을 때도 TRUE에서 시작
+    let maskExpr = finalMask;
     if (earlyError) return earlyError;
 
     // 2) 조인(inner/left) 및 오른쪽 열 픽업
@@ -524,156 +551,6 @@ const arrayFunctionBuilder = {
       );
     }
     return pipeSortIfRequested(ctx, intent, pickedLeft, selectedIndexMap);
-  },
-
-  // ---------------------- TOP N (Sheets) ----------------------
-  // 목적:
-  //  - "마케팅 부서 연봉 Top3의 직원ID, 이름, 연봉" 같은 요청을 안정적으로 처리
-  //
-  // intent 기대(없어도 최대한 유추):
-  //  - top_n: number (default 3)
-  //  - order_by_header or header_hint: 정렬 기준 열 (예: "연봉")
-  //  - return_headers: ["직원 ID","이름","연봉"] (없으면 return_hint를 쉼표로 split 시도)
-  //  - conditions: [{hint:"부서", operator:"=", value:"마케팅"} ...] (filter()와 동일 포맷)
-  topn: function (ctx) {
-    const { intent, allSheetsData } = ctx;
-    const isSheets = _isSheetsContext(ctx);
-    if (!isSheets)
-      return `=ERROR("TopN은 현재 Google Sheets에서만 지원됩니다.")`;
-
-    // 기본 시트 선택: bestReturn이 있으면 그 시트, 없으면 첫 시트
-    const sheetName =
-      ctx.bestReturn?.sheetName ||
-      (allSheetsData ? Object.keys(allSheetsData)[0] : null);
-    if (!sheetName) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
-    const sheetInfo = allSheetsData[sheetName];
-    if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
-
-    // fullRange(폭 계산) - filter()와 동일
-    const metaEntries = Object.entries(sheetInfo.metaData || {});
-    if (!metaEntries.length)
-      return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
-    metaEntries.sort((a, b) => {
-      const ai = formulaUtils.columnLetterToIndex(a[1].columnLetter);
-      const bi = formulaUtils.columnLetterToIndex(b[1].columnLetter);
-      return ai - bi;
-    });
-    const firstCol = metaEntries[0][1].columnLetter;
-    const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
-    const fullRange = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
-
-    const N = Math.max(
-      1,
-      parseInt(intent.top_n || intent.n || intent.limit || 3, 10) || 3,
-    );
-
-    // 반환 열들 결정
-    let returnHeaders = Array.isArray(intent.return_headers)
-      ? intent.return_headers.slice()
-      : [];
-    if (!returnHeaders.length && typeof intent.return_hint === "string") {
-      // "직원 ID, 이름, 연봉" 같은 힌트 처리
-      returnHeaders = intent.return_hint
-        .split(/[,/|]/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    if (!returnHeaders.length && ctx.bestReturn?.header) {
-      returnHeaders = [ctx.bestReturn.header];
-    }
-
-    // 정렬 기준 열
-    const orderHeader =
-      intent.order_by_header ||
-      intent.order_header ||
-      (typeof intent.order_by === "string" ? intent.order_by : null) ||
-      intent.header_hint;
-    if (!orderHeader) return `=ERROR("TopN: 정렬 기준 열을 찾을 수 없습니다.")`;
-
-    // 헤더 → 열 범위(A1) 변환(모호성 차단)
-    function _colRangeByHeader(h, role = "return") {
-      const termSet = formulaUtils.expandTermsFromText(h);
-      const bestCol = formulaUtils.bestHeaderInSheet(
-        sheetInfo,
-        sheetName,
-        termSet,
-        role,
-      );
-      if (!bestCol?.col) return null;
-      if (bestCol.isAmbiguous) {
-        return {
-          error: `=ERROR("열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`,
-        };
-      }
-      return {
-        range: `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`,
-      };
-    }
-
-    const orderRef = _colRangeByHeader(orderHeader, "lookup");
-    if (!orderRef) return `=ERROR("TopN: 정렬 기준 열을 찾을 수 없습니다.")`;
-    if (orderRef.error) return orderRef.error;
-
-    const retRefs = [];
-    for (const h of returnHeaders) {
-      const rr = _colRangeByHeader(h, "return");
-      if (!rr) return `=ERROR("TopN: 반환 열을 찾을 수 없습니다: ${_q(h)}")`;
-      if (rr.error) return rr.error;
-      retRefs.push(rr.range);
-    }
-
-    // 조건 마스크 생성: filter()의 핵심 로직 일부만 재사용(AND/OR 포함)
-    // (단, join 등 고급 기능은 topn에서는 제외)
-    let earlyError = null;
-    const condNodes = Array.isArray(intent.conditions) ? intent.conditions : [];
-    const masks = condNodes
-      .map((cond) => {
-        const termSet = formulaUtils.expandTermsFromText(cond.hint);
-        const bestCol = formulaUtils.bestHeaderInSheet(
-          sheetInfo,
-          sheetName,
-          termSet,
-          "lookup",
-        );
-        if (!bestCol?.col) return null;
-        if (bestCol.isAmbiguous) {
-          earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
-          return null;
-        }
-        const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
-        const rawOp = String(cond.operator || "=").toLowerCase();
-        const op = _normalizeOp(rawOp);
-        const rawVal = cond.value;
-        if (_isISODate(rawVal))
-          return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
-        if (_isNumericLiteral(rawVal))
-          return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
-        const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
-        if (["contains", "포함"].includes(rawOp))
-          return _containsExpr(colA1, rawVal, cs);
-        if (["startswith", "startswith"].includes(rawOp))
-          return _startsWithExpr(colA1, rawVal, cs);
-        if (["endswith", "endswith"].includes(rawOp))
-          return _endsWithExpr(colA1, rawVal, cs);
-        return `${_trimText(colA1)}${op}${_q(rawVal)}`;
-      })
-      .filter(Boolean);
-
-    if (earlyError) return earlyError;
-    const isOR =
-      String(
-        intent.logical || intent.conditions_logical || "AND",
-      ).toUpperCase() === "OR";
-    const maskExpr = masks.length
-      ? `(${masks.join(isOR ? " + " : " * ")})`
-      : "TRUE";
-
-    // 데이터: {returnCols..., orderCol} 를 필터 → orderCol desc 정렬 → 상위 N 추출 → returnCols만
-    const dataBlock = `{${retRefs.join(",")},${orderRef.range}}`;
-    const sortIndex = retRefs.length + 1;
-    const chooseCols = retRefs.map((_r, i) => i + 1).join(",");
-
-    return `=LET(_d, FILTER(${dataBlock}, ${maskExpr}), _s, SORT(_d, ${sortIndex}, FALSE), TAKE(CHOOSECOLS(_s, ${chooseCols}), ${N}))`;
   },
 
   // ---------------------- UNIQUE ----------------------
@@ -940,130 +817,6 @@ const arrayFunctionBuilder = {
     if (it.cols != null) args.push(String(it.cols));
     if (it.pad_with != null) args.push(_q(it.pad_with));
     return `=EXPAND(${args.join(", ")})`;
-  },
-
-  // ---------------------- TOP N (GROUPED) ----------------------
-  // 예) "부서별 연봉 Top3"  → group_by + sort_by + top_n/limit 기반
-  topn_grouped: function (ctx) {
-    const { bestReturn, intent, allSheetsData } = ctx;
-    if (!bestReturn) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
-
-    const sheetName = bestReturn.sheetName;
-    const sheetInfo = allSheetsData?.[sheetName];
-    if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
-
-    const groupHint = intent.group_by;
-    if (!groupHint) return `=ERROR("topn_grouped: group_by가 필요합니다.")`;
-
-    const sortHint = intent.sort_by || intent.order_by;
-    if (!sortHint)
-      return `=ERROR("topn_grouped: sort_by(정렬 기준)가 필요합니다.")`;
-
-    const n =
-      Number(intent.top_n ?? intent.limit ?? intent.n ?? intent.count ?? 3) ||
-      3;
-    const sortOrder =
-      String(intent.sort_order || intent.order || "desc").toLowerCase() ===
-      "asc"
-        ? 1
-        : -1;
-
-    // 그룹 열
-    const gTerm = formulaUtils.expandTermsFromText(
-      typeof groupHint === "string" ? groupHint : groupHint.header || "",
-    );
-    const gCol = formulaUtils.bestHeaderInSheet(
-      sheetInfo,
-      sheetName,
-      gTerm,
-      "lookup",
-    );
-    if (!gCol?.col) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-    if (gCol.isAmbiguous)
-      return `=ERROR("group_by 열이 모호합니다: '${gCol.header}' 또는 '${
-        gCol.runnerUp?.header || "다른 후보"
-      }' 중 선택이 필요합니다.")`;
-
-    const groupRange = `'${sheetName}'!${gCol.col.columnLetter}${sheetInfo.startRow}:${gCol.col.columnLetter}${sheetInfo.lastDataRow}`;
-
-    // 정렬 열
-    const sTerm = formulaUtils.expandTermsFromText(
-      typeof sortHint === "string" ? sortHint : sortHint.header || "",
-    );
-    const sCol = formulaUtils.bestHeaderInSheet(
-      sheetInfo,
-      sheetName,
-      sTerm,
-      "lookup",
-    );
-    if (!sCol?.col) return `=ERROR("sort_by: 기준 열을 찾을 수 없습니다.")`;
-    if (sCol.isAmbiguous)
-      return `=ERROR("sort_by 열이 모호합니다: '${sCol.header}' 또는 '${
-        sCol.runnerUp?.header || "다른 후보"
-      }' 중 선택이 필요합니다.")`;
-    const sortRange = `'${sheetName}'!${sCol.col.columnLetter}${sheetInfo.startRow}:${sCol.col.columnLetter}${sheetInfo.lastDataRow}`;
-
-    // 반환열 (명시되면 그걸 우선, 없으면 bestReturn 단일)
-    const headerOpts =
-      intent.return_headers || intent.select_headers || intent.return_cols;
-    const metaEntries = Object.entries(sheetInfo.metaData || {});
-    metaEntries.sort((a, b) => {
-      const ai = formulaUtils.columnLetterToIndex(a[1].columnLetter);
-      const bi = formulaUtils.columnLetterToIndex(b[1].columnLetter);
-      return ai - bi;
-    });
-    const nameToIndex = new Map(metaEntries.map(([h, m], i) => [h, i + 1]));
-
-    const wantedHeaders =
-      Array.isArray(headerOpts) && headerOpts.length
-        ? headerOpts
-        : [bestReturn.header || bestReturn.columnLetter];
-
-    const wantedRanges = [];
-    const wantedLabels = [];
-    for (const hSpec of wantedHeaders) {
-      const hName =
-        typeof hSpec === "string"
-          ? (
-              hSpec.match(/^\s*'?([^'!]+)'?\s*!\s*(.+)\s*$/)?.[2] || hSpec
-            ).trim()
-          : String(hSpec?.header || "").trim();
-      if (!hName) continue;
-      const idx = nameToIndex.get(hName);
-      if (!idx) continue;
-      const meta = metaEntries[idx - 1]?.[1];
-      if (!meta?.columnLetter) continue;
-      wantedRanges.push(
-        `'${sheetName}'!${meta.columnLetter}${sheetInfo.startRow}:${meta.columnLetter}${sheetInfo.lastDataRow}`,
-      );
-      wantedLabels.push(hName);
-    }
-    if (!wantedRanges.length)
-      return `=ERROR("topn_grouped: 반환할 열을 찾을 수 없습니다.")`;
-
-    // 조건 마스크(공용)
-    const { maskExpr, earlyError } = _buildMaskExprFromIntent(
-      ctx,
-      sheetInfo,
-      sheetName,
-    );
-    if (earlyError) return earlyError;
-
-    const groupLabel =
-      String(gCol.header || groupHint.header || groupHint).trim() || "group";
-    const headerRow = `{${[_q(groupLabel), ...wantedLabels.map(_q)].join(",")}}`;
-
-    // data: [wanted..., sortKey] 로 만들고 정렬/TAKE 후 sortKey 컬럼 제거
-    const dataWithSort = `HSTACK(${wantedRanges.join(", ")}, ${sortRange})`;
-    const sortKeyIndex = wantedRanges.length + 1;
-    const pickCols = Array.from(
-      { length: wantedRanges.length },
-      (_, i) => i + 1,
-    ).join(", ");
-
-    const gList = `SORT(UNIQUE(IFERROR(FILTER(${groupRange}, ${maskExpr}), )))`;
-
-    return `=LET(_g, ${gList}, _hdr, ${headerRow}, _body, REDUCE("", _g, LAMBDA(acc, k, LET(_m, (${groupRange}=k)*(${maskExpr}), _d, IFERROR(FILTER(${dataWithSort}, _m), ), _s, IFERROR(SORT(_d, ${sortKeyIndex}, ${sortOrder}), ), _t, IFERROR(TAKE(CHOOSECOLS(_s, ${pickCols}), ${n}), ), VSTACK(acc, HSTACK(EXPAND(k, ROWS(_t), 1), _t)) )))), IF(LEN(_body)=0, _hdr, VSTACK(_hdr, FILTER(_body, INDEX(_body,,2)<>\"\"))))`;
   },
 };
 
