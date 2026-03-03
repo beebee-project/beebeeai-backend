@@ -1,6 +1,46 @@
 const formulaUtils = require("../utils/formulaUtils");
 const { rangeFromSpec } = require("../utils/builderHelpers");
 
+// A1 / 'Sheet'!A1 / range 인지 (따옴표 금지)
+function _isA1RefOrRange(s) {
+  const t = String(s || "").trim();
+  if (/^\$?[A-Z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Z]{1,3}\$?[0-9]{1,7})?$/i.test(t))
+    return true;
+  if (
+    /^([^!'\s]+|'[^']+')!\$?[A-Z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Z]{1,3}\$?[0-9]{1,7})?$/i.test(
+      t,
+    )
+  )
+    return true;
+  return false;
+}
+
+// 조건의 "열 힌트" 추출: hint 우선, 없으면 target/header 지원
+function _condHint(cond) {
+  if (!cond) return null;
+  if (cond.hint) return cond.hint;
+  const t = cond.target;
+  if (typeof t === "string") return t;
+  if (t && typeof t === "object") {
+    if (t.header) return t.header;
+    if (t.hint) return t.hint;
+    if (t.columnLetter) return t.columnLetter;
+  }
+  return null;
+}
+
+// 비교값 표현식: 셀참조면 그대로, 아니면 문자열 quote
+function _valExpr(v) {
+  if (v == null) return _q("");
+  if (typeof v === "object") {
+    if (v.cell) return v.cell; // {cell:"J3"} 같은 형태
+    if (v.header) return _q(String(v.header));
+  }
+  const s = String(v);
+  if (_isA1RefOrRange(s)) return s.trim();
+  return _q(s);
+}
+
 // 모든 인자를 "1열 벡터"로 정규화 (공백 무시)
 function _broadcastToColumn(exprOrRange, ctx) {
   const e = rangeFromSpec(ctx, exprOrRange) || exprOrRange;
@@ -114,7 +154,33 @@ function _stripCaseInsensInlineFlag(pattern) {
 function _containsExpr(colA1, needle, cs) {
   // Step2: 공백/타입 혼합 안정화 (TRIM + &"")
   const colN = _normText(colA1, cs);
-  const ndl = cs ? String(needle ?? "") : String(needle ?? "").toLowerCase();
+  const raw = needle;
+
+  // ✅ needle이 셀/범위 참조면 따옴표 없이 사용 (범위면 INDEX로 스칼라화)
+  const asCellOrScalar = (v) => {
+    if (v == null) return _q("");
+    if (typeof v === "object") {
+      if (v.cell) return v.cell;
+      if (v.range) return `INDEX(${v.range},1)`;
+    }
+    const s = String(v);
+    if (_isA1RefOrRange(s)) {
+      const t = s.trim();
+      return /:/.test(t) ? `INDEX(${t},1)` : t;
+    }
+    return null;
+  };
+
+  const refExpr = asCellOrScalar(raw);
+  if (refExpr) {
+    const ndlExpr = cs ? `TRIM(${refExpr}&"")` : `LOWER(TRIM(${refExpr}&""))`;
+    return cs
+      ? `ISNUMBER(FIND(${ndlExpr}, ${colN}))`
+      : `ISNUMBER(SEARCH(${ndlExpr}, ${colN}))`;
+  }
+
+  // 리터럴 문자열
+  const ndl = cs ? String(raw ?? "") : String(raw ?? "").toLowerCase();
   return cs
     ? `ISNUMBER(FIND(${_q(ndl)}, ${colN}))`
     : `ISNUMBER(SEARCH(${_q(ndl)}, ${colN}))`;
@@ -122,8 +188,28 @@ function _containsExpr(colA1, needle, cs) {
 
 function _startsWithExpr(colA1, needle, cs) {
   const colN = _normText(colA1, cs);
-  const ndl = cs ? String(needle ?? "") : String(needle ?? "").toLowerCase();
-  const q = _q(ndl);
+  const raw = needle;
+
+  const asCellOrScalar = (v) => {
+    if (v == null) return _q("");
+    if (typeof v === "object") {
+      if (v.cell) return v.cell;
+      if (v.range) return `INDEX(${v.range},1)`;
+    }
+    const s = String(v);
+    if (_isA1RefOrRange(s)) {
+      const t = s.trim();
+      return /:/.test(t) ? `INDEX(${t},1)` : t;
+    }
+    return null;
+  };
+
+  const refExpr = asCellOrScalar(raw);
+  const q = refExpr
+    ? cs
+      ? `TRIM(${refExpr}&"")`
+      : `LOWER(TRIM(${refExpr}&""))`
+    : _q(cs ? String(raw ?? "") : String(raw ?? "").toLowerCase());
   return cs
     ? `EXACT(LEFT(${colN}, LEN(${q})), ${q})`
     : `LEFT(${colN}, LEN(${q}))=${q}`;
@@ -131,8 +217,28 @@ function _startsWithExpr(colA1, needle, cs) {
 
 function _endsWithExpr(colA1, needle, cs) {
   const colN = _normText(colA1, cs);
-  const ndl = cs ? String(needle ?? "") : String(needle ?? "").toLowerCase();
-  const q = _q(ndl);
+  const raw = needle;
+
+  const asCellOrScalar = (v) => {
+    if (v == null) return _q("");
+    if (typeof v === "object") {
+      if (v.cell) return v.cell;
+      if (v.range) return `INDEX(${v.range},1)`;
+    }
+    const s = String(v);
+    if (_isA1RefOrRange(s)) {
+      const t = s.trim();
+      return /:/.test(t) ? `INDEX(${t},1)` : t;
+    }
+    return null;
+  };
+
+  const refExpr = asCellOrScalar(raw);
+  const q = refExpr
+    ? cs
+      ? `TRIM(${refExpr}&"")`
+      : `LOWER(TRIM(${refExpr}&""))`
+    : _q(cs ? String(raw ?? "") : String(raw ?? "").toLowerCase());
   return cs
     ? `EXACT(RIGHT(${colN}, LEN(${q})), ${q})`
     : `RIGHT(${colN}, LEN(${q}))=${q}`;
@@ -204,10 +310,30 @@ const arrayFunctionBuilder = {
     // Step2: regex가 Excel에서 불가하므로, 필요 시 조기에 ERROR 반환
     let earlyError = null;
     const isSheets = _isSheetsContext(ctx);
-    const condNodes = Array.isArray(intent.conditions) ? intent.conditions : [];
+    // ✅ intent.conditions가 ConditionNode( target/header ) 형태여도 지원
+    const rawConds = Array.isArray(intent.conditions) ? intent.conditions : [];
+    const inlineGroups = rawConds.filter(
+      (c) =>
+        c &&
+        typeof c === "object" &&
+        c.logical_operator &&
+        Array.isArray(c.conditions),
+    );
+    const condNodes = rawConds.filter(
+      (c) =>
+        !(
+          c &&
+          typeof c === "object" &&
+          c.logical_operator &&
+          Array.isArray(c.conditions)
+        ),
+    );
+
     const masks = condNodes
       .map((cond) => {
-        const termSet = formulaUtils.expandTermsFromText(cond.hint);
+        const hint = _condHint(cond);
+        if (!hint) return null;
+        const termSet = formulaUtils.expandTermsFromText(hint);
         const bestCol = formulaUtils.bestHeaderInSheet(
           sheetInfo,
           sheetName,
@@ -289,21 +415,27 @@ const arrayFunctionBuilder = {
             (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
           return _regexMatchExpr(colA1, rawVal, cs, strict);
         }
-        // Step2: 문자열 비교도 TRIM 기반으로 안정화
-        return `${_trimText(colA1)}${op}${_q(rawVal)}`;
+        // ✅ 문자열/셀참조 비교: J3 같은 셀은 따옴표 금지
+        return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
       })
       .filter(Boolean);
 
     // --- 조건 그룹 ---
-    const groups = Array.isArray(intent.condition_groups)
-      ? intent.condition_groups
-      : [];
+    const groups = [
+      ...(Array.isArray(intent.condition_groups)
+        ? intent.condition_groups
+        : []),
+      ...inlineGroups,
+    ];
     const groupMasks = groups
       .map((g) => {
         const list = Array.isArray(g.conditions) ? g.conditions : [];
+        const isOr = String(g.logical_operator || "AND").toUpperCase() === "OR";
         const masksInGroup = list
           .map((cond) => {
-            const termSet = formulaUtils.expandTermsFromText(cond.hint);
+            const hint = _condHint(cond);
+            if (!hint) return null;
+            const termSet = formulaUtils.expandTermsFromText(hint);
             const bestCol = formulaUtils.bestHeaderInSheet(
               sheetInfo,
               sheetName,
@@ -330,60 +462,11 @@ const arrayFunctionBuilder = {
               return _startsWithExpr(colA1, rawVal, cs);
             if (["endswith", "endsWith"].includes(rawOp))
               return _endsWithExpr(colA1, rawVal, cs);
-            if (
-              ["in", "any_of"].includes(rawOp) &&
-              Array.isArray(cond.values) &&
-              cond.values.length
-            ) {
-              const colN = _normText(colA1, cs);
-              const values = cond.values.map((v) => {
-                if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
-                const s = cs
-                  ? String(v ?? "").trim()
-                  : String(v ?? "")
-                      .trim()
-                      .toLowerCase();
-                return _q(s);
-              });
-              return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
-            }
-            if (rawOp === "between" && cond.min != null && cond.max != null) {
-              const isNum =
-                _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
-              const isDate = _isISODate(cond.min) && _isISODate(cond.max);
-              if (isNum) {
-                const L = String(cond.min).replace(/,/g, "");
-                const R = String(cond.max).replace(/,/g, "");
-                const left = _coerceNumber(colA1);
-                return `(${left}>=${L})*(${left}<=${R})`;
-              }
-              if (isDate) {
-                const L = _dateVal(String(cond.min));
-                const R = _dateVal(String(cond.max));
-                const left = _coerceDate(colA1);
-                return `(${left}>=${L})*(${left}<=${R})`;
-              }
-              const L = _q(cond.min);
-              const R = _q(cond.max);
-              const left = _trimText(colA1);
-              return `(${left}>=${L})*(${left}<=${R})`;
-            }
-            if (["matches", "regex"].includes(rawOp)) {
-              if (!isSheets) {
-                earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
-                return null;
-              }
-              const strict =
-                (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
-              return _regexMatchExpr(colA1, rawVal, cs, strict);
-            }
-            return `${_trimText(colA1)}${op}${_q(rawVal)}`;
+            return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
           })
           .filter(Boolean);
-        const useOR = String(g.logical || "AND").toUpperCase() === "OR";
-        return masksInGroup.length
-          ? `(${masksInGroup.join(useOR ? " + " : " * ")})`
-          : null;
+        if (!masksInGroup.length) return null;
+        return `(${masksInGroup.join(isOr ? " + " : " * ")})`;
       })
       .filter(Boolean);
 
