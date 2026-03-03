@@ -52,7 +52,7 @@ function buildDateWindowPairs(ctx, windowObj = {}) {
   const rr = resolveHeaderRef(
     ctx,
     windowObj.header || windowObj.date_header || "날짜",
-    windowObj.sheet
+    windowObj.sheet,
   );
   if (!rr) return [];
 
@@ -91,7 +91,7 @@ function resolveHeaderRef(ctx, headerText, sheetHint) {
   let sheets = ctx.allSheetsData;
   if (sheetHint) {
     sheets = Object.fromEntries(
-      Object.entries(sheets).filter(([n]) => n === sheetHint)
+      Object.entries(sheets).filter(([n]) => n === sheetHint),
     );
   }
   const col = findBestColumnAcrossSheets(sheets, term, "lookup");
@@ -162,11 +162,38 @@ function formatValue(value, options = {}) {
   const { trim_text = true, coerce_number = true, forceText = false } = options;
   if (value == null) return '""';
 
+  // --- Helpers: keep A1 refs / ranges unquoted ---
+  const isA1RefOrRange = (s) => {
+    const t = String(s || "").trim();
+    // A1, $A$1, A1:B10, $A$1:$B$10
+    if (/^\$?[A-Z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Z]{1,3}\$?[0-9]{1,7})?$/i.test(t))
+      return true;
+    // Sheet!A1 or 'Sheet Name'!A1 and ranges
+    if (
+      /^([^!'\s]+|'[^']+')!\$?[A-Z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Z]{1,3}\$?[0-9]{1,7})?$/i.test(
+        t,
+      )
+    )
+      return true;
+    return false;
+  };
+
+  // --- Helper: ISO-like date string -> DATEVALUE("YYYY-MM-DD") ---
+  const toIsoDateValueExpr = (s) => {
+    const t = String(s || "").trim();
+    if (!/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(t)) return null;
+    const iso = t.replace(/[./]/g, "-");
+    return `DATEVALUE(${_quoteString(iso)})`;
+  };
+
   if (
     typeof value === "string" &&
     /^\s*(NOW\(\)|TODAY\(\)|DATE\(|EOMONTH\(|WORKDAY\()/.test(value)
   )
     return value.trim();
+
+  // ✅ 셀/범위 참조는 따옴표로 감싸지 않는다. (예: J2, A1:A10, '나무'!H91:H177)
+  if (typeof value === "string" && isA1RefOrRange(value)) return value.trim();
 
   if (
     !forceText &&
@@ -175,6 +202,12 @@ function formatValue(value, options = {}) {
       (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())))
   )
     return String(Number(value));
+
+  // ✅ 날짜 리터럴("2023-01-01")은 DATEVALUE로 변환 (forceText면 유지)
+  if (!forceText && typeof value === "string") {
+    const dv = toIsoDateValueExpr(value);
+    if (dv) return dv;
+  }
 
   if (typeof value === "string") {
     const s = trim_text ? value.trim() : value;
@@ -481,7 +514,7 @@ function findBestSheetAndColumns(allSheetsData, searchTerms, options = {}) {
     ? findBestColumnAcrossSheets(
         data,
         expandTermsFromText(lookupTerms),
-        "lookup"
+        "lookup",
       )
     : null;
 

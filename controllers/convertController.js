@@ -623,15 +623,27 @@ const formulaBuilder = {
 
         const range = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
 
-        const op = c.operator || "=";
+        const op = String(c.operator || "=").trim();
         const rawVal = c.value;
 
         // 값도 반드시 포매터를 통과시켜 따옴표/숫자 처리
         const val = formulaBuilder._formatValue(rawVal);
 
-        if (op !== "=" && rawVal != null && !isNaN(rawVal)) {
-          return `${range}, "${op}${rawVal}"`;
+        // COUNTIFS/SUMIFS/AVERAGEIFS 기준:
+        // - 숫자 비교:  "<=100" 형태
+        // - 날짜/텍스트 비교(>=,<= 등): "<="&DATEVALUE("2023-01-01") 처럼 연결
+        // - contains/starts_with/ends_with: 와일드카드
+        const cmpOps = new Set([">", ">=", "<", "<=", "<>"]);
+        if (cmpOps.has(op)) {
+          if (rawVal != null && !isNaN(rawVal))
+            return `${range}, "${op}${rawVal}"`;
+          return `${range}, "${op}"&${val}`;
         }
+        if (/^contains$/i.test(op)) return `${range}, "*"&${val}&"*"`;
+        if (/^starts?_with$/i.test(op)) return `${range}, ${val}&"*"`;
+        if (/^ends?_with$/i.test(op)) return `${range}, "*"&${val}`;
+
+        // 기본(=)
         return `${range}, ${val}`;
       })
       .filter(Boolean);
