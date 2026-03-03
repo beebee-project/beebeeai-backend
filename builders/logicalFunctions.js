@@ -345,7 +345,9 @@ const logicalFunctionBuilder = {
       }
     })(cond);
     if (headers.size >= 3) {
-      const refs = [...headers].map((h) => refFromHeaderSpec(ctx, h));
+      const refs = [...headers].map((h) =>
+        refFromHeaderSpec(ctx, { header: h }),
+      );
       if (refs.some((r) => !r)) return `=ERROR("조건 열을 찾을 수 없습니다.")`;
       const aligned = refs
         .map((r) => `(${formulaUtils.ALIGN_TO(r.range, "col")})`)
@@ -680,6 +682,165 @@ logicalFunctionBuilder.choose = (ctx, formatValue) => {
 };
 
 // === Row/Vector 전용 빌더들 ===
+// =============================
+// IF 고급 패턴: (A+B) op C, 동일헤더 논리, 2헤더 논리
+// =============================
+
+function _isHeaderSpec(x) {
+  return !!x && typeof x === "object" && !!x.header;
+}
+
+function _getArithOpSymbol(op) {
+  const s = String(op || "+").toLowerCase();
+  if (s === "+" || s === "add" || s === "plus") return "+";
+  if (s === "-" || s === "sub" || s === "subtract" || s === "minus") return "-";
+  if (s === "*" || s === "mul" || s === "multiply" || s === "times") return "*";
+  if (s === "/" || s === "div" || s === "divide") return "/";
+  return null;
+}
+
+// 1) 산술식 (A op B) cmp C 를 전행으로 벡터화
+// 지원 형태:
+// - condition.target = { operation: "add|sub|mul|div|+|-|*|/", left:{header}, right:{header} }
+// - condition.value  = {header} 또는 상수
+function buildIfArithTwoColsVsCol(ctx, formatValue) {
+  const it = ctx.intent || {};
+  const cond = it.condition || {};
+  const t = formatValue(it.value_if_true ?? "");
+  const f = formatValue(it.value_if_false ?? "");
+
+  const lhs = cond.target;
+  if (!lhs || typeof lhs !== "object" || !lhs.operation) return null;
+
+  const arSym = _getArithOpSymbol(lhs.operation);
+  if (!arSym) return null;
+
+  const leftSpec =
+    lhs.left || lhs.a || (Array.isArray(lhs.operands) ? lhs.operands[0] : null);
+  const rightSpec =
+    lhs.right ||
+    lhs.b ||
+    (Array.isArray(lhs.operands) ? lhs.operands[1] : null);
+  if (!_isHeaderSpec(leftSpec) || !_isHeaderSpec(rightSpec)) return null;
+
+  const A = refFromHeaderSpec(ctx, leftSpec);
+  const B = refFromHeaderSpec(ctx, rightSpec);
+  if (!A || !B) return null;
+
+  const cmp = _op(cond.operator);
+  const rhs = cond.value;
+
+  // RHS가 헤더인 경우: MAP(A,B,C)
+  if (_isHeaderSpec(rhs)) {
+    const C = refFromHeaderSpec(ctx, rhs);
+    if (!C) return null;
+    const aR = `(${formulaUtils.ALIGN_TO(A.range, "col")})`;
+    const bR = `(${formulaUtils.ALIGN_TO(B.range, "col")})`;
+    const cR = `(${formulaUtils.ALIGN_TO(C.range, "col")})`;
+    return `=MAP(${aR}, ${bR}, ${cR}, LAMBDA(a, b, c, IF((a${arSym}b)${cmp}c, ${t}, ${f})))`;
+  }
+
+  // RHS가 상수/스칼라면: MAP(A,B)
+  if (rhs !== undefined) {
+    const rv = formatValue(rhs);
+    const aR = `(${formulaUtils.ALIGN_TO(A.range, "col")})`;
+    const bR = `(${formulaUtils.ALIGN_TO(B.range, "col")})`;
+    return `=MAP(${aR}, ${bR}, LAMBDA(a, b, IF((a${arSym}b)${cmp}${rv}, ${t}, ${f})))`;
+  }
+
+  return null;
+}
+
+// 2) 동일 헤더 AND/OR: 조건들이 모두 같은 target.header를 사용하고, value는 상수인 경우
+function buildIfVectorSameHeaderLogic(ctx, formatValue) {
+  const it = ctx.intent || {};
+  const cond = it.condition || {};
+  if (
+    !cond?.logical_operator ||
+    !Array.isArray(cond.conditions) ||
+    !cond.conditions.length
+  )
+    return null;
+
+  const op = String(cond.logical_operator || "AND").toUpperCase();
+  if (op !== "AND" && op !== "OR") return null;
+
+  const targets = cond.conditions
+    .map((c) => c?.target?.header)
+    .filter(Boolean)
+    .map(String);
+  if (!targets.length) return null;
+
+  const first = targets[0];
+  if (!targets.every((h) => h === first)) return null;
+
+  // value 쪽에 header가 섞이면(다른 열 비교) 이 빌더는 패스
+  if (
+    cond.conditions.some(
+      (c) => c?.value && typeof c.value === "object" && c.value.header,
+    )
+  )
+    return null;
+
+  const L = refFromHeaderSpec(ctx, { header: first });
+  if (!L) return null;
+
+  const tests = cond.conditions.map((c) => {
+    const cmp = _op(c.operator);
+    const rv = formatValue(c.value);
+    return `l${cmp}${rv}`;
+  });
+  const testExpr =
+    op === "AND" ? `AND(${tests.join(", ")})` : `OR(${tests.join(", ")})`;
+
+  const t = formatValue(it.value_if_true ?? "");
+  const f = formatValue(it.value_if_false ?? "");
+  return `=BYROW(${L.range}, LAMBDA(l, IF(${testExpr}, ${t}, ${f})))`;
+}
+
+// 3) 두 헤더 AND/OR: 조건 2개가 각각 다른 target.header를 쓰고 value는 상수인 경우
+function buildIfVectorTwoHeadersLogic(ctx, formatValue) {
+  const it = ctx.intent || {};
+  const cond = it.condition || {};
+  if (
+    !cond?.logical_operator ||
+    !Array.isArray(cond.conditions) ||
+    cond.conditions.length !== 2
+  )
+    return null;
+
+  const op = String(cond.logical_operator || "AND").toUpperCase();
+  if (op !== "AND" && op !== "OR") return null;
+
+  const [c1, c2] = cond.conditions;
+  const h1 = c1?.target?.header;
+  const h2 = c2?.target?.header;
+  if (!h1 || !h2 || String(h1) === String(h2)) return null;
+
+  // value 쪽에 header가 섞이면 이 빌더는 패스
+  if (
+    [c1, c2].some(
+      (c) => c?.value && typeof c.value === "object" && c.value.header,
+    )
+  )
+    return null;
+
+  const A = refFromHeaderSpec(ctx, { header: h1 });
+  const B = refFromHeaderSpec(ctx, { header: h2 });
+  if (!A || !B) return null;
+
+  const aR = `(${formulaUtils.ALIGN_TO(A.range, "col")})`;
+  const bR = `(${formulaUtils.ALIGN_TO(B.range, "col")})`;
+
+  const e1 = `a${_op(c1.operator)}${formatValue(c1.value)}`;
+  const e2 = `b${_op(c2.operator)}${formatValue(c2.value)}`;
+  const testExpr = op === "AND" ? `AND(${e1}, ${e2})` : `OR(${e1}, ${e2})`;
+
+  const t = formatValue(it.value_if_true ?? "");
+  const f = formatValue(it.value_if_false ?? "");
+  return `=MAP(${aR}, ${bR}, LAMBDA(a, b, IF(${testExpr}, ${t}, ${f})))`;
+}
+
 function buildIfRow(ctx, formatValue) {
   const it = ctx.intent;
   const cond = it.condition || {};
