@@ -309,6 +309,24 @@ function _deduceOp(text = "") {
   return "formula";
 }
 
+function applyUniqueListOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+  const op = String(intent.operation || "").toLowerCase();
+  if (op !== "unique") return intent;
+
+  // "부서 목록", "평가 등급 리스트" 등에서 header_hint 보정
+  if (!intent.header_hint && !intent.return_hint) {
+    const m =
+      msg.match(/([가-힣A-Za-z0-9_()\s]+?)\s*목록/) ||
+      msg.match(/([가-힣A-Za-z0-9_()\s]+?)\s*(리스트|list)/i);
+    if (m && m[1]) intent.header_hint = String(m[1]).trim();
+  }
+  if (!intent.header_hint && /부서/.test(msg)) intent.header_hint = "부서";
+  if (/(정렬|가나다|오름차순|asc)/i.test(msg)) intent.sort_unique = true;
+  return intent;
+}
+
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -336,6 +354,20 @@ function buildLocalIntentFromText(text = "") {
   // ✅ H) "중복 없이 + 정렬(가나다순)" → unique 결과를 SORT로 감싸기 위한 플래그
   // (정렬 기준 열 지정이 아니라, "고유목록 자체를 정렬"하는 케이스)
   if (intent.operation === "unique") {
+    // ✅ 핵심: UNIQUE 대상 열 힌트가 없으면 bestReturn을 못 잡아 실패함
+    // 1) "부서 목록" 같은 패턴에서 header_hint를 자동 주입
+    //    - 예: "부서 목록을…" → header_hint="부서"
+    //    - 예: "평가 등급 목록…" → header_hint="평가 등급"
+    const m =
+      original.match(/([가-힣A-Za-z0-9_()\s]+?)\s*목록/) ||
+      original.match(/([가-힣A-Za-z0-9_()\s]+?)\s*(리스트|list)/i);
+    if (!intent.header_hint && !intent.return_hint) {
+      if (m && m[1]) intent.header_hint = String(m[1]).trim();
+    }
+    // 안전망: “부서”가 명시되면 부서로 강제
+    if (!intent.header_hint && /부서/.test(original))
+      intent.header_hint = "부서";
+
     if (/(정렬|가나다|오름차순|asc)/i.test(text)) {
       intent.sort_unique = true; // unique 결과를 SORT()로 감싸도록
       intent.sort_order = "asc";
@@ -1178,8 +1210,7 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     intent = normalizeLookupIntent(intent);
-    intent = applyMedianOverride(message, intent);
-    intent.raw_message = message;
+    intent = applyUniqueListOverride(message, intent);
     _dbgIntent = intent;
 
     _tIntentEnd = process.hrtime.bigint();
