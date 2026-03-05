@@ -736,26 +736,27 @@ function applyMedianOverride(message, intent) {
 }
 
 function applyExtremeRowOverride(message, intent) {
-  const msg = String(message || "");
-  if (!intent || typeof intent !== "object") return intent;
+  const msg = String(message || "").trim();
+  if (!intent || typeof intent !== "object" || !msg) return intent;
 
-  const wantsRowFields =
-    /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
-  if (!wantsRowFields) return intent;
+  // ✅ 범용 패턴: "X가 가장 높은/낮은/많은/적은 ..."
+  // 예) "연봉이 가장 높은 직원의 이름..."
+  // 예) "안전재고가 가장 많은 제품의 제품코드"
+  const m = msg.match(/(.+?)(?:이|가)\s*가장\s*(높|낮|많|적)/);
+  if (!m) return intent;
 
-  const isMax =
-    /(가장\s*높|최고|최대|top|highest|max)/i.test(msg) &&
-    !/(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
-  const isMin = /(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
+  const key = String(m[1] || "").trim(); // 기준 열(개념)
+  const dir = String(m[2] || "").trim(); // 높/낮/많/적
+  const isMax = dir === "높" || dir === "많";
+  const isMin = dir === "낮" || dir === "적";
+  if (!isMax && !isMin) return intent;
 
-  if (isMax) intent.operation = "maxrow";
-  else if (isMin) intent.operation = "minrow";
-  else return intent;
+  intent.operation = isMax ? "maxrow" : "minrow";
 
-  if (!intent.header_hint && !intent.return_hint) intent.header_hint = "연봉";
-  if (!intent.return_headers && !intent.select_headers) {
-    intent.return_headers = ["이름", "부서", "직급", "연봉"];
-  }
+  // rank_by가 있으면 builder에서 기준열로 사용
+  if (!intent.rank_by && key) intent.rank_by = key;
+
+  // header_hint/return_headers 하드코딩은 제거 (범용화)
   return intent;
 }
 
