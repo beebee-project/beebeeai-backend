@@ -901,6 +901,75 @@ const arrayFunctionBuilder = {
     if (it.pad_with != null) args.push(_q(it.pad_with));
     return `=EXPAND(${args.join(", ")})`;
   },
+  // =========================================================
+  // B) 최고/최저(연봉) 직원 정보 1행 반환
+  // intent:
+  //  - extreme: "max" | "min"
+  //  - sort_header: 기본 "연봉"
+  //  - return_headers: ["이름","부서","직급","연봉",...]
+  // =========================================================
+  extreme_row: function (ctx) {
+    const it = ctx.intent || {};
+    const extreme = String(it.extreme || "max").toLowerCase(); // max|min
+    const sortHeader = it.sort_header || "연봉";
+    const retHeaders = Array.isArray(it.return_headers)
+      ? it.return_headers
+      : ["이름", "부서", "직급", "연봉"];
+
+    // 대상 시트 선택: bestReturn 우선, 없으면 첫 시트
+    const sheetName =
+      ctx.bestReturn?.sheetName ||
+      ctx.bestLookup?.sheetName ||
+      (ctx.allSheetsData ? Object.keys(ctx.allSheetsData)[0] : null);
+    if (!sheetName || !ctx.allSheetsData?.[sheetName])
+      return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
+
+    const sheetInfo = ctx.allSheetsData[sheetName];
+
+    // 정렬 기준 열(연봉) 찾기
+    const termSort = formulaUtils.expandTermsFromText(sortHeader);
+    const sortCol = formulaUtils.bestHeaderInSheet(
+      sheetInfo,
+      sheetName,
+      termSort,
+      "return",
+    );
+    if (!sortCol?.col)
+      return `=ERROR("기준 열을 찾을 수 없습니다: ${sortHeader}")`;
+    if (sortCol.isAmbiguous)
+      return `=ERROR("기준 열이 모호합니다: '${sortCol.header}' 또는 '${sortCol.runnerUp?.header || "다른 후보"}'")`;
+
+    const sortRange = `'${sheetName}'!${sortCol.col.columnLetter}${sheetInfo.startRow}:${sortCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+    const sortNum = _coerceNumber(sortRange);
+    const extremeVal =
+      extreme === "min" ? `MIN(${sortNum})` : `MAX(${sortNum})`;
+
+    // Excel은 XMATCH, Sheets는 MATCH
+    const idx =
+      ctx.engine === "sheets"
+        ? `MATCH(${extremeVal}, ${sortNum}, 0)`
+        : `XMATCH(${extremeVal}, ${sortNum}, 0)`;
+
+    // 반환 열들 INDEX로 뽑아서 HSTACK
+    const outCells = [];
+    for (const h of retHeaders) {
+      const term = formulaUtils.expandTermsFromText(h);
+      const col = formulaUtils.bestHeaderInSheet(
+        sheetInfo,
+        sheetName,
+        term,
+        "return",
+      );
+      if (!col?.col) return `=ERROR("반환 열을 찾을 수 없습니다: ${h}")`;
+      if (col.isAmbiguous)
+        return `=ERROR("반환 열이 모호합니다: '${col.header}' 또는 '${col.runnerUp?.header || "다른 후보"}'")`;
+      const rng = `'${sheetName}'!${col.col.columnLetter}${sheetInfo.startRow}:${col.col.columnLetter}${sheetInfo.lastDataRow}`;
+      outCells.push(`INDEX(${rng}, ${idx})`);
+    }
+
+    if (outCells.length === 1) return `=${outCells[0]}`;
+    return `=HSTACK(${outCells.join(", ")})`;
+  },
 };
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----

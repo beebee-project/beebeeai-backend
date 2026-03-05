@@ -1435,6 +1435,41 @@ async function convert(nl, options = {}, meta = {}) {
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
   const intent = normalizeLookupIntent(baseIntent);
 
+  // =========================================
+  // B-1) 중앙값/median 강제 보정 (LLM 오분류 방지)
+  // =========================================
+  const rawText = String(nl || "");
+  if (/(중앙값|median)/i.test(rawText)) {
+    const op0 = String(intent.operation || "").toLowerCase();
+    if (op0 !== "median") intent.operation = "median";
+  }
+
+  // =========================================
+  // B-2) 최고/최저 연봉 "직원 정보" 요청 → 행 반환 빌더로 라우팅
+  // 예: "연봉이 가장 높은 직원의 이름/부서/직급/연봉"
+  // =========================================
+  if (
+    /(가장\s*(높|낮)|최고|최저)/.test(rawText) &&
+    /(연봉)/.test(rawText) &&
+    /(직원)/.test(rawText) &&
+    /(이름|부서|직급|연봉|사번|직원\s*id|id)/i.test(rawText)
+  ) {
+    intent.operation = "extreme_row";
+    intent.extreme = /(낮|최저)/.test(rawText) ? "min" : "max";
+    // 정렬 기준(기본은 연봉)
+    intent.sort_header = intent.sort_header || "연봉";
+    // 반환할 헤더들(문장에 언급된 것만)
+    const headers = [];
+    if (/(사번|직원\s*id|id)/i.test(rawText)) headers.push("직원 ID");
+    if (/(이름)/.test(rawText)) headers.push("이름");
+    if (/(부서)/.test(rawText)) headers.push("부서");
+    if (/(직급)/.test(rawText)) headers.push("직급");
+    if (/(연봉)/.test(rawText)) headers.push("연봉");
+    intent.return_headers = headers.length
+      ? headers
+      : ["이름", "부서", "직급", "연봉"];
+  }
+
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
   const policy = options.policy || DEFAULT_POLICY;
