@@ -295,6 +295,7 @@ const DEFAULT_FORMAT_OPTIONS = {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
+  if (/(unique|고유|중복\s*없이|중복\s*제거)/.test(s)) return "unique";
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
@@ -331,6 +332,15 @@ function buildLocalIntentFromText(text = "") {
 
   /** @type {Intent} */
   const intent = { operation: op };
+
+  // ✅ H) "중복 없이 + 정렬(가나다순)" → unique 결과를 SORT로 감싸기 위한 플래그
+  // (정렬 기준 열 지정이 아니라, "고유목록 자체를 정렬"하는 케이스)
+  if (intent.operation === "unique") {
+    if (/(정렬|가나다|오름차순|asc)/i.test(text)) {
+      intent.sort_unique = true; // unique 결과를 SORT()로 감싸도록
+      intent.sort_order = "asc";
+    }
+  }
 
   // ✅ B(중앙값) 우선 해결:
   // "중앙값" 요청인데 header_hint가 비면 bestReturn이 연봉이 아닌 숫자열로 잡힐 수 있음.
@@ -695,6 +705,9 @@ const OP_ALIASES = {
   avg: "average",
   averageifs: "average",
 
+  // ✅ H) UNIQUE
+  unique: "unique",
+
   // 개수
   count: "count",
   countifs: "count",
@@ -703,6 +716,8 @@ const OP_ALIASES = {
   stdev: "stdev_s",
   var: "var_s",
 
+  // ✅ 중앙값
+  middle: "median",
   median: "median",
   med: "median",
 

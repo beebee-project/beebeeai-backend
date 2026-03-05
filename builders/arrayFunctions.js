@@ -657,7 +657,14 @@ const arrayFunctionBuilder = {
       }${info.lastDataRow}`;
       return `=UNIQUE(CHOOSECOLS(${full}, ${idxs.join(", ")}))`;
     }
-    return `=UNIQUE(${targetRange})`;
+    const base = `UNIQUE(${targetRange})`;
+    const it2 = ctx.intent || {};
+    // ✅ H) "중복 없이 + 가나다순 정렬" → SORT(UNIQUE(range))
+    // Excel/Google Sheets 모두 SORT(array) 기본값이 오름차순 1열이라 안전
+    if (it2.sort_unique) {
+      return `=SORT(${base})`;
+    }
+    return `=${base}`;
   },
 
   // ---------------------- SORT ----------------------
