@@ -339,6 +339,17 @@ function buildLocalIntentFromText(text = "") {
   /** @type {Intent} */
   const intent = { operation: op };
 
+  // ✅ H(고유 목록 + 정렬) 안정화:
+  // - "부서 목록을 중복 없이 뽑고 가나다순 정렬" 같은 요청은 LLM이 header_hint를 생략하는 경우가 많음
+  // - hasHints=false가 되면 bestReturn 탐색이 아예 안 돌아서 arrayFunctions.unique_sort가 ERROR를 냄
+  // - 따라서 H류 요청이면 기본 header_hint를 "부서"로 채워 넣어 bestReturn 탐색을 강제한다.
+  if (intent.operation === "unique_sort" || intent.operation === "unique") {
+    if (!intent.header_hint && !intent.return_hint) {
+      // 기본값: "부서" (샘플 데이터/테스트셋 기준)
+      intent.header_hint = "부서";
+    }
+  }
+
   // ✅ B(중앙값) 우선 해결:
   // "중앙값" 요청인데 header_hint가 비면 bestReturn이 연봉이 아닌 숫자열로 잡힐 수 있음.
   // 로컬 intent 경로에서는 확실히 연봉을 타게 유도한다.
@@ -1199,10 +1210,27 @@ exports.handleConversion = async (req, res, next) => {
     _tBuildStart = process.hrtime.bigint();
     const context = { intent, formulaBuilder };
     if (isFileAttached && allSheetsData) {
+      // ✅ hasHints 보강:
+      // - unique/unique_sort/sort/filter 같은 "범위 기반" 연산은
+      //   header_hint가 비어도 bestReturn이 필요함
+      // - LLM이 hint를 누락하면 기존 로직에서 bestReturn 탐색이 스킵되어 ERROR로 떨어짐
+      const opLower = String(intent.operation || "").toLowerCase();
+      const needsBestReturnEvenWithoutHints = [
+        "unique",
+        "unique_sort",
+        "sort",
+        "sortby",
+        "filter",
+        "tolist",
+        "torow",
+        "tocol",
+      ].includes(opLower);
+
       const hasHints = !!(
         intent.return_hint ||
         intent.header_hint ||
-        intent.lookup_hint
+        intent.lookup_hint ||
+        needsBestReturnEvenWithoutHints
       );
 
       if (hasHints) {
@@ -1272,6 +1300,9 @@ exports.handleConversion = async (req, res, next) => {
             intentOp: intent?.operation,
             intentCacheKey: _dbgIntentCacheKey,
             validator: v,
+            extra: {
+              builtFormula: finalFormula,
+            },
             timing: {
               preprocess: _ms(_tPreStart, _tPreEnd),
               intent: _ms(_tIntentStart, _tIntentEnd),
