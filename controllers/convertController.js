@@ -686,6 +686,9 @@ const OP_ALIASES = {
   avg: "average",
   averageifs: "average",
 
+  // ✅ 중앙값
+  middle: "median",
+
   // 개수
   count: "count",
   countifs: "count",
@@ -694,10 +697,55 @@ const OP_ALIASES = {
   stdev: "stdev_s",
   var: "var_s",
 
+  // ✅ B) 중앙값/최고/최저 (통계 intent 보정용)
+  median: "median",
+  med: "median",
+
+  // “연봉이 가장 높은/낮은 직원 정보” → 행 반환 빌더
+  argmaxrow: "argmax_row",
+  argminrow: "argmin_row",
+  maxrow: "argmax_row",
+  minrow: "argmin_row",
+  topemployee: "argmax_row",
+  bottomemployee: "argmin_row",
+
   sortby: "sortby",
   regexmatch: "regexmatch",
   textsplit: "textsplit",
 };
+
+// ✅ B) LLM intent가 흔히 평균으로 떨어지거나(중앙값), “결과 검증 실패”로 빠지던
+// “최고/최저 연봉자 정보”를 message 키워드로 강제 보정.
+function applyStatKeywordOverrides(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  // 1) 중앙값
+  if (/(중앙값|median)/i.test(msg)) {
+    const op = String(intent.operation || "").toLowerCase();
+    if (["average", "avg", "mean"].includes(op) || !op) {
+      intent.operation = "median";
+    }
+    // 흔한 케이스: “전체 연봉의 중앙값” → return/header 힌트가 비었으면 연봉으로 유도
+    if (!intent.header_hint && !intent.return_hint) intent.header_hint = "연봉";
+  }
+
+  // 2) 최고/최저 연봉자 “행 반환”
+  const wantsSalaryExtreme =
+    /(연봉)/.test(msg) && /(가장\s*높|최고|최대|가장\s*낮|최저|최소)/.test(msg);
+  if (wantsSalaryExtreme) {
+    if (/(가장\s*높|최고|최대)/.test(msg)) intent.operation = "argmax_row";
+    if (/(가장\s*낮|최저|최소)/.test(msg)) intent.operation = "argmin_row";
+    if (!intent.header_hint && !intent.return_hint) intent.header_hint = "연봉";
+
+    // 기본 반환 컬럼(요청에 맞춰: 이름/부서/직급/연봉)
+    const hasReturn =
+      Array.isArray(intent.return_headers) && intent.return_headers.length > 0;
+    if (!hasReturn) intent.return_headers = ["이름", "부서", "직급", "연봉"];
+  }
+
+  return intent;
+}
 
 function resolveOp(op) {
   if (!op) return null;
@@ -1136,6 +1184,8 @@ exports.handleConversion = async (req, res, next) => {
 
     intent = normalizeLookupIntent(intent);
     intent.raw_message = message;
+    // ✅ B) 통계 키워드 기반 보정
+    intent = applyStatKeywordOverrides(message, intent);
     _dbgIntent = intent;
 
     _tIntentEnd = process.hrtime.bigint();
@@ -1434,41 +1484,8 @@ async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
   const intent = normalizeLookupIntent(baseIntent);
-
-  // =========================================
-  // B-1) 중앙값/median 강제 보정 (LLM 오분류 방지)
-  // =========================================
-  const rawText = String(nl || "");
-  if (/(중앙값|median)/i.test(rawText)) {
-    const op0 = String(intent.operation || "").toLowerCase();
-    if (op0 !== "median") intent.operation = "median";
-  }
-
-  // =========================================
-  // B-2) 최고/최저 연봉 "직원 정보" 요청 → 행 반환 빌더로 라우팅
-  // 예: "연봉이 가장 높은 직원의 이름/부서/직급/연봉"
-  // =========================================
-  if (
-    /(가장\s*(높|낮)|최고|최저)/.test(rawText) &&
-    /(연봉)/.test(rawText) &&
-    /(직원)/.test(rawText) &&
-    /(이름|부서|직급|연봉|사번|직원\s*id|id)/i.test(rawText)
-  ) {
-    intent.operation = "extreme_row";
-    intent.extreme = /(낮|최저)/.test(rawText) ? "min" : "max";
-    // 정렬 기준(기본은 연봉)
-    intent.sort_header = intent.sort_header || "연봉";
-    // 반환할 헤더들(문장에 언급된 것만)
-    const headers = [];
-    if (/(사번|직원\s*id|id)/i.test(rawText)) headers.push("직원 ID");
-    if (/(이름)/.test(rawText)) headers.push("이름");
-    if (/(부서)/.test(rawText)) headers.push("부서");
-    if (/(직급)/.test(rawText)) headers.push("직급");
-    if (/(연봉)/.test(rawText)) headers.push("연봉");
-    intent.return_headers = headers.length
-      ? headers
-      : ["이름", "부서", "직급", "연봉"];
-  }
+  // ✅ B) convert() 경로(테스트/로컬)도 동일 보정 적용
+  applyStatKeywordOverrides(nl, intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
