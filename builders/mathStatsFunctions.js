@@ -103,6 +103,43 @@ function _scalarFrom(spec, ctx, formatValue) {
   return formatValue(spec);
 }
 
+// ✅ B) 최고/최저 “직원 정보” (행 반환) 빌더
+// - 조건 없는 케이스(현재 B단계 8/9번)를 안정적으로 통과시키기 위해
+//   SORTBY/TAKE/CHOOSECOLS 대신 MAX/MIN + MATCH + INDEX + HSTACK 조합 사용
+function _buildExtremeRowByBestReturn(ctx, mode /* "max"|"min" */) {
+  const it = ctx.intent || {};
+  const bestReturn = ctx.bestReturn;
+  if (!bestReturn) return `=ERROR("대상 열을 찾을 수 없습니다.")`;
+
+  const sheetName = bestReturn.sheetName;
+  const keyRange = _targetRangeFromBest(bestReturn); // 보통 '연봉' 열
+  const fn = mode === "min" ? "MIN" : "MAX";
+  const pos = `MATCH(${fn}(${keyRange}), ${keyRange}, 0)`;
+
+  // 요청 기본값: 이름/부서/직급/연봉
+  const headers =
+    Array.isArray(it.return_headers) && it.return_headers.length
+      ? it.return_headers
+      : ["이름", "부서", "직급", "연봉"];
+
+  const cells = [];
+  for (const h of headers) {
+    const header = String(h?.header || h || "").trim();
+    if (!header) continue;
+    // 같은 시트 우선
+    const rr =
+      refFromHeaderSpec(ctx, { header, sheet: sheetName }) ||
+      refFromHeaderSpec(ctx, { header });
+    if (!rr) continue;
+    cells.push(`INDEX(${rr.range}, ${pos})`);
+  }
+
+  // 못 찾으면 최소한 기준열(연봉)이라도 반환
+  if (!cells.length) return `=INDEX(${keyRange}, ${pos})`;
+  if (cells.length === 1) return `=${cells[0]}`;
+  return `=HSTACK(${cells.join(", ")})`;
+}
+
 const mathStatsFunctionBuilder = {
   /* SUM / AVERAGE / COUNT (+ group_by) */
   sum: function (ctx, formatValue, buildConditionPairs) {
@@ -311,35 +348,32 @@ const mathStatsFunctionBuilder = {
     return `=MAXIFS(${tgt}, ${pairs.join(", ")})`;
   },
 
-  median: function (ctx, formatValue, buildConditionPairs) {
-    const { intent, bestReturn } = ctx;
-    const tgt = _targetRangeFromBest(bestReturn);
-    if (!intent.conditions || intent.conditions.length === 0) {
-      return `=MEDIAN(${tgt})`;
+  // ---------------------- ARGMAX/ARGMIN (ROW RETURN) ----------------------
+  // ✅ B-2) “연봉이 가장 높은/낮은 직원의 이름/부서/직급/연봉” 반환
+  // 현재 B단계 요구사항은 “조건 없는 최고/최저”이므로 조건은 무시(있으면 validator-safe 위해 에러로 반환)
+  argmax_row: function (ctx, formatValue, buildConditionPairs) {
+    const pairs = _collectPairs(
+      ctx,
+      ctx.intent,
+      buildConditionPairs,
+      formatValue,
+    );
+    if (pairs.length) {
+      return `=ERROR("최고/최저 행 반환은 현재 조건 포함 케이스를 지원하지 않습니다.")`;
     }
-    const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
-    if (pairs.length === 0)
-      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
-    const filtered = _buildFilterCall(tgt, pairs);
-    if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
-      if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
-      const basePairs = pairs || [];
-      const inner = (kSym) => {
-        const pairsPlus = basePairs.length
-          ? `${basePairs.join(", ")}, ${keyRef.range}, ${kSym}`
-          : `${keyRef.range}, ${kSym}`;
-        const filteredK = _buildFilterCall(
-          tgt,
-          pairsPlus.split(", ").filter(Boolean),
-        );
-        return `MEDIAN(${filteredK})`;
-      };
-      return _wrapGroupByWithMaker(keyRef, inner);
+    return _buildExtremeRowByBestReturn(ctx, "max");
+  },
+  argmin_row: function (ctx, formatValue, buildConditionPairs) {
+    const pairs = _collectPairs(
+      ctx,
+      ctx.intent,
+      buildConditionPairs,
+      formatValue,
+    );
+    if (pairs.length) {
+      return `=ERROR("최고/최저 행 반환은 현재 조건 포함 케이스를 지원하지 않습니다.")`;
     }
-    return `=MEDIAN(${filtered})`;
+    return _buildExtremeRowByBestReturn(ctx, "min");
   },
 
   stdev_s: function (ctx, formatValue, buildConditionPairs) {
