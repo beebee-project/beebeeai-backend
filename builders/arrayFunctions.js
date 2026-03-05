@@ -935,20 +935,50 @@ function _extremeRow(ctx, which) {
   const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
   const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
-  const nameToIndex = new Map(
-    metaEntries.map(([h, _m], i) => [String(h).trim(), i + 1]),
-  );
+  // ✅ columnLetter 기반 "상대 인덱스" 계산 (CHOOSECOLS는 1-based)
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol); // 0-based
+  const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
+  const findMetaByContains = (needle) => {
+    const n = String(needle || "").trim();
+    if (!n) return null;
+    for (const [h, m] of metaEntries) {
+      if (String(h).trim() === n) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      if (String(h).includes(n)) return m;
+    }
+    return null;
+  };
+
+  // 연봉 헤더는 실제 파일에서 "연봉(만원)" 처럼 올 수 있으니 contains 매칭
+  const salaryMeta =
+    byName.get("연봉") ||
+    findMetaByContains("연봉") ||
+    findMetaByContains(String(it.header_hint || "")) ||
+    null;
+  if (!salaryMeta?.columnLetter)
+    return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
   const salaryIdx =
-    nameToIndex.get("연봉") ||
-    nameToIndex.get(String(it.header_hint || "").trim());
-  if (!salaryIdx) return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
+    formulaUtils.columnLetterToIndex(salaryMeta.columnLetter) -
+    firstColIdx0 +
+    1;
 
   const want = Array.isArray(it.return_headers)
     ? it.return_headers
     : ["이름", "부서", "직급", "연봉"];
   const retIdxs = want
-    .map((h) => nameToIndex.get(String(h).trim()))
-    .filter(Boolean);
+    .map((h) => {
+      const key = String(h).trim();
+      const m =
+        byName.get(key) ||
+        findMetaByContains(key) ||
+        (key === "연봉" ? findMetaByContains("연봉") : null);
+      if (!m?.columnLetter) return null;
+      return (
+        formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
+      );
+    })
+    .filter((v) => Number.isFinite(v));
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
