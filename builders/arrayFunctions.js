@@ -657,14 +657,20 @@ const arrayFunctionBuilder = {
       }${info.lastDataRow}`;
       return `=UNIQUE(CHOOSECOLS(${full}, ${idxs.join(", ")}))`;
     }
-    const base = `UNIQUE(${targetRange})`;
-    const it2 = ctx.intent || {};
-    // ✅ H) "중복 없이 + 가나다순 정렬" → SORT(UNIQUE(range))
-    // Excel/Google Sheets 모두 SORT(array) 기본값이 오름차순 1열이라 안전
-    if (it2.sort_unique) {
-      return `=SORT(${base})`;
-    }
-    return `=${base}`;
+    return `=UNIQUE(${targetRange})`;
+  },
+
+  // ---------------------- UNIQUE + SORT ----------------------
+  // H) "중복 없이 뽑고 가나다순 정렬" 같은 케이스를 안정적으로 처리
+  unique_sort: (ctx) => {
+    const { bestReturn } = ctx;
+    if (!bestReturn) return `=ERROR("범위를 찾을 수 없습니다.")`;
+    const sheetName = bestReturn.sheetName;
+    const targetRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+
+    // 기본: 1열 기준 오름차순(가나다순)
+    // 필요하면 intent.sort_order 로 desc 지원 가능하지만, H 단계는 일단 asc 고정이 안전함
+    return `=SORT(UNIQUE(${targetRange}), 1, 1)`;
   },
 
   // ---------------------- SORT ----------------------

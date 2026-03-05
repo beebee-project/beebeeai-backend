@@ -295,7 +295,13 @@ const DEFAULT_FORMAT_OPTIONS = {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
-  if (/(unique|고유|중복\s*없이|중복\s*제거)/.test(s)) return "unique";
+  // H) "중복 없이(고유) + 정렬"은 고정적으로 unique_sort로
+  // 예: "부서 목록을 중복 없이 뽑고 가나다순 정렬"
+  const wantUnique = /(unique|중복\s*없이|중복제거|고유)/.test(s);
+  const wantSort = /(sort|정렬|가나다순|오름차순|내림차순|alphabet)/.test(s);
+  if (wantUnique && wantSort) return "unique_sort";
+  if (wantUnique) return "unique";
+
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
@@ -307,24 +313,6 @@ function _deduceOp(text = "") {
   if (/(var|분산)/.test(s)) return "var_s";
   if (/(sortby|정렬)/.test(s)) return "sortby";
   return "formula";
-}
-
-function applyUniqueListOverride(message, intent) {
-  const msg = String(message || "");
-  if (!intent || typeof intent !== "object") return intent;
-  const op = String(intent.operation || "").toLowerCase();
-  if (op !== "unique") return intent;
-
-  // "부서 목록", "평가 등급 리스트" 등에서 header_hint 보정
-  if (!intent.header_hint && !intent.return_hint) {
-    const m =
-      msg.match(/([가-힣A-Za-z0-9_()\s]+?)\s*목록/) ||
-      msg.match(/([가-힣A-Za-z0-9_()\s]+?)\s*(리스트|list)/i);
-    if (m && m[1]) intent.header_hint = String(m[1]).trim();
-  }
-  if (!intent.header_hint && /부서/.test(msg)) intent.header_hint = "부서";
-  if (/(정렬|가나다|오름차순|asc)/i.test(msg)) intent.sort_unique = true;
-  return intent;
 }
 
 /* ---------------------------------------------
@@ -350,29 +338,6 @@ function buildLocalIntentFromText(text = "") {
 
   /** @type {Intent} */
   const intent = { operation: op };
-
-  // ✅ H) "중복 없이 + 정렬(가나다순)" → unique 결과를 SORT로 감싸기 위한 플래그
-  // (정렬 기준 열 지정이 아니라, "고유목록 자체를 정렬"하는 케이스)
-  if (intent.operation === "unique") {
-    // ✅ 핵심: UNIQUE 대상 열 힌트가 없으면 bestReturn을 못 잡아 실패함
-    // 1) "부서 목록" 같은 패턴에서 header_hint를 자동 주입
-    //    - 예: "부서 목록을…" → header_hint="부서"
-    //    - 예: "평가 등급 목록…" → header_hint="평가 등급"
-    const m =
-      original.match(/([가-힣A-Za-z0-9_()\s]+?)\s*목록/) ||
-      original.match(/([가-힣A-Za-z0-9_()\s]+?)\s*(리스트|list)/i);
-    if (!intent.header_hint && !intent.return_hint) {
-      if (m && m[1]) intent.header_hint = String(m[1]).trim();
-    }
-    // 안전망: “부서”가 명시되면 부서로 강제
-    if (!intent.header_hint && /부서/.test(original))
-      intent.header_hint = "부서";
-
-    if (/(정렬|가나다|오름차순|asc)/i.test(text)) {
-      intent.sort_unique = true; // unique 결과를 SORT()로 감싸도록
-      intent.sort_order = "asc";
-    }
-  }
 
   // ✅ B(중앙값) 우선 해결:
   // "중앙값" 요청인데 header_hint가 비면 bestReturn이 연봉이 아닌 숫자열로 잡힐 수 있음.
@@ -737,9 +702,6 @@ const OP_ALIASES = {
   avg: "average",
   averageifs: "average",
 
-  // ✅ H) UNIQUE
-  unique: "unique",
-
   // 개수
   count: "count",
   countifs: "count",
@@ -748,10 +710,12 @@ const OP_ALIASES = {
   stdev: "stdev_s",
   var: "var_s",
 
-  // ✅ 중앙값
-  middle: "median",
   median: "median",
   med: "median",
+
+  unique: "unique",
+  uniquesort: "unique_sort",
+  unique_sort: "unique_sort",
 
   sortby: "sortby",
   regexmatch: "regexmatch",
@@ -1210,7 +1174,8 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     intent = normalizeLookupIntent(intent);
-    intent = applyUniqueListOverride(message, intent);
+    intent = applyMedianOverride(message, intent);
+    intent.raw_message = message;
     _dbgIntent = intent;
 
     _tIntentEnd = process.hrtime.bigint();
