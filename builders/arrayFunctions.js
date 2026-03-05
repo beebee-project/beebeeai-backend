@@ -915,129 +915,6 @@ const arrayFunctionBuilder = {
   },
 };
 
-// ---------------------- extreme row helpers (범용) ----------------------
-function _normHeader(s) {
-  return String(s || "").trim();
-}
-
-function _findMetaByBestMatch(metaEntries, needle) {
-  const n = _normHeader(needle);
-  if (!n) return null;
-  // 1) exact
-  for (const [h, m] of metaEntries) {
-    if (_normHeader(h) === n) return m;
-  }
-  // 2) contains (예: "연봉" vs "연봉(만원)")
-  for (const [h, m] of metaEntries) {
-    const hh = _normHeader(h);
-    if (hh.includes(n) || n.includes(hh)) return m;
-  }
-  return null;
-}
-
-function _pickHeadersFromMessage(metaEntries, rawMessage) {
-  const msg = String(rawMessage || "");
-  if (!msg) return [];
-  const hits = [];
-  for (const [h] of metaEntries) {
-    const name = _normHeader(h);
-    if (!name) continue;
-    const pos = msg.indexOf(name);
-    if (pos >= 0) hits.push({ name, pos });
-  }
-  hits.sort((a, b) => a.pos - b.pos);
-  const out = [];
-  const seen = new Set();
-  for (const x of hits) {
-    if (!seen.has(x.name)) {
-      seen.add(x.name);
-      out.push(x.name);
-    }
-  }
-  return out;
-}
-
-function _extremeRow(ctx, which) {
-  const it = ctx.intent || {};
-  const best = ctx.bestReturn;
-  const sheetName =
-    best?.sheetName || it.sheet || Object.keys(ctx.allSheetsData || {})[0];
-  const sheetInfo = ctx.allSheetsData?.[sheetName];
-  if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
-
-  // metaEntries: [header, meta] 정렬(열 문자 기준)
-  const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
-    (a, b) =>
-      formulaUtils.columnLetterToIndex(a[1].columnLetter) -
-      formulaUtils.columnLetterToIndex(b[1].columnLetter),
-  );
-  if (!metaEntries.length)
-    return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
-
-  const firstCol = metaEntries[0][1].columnLetter;
-  const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
-  const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
-
-  // ✅ CHOOSECOLS는 "범위 내 상대 열 인덱스(1-based)"여야 함
-  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol); // 0-based
-  const toRel = (colLetter) =>
-    formulaUtils.columnLetterToIndex(colLetter) - firstColIdx0 + 1;
-
-  // 1) 기준열(rank_by) 결정 (연봉 하드코딩 제거)
-  const rankKey =
-    it.rank_by ||
-    it.sort_by ||
-    it.order_by ||
-    it.lookup_hint ||
-    it.header_hint ||
-    it.return_hint ||
-    "";
-
-  let rankMeta = _findMetaByBestMatch(metaEntries, rankKey);
-  if (!rankMeta) {
-    // raw_message에 등장하는 헤더들 중 첫 번째를 기준열 후보로 사용
-    const cands = _pickHeadersFromMessage(metaEntries, it.raw_message);
-    rankMeta = cands.length
-      ? _findMetaByBestMatch(metaEntries, cands[0])
-      : null;
-  }
-  if (!rankMeta?.columnLetter) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
-  const rankIdx = toRel(rankMeta.columnLetter);
-
-  // 2) 반환열 결정
-  const explicit =
-    (Array.isArray(it.return_headers) &&
-      it.return_headers.length &&
-      it.return_headers) ||
-    (Array.isArray(it.select_headers) &&
-      it.select_headers.length &&
-      it.select_headers) ||
-    null;
-
-  let returnHeaders = explicit;
-  if (!returnHeaders) {
-    const picked = _pickHeadersFromMessage(metaEntries, it.raw_message);
-    if (picked.length) returnHeaders = picked;
-    else if (best?.header) returnHeaders = [best.header];
-    else returnHeaders = [_normHeader(metaEntries[0][0])];
-  }
-
-  const retIdxs = returnHeaders
-    .map((h) => _findMetaByBestMatch(metaEntries, h))
-    .filter((m) => m?.columnLetter)
-    .map((m) => toRel(m.columnLetter))
-    .filter((v) => Number.isFinite(v));
-
-  if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
-
-  const order = which === "min" ? 1 : -1;
-
-  // ✅ TAKE 대신 INDEX로 첫 행 (1 x N) 반환
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${rankIdx}), ${order}), INDEX(CHOOSECOLS(s, ${retIdxs.join(
-    ", ",
-  )}), 1, ))`;
-}
-
 function _extremeRow(ctx, which) {
   const it = ctx.intent || {};
   const best = ctx.bestReturn;
@@ -1073,35 +950,29 @@ function _extremeRow(ctx, which) {
     return null;
   };
 
-  // ✅ 기준열: rank_by 우선, 없으면 header_hint/return_hint → 그래도 없으면 "연봉" fallback
-  const rankKey =
-    it.rank_by ||
-    it.sort_by ||
-    it.order_by ||
-    it.header_hint ||
-    it.return_hint ||
-    "연봉";
-  const rankMeta =
-    byName.get(String(rankKey).trim()) || findMetaByContains(rankKey) || null;
-  if (!rankMeta?.columnLetter)
-    return `=ERROR("기준 열의 위치를 찾을 수 없습니다.")`;
-  const rankIdx =
-    formulaUtils.columnLetterToIndex(rankMeta.columnLetter) - firstColIdx0 + 1;
+  // 연봉 헤더는 실제 파일에서 "연봉(만원)" 처럼 올 수 있으니 contains 매칭
+  const salaryMeta =
+    byName.get("연봉") ||
+    findMetaByContains("연봉") ||
+    findMetaByContains(String(it.header_hint || "")) ||
+    null;
+  if (!salaryMeta?.columnLetter)
+    return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
+  const salaryIdx =
+    formulaUtils.columnLetterToIndex(salaryMeta.columnLetter) -
+    firstColIdx0 +
+    1;
 
-  // ✅ 반환열: 명시(return_headers/select_headers) 우선, 없으면 return_hint 1개, 그것도 없으면 best.header
-  const want =
-    (Array.isArray(it.return_headers) &&
-      it.return_headers.length &&
-      it.return_headers) ||
-    (Array.isArray(it.select_headers) &&
-      it.select_headers.length &&
-      it.select_headers) ||
-    (it.return_hint ? [it.return_hint] : null) ||
-    (best?.header ? [best.header] : ["연봉"]);
+  const want = Array.isArray(it.return_headers)
+    ? it.return_headers
+    : ["이름", "부서", "직급", "연봉"];
   const retIdxs = want
     .map((h) => {
       const key = String(h).trim();
-      const m = byName.get(key) || findMetaByContains(key) || null;
+      const m =
+        byName.get(key) ||
+        findMetaByContains(key) ||
+        (key === "연봉" ? findMetaByContains("연봉") : null);
       if (!m?.columnLetter) return null;
       return (
         formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
@@ -1111,8 +982,7 @@ function _extremeRow(ctx, which) {
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
-  // ✅ TAKE 대신 INDEX로 첫 행 반환(1 x N)
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${rankIdx}), ${order}), INDEX(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1, ))`;
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${salaryIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----
