@@ -255,10 +255,10 @@ const mathStatsFunctionBuilder = {
   // ---------------------- ARGMAX/ARGMIN (ROW RETURN) ----------------------
   // ✅ B-2) “연봉이 가장 높은/낮은 직원의 (이름/부서/직급/연봉)” → 행 반환 빌더
   argmax_row: function (ctx, formatValue, buildConditionPairs) {
-    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, -1);
+    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, "max");
   },
   argmin_row: function (ctx, formatValue, buildConditionPairs) {
-    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, 1);
+    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, "min");
   },
 
   min: function (ctx, formatValue, buildConditionPairs) {
