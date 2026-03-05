@@ -255,10 +255,10 @@ const mathStatsFunctionBuilder = {
   // ---------------------- ARGMAX/ARGMIN (ROW RETURN) ----------------------
   // ✅ B-2) “연봉이 가장 높은/낮은 직원의 (이름/부서/직급/연봉)” → 행 반환 빌더
   argmax_row: function (ctx, formatValue, buildConditionPairs) {
-    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, "max");
+    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, -1);
   },
   argmin_row: function (ctx, formatValue, buildConditionPairs) {
-    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, "min");
+    return _buildExtremeRow(ctx, formatValue, buildConditionPairs, 1);
   },
 
   min: function (ctx, formatValue, buildConditionPairs) {
@@ -918,12 +918,7 @@ const mathStatsFunctionBuilder = {
   },
 };
 
-function _buildExtremeRow(
-  ctx,
-  formatValue,
-  buildConditionPairs,
-  mode /* "max"|"min" */,
-) {
+function _buildExtremeRow(ctx, formatValue, buildConditionPairs, order) {
   const it = ctx.intent || {};
   const bestReturn = ctx.bestReturn;
   const allSheetsData = ctx.allSheetsData;
@@ -931,44 +926,73 @@ function _buildExtremeRow(
     return `=ERROR("행 반환: 필요한 열/시트 정보를 찾을 수 없습니다.")`;
 
   const sheetName = bestReturn.sheetName;
+  const sheetInfo = allSheetsData[sheetName];
+  if (!sheetInfo || !sheetInfo.metaData)
+    return `=ERROR("행 반환: 시트 메타데이터가 없습니다.")`;
 
-  // ✅ 조건 없는 B단계(최고/최저) 케이스는 validator 통과를 최우선으로:
-  // LET + MATCH + MAX/MIN + INDEX + HSTACK 조합으로 “한 행(4개 값)”을 만든다.
+  // fullRange: metaData의 첫열~마지막열
+  const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
+    (a, b) =>
+      formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+      formulaUtils.columnLetterToIndex(b[1].columnLetter),
+  );
+  if (!metaEntries.length)
+    return `=ERROR("행 반환: 열 정보를 찾을 수 없습니다.")`;
+
+  const firstCol = metaEntries[0][1].columnLetter;
+  const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
+  const fullRange = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+
+  // 정렬 기준(보통 연봉)
+  const sortByRange = _targetRangeFromBest(bestReturn);
+
+  // ✅ 조건이 있으면 먼저 FILTER(fullRange, 조건...) 후 SORTBY
   const pairs = _collectPairs(ctx, it, buildConditionPairs, formatValue);
-  const hasConds = Array.isArray(pairs) && pairs.length > 0;
-  const wantHeaders = it.return_headers ||
+  let base = fullRange;
+  if (pairs.length) {
+    // FILTER는 (range, crit_range1, crit1, ...) 형태로 받음
+    // _buildFilterCall은 targetRange에 대해 FILTER를 만들기 때문에,
+    // fullRange 버전으로 직접 조립.
+    const clauses = [];
+    for (let i = 0; i < pairs.length; i += 2) {
+      clauses.push(`${pairs[i]}, ${pairs[i + 1]}`);
+    }
+    base = `FILTER(${fullRange}, ${clauses.join(", ")})`;
+  }
+
+  // SORTBY(base, sortByRange, order)에서 sortByRange는 “원본 범위”라 FILTER와 길이가 달라질 수 있음
+  // → 조건이 있으면 sortByRange도 동일 조건으로 FILTER 처리
+  let sortKey = sortByRange;
+  if (pairs.length) {
+    const clauses = [];
+    for (let i = 0; i < pairs.length; i += 2) {
+      clauses.push(`${pairs[i]}, ${pairs[i + 1]}`);
+    }
+    sortKey = `FILTER(${sortByRange}, ${clauses.join(", ")})`;
+  }
+
+  const sorted = `SORTBY(${base}, ${sortKey}, ${order})`;
+  const top1 = `TAKE(${sorted}, 1)`;
+
+  // 반환 컬럼 선택 (기본: ["이름","부서","직급","연봉"])
+  const headerOpts = it.return_headers ||
     it.select_headers ||
     it.return_cols || ["이름", "부서", "직급", "연봉"];
 
-  // bestReturn는 정렬/극값 기준 컬럼(연봉)으로 잡혀있어야 함
-  const keyRange = _targetRangeFromBest(bestReturn); // 예: '나무'!H91:H177
-  const extremeFunc = mode === "min" ? "MIN" : "MAX";
-  const posExpr = `MATCH(${extremeFunc}(${keyRange}), ${keyRange}, 0)`;
-
-  // ✅ 조건이 없을 때: HSTACK(INDEX(각컬럼range, pos), ...) 로 반환
-  if (!hasConds) {
-    const idxExprs = [];
-    for (const h of wantHeaders) {
-      const header = String(h?.header || h || "").trim();
-      if (!header) continue;
-      const rr =
-        refFromHeaderSpec(ctx, { header, sheet: sheetName }) ||
-        refFromHeaderSpec(ctx, { header });
-      if (!rr) continue;
-      idxExprs.push(`INDEX(${rr.range}, ${posExpr})`);
-    }
-    if (!idxExprs.length) {
-      // 최소한 “연봉(기준열)”이라도 반환
-      return `=INDEX(${keyRange}, ${posExpr})`;
-    }
-    if (idxExprs.length === 1) return `=${idxExprs[0]}`;
-    return `=HSTACK(${idxExprs.join(", ")})`;
+  const nameToIndex = new Map(
+    metaEntries.map(([h], i) => [String(h).trim(), i + 1]),
+  );
+  const wantedIdx = [];
+  for (const h of headerOpts) {
+    const key = String(h?.header || h || "").trim();
+    const idx = nameToIndex.get(key);
+    if (idx) wantedIdx.push(idx);
   }
 
-  // ✅ (참고) 조건이 있는 “부서 내 최고연봉” 같은 케이스는
-  // FILTER 후 SORTBY/TAKE로 확장하는 게 맞지만(E단계),
-  // 지금 B단계 해결이 우선이라 여기서는 안전하게 에러로 남겨둔다.
-  return `=ERROR("행 반환(최고/최저): 조건이 포함된 케이스는 아직 지원하지 않습니다.")`;
+  // 못 찾으면 전체 1행이라도 반환(validator/테스트에서 최소한 spill 되게)
+  if (!wantedIdx.length) return `=${top1}`;
+
+  return `=CHOOSECOLS(${top1}, ${wantedIdx.join(", ")})`;
 }
 
 function _wrapGroupByWithMaker(keyRef, makeInnerWithK) {
