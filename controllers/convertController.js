@@ -295,13 +295,6 @@ const DEFAULT_FORMAT_OPTIONS = {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
-  // H) "중복 없이(고유) + 정렬"은 고정적으로 unique_sort로
-  // 예: "부서 목록을 중복 없이 뽑고 가나다순 정렬"
-  const wantUnique = /(unique|중복\s*없이|중복제거|고유)/.test(s);
-  const wantSort = /(sort|정렬|가나다순|오름차순|내림차순|alphabet)/.test(s);
-  if (wantUnique && wantSort) return "unique_sort";
-  if (wantUnique) return "unique";
-
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
@@ -338,17 +331,6 @@ function buildLocalIntentFromText(text = "") {
 
   /** @type {Intent} */
   const intent = { operation: op };
-
-  // ✅ H(고유 목록 + 정렬) 안정화:
-  // - "부서 목록을 중복 없이 뽑고 가나다순 정렬" 같은 요청은 LLM이 header_hint를 생략하는 경우가 많음
-  // - hasHints=false가 되면 bestReturn 탐색이 아예 안 돌아서 arrayFunctions.unique_sort가 ERROR를 냄
-  // - 따라서 H류 요청이면 기본 header_hint를 "부서"로 채워 넣어 bestReturn 탐색을 강제한다.
-  if (intent.operation === "unique_sort" || intent.operation === "unique") {
-    if (!intent.header_hint && !intent.return_hint) {
-      // 기본값: "부서" (샘플 데이터/테스트셋 기준)
-      intent.header_hint = "부서";
-    }
-  }
 
   // ✅ B(중앙값) 우선 해결:
   // "중앙값" 요청인데 header_hint가 비면 bestReturn이 연봉이 아닌 숫자열로 잡힐 수 있음.
@@ -724,9 +706,13 @@ const OP_ALIASES = {
   median: "median",
   med: "median",
 
-  unique: "unique",
-  uniquesort: "unique_sort",
-  unique_sort: "unique_sort",
+  // ✅ 행 반환(최고/최저 직원 정보)
+  maxrow: "maxrow",
+  minrow: "minrow",
+  argmax: "maxrow",
+  argmin: "minrow",
+  top1: "maxrow",
+  bottom1: "minrow",
 
   sortby: "sortby",
   regexmatch: "regexmatch",
@@ -745,6 +731,52 @@ function applyMedianOverride(message, intent) {
   }
   if (!intent.header_hint && !intent.return_hint) {
     intent.header_hint = "연봉";
+  }
+  return intent;
+}
+
+function applyExtremeRowOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const wantsRowFields =
+    /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
+  if (!wantsRowFields) return intent;
+
+  const isMax =
+    /(가장\s*높|최고|최대|top|highest|max)/i.test(msg) &&
+    !/(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
+  const isMin = /(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
+
+  if (isMax) intent.operation = "maxrow";
+  else if (isMin) intent.operation = "minrow";
+  else return intent;
+
+  if (!intent.header_hint && !intent.return_hint) intent.header_hint = "연봉";
+  if (!intent.return_headers && !intent.select_headers) {
+    intent.return_headers = ["이름", "부서", "직급", "연봉"];
+  }
+  return intent;
+}
+
+function applyUniqueSortOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const wantsUnique = /(중복\s*없이|중복\s*제거|unique)/i.test(msg);
+  if (!wantsUnique) return intent;
+
+  intent.operation = "unique";
+
+  // "가나다순" 등 정렬 키워드가 있으면 SORT(UNIQUE())로 가도록 플래그
+  if (/(가나다|정렬|오름차순|asc)/i.test(msg)) {
+    intent.sorted = true;
+    intent.sort_order = "asc";
+  }
+
+  // bestReturn이 null이면 UNIQUE 빌더가 =ERROR(...) 반환하므로 최소 힌트 보강
+  if (!intent.header_hint && !intent.return_hint) {
+    if (/부서/.test(msg)) intent.header_hint = "부서";
   }
   return intent;
 }
@@ -1186,6 +1218,8 @@ exports.handleConversion = async (req, res, next) => {
 
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
+    intent = applyExtremeRowOverride(message, intent);
+    intent = applyUniqueSortOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
@@ -1210,27 +1244,10 @@ exports.handleConversion = async (req, res, next) => {
     _tBuildStart = process.hrtime.bigint();
     const context = { intent, formulaBuilder };
     if (isFileAttached && allSheetsData) {
-      // ✅ hasHints 보강:
-      // - unique/unique_sort/sort/filter 같은 "범위 기반" 연산은
-      //   header_hint가 비어도 bestReturn이 필요함
-      // - LLM이 hint를 누락하면 기존 로직에서 bestReturn 탐색이 스킵되어 ERROR로 떨어짐
-      const opLower = String(intent.operation || "").toLowerCase();
-      const needsBestReturnEvenWithoutHints = [
-        "unique",
-        "unique_sort",
-        "sort",
-        "sortby",
-        "filter",
-        "tolist",
-        "torow",
-        "tocol",
-      ].includes(opLower);
-
       const hasHints = !!(
         intent.return_hint ||
         intent.header_hint ||
-        intent.lookup_hint ||
-        needsBestReturnEvenWithoutHints
+        intent.lookup_hint
       );
 
       if (hasHints) {
@@ -1300,9 +1317,6 @@ exports.handleConversion = async (req, res, next) => {
             intentOp: intent?.operation,
             intentCacheKey: _dbgIntentCacheKey,
             validator: v,
-            extra: {
-              builtFormula: finalFormula,
-            },
             timing: {
               preprocess: _ms(_tPreStart, _tPreEnd),
               intent: _ms(_tIntentStart, _tIntentEnd),

@@ -655,23 +655,22 @@ const arrayFunctionBuilder = {
       const full = `'${sheetName}'!${meta[0][1].columnLetter}${info.startRow}:${
         meta[meta.length - 1][1].columnLetter
       }${info.lastDataRow}`;
-      return `=UNIQUE(CHOOSECOLS(${full}, ${idxs.join(", ")}))`;
+      const u = `UNIQUE(CHOOSECOLS(${full}, ${idxs.join(", ")}))`;
+      if (it.sorted === true || it.sort === true || it.sort_order) {
+        return `=SORT(${u}, 1, 1)`;
+      }
+      return `=${u}`;
     }
-    return `=UNIQUE(${targetRange})`;
+    const u = `UNIQUE(${targetRange})`;
+    if (it.sorted === true || it.sort === true || it.sort_order) {
+      return `=SORT(${u}, 1, 1)`;
+    }
+    return `=${u}`;
   },
 
-  // ---------------------- UNIQUE + SORT ----------------------
-  // H) "중복 없이 뽑고 가나다순 정렬" 같은 케이스를 안정적으로 처리
-  unique_sort: (ctx) => {
-    const { bestReturn } = ctx;
-    if (!bestReturn) return `=ERROR("범위를 찾을 수 없습니다.")`;
-    const sheetName = bestReturn.sheetName;
-    const targetRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
-
-    // 기본: 1열 기준 오름차순(가나다순)
-    // 필요하면 intent.sort_order 로 desc 지원 가능하지만, H 단계는 일단 asc 고정이 안전함
-    return `=SORT(UNIQUE(${targetRange}), 1, 1)`;
-  },
+  // ✅ 최고/최저 직원 정보(행 반환)
+  maxrow: (ctx) => _extremeRow(ctx, "max"),
+  minrow: (ctx) => _extremeRow(ctx, "min"),
 
   // ---------------------- SORT ----------------------
   sort: (ctx) => {
@@ -915,6 +914,46 @@ const arrayFunctionBuilder = {
     return `=EXPAND(${args.join(", ")})`;
   },
 };
+
+function _extremeRow(ctx, which) {
+  const it = ctx.intent || {};
+  const best = ctx.bestReturn;
+  if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
+  const sheetName = best.sheetName;
+  const sheetInfo = ctx.allSheetsData?.[sheetName];
+  if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
+
+  const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
+    (a, b) =>
+      formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+      formulaUtils.columnLetterToIndex(b[1].columnLetter),
+  );
+  if (!metaEntries.length)
+    return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
+
+  const firstCol = metaEntries[0][1].columnLetter;
+  const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
+  const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+
+  const nameToIndex = new Map(
+    metaEntries.map(([h, _m], i) => [String(h).trim(), i + 1]),
+  );
+  const salaryIdx =
+    nameToIndex.get("연봉") ||
+    nameToIndex.get(String(it.header_hint || "").trim());
+  if (!salaryIdx) return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
+
+  const want = Array.isArray(it.return_headers)
+    ? it.return_headers
+    : ["이름", "부서", "직급", "연봉"];
+  const retIdxs = want
+    .map((h) => nameToIndex.get(String(h).trim()))
+    .filter(Boolean);
+  if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+
+  const order = which === "min" ? 1 : -1;
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${salaryIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+}
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----
 function pipeSortIfRequested(ctx, intent, expr, selectedIndexMap) {
