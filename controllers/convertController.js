@@ -501,14 +501,6 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
   }
 
-  // multi-column lookup 지원
-  if (
-    Array.isArray(intent.return_headers) &&
-    intent.return_headers.length > 1
-  ) {
-    intent.multi_return = true;
-  }
-
   return intent;
 }
 
@@ -721,41 +713,11 @@ const OP_ALIASES = {
   argmin: "minrow",
   top1: "maxrow",
   bottom1: "minrow",
-  topn: "topn",
-  top: "topn",
-  rank: "topn",
-  ranking: "topn",
+
   sortby: "sortby",
   regexmatch: "regexmatch",
   textsplit: "textsplit",
 };
-
-function applyTopNOverride(message, intent) {
-  const msg = String(message || "").trim();
-  if (!intent || typeof intent !== "object" || !msg) return intent;
-
-  const hasTopN = /(top\s*\d+|상위\s*\d+)/i.test(msg);
-  if (!hasTopN) return intent;
-
-  const nMatch = msg.match(/top\s*(\d+)/i) || msg.match(/상위\s*(\d+)/i);
-  const topN = nMatch ? Math.max(1, parseInt(nMatch[1], 10) || 3) : 3;
-
-  intent.operation = "topn";
-  intent.top_n = topN;
-  intent.sort_order = intent.sort_order || "desc";
-
-  // 예: "연봉 Top3" → rank_by/sort_by = 연봉
-  const rankMatch = msg.match(/([가-힣A-Za-z0-9_()]+)\s*top\s*\d+/i);
-  const rankMatchKo = msg.match(/([가-힣A-Za-z0-9_()]+)\s*상위\s*\d+/i);
-  const rankKey =
-    (rankMatch && rankMatch[1]) || (rankMatchKo && rankMatchKo[1]) || "";
-  if (rankKey && !intent.rank_by && !intent.sort_by) {
-    intent.rank_by = rankKey.trim();
-    intent.sort_by = rankKey.trim();
-  }
-
-  return intent;
-}
 
 // ✅ LLM이 평균으로 오판하는 케이스를 중앙값에 한해 안전하게 보정
 function applyMedianOverride(message, intent) {

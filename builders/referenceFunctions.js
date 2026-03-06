@@ -477,37 +477,6 @@ const referenceFunctionBuilder = {
   lookup(ctx, formatValue) {
     const { bestReturn, bestLookup, intent } = ctx;
     const sheetName = bestReturn.sheetName;
-    // ------------------------------
-    // multi return 처리
-    // ------------------------------
-
-    if (
-      Array.isArray(intent.return_headers) &&
-      intent.return_headers.length > 1
-    ) {
-      const sheetInfo = allSheetsData?.[sheetName];
-      if (!sheetInfo || !sheetInfo.metaData)
-        return `=ERROR("반환 열 정보를 찾을 수 없습니다.")`;
-
-      const ranges = intent.return_headers
-        .map((h) => {
-          const m = sheetInfo.metaData[String(h).trim()];
-          if (!m) return null;
-          return `'${sheetName}'!${m.columnLetter}${sheetInfo.startRow}:${m.columnLetter}${sheetInfo.lastDataRow}`;
-        })
-        .filter(Boolean);
-
-      if (!ranges.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
-
-      const lookupRange = `'${sheetName}'!${bestLookup.columnLetter}${bestLookup.startRow}:${bestLookup.columnLetter}${bestLookup.lastDataRow}`;
-
-      const lookupValue = formatValue(intent.lookup_value);
-
-      const returnRange =
-        ranges.length === 1 ? ranges[0] : `HSTACK(${ranges.join(", ")})`;
-
-      return `=XLOOKUP(${lookupValue}, ${lookupRange}, ${returnRange})`;
-    }
     const returnRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
     const lookupRange = `'${sheetName}'!${bestLookup.columnLetter}${bestLookup.startRow}:${bestLookup.columnLetter}${bestLookup.lastDataRow}`;
     const lookupValue = formatValue(intent.lookup_value);
