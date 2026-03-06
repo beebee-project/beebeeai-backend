@@ -18,7 +18,7 @@ function _bestColumnByHint(hint, ctx, role = "lookup") {
     return formulaUtils.findBestColumnAcrossSheets(
       ctx.allSheetsData,
       terms,
-      role
+      role,
     );
   }
   return formulaUtils.findColumnInfo
@@ -76,7 +76,7 @@ function buildSingleCondition(range, key, mode, env) {
 // 멀티 조건 AND 곱
 function buildAndConditions(ranges, keys, modes, env) {
   const parts = ranges.map((rg, i) =>
-    buildSingleCondition(rg, keys[i], modes[i] ?? modes[0] ?? "exact", env)
+    buildSingleCondition(rg, keys[i], modes[i] ?? modes[0] ?? "exact", env),
   );
   return parts.join(" * ");
 }
@@ -99,7 +99,7 @@ function buildSecondaryCondProduct(ranges, keys, modes, env, primaryIndex) {
   for (let i = 0; i < ranges.length; i++) {
     if (i === primaryIndex) continue;
     parts.push(
-      buildSingleCondition(ranges[i], keys[i], modes[i] ?? "exact", env)
+      buildSingleCondition(ranges[i], keys[i], modes[i] ?? "exact", env),
     );
   }
   return parts.join(" * ");
@@ -215,7 +215,7 @@ function _pairsBySheetLoose(ctx, it) {
     } else if (it.lookup_range) {
       const rr = rangeFromSpec(
         { ...ctx, bestReturn: { sheetName: s } },
-        it.lookup_range
+        it.lookup_range,
       );
       if (rr) l = { range: rr };
     }
@@ -225,7 +225,7 @@ function _pairsBySheetLoose(ctx, it) {
     } else if (it.return_range) {
       const rr = rangeFromSpec(
         { ...ctx, bestReturn: { sheetName: s } },
-        it.return_range
+        it.return_range,
       );
       if (rr) r = { range: rr };
     }
@@ -279,7 +279,7 @@ function buildLookupFormula(args) {
   // N번째 매칭(2+) : exact/wildcard만 안전 래핑
   const _nth = Number(nth || 0);
   const _hasApprox = modes.some(
-    (m) => m === "nextSmaller" || m === "nextLarger"
+    (m) => m === "nextSmaller" || m === "nextLarger",
   );
   if (_nth >= 2 && !_hasApprox) {
     const condProduct = isMulti
@@ -331,14 +331,14 @@ function buildLookupFormula(args) {
         keys,
         modes,
         env,
-        approxIdx
+        approxIdx,
       );
       const hasSecondary = sec.trim().length > 0;
 
       const primKey = keyWithWildcardIfNeeded(
         keys[approxIdx],
         modes[approxIdx],
-        env
+        env,
       );
       const xMatch = toXMatchMode(modes[approxIdx]);
 
@@ -374,7 +374,7 @@ function buildLookupFormula(args) {
         keys,
         modes,
         env,
-        approxIdx
+        approxIdx,
       );
       const hasSecondary = sec.trim().length > 0;
       const lookFilt = hasSecondary
@@ -410,7 +410,7 @@ function buildLookupFormula(args) {
         [keys[0]],
         [firstMode],
         env,
-        orientation
+        orientation,
       );
       const core =
         orientation === "vertical"
@@ -477,6 +477,37 @@ const referenceFunctionBuilder = {
   lookup(ctx, formatValue) {
     const { bestReturn, bestLookup, intent } = ctx;
     const sheetName = bestReturn.sheetName;
+    // ------------------------------
+    // multi return 처리
+    // ------------------------------
+
+    if (
+      Array.isArray(intent.return_headers) &&
+      intent.return_headers.length > 1
+    ) {
+      const sheetInfo = allSheetsData?.[sheetName];
+      if (!sheetInfo || !sheetInfo.metaData)
+        return `=ERROR("반환 열 정보를 찾을 수 없습니다.")`;
+
+      const ranges = intent.return_headers
+        .map((h) => {
+          const m = sheetInfo.metaData[String(h).trim()];
+          if (!m) return null;
+          return `'${sheetName}'!${m.columnLetter}${sheetInfo.startRow}:${m.columnLetter}${sheetInfo.lastDataRow}`;
+        })
+        .filter(Boolean);
+
+      if (!ranges.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+
+      const lookupRange = `'${sheetName}'!${bestLookup.columnLetter}${bestLookup.startRow}:${bestLookup.columnLetter}${bestLookup.lastDataRow}`;
+
+      const lookupValue = formatValue(intent.lookup_value);
+
+      const returnRange =
+        ranges.length === 1 ? ranges[0] : `HSTACK(${ranges.join(", ")})`;
+
+      return `=XLOOKUP(${lookupValue}, ${lookupRange}, ${returnRange})`;
+    }
     const returnRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
     const lookupRange = `'${sheetName}'!${bestLookup.columnLetter}${bestLookup.startRow}:${bestLookup.columnLetter}${bestLookup.lastDataRow}`;
     const lookupValue = formatValue(intent.lookup_value);
@@ -489,7 +520,7 @@ const referenceFunctionBuilder = {
       exists,
       intent.value_if_not_found
         ? JSON.stringify(String(intent.value_if_not_found))
-        : null
+        : null,
     )}`;
   },
 
@@ -507,8 +538,8 @@ const referenceFunctionBuilder = {
       it.lookup_value.operation
         ? evalSubIntentToScalar(ctx, FV, it.lookup_value)
         : it.lookup_value != null
-        ? FV(it.lookup_value, { forceText: true })
-        : null;
+          ? FV(it.lookup_value, { forceText: true })
+          : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
     // lookup/return 열(반환 시트 기준 정렬)
@@ -524,7 +555,7 @@ const referenceFunctionBuilder = {
         : resolveHeaderInSheet(
             bestLookup.header || it.lookup_hint,
             primarySheet,
-            ctx
+            ctx,
           );
     if (!lookCol)
       return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
@@ -566,7 +597,7 @@ const referenceFunctionBuilder = {
         .filter(Boolean)
         .map(
           (c) =>
-            `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`
+            `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`,
         );
       if (cols.length > 0) {
         lookupArray = cols.map((c) => `(${c})`).join(`&"|"&`);
@@ -642,12 +673,12 @@ const referenceFunctionBuilder = {
       const lookupStack = _stackRanges(
         pairs.map((p) => p.lookupRange),
         env,
-        ctx.supports || {}
+        ctx.supports || {},
       );
       const returnStack = _stackRanges(
         pairs.map((p) => p.returnRange),
         env,
-        ctx.supports || {}
+        ctx.supports || {},
       );
       if (!lookupStack || !returnStack)
         return `=ERROR("멀티시트 스캔에 사용할 범위를 찾지 못했습니다.")`;
@@ -656,10 +687,10 @@ const referenceFunctionBuilder = {
         it.match_mode === "wildcard"
           ? "wildcard"
           : it.match_mode === "nextsmaller" || it.match_mode === -1
-          ? "nextSmaller"
-          : it.match_mode === "nextlarger" || it.match_mode === 1
-          ? "nextLarger"
-          : "exact";
+            ? "nextSmaller"
+            : it.match_mode === "nextlarger" || it.match_mode === 1
+              ? "nextLarger"
+              : "exact";
 
       const keyRef =
         it.lookup_value_cell ||
@@ -681,10 +712,10 @@ const referenceFunctionBuilder = {
           it.search_mode === "last"
             ? "lastToFirst"
             : it.search_mode === "asc"
-            ? "ascending"
-            : it.search_mode === "desc"
-            ? "descending"
-            : "firstToLast",
+              ? "ascending"
+              : it.search_mode === "desc"
+                ? "descending"
+                : "firstToLast",
         env,
         supports: {
           XLOOKUP: ctx.supports?.XLOOKUP !== false,
@@ -708,23 +739,23 @@ const referenceFunctionBuilder = {
     const keyRefs = Array.isArray(it.keyRefs)
       ? it.keyRefs
       : it.multi_keys
-      ? it.multi_keys.map((k) => fmt(k.value, { forceText: true }))
-      : null;
+        ? it.multi_keys.map((k) => fmt(k.value, { forceText: true }))
+        : null;
 
     const lookupRanges = Array.isArray(it.lookupRanges)
       ? it.lookupRanges
       : it.multi_keys
-      ? it.multi_keys.map((_k) => lookupRange)
-      : null;
+        ? it.multi_keys.map((_k) => lookupRange)
+        : null;
 
     const matchMode =
       it.match_mode === "wildcard"
         ? "wildcard"
         : it.match_mode === "nextsmaller" || it.match_mode === -1
-        ? "nextSmaller"
-        : it.match_mode === "nextlarger" || it.match_mode === 1
-        ? "nextLarger"
-        : "exact";
+          ? "nextSmaller"
+          : it.match_mode === "nextlarger" || it.match_mode === 1
+            ? "nextLarger"
+            : "exact";
 
     const env =
       ctx.platform === "excel" || ctx.env === "excel" ? "excel" : "gsheets";
@@ -732,8 +763,8 @@ const referenceFunctionBuilder = {
       key: keyRefs?.length
         ? keyRefs
         : keyRef
-        ? fmt(keyRef, { forceText: true })
-        : "",
+          ? fmt(keyRef, { forceText: true })
+          : "",
       lookupRange: lookupRanges?.length ? lookupRanges : lookupRange,
       returnRange,
       nth: Number(it.nth ?? it.ordinal ?? 0),
@@ -742,8 +773,8 @@ const referenceFunctionBuilder = {
         ? Array.isArray(it.wildcard)
           ? it.wildcard.map((w) => (w ? "wildcard" : "exact"))
           : it.wildcard
-          ? "wildcard"
-          : "exact"
+            ? "wildcard"
+            : "exact"
         : matchMode,
       searchMode: it.search_mode === "last" ? "lastToFirst" : "firstToLast",
       env,

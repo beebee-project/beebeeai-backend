@@ -255,6 +255,287 @@ function _normRange(rg) {
   return `UPPER(TRIM(${rg}&""))`;
 }
 
+function _normHeaderName(s) {
+  return String(s || "").trim();
+}
+
+function _findMetaByBestMatch(metaEntries, needle) {
+  const n = _normHeaderName(needle);
+  if (!n) return null;
+  for (const [h, m] of metaEntries) {
+    if (_normHeaderName(h) === n) return { header: h, meta: m };
+  }
+  for (const [h, m] of metaEntries) {
+    const hh = _normHeaderName(h);
+    if (hh.includes(n) || n.includes(hh)) return { header: h, meta: m };
+  }
+  return null;
+}
+
+function _pickHeadersFromMessage(metaEntries, rawMessage) {
+  const msg = String(rawMessage || "");
+  if (!msg) return [];
+  const hits = [];
+  for (const [h] of metaEntries) {
+    const name = _normHeaderName(h);
+    if (!name) continue;
+    const pos = msg.indexOf(name);
+    if (pos >= 0) hits.push({ name, pos });
+  }
+  hits.sort((a, b) => a.pos - b.pos);
+  const seen = new Set();
+  const out = [];
+  for (const x of hits) {
+    if (!seen.has(x.name)) {
+      seen.add(x.name);
+      out.push(x.name);
+    }
+  }
+  return out;
+}
+
+function _buildCombinedMask(ctx, sheetName, sheetInfo, intent) {
+  let earlyError = null;
+  const rawConds = Array.isArray(intent.conditions) ? intent.conditions : [];
+  const inlineGroups = rawConds.filter(
+    (c) =>
+      c &&
+      typeof c === "object" &&
+      c.logical_operator &&
+      Array.isArray(c.conditions),
+  );
+  const condNodes = rawConds.filter(
+    (c) =>
+      !(
+        c &&
+        typeof c === "object" &&
+        c.logical_operator &&
+        Array.isArray(c.conditions)
+      ),
+  );
+
+  const masks = condNodes
+    .map((cond) => {
+      const hint = _condHint(cond);
+      if (!hint) return null;
+      const termSet = formulaUtils.expandTermsFromText(hint);
+      const bestCol = formulaUtils.bestHeaderInSheet(
+        sheetInfo,
+        sheetName,
+        termSet,
+        "lookup",
+      );
+      if (!bestCol?.col) return null;
+      if (bestCol.isAmbiguous) {
+        earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
+        return null;
+      }
+
+      const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+      const rawOp = String(cond.operator || "=").toLowerCase();
+      const op = _normalizeOp(rawOp);
+      const rawVal = cond.value;
+
+      if (_isISODate(rawVal))
+        return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
+      if (_isNumericLiteral(rawVal))
+        return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
+
+      const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+      if (["contains", "포함"].includes(rawOp))
+        return _containsExpr(colA1, rawVal, cs);
+      if (["startswith", "startsWith"].includes(rawOp))
+        return _startsWithExpr(colA1, rawVal, cs);
+      if (["endswith", "endsWith"].includes(rawOp))
+        return _endsWithExpr(colA1, rawVal, cs);
+      return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
+    })
+    .filter(Boolean);
+
+  const groups = [
+    ...(Array.isArray(intent.condition_groups) ? intent.condition_groups : []),
+    ...inlineGroups,
+  ];
+  const groupMasks = groups
+    .map((g) => {
+      const list = Array.isArray(g.conditions) ? g.conditions : [];
+      const isOr = String(g.logical_operator || "AND").toUpperCase() === "OR";
+      const masksInGroup = list
+        .map((cond) => {
+          const hint = _condHint(cond);
+          if (!hint) return null;
+          const termSet = formulaUtils.expandTermsFromText(hint);
+          const bestCol = formulaUtils.bestHeaderInSheet(
+            sheetInfo,
+            sheetName,
+            termSet,
+            "lookup",
+          );
+          if (!bestCol?.col) return null;
+          if (bestCol.isAmbiguous) {
+            earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
+            return null;
+          }
+          const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+          const rawOp = String(cond.operator || "=").toLowerCase();
+          const op = _normalizeOp(rawOp);
+          const rawVal = cond.value;
+
+          if (_isISODate(rawVal))
+            return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
+          if (_isNumericLiteral(rawVal))
+            return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
+
+          const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+          if (["contains", "포함"].includes(rawOp))
+            return _containsExpr(colA1, rawVal, cs);
+          if (["startswith", "startsWith"].includes(rawOp))
+            return _startsWithExpr(colA1, rawVal, cs);
+          if (["endswith", "endsWith"].includes(rawOp))
+            return _endsWithExpr(colA1, rawVal, cs);
+          return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
+        })
+        .filter(Boolean);
+
+      if (!masksInGroup.length) return null;
+      return `(${masksInGroup.join(isOr ? " + " : " * ")})`;
+    })
+    .filter(Boolean);
+
+  if (earlyError) return { earlyError, mask: null };
+
+  const isOR =
+    String(
+      intent.logical || intent.conditions_logical || "AND",
+    ).toUpperCase() === "OR";
+  const baseMask = masks.length ? `(${masks.join(isOR ? " + " : " * ")})` : "";
+
+  const groupsLogicalOR =
+    String(intent.groups_logical || "AND").toUpperCase() === "OR";
+  const combinedMask = [baseMask, ...groupMasks]
+    .filter(Boolean)
+    .join(groupsLogicalOR ? " + " : " * ");
+
+  return {
+    earlyError: null,
+    mask: combinedMask || "TRUE",
+  };
+}
+
+function _topN(ctx) {
+  const { bestReturn, intent, allSheetsData } = ctx;
+  if (!bestReturn) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
+
+  const sheetName = bestReturn.sheetName;
+  const sheetInfo = allSheetsData?.[sheetName];
+  if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
+
+  const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
+    (a, b) =>
+      formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+      formulaUtils.columnLetterToIndex(b[1].columnLetter),
+  );
+  if (!metaEntries.length)
+    return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
+
+  const firstCol = metaEntries[0][1].columnLetter;
+  const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
+  const fullRange = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
+  const toRelIdx = (colLetter) =>
+    formulaUtils.columnLetterToIndex(colLetter) - firstColIdx0 + 1;
+
+  const { earlyError, mask } = _buildCombinedMask(
+    ctx,
+    sheetName,
+    sheetInfo,
+    intent,
+  );
+  if (earlyError) return earlyError;
+
+  const explicitHeaders =
+    (Array.isArray(intent.return_headers) &&
+      intent.return_headers.length &&
+      intent.return_headers) ||
+    (Array.isArray(intent.select_headers) &&
+      intent.select_headers.length &&
+      intent.select_headers) ||
+    null;
+
+  let returnHeaders = explicitHeaders;
+  if (!returnHeaders) {
+    const picked = _pickHeadersFromMessage(metaEntries, intent.raw_message);
+    returnHeaders = picked.length ? picked : [bestReturn.header];
+  }
+
+  const selected = returnHeaders
+    .map((h) => _findMetaByBestMatch(metaEntries, h))
+    .filter((x) => x?.meta?.columnLetter)
+    .map((x) => ({
+      header: x.header,
+      relIdx: toRelIdx(x.meta.columnLetter),
+    }));
+
+  if (!selected.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+
+  const selectedIndexMap = new Map(
+    selected.map((x) => [String(x.header).trim(), x.relIdx]),
+  );
+
+  const rankKey =
+    intent.rank_by ||
+    intent.sort_by ||
+    intent.order_by ||
+    intent.header_hint ||
+    "";
+  let sortIdxWithinPicked = null;
+  if (rankKey) {
+    const sortHeader = _findMetaByBestMatch(metaEntries, rankKey)?.header;
+    if (sortHeader) {
+      sortIdxWithinPicked =
+        selected.findIndex((x) => x.header === sortHeader) + 1;
+    }
+  }
+
+  // 정렬 기준 열이 반환열에 없으면 자동 포함
+  let selectedExprIdxs = selected.map((x) => x.relIdx);
+  if (!sortIdxWithinPicked && rankKey) {
+    const rankMeta = _findMetaByBestMatch(metaEntries, rankKey);
+    if (rankMeta?.meta?.columnLetter) {
+      const rel = toRelIdx(rankMeta.meta.columnLetter);
+      if (!selectedExprIdxs.includes(rel)) {
+        selectedExprIdxs.push(rel);
+        sortIdxWithinPicked = selectedExprIdxs.length;
+      }
+    }
+  }
+
+  const order =
+    String(intent.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+  const n = Math.max(1, Number(intent.top_n || intent.limit || 3));
+
+  const pickedExpr =
+    selectedExprIdxs.length === 1
+      ? `CHOOSECOLS(src, ${selectedExprIdxs[0]})`
+      : `CHOOSECOLS(src, ${selectedExprIdxs.join(", ")})`;
+
+  let sortedExpr = `picked`;
+  if (sortIdxWithinPicked) {
+    sortedExpr = `SORTBY(picked, CHOOSECOLS(picked, ${sortIdxWithinPicked}), ${order})`;
+  } else {
+    sortedExpr = `picked`;
+  }
+
+  // rank 열을 자동으로 끼워 넣은 경우, 최종 반환에서는 제거
+  const finalColCount = selected.length;
+  const finalExpr =
+    selectedExprIdxs.length === finalColCount
+      ? `sorted`
+      : `CHOOSECOLS(sorted, ${Array.from({ length: finalColCount }, (_, i) => i + 1).join(", ")})`;
+
+  return `=LET(src, FILTER(${fullRange}, ${mask}), picked, ${pickedExpr}, sorted, ${sortedExpr}, INDEX(${finalExpr}, SEQUENCE(MIN(${n}, ROWS(${finalExpr}))), ))`;
+}
+
 // --- Build concatenated normalized key vector from multiple ranges ---
 function _concatKeyVector(ranges, sep = "|") {
   if (!Array.isArray(ranges) || !ranges.length) return null;
@@ -635,6 +916,8 @@ const arrayFunctionBuilder = {
     }
     return pipeSortIfRequested(ctx, intent, pickedLeft, selectedIndexMap);
   },
+
+  topn: (ctx) => _topN(ctx),
 
   // ---------------------- UNIQUE ----------------------
   unique: (ctx) => {
