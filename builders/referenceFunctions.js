@@ -458,6 +458,45 @@ function buildTwoWayLookupFormula(args) {
   return ifNotFound ? `IF(${exists}, ${core}, ${ifNotFound})` : core;
 }
 
+function _rangeFromColMeta(col) {
+  if (!col) return null;
+  return `'${col.sheetName}'!${col.columnLetter}${col.startRow}:${col.columnLetter}${col.lastDataRow}`;
+}
+
+function _resolveReturnColumnsForXlookup(ctx, it, primarySheet) {
+  const rawHeaders =
+    Array.isArray(it.return_headers) && it.return_headers.length
+      ? it.return_headers
+      : Array.isArray(it.return_hints) && it.return_hints.length
+        ? it.return_hints
+        : Array.isArray(it.select_headers) && it.select_headers.length
+          ? it.select_headers
+          : Array.isArray(it.return_cols) && it.return_cols.length
+            ? it.return_cols
+            : null;
+
+  if (!rawHeaders || rawHeaders.length === 0) return null;
+
+  const cols = rawHeaders
+    .map((h) => {
+      const hint = typeof h === "string" ? h.trim() : h?.header;
+      if (!hint) return null;
+
+      return (
+        resolveHeaderInSheet(hint, primarySheet, ctx) ||
+        _bestColumnByHint(hint, ctx, "return")
+      );
+    })
+    .filter(Boolean);
+
+  if (!cols.length) return null;
+
+  const sameSheetCols = cols.filter((c) => c.sheetName === primarySheet);
+  if (!sameSheetCols.length) return null;
+
+  return sameSheetCols;
+}
+
 /* =========================
  * 공개 빌더
  * ========================= */
@@ -511,13 +550,52 @@ const referenceFunctionBuilder = {
           : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
-    // lookup/return 열(반환 시트 기준 정렬)
+    // lookup 열
     const bestLookup = _bestColumnByHint(it.lookup_hint, ctx, "lookup");
-    const bestReturn = _bestColumnByHint(it.return_hint, ctx, "return");
-    if (!bestLookup || !bestReturn)
-      return `=ERROR("XLOOKUP: lookup/return 열을 찾지 못했습니다.")`;
+    if (!bestLookup) return `=ERROR("XLOOKUP: lookup 열을 찾지 못했습니다.")`;
 
-    const primarySheet = bestReturn.sheetName || bestLookup.sheetName;
+    // ✅ 복수 반환 여부
+    const wantsMultiReturn =
+      Array.isArray(it.return_headers) && it.return_headers.length >= 2;
+
+    // primarySheet는 lookup 시트 우선, 없으면 첫 반환열 시트
+    let primarySheet = bestLookup.sheetName;
+
+    let returnRange = null;
+
+    if (wantsMultiReturn) {
+      const returnCols = _resolveReturnColumnsForXlookup(ctx, it, primarySheet);
+      if (!returnCols || !returnCols.length) {
+        return `=ERROR("XLOOKUP: 반환할 여러 열을 찾지 못했습니다.")`;
+      }
+
+      const returnRanges = returnCols.map((c) => _rangeFromColMeta(c));
+      returnRange =
+        returnRanges.length === 1
+          ? returnRanges[0]
+          : `HSTACK(${returnRanges.join(", ")})`;
+    } else {
+      const bestReturn = _bestColumnByHint(it.return_hint, ctx, "return");
+      if (!bestReturn) return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
+
+      primarySheet = bestReturn.sheetName || bestLookup.sheetName;
+
+      const resolvedReturn =
+        bestReturn.sheetName === primarySheet
+          ? bestReturn
+          : resolveHeaderInSheet(
+              bestReturn.header || it.return_hint,
+              primarySheet,
+              ctx,
+            );
+
+      if (!resolvedReturn) {
+        return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
+      }
+
+      returnRange = _rangeFromColMeta(resolvedReturn);
+    }
+
     const lookCol =
       bestLookup.sheetName === primarySheet
         ? bestLookup
@@ -526,15 +604,17 @@ const referenceFunctionBuilder = {
             primarySheet,
             ctx,
           );
-    if (!lookCol)
-      return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
 
-    const lookupRange = `'${primarySheet}'!${lookCol.columnLetter}${lookCol.startRow}:${lookCol.columnLetter}${lookCol.lastDataRow}`;
-    const returnRange = `'${primarySheet}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+    if (!lookCol) {
+      return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
+    }
+
+    const lookupRange = _rangeFromColMeta(lookCol);
 
     // if_not_found, match/search
     const ifNF =
       it.value_if_not_found != null ? `, ${FV(it.value_if_not_found)}` : "";
+
     const mm = (() => {
       const v = it.match_mode;
       if (v == null) return null;
@@ -546,6 +626,7 @@ const referenceFunctionBuilder = {
       if (s === "wildcard") return 2;
       return 0;
     })();
+
     const sm = (() => {
       const v = it.search_mode;
       if (v == null) return null;
@@ -562,12 +643,14 @@ const referenceFunctionBuilder = {
     let lookupArray = lookupRange;
     if (Array.isArray(it.multi_keys) && it.multi_keys.length > 0) {
       const cols = it.multi_keys
-        .map((k) => _bestColumnByHint(k.hint, ctx, "lookup"))
-        .filter(Boolean)
         .map(
-          (c) =>
-            `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`,
-        );
+          (k) =>
+            resolveHeaderInSheet(k.hint, primarySheet, ctx) ||
+            _bestColumnByHint(k.hint, ctx, "lookup"),
+        )
+        .filter(Boolean)
+        .map((c) => _rangeFromColMeta(c));
+
       if (cols.length > 0) {
         lookupArray = cols.map((c) => `(${c})`).join(`&"|"&`);
         if (!it.lookup_value) {
@@ -581,6 +664,7 @@ const referenceFunctionBuilder = {
 
     const mmArg = mm != null ? `, ${mm}` : "";
     const smArg = sm != null ? `, ${sm}` : "";
+
     return `=XLOOKUP(${lookupValue}, ${lookupArray}, ${returnRange}${ifNF}${mmArg}${smArg})`;
   },
 
