@@ -463,38 +463,6 @@ function normalizeLookupIntent(intent) {
   const op = String(intent.operation).toLowerCase();
   if (op !== "xlookup" && op !== "lookup") return intent;
 
-  // ✅ 0. 복수 반환 힌트 정규화
-  const multiReturn =
-    Array.isArray(intent.return_headers) && intent.return_headers.length
-      ? intent.return_headers
-      : Array.isArray(intent.return_hints) && intent.return_hints.length
-        ? intent.return_hints
-        : Array.isArray(intent.select_headers) && intent.select_headers.length
-          ? intent.select_headers
-          : Array.isArray(intent.return_cols) && intent.return_cols.length
-            ? intent.return_cols
-            : null;
-
-  if (multiReturn && !intent.return_headers) {
-    intent.return_headers = multiReturn;
-  }
-
-  // "부서, 직급"처럼 문자열 하나로 들어온 경우 보정
-  if (
-    !intent.return_headers &&
-    typeof intent.return_hint === "string" &&
-    /[,/]|및|\+|and/i.test(intent.return_hint)
-  ) {
-    const arr = intent.return_hint
-      .split(/,|\/|\+|및|and/gi)
-      .map((s) => String(s || "").trim())
-      .filter(Boolean);
-
-    if (arr.length >= 2) {
-      intent.return_headers = arr;
-    }
-  }
-
   // ✅ 1. LLM 출력 보정: lookup_key → lookup_array 변환
   if (intent.lookup_key) {
     if (intent.lookup_value == null)
@@ -507,15 +475,15 @@ function normalizeLookupIntent(intent) {
     }
   }
 
-  // ✅ 2. return → return_array 변환 (단일 반환일 때만)
-  if (intent.return && !intent.return_array && !intent.return_headers?.length) {
+  // ✅ 2. return → return_array 변환
+  if (intent.return && !intent.return_array) {
     intent.return_array = {
       sheet: intent.return.sheet,
       header: intent.return.header,
     };
   }
 
-  // ✅ 3. 중첩 구조 통일
+  // ✅ 3. 중첩 구조 통일 (referenceFunctions 호환용)
   intent.lookup = intent.lookup || {};
   if (intent.lookup_value != null && intent.lookup.value == null) {
     intent.lookup.value = intent.lookup_value;
@@ -531,16 +499,6 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
-  }
-
-  // ✅ 4. 복수 반환이면 대표 단일 return_hint를 첫 번째로만 잡아 둠
-  // (기존 bestReturn 탐색 호환용. 실제 수식은 referenceFunctions에서 return_headers 사용)
-  if (
-    !intent.return_hint &&
-    Array.isArray(intent.return_headers) &&
-    intent.return_headers.length
-  ) {
-    intent.return_hint = intent.return_headers[0];
   }
 
   return intent;
@@ -1605,18 +1563,11 @@ async function convert(nl, options = {}, meta = {}) {
       const bestLookup = joint?.lookup || null;
 
       // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
-      const isMultiReturnLookup =
-        String(intent.operation || "").toLowerCase() === "xlookup" &&
-        Array.isArray(intent.return_headers) &&
-        intent.return_headers.length >= 2;
-
-      if (
-        !bestReturn &&
-        (intent.header_hint || intent.return_hint) &&
-        !isMultiReturnLookup
-      ) {
+      // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
+      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
         return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
       }
+
       mergedMeta = {
         ...mergedMeta,
         allSheetsData,
