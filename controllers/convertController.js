@@ -804,6 +804,12 @@ function extractRequestedReturnHeaders(message) {
   }
 
   if (/이름만/.test(msg)) return ["이름"];
+  if (
+    /이름(을|만)?\s*(보여|출력|나열|목록)/.test(msg) &&
+    !/(부서|직급|연봉|직원id|id)/i.test(msg)
+  ) {
+    return ["이름"];
+  }
   return dedup;
 }
 
@@ -822,12 +828,9 @@ function applyTopNOverride(message, intent) {
   intent.operation = "topn";
   intent.top_n = n;
 
-  if (
-    !intent.header_hint &&
-    !intent.return_hint &&
-    /(연봉|salary)/i.test(msg)
-  ) {
+  if (/(연봉|salary)/i.test(msg)) {
     intent.header_hint = "연봉";
+    intent.sort_by = "연봉";
   }
 
   if (!intent.sort_by) {
@@ -1614,7 +1617,13 @@ exports.handleFeedback = async (req, res, next) => {
 async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-  const intent = normalizeLookupIntent(baseIntent);
+  let intent = normalizeLookupIntent(baseIntent);
+  intent = applyMedianOverride(nl, intent);
+  intent = applyExtremeRowOverride(nl, intent);
+  intent = applyTopNOverride(nl, intent);
+  intent = applySortByOverride(nl, intent);
+  intent = applyUniqueSortOverride(nl, intent);
+  intent.raw_message = nl;
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;

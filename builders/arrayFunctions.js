@@ -840,8 +840,15 @@ const arrayFunctionBuilder = {
     const order =
       String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
-    const requestedHeaders =
+    let requestedHeaders =
       it.return_headers || it.select_headers || it.return_cols;
+
+    if (
+      (!requestedHeaders || !requestedHeaders.length) &&
+      /이름(을|만)?\s*(보여|출력|나열|목록)/.test(String(it.raw_message || ""))
+    ) {
+      requestedHeaders = ["이름"];
+    }
     const retIdxs = _resolveReturnIndexes(metaEntries, requestedHeaders, [
       "이름",
       "부서",
