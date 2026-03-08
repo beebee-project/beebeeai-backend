@@ -785,33 +785,32 @@ function extractRequestedReturnHeaders(message) {
     ["입사일", "입사일"],
   ];
 
-  // 1) 반환 필드 전용 구간 우선 추출
-  // 예:
-  // - "연봉 상위 5명 이름을 보여줘"              -> "이름"
-  // - "직원ID, 이름, 연봉을 보여줘"              -> "직원ID, 이름, 연봉"
-  // - "이름과 연봉을 출력해줘"                   -> "이름과 연봉"
-  const returnClauseMatch = msg.match(
-    /(.+?)(?:을|를)?\s*(?:보여줘|보여\s*줘|출력해줘|출력|나열해줘|나열|목록으로 보여줘|목록)/,
-  );
-
   let scope = msg;
-  if (returnClauseMatch?.[1]) {
-    // 뒤쪽 반환 구간을 우선 사용
-    // 너무 앞쪽 조건/정렬 표현이 섞이면 마지막 쉼표/접속사 이후를 선호
-    const rawScope = returnClauseMatch[1].trim();
-    const splitters = [",", " 그리고 ", " 및 ", " 와 ", " 과 "];
-    let narrowed = rawScope;
-    for (const sep of splitters) {
-      const parts = narrowed
-        .split(sep)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (parts.length > 1) {
-        narrowed = parts.slice(-3).join(" ");
-      }
-    }
-    scope = narrowed;
+  const showVerb =
+    /(.*?)((?:을|를)?\s*(?:보여줘|보여\s*줘|출력해줘|출력|나열해줘|나열|목록으로 보여줘|목록))$/;
+  const m = msg.match(showVerb);
+  if (m?.[1]) {
+    scope = m[1].trim();
   }
+
+  // "…에서", "…의", "상위 3명", "Top3" 같은 앞쪽 조건/정렬 표현을 잘라내고
+  // 마지막 반환 후보 구간만 본다.
+  const cutPatterns = [
+    /\b(?:상위|top)\s*\d+\b/i,
+    /\b\d+\s*명\b/i,
+    /에서/g,
+    /중에서/g,
+    /의/g,
+  ];
+  let narrowed = scope;
+  for (const p of cutPatterns) {
+    const parts = narrowed
+      .split(p)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length > 1) narrowed = parts[parts.length - 1];
+  }
+  scope = narrowed;
 
   const hits = candidates
     .map(([needle, header]) => ({
@@ -872,6 +871,15 @@ function applyTopNOverride(message, intent) {
     intent.return_headers = requested;
   } else if (!intent.return_headers && !intent.select_headers) {
     intent.return_headers = ["이름", "부서", "직급", "연봉"];
+  }
+
+  // 다중 반환 열 명시 패턴 보정
+  if (/직원id|id/i.test(msg) && /이름/.test(msg) && /연봉/.test(msg)) {
+    intent.return_headers = ["직원ID", "이름", "연봉"];
+  } else if (/이름/.test(msg) && /연봉/.test(msg) && !/직원id|id/i.test(msg)) {
+    intent.return_headers = ["이름", "연봉"];
+  } else if (/이름(을|만)?\s*(보여줘|보여\s*줘|출력|나열|목록)/.test(msg)) {
+    intent.return_headers = ["이름"];
   }
 
   // 안전장치: "이름을 보여줘"는 정렬 기준(연봉), 필터 기준(부서)와 무관하게 반환 열은 이름만

@@ -845,19 +845,21 @@ const arrayFunctionBuilder = {
 
     const rawMsg = String(it.raw_message || "");
 
-    // 마지막 안전장치
-    if (/이름(을|만)?\s*(보여줘|보여\s*줘|출력|나열|목록)/.test(rawMsg)) {
-      requestedHeaders = ["이름"];
-    }
-    if (/이름\s*(과|와|,)\s*연봉|연봉\s*(과|와|,)\s*이름/.test(rawMsg)) {
-      requestedHeaders = ["이름", "연봉"];
-    }
+    // 마지막 방어선: 자연어 패턴으로 반환 열 정리
     if (
-      /직원id|id/.test(rawMsg) &&
+      /직원id|id/i.test(rawMsg) &&
       /이름/.test(rawMsg) &&
       /연봉/.test(rawMsg)
     ) {
       requestedHeaders = ["직원ID", "이름", "연봉"];
+    } else if (
+      /이름/.test(rawMsg) &&
+      /연봉/.test(rawMsg) &&
+      !/직원id|id/i.test(rawMsg)
+    ) {
+      requestedHeaders = ["이름", "연봉"];
+    } else if (/이름(을|만)?\s*(보여|출력|나열|목록)/.test(rawMsg)) {
+      requestedHeaders = ["이름"];
     }
 
     if (
