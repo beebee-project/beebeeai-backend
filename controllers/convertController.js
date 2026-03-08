@@ -341,45 +341,6 @@ function buildLocalIntentFromText(text = "") {
     }
   }
 
-  // ✅ 텍스트 조건 + 목록/개수 문장 보강
-  // 예: "이름이 "호"로 끝나는 직원 목록을 보여줘", "직원 ID가 "EMP0"로 시작하는 직원 수"
-  const quotedToken = original.match(/["“”']([^"“”']+)["“”']/);
-  const textToken = quotedToken ? quotedToken[1] : null;
-  const wantsList = /(목록|리스트|보여줘|나열)/.test(s);
-  const wantsCount =
-    /(count|개수|갯수|건수|직원 수|수를 구해줘|몇\s*명|몇\s*개)/.test(s);
-  const textTarget = /직원\s*id|employee\s*id|id/i.test(original)
-    ? "직원 ID"
-    : /이름|성명|name/i.test(original)
-      ? "이름"
-      : null;
-  let textOp = null;
-  if (/(포함|contains?)/.test(s)) textOp = "contains";
-  else if (/(시작|starts?_?with)/.test(s)) textOp = "startswith";
-  else if (/(끝|ends?_?with)/.test(s)) textOp = "endswith";
-
-  if (textTarget && textOp && textToken) {
-    intent.conditions = [
-      {
-        target: textTarget,
-        operator: textOp,
-        value: textToken,
-      },
-    ];
-
-    if (wantsCount) {
-      intent.operation = "countifs";
-      intent.header_hint = textTarget;
-      return intent;
-    }
-
-    if (wantsList || /목록|리스트|보여줘/.test(s)) {
-      intent.operation = "filter";
-      intent.return_hint = "이름";
-      return intent;
-    }
-  }
-
   // ✅ 1. Lookup / 조회 패턴 감지
   // 예: "홍길동의 매출", "이름으로 점수 찾기"
   const lookupMatch = s.match(
@@ -817,6 +778,21 @@ function applyUniqueSortOverride(message, intent) {
   if (!intent.header_hint && !intent.return_hint) {
     if (/부서/.test(msg)) intent.header_hint = "부서";
   }
+  return intent;
+}
+
+function applySortListOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const wantsNameList = /(이름\s*목록|직원\s*이름|이름\s*리스트|이름)/i.test(msg);
+  const wantsSalaryOrder = /(연봉|salary)/i.test(msg) && /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
+  if (!(wantsNameList && wantsSalaryOrder)) return intent;
+
+  intent.operation = "sortby";
+  intent.return_hint = "이름";
+  intent.lookup_hint = "연봉";
+  intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg) ? "asc" : "desc";
   return intent;
 }
 
@@ -1259,6 +1235,7 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyMedianOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
+    intent = applySortListOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
