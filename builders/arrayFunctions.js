@@ -849,12 +849,22 @@ const arrayFunctionBuilder = {
     ) {
       requestedHeaders = ["이름"];
     }
-    const retIdxs = _resolveReturnIndexes(metaEntries, requestedHeaders, [
-      "이름",
-      "부서",
-      "직급",
-      "연봉",
-    ]);
+    let fallbackHeaders = ["이름", "부서", "직급", "연봉"];
+
+    // 🔧 "이름만" 요청 감지
+    if (
+      Array.isArray(requestedHeaders) &&
+      requestedHeaders.length === 1 &&
+      requestedHeaders[0] === "이름"
+    ) {
+      fallbackHeaders = ["이름"];
+    }
+
+    const retIdxs = _resolveReturnIndexes(
+      metaEntries,
+      requestedHeaders,
+      fallbackHeaders,
+    );
 
     const mask = _maskExprForTopN(ctx, sheetName, sheetInfo);
     const src = mask ? `FILTER(${fullA1}, ${mask})` : fullA1;
