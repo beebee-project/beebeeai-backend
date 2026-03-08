@@ -304,7 +304,6 @@ function _deduceOp(text = "") {
   if (/(median|중앙값|중간값|가운데\s*값)/.test(s)) return "median";
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
-  if (/(상위\s*\d+|top\s*\d+)/.test(s)) return "topn";
   if (/(sortby|정렬)/.test(s)) return "sortby";
   return "formula";
 }
@@ -714,7 +713,6 @@ const OP_ALIASES = {
   argmin: "minrow",
   top1: "maxrow",
   bottom1: "minrow",
-  topn: "topn",
 
   sortby: "sortby",
   regexmatch: "regexmatch",
@@ -745,15 +743,6 @@ function applyExtremeRowOverride(message, intent) {
     /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
   if (!wantsRowFields) return intent;
 
-  const requestedCount = Number(
-    msg.match(/(?:상위|top)\s*(\d+)/i)?.[1] ||
-      msg.match(/(\d+)\s*명/)?.[1] ||
-      0,
-  );
-  if (Number.isFinite(requestedCount) && requestedCount > 1) {
-    return intent;
-  }
-
   const isMax =
     /(가장\s*높|최고|최대|top|highest|max)/i.test(msg) &&
     !/(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
@@ -767,131 +756,6 @@ function applyExtremeRowOverride(message, intent) {
   if (!intent.return_headers && !intent.select_headers) {
     intent.return_headers = ["이름", "부서", "직급", "연봉"];
   }
-  return intent;
-}
-
-function extractRequestedReturnHeaders(message) {
-  const msg = String(message || "");
-  const candidates = [
-    ["직원id", "직원ID"],
-    ["id", "직원ID"],
-    ["이름", "이름"],
-    ["성명", "이름"],
-    ["부서", "부서"],
-    ["직급", "직급"],
-    ["연봉", "연봉"],
-    ["평가 등급", "평가 등급"],
-    ["평가등급", "평가 등급"],
-    ["입사일", "입사일"],
-  ];
-
-  let scope = msg;
-  const showVerb =
-    /(.*?)((?:을|를)?\s*(?:보여줘|보여\s*줘|출력해줘|출력|나열해줘|나열|목록으로 보여줘|목록))$/;
-  const m = msg.match(showVerb);
-  if (m?.[1]) {
-    scope = m[1].trim();
-  }
-
-  // "…에서", "…의", "상위 3명", "Top3" 같은 앞쪽 조건/정렬 표현을 잘라내고
-  // 마지막 반환 후보 구간만 본다.
-  const cutPatterns = [
-    /\b(?:상위|top)\s*\d+\b/i,
-    /\b\d+\s*명\b/i,
-    /에서/g,
-    /중에서/g,
-    /의/g,
-  ];
-  let narrowed = scope;
-  for (const p of cutPatterns) {
-    const parts = narrowed
-      .split(p)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (parts.length > 1) narrowed = parts[parts.length - 1];
-  }
-  scope = narrowed;
-
-  const hits = candidates
-    .map(([needle, header]) => ({
-      idx: scope.toLowerCase().indexOf(String(needle).toLowerCase()),
-      header,
-    }))
-    .filter((x) => x.idx >= 0)
-    .sort((a, b) => a.idx - b.idx)
-    .map((x) => x.header);
-
-  const dedup = [];
-  const seen = new Set();
-  for (const h of hits) {
-    if (!seen.has(h)) {
-      seen.add(h);
-      dedup.push(h);
-    }
-  }
-
-  if (/이름만/.test(msg)) return ["이름"];
-  if (/이름(을|만)?\s*(보여|출력|나열|목록)/.test(msg)) {
-    return ["이름"];
-  }
-  return dedup;
-}
-
-function applyTopNOverride(message, intent) {
-  const msg = String(message || "");
-  if (!intent || typeof intent !== "object") return intent;
-
-  const topNumMatch =
-    msg.match(/(?:상위|top)\s*(\d+)/i) || msg.match(/(\d+)\s*명/);
-  const isTopN = /(상위\s*\d+|top\s*\d+)/i.test(msg);
-  if (!isTopN) return intent;
-
-  const n = Number(topNumMatch?.[1] || intent.top_n || 0);
-  if (!Number.isFinite(n) || n <= 0) return intent;
-
-  intent.operation = "topn";
-  intent.top_n = n;
-
-  if (/(연봉|salary)/i.test(msg)) {
-    intent.header_hint = "연봉";
-    intent.sort_by = "연봉";
-  }
-
-  if (!intent.sort_by) {
-    intent.sort_by = intent.header_hint || intent.return_hint || "연봉";
-  }
-  if (!intent.sort_order) {
-    intent.sort_order = /(낮은|lowest|smallest|bottom)/i.test(msg)
-      ? "asc"
-      : "desc";
-  }
-
-  const requested = extractRequestedReturnHeaders(msg);
-  if (requested.length && !intent.return_headers && !intent.select_headers) {
-    intent.return_headers = requested;
-  } else if (!intent.return_headers && !intent.select_headers) {
-    intent.return_headers = ["이름", "부서", "직급", "연봉"];
-  }
-
-  // 다중 반환 열 명시 패턴 보정
-  if (/직원id|id/i.test(msg) && /이름/.test(msg) && /연봉/.test(msg)) {
-    intent.return_headers = ["직원ID", "이름", "연봉"];
-  } else if (/이름/.test(msg) && /연봉/.test(msg) && !/직원id|id/i.test(msg)) {
-    intent.return_headers = ["이름", "연봉"];
-  } else if (/이름(을|만)?\s*(보여줘|보여\s*줘|출력|나열|목록)/.test(msg)) {
-    intent.return_headers = ["이름"];
-  }
-
-  // 안전장치: "이름을 보여줘"는 정렬 기준(연봉), 필터 기준(부서)와 무관하게 반환 열은 이름만
-  if (/이름(을|만)?\s*(보여줘|보여\s*줘|출력|나열|목록)/.test(msg)) {
-    intent.return_headers = ["이름"];
-  }
-
-  // "이름과 연봉"처럼 명시된 경우는 예외
-  if (/이름\s*(과|와|,)\s*연봉|연봉\s*(과|와|,)\s*이름/.test(msg)) {
-    intent.return_headers = ["이름", "연봉"];
-  }
-
   return intent;
 }
 
@@ -989,7 +853,7 @@ Core fields (always consider):
   - operation: string
       The main action. Examples:
         "sum", "sumifs", "average", "averageifs", "countifs",
-        "lookup", "xlookup", "filter", "if", "sortby", "topn",
+        "lookup", "xlookup", "filter", "if", "sortby",
         "textjoin", "textsplit", "regexmatch", "regexreplace".
       Choose the most appropriate single operation.
 
@@ -1041,11 +905,6 @@ Row selection (select a specific row by key):
 Aggregation / grouping (sum by branch, average by category, etc.):
   - group_by (optional): string
       e.g. "지점명", "카테고리"
-  - top_n (optional): number
-      e.g. 3, 5 when the user asks for top 3 / top 5
-  - sort_order (optional): "asc" | "desc"
-  - return_headers / select_headers (optional): string[]
-      e.g. ["이름", "연봉"] for name+salary output
 
 Text operations:
   - delimiter (optional): string
@@ -1360,7 +1219,6 @@ exports.handleConversion = async (req, res, next) => {
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
-    intent = applyTopNOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
@@ -1657,92 +1515,86 @@ exports.handleFeedback = async (req, res, next) => {
 /* ---------------------------------------------
  * 테스트/내부용 convert (LLM 미사용 경량)
  * -------------------------------------------*/
-async function convert(nl, options = {}, meta = {}) {
-  // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
-  const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-  let intent = normalizeLookupIntent(baseIntent);
-  intent = applyMedianOverride(nl, intent);
-  intent = applyExtremeRowOverride(nl, intent);
-  intent = applyTopNOverride(nl, intent);
-  intent = applySortByOverride(nl, intent);
-  intent = applyUniqueSortOverride(nl, intent);
-  intent.raw_message = nl;
+// async function convert(nl, options = {}, meta = {}) {
+//   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
+//   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
+//   const intent = normalizeLookupIntent(baseIntent);
 
-  // 2) 기본 컨텍스트 재료
-  const engine = options.engine || DEFAULT_ENGINE;
-  const policy = options.policy || DEFAULT_POLICY;
-  const allSheetsData = meta.allSheetsData || null;
+//   // 2) 기본 컨텍스트 재료
+//   const engine = options.engine || DEFAULT_ENGINE;
+//   const policy = options.policy || DEFAULT_POLICY;
+//   const allSheetsData = meta.allSheetsData || null;
 
-  /** @type {any} */
-  let mergedMeta = {
-    message: nl,
-    engine,
-    policy,
-    intent,
-    ...meta,
-  };
+//   /** @type {any} */
+//   let mergedMeta = {
+//     message: nl,
+//     engine,
+//     policy,
+//     intent,
+//     ...meta,
+//   };
 
-  // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
-  if (allSheetsData) {
-    const hasHints = !!(
-      intent.return_hint ||
-      intent.header_hint ||
-      intent.lookup_hint
-    );
+//   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
+//   if (allSheetsData) {
+//     const hasHints = !!(
+//       intent.return_hint ||
+//       intent.header_hint ||
+//       intent.lookup_hint
+//     );
 
-    if (
-      hasHints &&
-      typeof formulaUtils.findBestSheetAndColumns === "function"
-    ) {
-      const searchTerms = {
-        return: intent.return_hint || intent.header_hint || "",
-        lookup: intent.lookup_hint || "",
-      };
+//     if (
+//       hasHints &&
+//       typeof formulaUtils.findBestSheetAndColumns === "function"
+//     ) {
+//       const searchTerms = {
+//         return: intent.return_hint || intent.header_hint || "",
+//         lookup: intent.lookup_hint || "",
+//       };
 
-      const joint = formulaUtils.findBestSheetAndColumns(
-        allSheetsData,
-        searchTerms,
-        {
-          sameSheetBonus: 0.5,
-        },
-      );
+//       const joint = formulaUtils.findBestSheetAndColumns(
+//         allSheetsData,
+//         searchTerms,
+//         {
+//           sameSheetBonus: 0.5,
+//         },
+//       );
 
-      const bestReturn = joint?.return || null;
-      const bestLookup = joint?.lookup || null;
+//       const bestReturn = joint?.return || null;
+//       const bestLookup = joint?.lookup || null;
 
-      // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
-      // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
-        return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
-      }
+//       // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
+//       // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
+//       if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+//         return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
+//       }
 
-      mergedMeta = {
-        ...mergedMeta,
-        allSheetsData,
-        bestReturn,
-        bestLookup,
-      };
-    } else {
-      mergedMeta = { ...mergedMeta, allSheetsData };
-    }
-  }
+//       mergedMeta = {
+//         ...mergedMeta,
+//         allSheetsData,
+//         bestReturn,
+//         bestLookup,
+//       };
+//     } else {
+//       mergedMeta = { ...mergedMeta, allSheetsData };
+//     }
+//   }
 
-  // 4) 정책/포맷 옵션 정규화
-  const ctx = buildCtx(mergedMeta);
+//   // 4) 정책/포맷 옵션 정규화
+//   const ctx = buildCtx(mergedMeta);
 
-  // 5) 실제 빌더 호출
-  const op = resolveOp(ctx.intent?.operation);
-  if (!op) return '=ERROR("알 수 없는 operation 입니다.")';
+//   // 5) 실제 빌더 호출
+//   const op = resolveOp(ctx.intent?.operation);
+//   if (!op) return '=ERROR("알 수 없는 operation 입니다.")';
 
-  const built = formulaBuilder[op](
-    ctx,
-    (v, o) =>
-      formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
-    formulaBuilder._buildConditionPairs,
-  );
-  // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
-  if (ctx.__errorFormula) return ctx.__errorFormula;
-  return built;
-}
+//   const built = formulaBuilder[op](
+//     ctx,
+//     (v, o) =>
+//       formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
+//     formulaBuilder._buildConditionPairs,
+//   );
+//   // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
+//   if (ctx.__errorFormula) return ctx.__errorFormula;
+//   return built;
+// }
 
 module.exports.convert = convert;
