@@ -843,9 +843,26 @@ const arrayFunctionBuilder = {
     let requestedHeaders =
       it.return_headers || it.select_headers || it.return_cols;
 
+    const rawMsg = String(it.raw_message || "");
+
+    // 마지막 안전장치
+    if (/이름(을|만)?\s*(보여줘|보여\s*줘|출력|나열|목록)/.test(rawMsg)) {
+      requestedHeaders = ["이름"];
+    }
+    if (/이름\s*(과|와|,)\s*연봉|연봉\s*(과|와|,)\s*이름/.test(rawMsg)) {
+      requestedHeaders = ["이름", "연봉"];
+    }
+    if (
+      /직원id|id/.test(rawMsg) &&
+      /이름/.test(rawMsg) &&
+      /연봉/.test(rawMsg)
+    ) {
+      requestedHeaders = ["직원ID", "이름", "연봉"];
+    }
+
     if (
       (!requestedHeaders || !requestedHeaders.length) &&
-      /이름(을|만)?\s*(보여|출력|나열|목록)/.test(String(it.raw_message || ""))
+      /이름(을|만)?\s*(보여|출력|나열|목록)/.test(rawMsg)
     ) {
       requestedHeaders = ["이름"];
     }

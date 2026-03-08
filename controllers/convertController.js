@@ -785,9 +785,37 @@ function extractRequestedReturnHeaders(message) {
     ["입사일", "입사일"],
   ];
 
+  // 1) 반환 필드 전용 구간 우선 추출
+  // 예:
+  // - "연봉 상위 5명 이름을 보여줘"              -> "이름"
+  // - "직원ID, 이름, 연봉을 보여줘"              -> "직원ID, 이름, 연봉"
+  // - "이름과 연봉을 출력해줘"                   -> "이름과 연봉"
+  const returnClauseMatch = msg.match(
+    /(.+?)(?:을|를)?\s*(?:보여줘|보여\s*줘|출력해줘|출력|나열해줘|나열|목록으로 보여줘|목록)/,
+  );
+
+  let scope = msg;
+  if (returnClauseMatch?.[1]) {
+    // 뒤쪽 반환 구간을 우선 사용
+    // 너무 앞쪽 조건/정렬 표현이 섞이면 마지막 쉼표/접속사 이후를 선호
+    const rawScope = returnClauseMatch[1].trim();
+    const splitters = [",", " 그리고 ", " 및 ", " 와 ", " 과 "];
+    let narrowed = rawScope;
+    for (const sep of splitters) {
+      const parts = narrowed
+        .split(sep)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length > 1) {
+        narrowed = parts.slice(-3).join(" ");
+      }
+    }
+    scope = narrowed;
+  }
+
   const hits = candidates
     .map(([needle, header]) => ({
-      idx: msg.toLowerCase().indexOf(String(needle).toLowerCase()),
+      idx: scope.toLowerCase().indexOf(String(needle).toLowerCase()),
       header,
     }))
     .filter((x) => x.idx >= 0)
@@ -804,10 +832,7 @@ function extractRequestedReturnHeaders(message) {
   }
 
   if (/이름만/.test(msg)) return ["이름"];
-  if (
-    /이름(을|만)?\s*(보여|출력|나열|목록)/.test(msg) &&
-    !/(부서|직급|연봉|직원id|id)/i.test(msg)
-  ) {
+  if (/이름(을|만)?\s*(보여|출력|나열|목록)/.test(msg)) {
     return ["이름"];
   }
   return dedup;
@@ -847,6 +872,16 @@ function applyTopNOverride(message, intent) {
     intent.return_headers = requested;
   } else if (!intent.return_headers && !intent.select_headers) {
     intent.return_headers = ["이름", "부서", "직급", "연봉"];
+  }
+
+  // 안전장치: "이름을 보여줘"는 정렬 기준(연봉), 필터 기준(부서)와 무관하게 반환 열은 이름만
+  if (/이름(을|만)?\s*(보여줘|보여\s*줘|출력|나열|목록)/.test(msg)) {
+    intent.return_headers = ["이름"];
+  }
+
+  // "이름과 연봉"처럼 명시된 경우는 예외
+  if (/이름\s*(과|와|,)\s*연봉|연봉\s*(과|와|,)\s*이름/.test(msg)) {
+    intent.return_headers = ["이름", "연봉"];
   }
 
   return intent;
