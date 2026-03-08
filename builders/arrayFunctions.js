@@ -917,11 +917,72 @@ const arrayFunctionBuilder = {
 
 function _extremeRow(ctx, which) {
   const it = ctx.intent || {};
-  const best = ctx.bestReturn;
-  if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
+  const allSheets = ctx.allSheetsData || {};
 
-  const sheetName = best.sheetName;
-  const sheetInfo = ctx.allSheetsData?.[sheetName];
+  const normalizeHeader = (v) =>
+    String(v || "")
+      .trim()
+      .replace(/\s+/g, "")
+      .toLowerCase();
+
+  const includesHeader = (a, b) => {
+    const na = normalizeHeader(a);
+    const nb = normalizeHeader(b);
+    return !!na && !!nb && (na.includes(nb) || nb.includes(na));
+  };
+
+  const findMetaByHintInSheet = (metaEntries, hint) => {
+    const raw = String(hint || "").trim();
+    if (!raw) return null;
+
+    for (const [h, m] of metaEntries) {
+      if (normalizeHeader(h) === normalizeHeader(raw)) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      if (includesHeader(h, raw)) return m;
+    }
+    return null;
+  };
+
+  // 1) 기준열(header_hint)이 들어있는 시트부터 찾는다.
+  let targetSheetName = null;
+  let sortMeta = null;
+
+  for (const [sheetName, sheetInfo] of Object.entries(allSheets)) {
+    const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
+      (a, b) =>
+        formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+        formulaUtils.columnLetterToIndex(b[1].columnLetter),
+    );
+    const found = findMetaByHintInSheet(metaEntries, it.header_hint);
+    if (found) {
+      targetSheetName = sheetName;
+      sortMeta = found;
+      break;
+    }
+  }
+
+  // 2) header_hint로 못 찾았으면 기존 bestReturn의 시트에서 한 번 더 시도
+  if (!targetSheetName && ctx.bestReturn?.sheetName) {
+    const fallbackSheet = ctx.bestReturn.sheetName;
+    const sheetInfo = allSheets[fallbackSheet];
+    const metaEntries = Object.entries(sheetInfo?.metaData || {}).sort(
+      (a, b) =>
+        formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+        formulaUtils.columnLetterToIndex(b[1].columnLetter),
+    );
+    const found = findMetaByHintInSheet(metaEntries, it.header_hint);
+    if (found) {
+      targetSheetName = fallbackSheet;
+      sortMeta = found;
+    }
+  }
+
+  if (!targetSheetName || !sortMeta?.columnLetter) {
+    return `=ERROR("정렬 기준 열을 찾을 수 없습니다.")`;
+  }
+
+  const sheetInfo = allSheets[targetSheetName];
   if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
 
   const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
@@ -935,46 +996,32 @@ function _extremeRow(ctx, which) {
 
   const firstCol = metaEntries[0][1].columnLetter;
   const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
-  const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+  const fullA1 = `'${targetSheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
   const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
   const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
 
-  const findMetaByContains = (needle) => {
-    const n = String(needle || "").trim();
-    if (!n) return null;
-
-    for (const [h, m] of metaEntries) {
-      if (String(h).trim() === n) return m;
-    }
-    for (const [h, m] of metaEntries) {
-      if (String(h).includes(n)) return m;
-    }
-    return null;
+  const findMeta = (hint) => {
+    const raw = String(hint || "").trim();
+    if (!raw) return null;
+    return byName.get(raw) || findMetaByHintInSheet(metaEntries, raw) || null;
   };
 
-  // ✅ 정렬 기준열과 반환열 분리
-  const sortMeta =
-    byName.get(String(it.header_hint || "").trim()) ||
-    findMetaByContains(String(it.header_hint || "").trim()) ||
-    best ||
-    byName.get(String(it.return_hint || "").trim()) ||
-    findMetaByContains(String(it.return_hint || "").trim()) ||
-    null;
-
-  if (!sortMeta?.columnLetter) {
-    return `=ERROR("정렬 기준 열의 위치를 찾을 수 없습니다.")`;
-  }
-
+  // ✅ 정렬 기준열은 오직 header_hint 기준
   const sortIdx =
     formulaUtils.columnLetterToIndex(sortMeta.columnLetter) - firstColIdx0 + 1;
 
+  // ✅ 반환열은 오직 return_headers / select_headers 기준
   const want =
     Array.isArray(it.return_headers) && it.return_headers.length
       ? it.return_headers
       : Array.isArray(it.select_headers) && it.select_headers.length
         ? it.select_headers
-        : ["이름"];
+        : [];
+
+  if (!want.length) {
+    return `=ERROR("반환 열이 지정되지 않았습니다.")`;
+  }
 
   const retIdxs = want
     .map((h) => {
@@ -984,14 +1031,9 @@ function _extremeRow(ctx, which) {
           : h && typeof h === "object" && h.header
             ? String(h.header).trim()
             : "";
-
       if (!key) return null;
 
-      const m =
-        byName.get(key) ||
-        findMetaByContains(key) ||
-        (key === "연봉" ? findMetaByContains("연봉") : null);
-
+      const m = findMeta(key);
       if (!m?.columnLetter) return null;
 
       return (

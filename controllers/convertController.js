@@ -794,9 +794,9 @@ function applyExtremeRowOverride(message, intent) {
 
   if (!isMax && !isMin) return intent;
 
-  // ✅ extreme-row로 볼만한 문장인지
+  // extreme-row 계열인지 최소 판단
   const wantsRowResult =
-    /(출력|보여|가져와|알려줘|리턴|반환|목록|정보|상세|이름|성명|부서|직급|연봉|급여|salary|id|사번|직원|제품코드|상품명|카테고리|현재재고|안전재고|매출|점수|수량|주문번호|채널|지역)/i.test(
+    /(출력|보여|가져와|알려줘|리턴|반환|목록|정보|상세|이름|성명|부서|직급|연봉|급여|salary|id|사번|직원|학생|제품|제품코드|상품명|카테고리|현재재고|안전재고|매출|매출액|점수|수량|주문번호|채널|지역|시험id|학번)/i.test(
       msg,
     );
 
@@ -804,7 +804,9 @@ function applyExtremeRowOverride(message, intent) {
 
   intent.operation = isMax ? "maxrow" : "minrow";
 
-  // ✅ 기준 열 추론
+  // -----------------------------
+  // 1) 기준 열(header_hint) 추론
+  // -----------------------------
   if (!intent.header_hint) {
     const metricCandidates = [
       "연봉",
@@ -812,11 +814,11 @@ function applyExtremeRowOverride(message, intent) {
       "매출액",
       "매출",
       "점수",
-      "수량",
       "현재재고",
       "안전재고",
-      "리드타임",
+      "수량",
       "발주단가",
+      "리드타임",
     ];
 
     const foundMetric = metricCandidates.find((h) => msg.includes(h));
@@ -825,15 +827,25 @@ function applyExtremeRowOverride(message, intent) {
     }
   }
 
-  // ✅ 반환 열 추출
+  // 보조 패턴:
+  // "수학 점수가 가장 높은 ..." 같은 문장에서 기준은 결국 "점수"
+  if (!intent.header_hint && /점수/.test(msg)) {
+    intent.header_hint = "점수";
+  }
+
+  // -----------------------------
+  // 2) 반환 열(return_headers) 추론
+  // -----------------------------
   const requested = [];
 
+  // 직원/인사
   if (/(직원\s*id|사번|\bid\b)/i.test(msg)) requested.push("직원 ID");
   if (/(이름|성명)/i.test(msg)) requested.push("이름");
   if (/부서/.test(msg)) requested.push("부서");
   if (/직급/.test(msg)) requested.push("직급");
   if (/(연봉|급여|salary)/i.test(msg)) requested.push("연봉");
 
+  // 제품/재고
   if (/제품코드/.test(msg)) requested.push("제품코드");
   if (/상품명|제품명/.test(msg)) requested.push("상품명");
   if (/카테고리/.test(msg)) requested.push("카테고리");
@@ -843,13 +855,20 @@ function applyExtremeRowOverride(message, intent) {
   if (/발주단가/.test(msg)) requested.push("발주단가");
   if (/공급업체코드/.test(msg)) requested.push("공급업체코드");
 
+  // 교육/시험
+  if (/시험id|시험 id/i.test(msg)) requested.push("시험ID");
+  if (/학번/.test(msg)) requested.push("학번");
+  if (/과목/.test(msg)) requested.push("과목");
+  if (/점수/.test(msg)) requested.push("점수");
+  if (/등급/.test(msg)) requested.push("등급");
+  if (/시험일자|시험 날짜|날짜/.test(msg)) requested.push("시험일자");
+
+  // 판매/주문
   if (/주문번호/.test(msg)) requested.push("주문번호");
-  if (/날짜/.test(msg)) requested.push("날짜");
   if (/지역/.test(msg)) requested.push("지역");
   if (/채널/.test(msg)) requested.push("채널");
   if (/(매출액|매출)/.test(msg)) requested.push("매출액");
   if (/수량/.test(msg)) requested.push("수량");
-  if (/점수/.test(msg)) requested.push("점수");
 
   const deduped = [...new Set(requested)];
 
@@ -857,7 +876,38 @@ function applyExtremeRowOverride(message, intent) {
     if (deduped.length) {
       intent.return_headers = deduped;
     } else {
+      // 필드 명시가 전혀 없으면 최소 1개라도 나오게
       intent.return_headers = ["이름"];
+    }
+  }
+
+  // -----------------------------
+  // 3) "기준열이 반환열로 섞이는" 것 방지
+  // 예: "최고 연봉자의 이름" -> 반환열은 이름만
+  // -----------------------------
+  if (
+    intent.header_hint &&
+    Array.isArray(intent.return_headers) &&
+    intent.return_headers.length > 1
+  ) {
+    const norm = (s) =>
+      String(s || "")
+        .replace(/\s+/g, "")
+        .toLowerCase();
+    const headerNorm = norm(intent.header_hint);
+
+    // 사용자가 분명히 여러 필드를 요청한 게 아니면 기준열 중복 제거
+    const explicitlyMultiple =
+      /,|와|과|및|and/i.test(msg) ||
+      /(이름.*부서|부서.*직급|시험id.*학번|상품명.*현재재고)/i.test(msg);
+
+    if (!explicitlyMultiple) {
+      intent.return_headers = intent.return_headers.filter(
+        (h) => norm(h) !== headerNorm,
+      );
+      if (!intent.return_headers.length) {
+        intent.return_headers = ["이름"];
+      }
     }
   }
 
