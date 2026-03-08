@@ -341,6 +341,45 @@ function buildLocalIntentFromText(text = "") {
     }
   }
 
+  // ✅ 텍스트 조건 + 목록/개수 문장 보강
+  // 예: "이름이 "호"로 끝나는 직원 목록을 보여줘", "직원 ID가 "EMP0"로 시작하는 직원 수"
+  const quotedToken = original.match(/["“”']([^"“”']+)["“”']/);
+  const textToken = quotedToken ? quotedToken[1] : null;
+  const wantsList = /(목록|리스트|보여줘|나열)/.test(s);
+  const wantsCount =
+    /(count|개수|갯수|건수|직원 수|수를 구해줘|몇\s*명|몇\s*개)/.test(s);
+  const textTarget = /직원\s*id|employee\s*id|id/i.test(original)
+    ? "직원 ID"
+    : /이름|성명|name/i.test(original)
+      ? "이름"
+      : null;
+  let textOp = null;
+  if (/(포함|contains?)/.test(s)) textOp = "contains";
+  else if (/(시작|starts?_?with)/.test(s)) textOp = "startswith";
+  else if (/(끝|ends?_?with)/.test(s)) textOp = "endswith";
+
+  if (textTarget && textOp && textToken) {
+    intent.conditions = [
+      {
+        target: textTarget,
+        operator: textOp,
+        value: textToken,
+      },
+    ];
+
+    if (wantsCount) {
+      intent.operation = "countifs";
+      intent.header_hint = textTarget;
+      return intent;
+    }
+
+    if (wantsList || /목록|리스트|보여줘/.test(s)) {
+      intent.operation = "filter";
+      intent.return_hint = "이름";
+      return intent;
+    }
+  }
+
   // ✅ 1. Lookup / 조회 패턴 감지
   // 예: "홍길동의 매출", "이름으로 점수 찾기"
   const lookupMatch = s.match(
@@ -656,18 +695,9 @@ const formulaBuilder = {
             return `${range}, "${op}${rawVal}"`;
           return `${range}, "${op}"&${val}`;
         }
-        if (/^contains$/i.test(op)) {
-          const s = String(rawVal ?? "").replace(/^"(.*)"$/, "$1");
-          return `${range}, "${s.includes("*") ? s : `*${s}*`}"`;
-        }
-        if (/^(startswith|starts?_with)$/i.test(op)) {
-          const s = String(rawVal ?? "").replace(/^"(.*)"$/, "$1");
-          return `${range}, "${s.endsWith("*") ? s : `${s}*`}"`;
-        }
-        if (/^(endswith|ends?_with)$/i.test(op)) {
-          const s = String(rawVal ?? "").replace(/^"(.*)"$/, "$1");
-          return `${range}, "${s.startsWith("*") ? s : `*${s}`}"`;
-        }
+        if (/^contains$/i.test(op)) return `${range}, "*"&${val}&"*"`;
+        if (/^starts?_with$/i.test(op)) return `${range}, ${val}&"*"`;
+        if (/^ends?_with$/i.test(op)) return `${range}, "*"&${val}`;
 
         // 기본(=)
         return `${range}, ${val}`;

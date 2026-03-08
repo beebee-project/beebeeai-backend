@@ -361,13 +361,9 @@ const arrayFunctionBuilder = {
         const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
         if (["contains", "포함"].includes(rawOp))
           return _containsExpr(colA1, rawVal, cs);
-        if (
-          ["startswith", "startsWith", "starts_with", "start_with"].includes(
-            rawOp,
-          )
-        )
+        if (["startswith", "startsWith"].includes(rawOp))
           return _startsWithExpr(colA1, rawVal, cs);
-        if (["endswith", "endsWith", "ends_with", "end_with"].includes(rawOp))
+        if (["endswith", "endsWith"].includes(rawOp))
           return _endsWithExpr(colA1, rawVal, cs);
         if (
           ["in", "any_of"].includes(rawOp) &&
@@ -462,15 +458,25 @@ const arrayFunctionBuilder = {
             const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
             if (["contains", "포함"].includes(rawOp))
               return _containsExpr(colA1, rawVal, cs);
-            if (["startswith", "startsWith"].includes(rawOp))
+            if (
+              [
+                "startswith",
+                "startsWith",
+                "starts_with",
+                "start_with",
+              ].includes(rawOp)
+            )
               return _startsWithExpr(colA1, rawVal, cs);
-            if (["endswith", "endsWith"].includes(rawOp))
+            if (
+              ["endswith", "endsWith", "ends_with", "end_with"].includes(rawOp)
+            )
               return _endsWithExpr(colA1, rawVal, cs);
             return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
           })
           .filter(Boolean);
         if (!masksInGroup.length) return null;
-        return `(${masksInGroup.join(isOr ? " + " : " * ")})`;
+        const safeGroupMasks = masksInGroup.map((m) => `(${m})`);
+        return `(${safeGroupMasks.join(isOr ? " + " : " * ")})`;
       })
       .filter(Boolean);
 
@@ -479,8 +485,9 @@ const arrayFunctionBuilder = {
       String(
         intent.logical || intent.conditions_logical || "AND",
       ).toUpperCase() === "OR";
-    const baseMask = masks.length
-      ? `(${masks.join(isOR ? " + " : " * ")})`
+    const safeMasks = masks.map((m) => `(${m})`);
+    const baseMask = safeMasks.length
+      ? `(${safeMasks.join(isOR ? " + " : " * ")})`
       : "";
     const groupsLogicalOR =
       String(intent.groups_logical || "AND").toUpperCase() === "OR";
