@@ -451,6 +451,23 @@ const arrayFunctionBuilder = {
             const rawOp = String(cond.operator || "=").toLowerCase();
             const op = _normalizeOp(rawOp);
             const rawVal = cond.value;
+
+            // ✅ 그룹 조건에서도 like 복구
+            if (rawOp === "like") {
+              const v = String(rawVal ?? "");
+              const cs =
+                (cond.case_sensitive ?? intent.case_sensitive) === true;
+              if (v.startsWith("*") && v.endsWith("*") && v.length >= 3) {
+                return _containsExpr(colA1, v.slice(1, -1), cs);
+              }
+              if (v.endsWith("*") && !v.startsWith("*")) {
+                return _startsWithExpr(colA1, v.slice(0, -1), cs);
+              }
+              if (v.startsWith("*") && !v.endsWith("*")) {
+                return _endsWithExpr(colA1, v.slice(1), cs);
+              }
+            }
+
             if (_isISODate(rawVal))
               return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
             if (_isNumericLiteral(rawVal))
@@ -458,15 +475,16 @@ const arrayFunctionBuilder = {
             const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
             if (["contains", "포함"].includes(rawOp))
               return _containsExpr(colA1, rawVal, cs);
-            if (["startswith", "startsWith"].includes(rawOp))
+            if (["startswith", "starts_with", "start_with"].includes(rawOp))
               return _startsWithExpr(colA1, rawVal, cs);
-            if (["endswith", "endsWith"].includes(rawOp))
+            if (["endswith", "ends_with", "end_with"].includes(rawOp))
               return _endsWithExpr(colA1, rawVal, cs);
             return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
           })
           .filter(Boolean);
         if (!masksInGroup.length) return null;
-        return `(${masksInGroup.join(isOr ? " + " : " * ")})`;
+        const safeGroupMasks = masksInGroup.map((m) => `(${m})`);
+        return `(${safeGroupMasks.join(isOr ? " + " : " * ")})`;
       })
       .filter(Boolean);
 
@@ -475,8 +493,9 @@ const arrayFunctionBuilder = {
       String(
         intent.logical || intent.conditions_logical || "AND",
       ).toUpperCase() === "OR";
-    const baseMask = masks.length
-      ? `(${masks.join(isOR ? " + " : " * ")})`
+    const safeMasks = masks.map((m) => `(${m})`);
+    const baseMask = safeMasks.length
+      ? `(${safeMasks.join(isOR ? " + " : " * ")})`
       : "";
     const groupsLogicalOR =
       String(intent.groups_logical || "AND").toUpperCase() === "OR";
