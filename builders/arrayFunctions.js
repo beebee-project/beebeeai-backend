@@ -917,72 +917,10 @@ const arrayFunctionBuilder = {
 
 function _extremeRow(ctx, which) {
   const it = ctx.intent || {};
-  const allSheets = ctx.allSheetsData || {};
-
-  const normalizeHeader = (v) =>
-    String(v || "")
-      .trim()
-      .replace(/\s+/g, "")
-      .toLowerCase();
-
-  const includesHeader = (a, b) => {
-    const na = normalizeHeader(a);
-    const nb = normalizeHeader(b);
-    return !!na && !!nb && (na.includes(nb) || nb.includes(na));
-  };
-
-  const findMetaByHintInSheet = (metaEntries, hint) => {
-    const raw = String(hint || "").trim();
-    if (!raw) return null;
-
-    for (const [h, m] of metaEntries) {
-      if (normalizeHeader(h) === normalizeHeader(raw)) return m;
-    }
-    for (const [h, m] of metaEntries) {
-      if (includesHeader(h, raw)) return m;
-    }
-    return null;
-  };
-
-  // 1) 기준열(header_hint)이 들어있는 시트부터 찾는다.
-  let targetSheetName = null;
-  let sortMeta = null;
-
-  for (const [sheetName, sheetInfo] of Object.entries(allSheets)) {
-    const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
-      (a, b) =>
-        formulaUtils.columnLetterToIndex(a[1].columnLetter) -
-        formulaUtils.columnLetterToIndex(b[1].columnLetter),
-    );
-    const found = findMetaByHintInSheet(metaEntries, it.header_hint);
-    if (found) {
-      targetSheetName = sheetName;
-      sortMeta = found;
-      break;
-    }
-  }
-
-  // 2) header_hint로 못 찾았으면 기존 bestReturn의 시트에서 한 번 더 시도
-  if (!targetSheetName && ctx.bestReturn?.sheetName) {
-    const fallbackSheet = ctx.bestReturn.sheetName;
-    const sheetInfo = allSheets[fallbackSheet];
-    const metaEntries = Object.entries(sheetInfo?.metaData || {}).sort(
-      (a, b) =>
-        formulaUtils.columnLetterToIndex(a[1].columnLetter) -
-        formulaUtils.columnLetterToIndex(b[1].columnLetter),
-    );
-    const found = findMetaByHintInSheet(metaEntries, it.header_hint);
-    if (found) {
-      targetSheetName = fallbackSheet;
-      sortMeta = found;
-    }
-  }
-
-  if (!targetSheetName || !sortMeta?.columnLetter) {
-    return `=ERROR("정렬 기준 열을 찾을 수 없습니다.")`;
-  }
-
-  const sheetInfo = allSheets[targetSheetName];
+  const best = ctx.bestReturn;
+  if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
+  const sheetName = best.sheetName;
+  const sheetInfo = ctx.allSheetsData?.[sheetName];
   if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
 
   const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
@@ -990,65 +928,61 @@ function _extremeRow(ctx, which) {
       formulaUtils.columnLetterToIndex(a[1].columnLetter) -
       formulaUtils.columnLetterToIndex(b[1].columnLetter),
   );
-  if (!metaEntries.length) {
+  if (!metaEntries.length)
     return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
-  }
 
   const firstCol = metaEntries[0][1].columnLetter;
   const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
-  const fullA1 = `'${targetSheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+  const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
-  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
+  // ✅ columnLetter 기반 "상대 인덱스" 계산 (CHOOSECOLS는 1-based)
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol); // 0-based
   const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
-
-  const findMeta = (hint) => {
-    const raw = String(hint || "").trim();
-    if (!raw) return null;
-    return byName.get(raw) || findMetaByHintInSheet(metaEntries, raw) || null;
+  const findMetaByContains = (needle) => {
+    const n = String(needle || "").trim();
+    if (!n) return null;
+    for (const [h, m] of metaEntries) {
+      if (String(h).trim() === n) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      if (String(h).includes(n)) return m;
+    }
+    return null;
   };
 
-  // ✅ 정렬 기준열은 오직 header_hint 기준
-  const sortIdx =
-    formulaUtils.columnLetterToIndex(sortMeta.columnLetter) - firstColIdx0 + 1;
+  // 연봉 헤더는 실제 파일에서 "연봉(만원)" 처럼 올 수 있으니 contains 매칭
+  const salaryMeta =
+    byName.get("연봉") ||
+    findMetaByContains("연봉") ||
+    findMetaByContains(String(it.header_hint || "")) ||
+    null;
+  if (!salaryMeta?.columnLetter)
+    return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
+  const salaryIdx =
+    formulaUtils.columnLetterToIndex(salaryMeta.columnLetter) -
+    firstColIdx0 +
+    1;
 
-  // ✅ 반환열은 오직 return_headers / select_headers 기준
-  const want =
-    Array.isArray(it.return_headers) && it.return_headers.length
-      ? it.return_headers
-      : Array.isArray(it.select_headers) && it.select_headers.length
-        ? it.select_headers
-        : [];
-
-  if (!want.length) {
-    return `=ERROR("반환 열이 지정되지 않았습니다.")`;
-  }
-
+  const want = Array.isArray(it.return_headers)
+    ? it.return_headers
+    : ["이름", "부서", "직급", "연봉"];
   const retIdxs = want
     .map((h) => {
-      const key =
-        typeof h === "string"
-          ? h.trim()
-          : h && typeof h === "object" && h.header
-            ? String(h.header).trim()
-            : "";
-      if (!key) return null;
-
-      const m = findMeta(key);
+      const key = String(h).trim();
+      const m =
+        byName.get(key) ||
+        findMetaByContains(key) ||
+        (key === "연봉" ? findMetaByContains("연봉") : null);
       if (!m?.columnLetter) return null;
-
       return (
         formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
       );
     })
     .filter((v) => Number.isFinite(v));
-
-  if (!retIdxs.length) {
-    return `=ERROR("반환 열을 찾을 수 없습니다.")`;
-  }
+  if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
-
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${sortIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${salaryIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----
