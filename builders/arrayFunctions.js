@@ -929,14 +929,15 @@ function _extremeRow(ctx, which) {
       formulaUtils.columnLetterToIndex(a[1].columnLetter) -
       formulaUtils.columnLetterToIndex(b[1].columnLetter),
   );
-  if (!metaEntries.length)
+  if (!metaEntries.length) {
     return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
+  }
 
   const firstCol = metaEntries[0][1].columnLetter;
   const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
   const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
-  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol); // 0-based
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
   const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
 
   const findMetaByContains = (needle) => {
@@ -952,22 +953,22 @@ function _extremeRow(ctx, which) {
     return null;
   };
 
-  // ✅ 정렬 기준 열: 하드코딩 "연봉" 제거
-  const baseMeta =
-    best ||
+  // ✅ 정렬 기준열과 반환열 분리
+  const sortMeta =
     byName.get(String(it.header_hint || "").trim()) ||
     findMetaByContains(String(it.header_hint || "").trim()) ||
+    best ||
+    byName.get(String(it.return_hint || "").trim()) ||
     findMetaByContains(String(it.return_hint || "").trim()) ||
     null;
 
-  if (!baseMeta?.columnLetter) {
+  if (!sortMeta?.columnLetter) {
     return `=ERROR("정렬 기준 열의 위치를 찾을 수 없습니다.")`;
   }
 
-  const baseIdx =
-    formulaUtils.columnLetterToIndex(baseMeta.columnLetter) - firstColIdx0 + 1;
+  const sortIdx =
+    formulaUtils.columnLetterToIndex(sortMeta.columnLetter) - firstColIdx0 + 1;
 
-  // ✅ 요청 필드만 반환
   const want =
     Array.isArray(it.return_headers) && it.return_headers.length
       ? it.return_headers
@@ -999,11 +1000,13 @@ function _extremeRow(ctx, which) {
     })
     .filter((v) => Number.isFinite(v));
 
-  if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+  if (!retIdxs.length) {
+    return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+  }
 
   const order = which === "min" ? 1 : -1;
 
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${baseIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${sortIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----

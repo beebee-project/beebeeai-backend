@@ -463,10 +463,43 @@ function normalizeLookupIntent(intent) {
   const op = String(intent.operation).toLowerCase();
   if (op !== "xlookup" && op !== "lookup") return intent;
 
+  // ✅ 0. 복수 반환 힌트 정규화
+  const multiReturn =
+    Array.isArray(intent.return_headers) && intent.return_headers.length
+      ? intent.return_headers
+      : Array.isArray(intent.return_hints) && intent.return_hints.length
+        ? intent.return_hints
+        : Array.isArray(intent.select_headers) && intent.select_headers.length
+          ? intent.select_headers
+          : Array.isArray(intent.return_cols) && intent.return_cols.length
+            ? intent.return_cols
+            : null;
+
+  if (multiReturn && !intent.return_headers) {
+    intent.return_headers = multiReturn;
+  }
+
+  // "부서, 직급" / "부서 및 직급" 같은 문자열 보정
+  if (
+    !intent.return_headers &&
+    typeof intent.return_hint === "string" &&
+    /,|\/|\+|및|and/gi.test(intent.return_hint)
+  ) {
+    const arr = intent.return_hint
+      .split(/,|\/|\+|및|and/gi)
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
+
+    if (arr.length >= 2) {
+      intent.return_headers = arr;
+    }
+  }
+
   // ✅ 1. LLM 출력 보정: lookup_key → lookup_array 변환
   if (intent.lookup_key) {
-    if (intent.lookup_value == null)
+    if (intent.lookup_value == null) {
       intent.lookup_value = intent.lookup_key.value;
+    }
     if (!intent.lookup_array) {
       intent.lookup_array = {
         sheet: intent.lookup_key.sheet,
@@ -475,15 +508,15 @@ function normalizeLookupIntent(intent) {
     }
   }
 
-  // ✅ 2. return → return_array 변환
-  if (intent.return && !intent.return_array) {
+  // ✅ 2. return → return_array 변환 (단일 반환일 때만)
+  if (intent.return && !intent.return_array && !intent.return_headers?.length) {
     intent.return_array = {
       sheet: intent.return.sheet,
       header: intent.return.header,
     };
   }
 
-  // ✅ 3. 중첩 구조 통일 (referenceFunctions 호환용)
+  // ✅ 3. 중첩 구조 통일
   intent.lookup = intent.lookup || {};
   if (intent.lookup_value != null && intent.lookup.value == null) {
     intent.lookup.value = intent.lookup_value;
@@ -499,6 +532,15 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
+  }
+
+  // ✅ 4. 복수 반환이면 첫 번째를 대표 return_hint로만 세팅
+  if (
+    !intent.return_hint &&
+    Array.isArray(intent.return_headers) &&
+    intent.return_headers.length
+  ) {
+    intent.return_hint = intent.return_headers[0];
   }
 
   return intent;
@@ -740,16 +782,21 @@ function applyExtremeRowOverride(message, intent) {
   if (!intent || typeof intent !== "object") return intent;
 
   const isMax =
-    /(가장\s*높|최고|최대|top|highest|max)/i.test(msg) &&
-    !/(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
-  const isMin = /(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
+    /(가장\s*높|가장\s*많|최고|최대|top|highest|max|largest|most)/i.test(msg) &&
+    !/(가장\s*낮|가장\s*적|최저|최소|bottom|lowest|min|least|smallest)/i.test(
+      msg,
+    );
+
+  const isMin =
+    /(가장\s*낮|가장\s*적|최저|최소|bottom|lowest|min|least|smallest)/i.test(
+      msg,
+    );
 
   if (!isMax && !isMin) return intent;
 
-  // "행 반환" 계열인지 판단:
-  // 이름/부서/직급/ID/정보/출력/가져와줘 등 결과 행/필드를 요구하는 경우
+  // ✅ extreme-row로 볼만한 문장인지
   const wantsRowResult =
-    /(이름|성명|부서|직급|연봉|급여|직원\s*id|사번|id|정보|출력|보여|가져와)/i.test(
+    /(출력|보여|가져와|알려줘|리턴|반환|목록|정보|상세|이름|성명|부서|직급|연봉|급여|salary|id|사번|직원|제품코드|상품명|카테고리|현재재고|안전재고|매출|점수|수량|주문번호|채널|지역)/i.test(
       msg,
     );
 
@@ -757,12 +804,28 @@ function applyExtremeRowOverride(message, intent) {
 
   intent.operation = isMax ? "maxrow" : "minrow";
 
-  // 기준 열 기본값 보강: 사용자가 기준 열을 안 줬을 때만 연봉 fallback
-  if (!intent.header_hint && !intent.return_hint) {
-    if (/(연봉|급여|salary)/i.test(msg)) intent.header_hint = "연봉";
+  // ✅ 기준 열 추론
+  if (!intent.header_hint) {
+    const metricCandidates = [
+      "연봉",
+      "급여",
+      "매출액",
+      "매출",
+      "점수",
+      "수량",
+      "현재재고",
+      "안전재고",
+      "리드타임",
+      "발주단가",
+    ];
+
+    const foundMetric = metricCandidates.find((h) => msg.includes(h));
+    if (foundMetric) {
+      intent.header_hint = foundMetric;
+    }
   }
 
-  // ✅ 사용자가 실제 요청한 반환 컬럼만 추출
+  // ✅ 반환 열 추출
   const requested = [];
 
   if (/(직원\s*id|사번|\bid\b)/i.test(msg)) requested.push("직원 ID");
@@ -771,16 +834,29 @@ function applyExtremeRowOverride(message, intent) {
   if (/직급/.test(msg)) requested.push("직급");
   if (/(연봉|급여|salary)/i.test(msg)) requested.push("연봉");
 
-  // "정보"라고 했으면 상세 기본셋
-  const wantsFullInfo = /(정보|상세|전체)/i.test(msg);
+  if (/제품코드/.test(msg)) requested.push("제품코드");
+  if (/상품명|제품명/.test(msg)) requested.push("상품명");
+  if (/카테고리/.test(msg)) requested.push("카테고리");
+  if (/현재재고/.test(msg)) requested.push("현재재고");
+  if (/안전재고/.test(msg)) requested.push("안전재고");
+  if (/리드타임/.test(msg)) requested.push("리드타임(일)");
+  if (/발주단가/.test(msg)) requested.push("발주단가");
+  if (/공급업체코드/.test(msg)) requested.push("공급업체코드");
+
+  if (/주문번호/.test(msg)) requested.push("주문번호");
+  if (/날짜/.test(msg)) requested.push("날짜");
+  if (/지역/.test(msg)) requested.push("지역");
+  if (/채널/.test(msg)) requested.push("채널");
+  if (/(매출액|매출)/.test(msg)) requested.push("매출액");
+  if (/수량/.test(msg)) requested.push("수량");
+  if (/점수/.test(msg)) requested.push("점수");
+
+  const deduped = [...new Set(requested)];
 
   if (!intent.return_headers && !intent.select_headers) {
-    if (requested.length) {
-      intent.return_headers = requested;
-    } else if (wantsFullInfo) {
-      intent.return_headers = ["이름", "부서", "직급", "연봉"];
+    if (deduped.length) {
+      intent.return_headers = deduped;
     } else {
-      // 아무 필드도 명시 안 했으면 최소 1개라도 반환되게
       intent.return_headers = ["이름"];
     }
   }
@@ -1296,7 +1372,16 @@ exports.handleConversion = async (req, res, next) => {
         const bestReturn = joint.return;
         const bestLookup = joint.lookup;
 
-        if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+        const isMultiReturnLookup =
+          String(intent.operation || "").toLowerCase() === "xlookup" &&
+          Array.isArray(intent.return_headers) &&
+          intent.return_headers.length >= 2;
+
+        if (
+          !bestReturn &&
+          (intent.header_hint || intent.return_hint) &&
+          !isMultiReturnLookup
+        ) {
           return res.json({
             result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
           });
@@ -1593,7 +1678,16 @@ async function convert(nl, options = {}, meta = {}) {
 
       // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
       // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+      const isMultiReturnLookup =
+        String(intent.operation || "").toLowerCase() === "xlookup" &&
+        Array.isArray(intent.return_headers) &&
+        intent.return_headers.length >= 2;
+
+      if (
+        !bestReturn &&
+        (intent.header_hint || intent.return_hint) &&
+        !isMultiReturnLookup
+      ) {
         return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
       }
 
