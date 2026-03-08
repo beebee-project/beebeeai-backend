@@ -1515,86 +1515,86 @@ exports.handleFeedback = async (req, res, next) => {
 /* ---------------------------------------------
  * 테스트/내부용 convert (LLM 미사용 경량)
  * -------------------------------------------*/
-// async function convert(nl, options = {}, meta = {}) {
-//   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
-//   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-//   const intent = normalizeLookupIntent(baseIntent);
+async function convert(nl, options = {}, meta = {}) {
+  // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
+  const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
+  const intent = normalizeLookupIntent(baseIntent);
 
-//   // 2) 기본 컨텍스트 재료
-//   const engine = options.engine || DEFAULT_ENGINE;
-//   const policy = options.policy || DEFAULT_POLICY;
-//   const allSheetsData = meta.allSheetsData || null;
+  // 2) 기본 컨텍스트 재료
+  const engine = options.engine || DEFAULT_ENGINE;
+  const policy = options.policy || DEFAULT_POLICY;
+  const allSheetsData = meta.allSheetsData || null;
 
-//   /** @type {any} */
-//   let mergedMeta = {
-//     message: nl,
-//     engine,
-//     policy,
-//     intent,
-//     ...meta,
-//   };
+  /** @type {any} */
+  let mergedMeta = {
+    message: nl,
+    engine,
+    policy,
+    intent,
+    ...meta,
+  };
 
-//   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
-//   if (allSheetsData) {
-//     const hasHints = !!(
-//       intent.return_hint ||
-//       intent.header_hint ||
-//       intent.lookup_hint
-//     );
+  // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
+  if (allSheetsData) {
+    const hasHints = !!(
+      intent.return_hint ||
+      intent.header_hint ||
+      intent.lookup_hint
+    );
 
-//     if (
-//       hasHints &&
-//       typeof formulaUtils.findBestSheetAndColumns === "function"
-//     ) {
-//       const searchTerms = {
-//         return: intent.return_hint || intent.header_hint || "",
-//         lookup: intent.lookup_hint || "",
-//       };
+    if (
+      hasHints &&
+      typeof formulaUtils.findBestSheetAndColumns === "function"
+    ) {
+      const searchTerms = {
+        return: intent.return_hint || intent.header_hint || "",
+        lookup: intent.lookup_hint || "",
+      };
 
-//       const joint = formulaUtils.findBestSheetAndColumns(
-//         allSheetsData,
-//         searchTerms,
-//         {
-//           sameSheetBonus: 0.5,
-//         },
-//       );
+      const joint = formulaUtils.findBestSheetAndColumns(
+        allSheetsData,
+        searchTerms,
+        {
+          sameSheetBonus: 0.5,
+        },
+      );
 
-//       const bestReturn = joint?.return || null;
-//       const bestLookup = joint?.lookup || null;
+      const bestReturn = joint?.return || null;
+      const bestLookup = joint?.lookup || null;
 
-//       // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
-//       // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-//       if (!bestReturn && (intent.header_hint || intent.return_hint)) {
-//         return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
-//       }
+      // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
+      // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
+      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+        return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
+      }
 
-//       mergedMeta = {
-//         ...mergedMeta,
-//         allSheetsData,
-//         bestReturn,
-//         bestLookup,
-//       };
-//     } else {
-//       mergedMeta = { ...mergedMeta, allSheetsData };
-//     }
-//   }
+      mergedMeta = {
+        ...mergedMeta,
+        allSheetsData,
+        bestReturn,
+        bestLookup,
+      };
+    } else {
+      mergedMeta = { ...mergedMeta, allSheetsData };
+    }
+  }
 
-//   // 4) 정책/포맷 옵션 정규화
-//   const ctx = buildCtx(mergedMeta);
+  // 4) 정책/포맷 옵션 정규화
+  const ctx = buildCtx(mergedMeta);
 
-//   // 5) 실제 빌더 호출
-//   const op = resolveOp(ctx.intent?.operation);
-//   if (!op) return '=ERROR("알 수 없는 operation 입니다.")';
+  // 5) 실제 빌더 호출
+  const op = resolveOp(ctx.intent?.operation);
+  if (!op) return '=ERROR("알 수 없는 operation 입니다.")';
 
-//   const built = formulaBuilder[op](
-//     ctx,
-//     (v, o) =>
-//       formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
-//     formulaBuilder._buildConditionPairs,
-//   );
-//   // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
-//   if (ctx.__errorFormula) return ctx.__errorFormula;
-//   return built;
-// }
+  const built = formulaBuilder[op](
+    ctx,
+    (v, o) =>
+      formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
+    formulaBuilder._buildConditionPairs,
+  );
+  // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
+  if (ctx.__errorFormula) return ctx.__errorFormula;
+  return built;
+}
 
 module.exports.convert = convert;
