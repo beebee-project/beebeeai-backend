@@ -304,6 +304,7 @@ function _deduceOp(text = "") {
   if (/(median|중앙값|중간값|가운데\s*값)/.test(s)) return "median";
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
+  if (/(상위\s*\d+|top\s*\d+)/.test(s)) return "topn";
   if (/(sortby|정렬)/.test(s)) return "sortby";
   return "formula";
 }
@@ -713,6 +714,7 @@ const OP_ALIASES = {
   argmin: "minrow",
   top1: "maxrow",
   bottom1: "minrow",
+  topn: "topn",
 
   sortby: "sortby",
   regexmatch: "regexmatch",
@@ -756,6 +758,85 @@ function applyExtremeRowOverride(message, intent) {
   if (!intent.return_headers && !intent.select_headers) {
     intent.return_headers = ["이름", "부서", "직급", "연봉"];
   }
+  return intent;
+}
+
+function extractRequestedReturnHeaders(message) {
+  const msg = String(message || "");
+  const candidates = [
+    ["직원id", "직원ID"],
+    ["id", "직원ID"],
+    ["이름", "이름"],
+    ["성명", "이름"],
+    ["부서", "부서"],
+    ["직급", "직급"],
+    ["연봉", "연봉"],
+    ["평가 등급", "평가 등급"],
+    ["평가등급", "평가 등급"],
+    ["입사일", "입사일"],
+  ];
+
+  const hits = candidates
+    .map(([needle, header]) => ({
+      idx: msg.toLowerCase().indexOf(String(needle).toLowerCase()),
+      header,
+    }))
+    .filter((x) => x.idx >= 0)
+    .sort((a, b) => a.idx - b.idx)
+    .map((x) => x.header);
+
+  const dedup = [];
+  const seen = new Set();
+  for (const h of hits) {
+    if (!seen.has(h)) {
+      seen.add(h);
+      dedup.push(h);
+    }
+  }
+
+  if (/이름만/.test(msg)) return ["이름"];
+  return dedup;
+}
+
+function applyTopNOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const topNumMatch =
+    msg.match(/(?:상위|top)\s*(\d+)/i) || msg.match(/(\d+)\s*명/);
+  const isTopN = /(상위\s*\d+|top\s*\d+)/i.test(msg);
+  if (!isTopN) return intent;
+
+  const n = Number(topNumMatch?.[1] || intent.top_n || 0);
+  if (!Number.isFinite(n) || n <= 0) return intent;
+
+  intent.operation = "topn";
+  intent.top_n = n;
+
+  if (
+    !intent.header_hint &&
+    !intent.return_hint &&
+    /(연봉|salary)/i.test(msg)
+  ) {
+    intent.header_hint = "연봉";
+  }
+
+  if (!intent.sort_by) {
+    intent.sort_by = intent.header_hint || intent.return_hint || "연봉";
+  }
+  if (!intent.sort_order) {
+    intent.sort_order = /(낮은|lowest|smallest|bottom)/i.test(msg)
+      ? "asc"
+      : "desc";
+  }
+
+  const requested = extractRequestedReturnHeaders(msg);
+  if (requested.length && !intent.return_headers && !intent.select_headers) {
+    intent.return_headers = requested;
+  } else if (!intent.return_headers && !intent.select_headers) {
+    intent.return_headers = ["이름", "부서", "직급", "연봉"];
+  }
+
   return intent;
 }
 
@@ -853,7 +934,7 @@ Core fields (always consider):
   - operation: string
       The main action. Examples:
         "sum", "sumifs", "average", "averageifs", "countifs",
-        "lookup", "xlookup", "filter", "if", "sortby",
+        "lookup", "xlookup", "filter", "if", "sortby", "topn",
         "textjoin", "textsplit", "regexmatch", "regexreplace".
       Choose the most appropriate single operation.
 
@@ -905,6 +986,11 @@ Row selection (select a specific row by key):
 Aggregation / grouping (sum by branch, average by category, etc.):
   - group_by (optional): string
       e.g. "지점명", "카테고리"
+  - top_n (optional): number
+      e.g. 3, 5 when the user asks for top 3 / top 5
+  - sort_order (optional): "asc" | "desc"
+  - return_headers / select_headers (optional): string[]
+      e.g. ["이름", "연봉"] for name+salary output
 
 Text operations:
   - delimiter (optional): string
@@ -1219,6 +1305,7 @@ exports.handleConversion = async (req, res, next) => {
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
+    intent = applyTopNOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;

@@ -282,6 +282,107 @@ function _resolveRangeOrError(it, ctx) {
   return r;
 }
 
+function _maskExprForTopN(ctx, sheetName, sheetInfo) {
+  const intent = ctx.intent || {};
+  const rawConds = Array.isArray(intent.conditions) ? intent.conditions : [];
+  if (!rawConds.length) return null;
+
+  const parts = [];
+  for (const cond of rawConds) {
+    if (!cond || typeof cond !== "object") continue;
+    if (cond.logical_operator && Array.isArray(cond.conditions)) {
+      // Phase 1: TopN은 AND 플랫 조건 중심으로 먼저 지원
+      if (String(cond.logical_operator).toUpperCase() !== "AND") continue;
+      for (const child of cond.conditions) rawConds.push(child);
+      continue;
+    }
+    const hint = _condHint(cond);
+    if (!hint) continue;
+    const termSet = formulaUtils.expandTermsFromText(hint);
+    const bestCol = formulaUtils.bestHeaderInSheet(
+      sheetInfo,
+      sheetName,
+      termSet,
+      "lookup",
+    );
+    if (!bestCol?.col || bestCol.isAmbiguous) continue;
+    const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+    const rawOp = String(cond.operator || "=").toLowerCase();
+    const op = _normalizeOp(rawOp);
+    const rawVal = cond.value;
+
+    if (_isISODate(rawVal)) {
+      parts.push(`${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`);
+      continue;
+    }
+    if (_isNumericLiteral(rawVal)) {
+      parts.push(
+        `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`,
+      );
+      continue;
+    }
+
+    const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+    if (["contains", "포함"].includes(rawOp)) {
+      parts.push(_containsExpr(colA1, rawVal, cs));
+      continue;
+    }
+    if (["startswith", "startsWith"].includes(rawOp)) {
+      parts.push(_startsWithExpr(colA1, rawVal, cs));
+      continue;
+    }
+    if (["endswith", "endsWith"].includes(rawOp)) {
+      parts.push(_endsWithExpr(colA1, rawVal, cs));
+      continue;
+    }
+
+    parts.push(`${_trimText(colA1)}${op}${_valExpr(rawVal)}`);
+  }
+
+  if (!parts.length) return null;
+  return parts.length === 1 ? parts[0] : parts.map((p) => `(${p})`).join("*");
+}
+
+function _resolveReturnIndexes(
+  metaEntries,
+  wantedHeaders,
+  fallbackHeaders = [],
+) {
+  const firstCol = metaEntries[0]?.[1]?.columnLetter;
+  if (!firstCol) return [];
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
+  const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
+  const findMetaByContains = (needle) => {
+    const n = String(needle || "").trim();
+    if (!n) return null;
+    for (const [h, m] of metaEntries) {
+      if (String(h).trim() === n) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      if (String(h).includes(n)) return m;
+    }
+    return null;
+  };
+
+  const source =
+    Array.isArray(wantedHeaders) && wantedHeaders.length
+      ? wantedHeaders
+      : fallbackHeaders;
+  return source
+    .map((h) => {
+      const key = String(h?.header || h || "").trim();
+      const m =
+        byName.get(key) ||
+        findMetaByContains(key) ||
+        (key === "연봉" ? findMetaByContains("연봉") : null);
+      if (!m?.columnLetter) return null;
+      return (
+        formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
+      );
+    })
+    .filter((v) => Number.isFinite(v));
+}
+
 const arrayFunctionBuilder = {
   // ---------------------- FILTER ----------------------
   filter: function (ctx) {
@@ -671,6 +772,48 @@ const arrayFunctionBuilder = {
   // ✅ 최고/최저 직원 정보(행 반환)
   maxrow: (ctx) => _extremeRow(ctx, "max"),
   minrow: (ctx) => _extremeRow(ctx, "min"),
+  topn: (ctx) => {
+    const it = ctx.intent || {};
+    const best = ctx.bestReturn;
+    if (!best) return `=ERROR("정렬 기준 열을 찾을 수 없습니다.")`;
+
+    const sheetName = best.sheetName;
+    const sheetInfo = ctx.allSheetsData?.[sheetName];
+    if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
+
+    const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
+      (a, b) =>
+        formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+        formulaUtils.columnLetterToIndex(b[1].columnLetter),
+    );
+    if (!metaEntries.length)
+      return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
+
+    const firstCol = metaEntries[0][1].columnLetter;
+    const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
+    const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+
+    const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
+    const criterionIdx =
+      formulaUtils.columnLetterToIndex(best.columnLetter) - firstColIdx0 + 1;
+    const n = Math.max(1, Number(it.top_n || it.limit || 1));
+    const order =
+      String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+    const retIdxs = _resolveReturnIndexes(
+      metaEntries,
+      it.return_headers || it.select_headers || it.return_cols,
+      ["이름", "부서", "직급", "연봉"],
+    );
+
+    const mask = _maskExprForTopN(ctx, sheetName, sheetInfo);
+    const src = mask ? `FILTER(${fullA1}, ${mask})` : fullA1;
+    const sorted = `SORTBY(${src}, CHOOSECOLS(${src}, ${criterionIdx}), ${order})`;
+    const picked = retIdxs.length
+      ? `CHOOSECOLS(${sorted}, ${retIdxs.join(", ")})`
+      : sorted;
+    return `=TAKE(${picked}, ${n})`;
+  },
 
   // ---------------------- SORT ----------------------
   sort: (ctx) => {
