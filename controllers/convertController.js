@@ -304,13 +304,7 @@ function _deduceOp(text = "") {
   if (/(median|중앙값|중간값|가운데\s*값)/.test(s)) return "median";
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
-  if (
-    /(sortby|정렬|순으로|내림차순|오름차순|높은 순|낮은 순|top|상위|하위)/.test(
-      s,
-    )
-  ) {
-    return "sortby";
-  }
+  if (/(sortby|정렬)/.test(s)) return "sortby";
   return "formula";
 }
 
@@ -345,19 +339,6 @@ function buildLocalIntentFromText(text = "") {
     if (!intent.header_hint && !intent.return_hint) {
       intent.header_hint = "연봉";
     }
-  }
-
-  if (
-    /목록|리스트|보여줘/.test(s) &&
-    /이름/.test(s) &&
-    /연봉/.test(s) &&
-    /(높은 순|낮은 순|정렬|순으로)/.test(s)
-  ) {
-    intent.operation = "sortby";
-    intent.return_hint = "이름";
-    intent.lookup_hint = "연봉";
-    intent.sort_order = /낮은 순|오름차순/.test(s) ? "asc" : "desc";
-    return intent;
   }
 
   // ✅ 1. Lookup / 조회 패턴 감지
@@ -675,22 +656,18 @@ const formulaBuilder = {
             return `${range}, "${op}${rawVal}"`;
           return `${range}, "${op}"&${val}`;
         }
-        const opNorm = String(c.operator || "=")
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, "_");
-
-        if (cmpOps.has(opNorm)) {
-          if (rawVal != null && !isNaN(rawVal))
-            return `${range}, "${opNorm}${rawVal}"`;
-          return `${range}, "${opNorm}"&${val}`;
+        if (/^contains$/i.test(op)) {
+          const s = String(rawVal ?? "").replace(/^"(.*)"$/, "$1");
+          return `${range}, "${s.includes("*") ? s : `*${s}*`}"`;
         }
-        if (["contains", "포함"].includes(opNorm))
-          return `${range}, "*"&${val}&"*"`;
-        if (["startswith", "starts_with", "시작"].includes(opNorm))
-          return `${range}, ${val}&"*"`;
-        if (["endswith", "ends_with", "끝", "종료"].includes(opNorm))
-          return `${range}, "*"&${val}`;
+        if (/^(startswith|starts?_with)$/i.test(op)) {
+          const s = String(rawVal ?? "").replace(/^"(.*)"$/, "$1");
+          return `${range}, "${s.endsWith("*") ? s : `${s}*`}"`;
+        }
+        if (/^(endswith|ends?_with)$/i.test(op)) {
+          const s = String(rawVal ?? "").replace(/^"(.*)"$/, "$1");
+          return `${range}, "${s.startsWith("*") ? s : `*${s}`}"`;
+        }
 
         // 기본(=)
         return `${range}, ${val}`;
