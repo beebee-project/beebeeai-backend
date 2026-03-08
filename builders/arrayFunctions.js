@@ -774,10 +774,10 @@ const arrayFunctionBuilder = {
   minrow: (ctx) => _extremeRow(ctx, "min"),
   topn: (ctx) => {
     const it = ctx.intent || {};
-    const best = ctx.bestReturn;
-    if (!best) return `=ERROR("정렬 기준 열을 찾을 수 없습니다.")`;
+    const anchor = ctx.bestLookup || ctx.bestReturn;
+    if (!anchor) return `=ERROR("정렬 기준 열을 찾을 수 없습니다.")`;
 
-    const sheetName = best.sheetName;
+    const sheetName = anchor.sheetName;
     const sheetInfo = ctx.allSheetsData?.[sheetName];
     if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
 
@@ -794,17 +794,60 @@ const arrayFunctionBuilder = {
     const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
     const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
-    const criterionIdx =
-      formulaUtils.columnLetterToIndex(best.columnLetter) - firstColIdx0 + 1;
+    const resolveSortIdx = () => {
+      const wanted = Array.isArray(it.sort_by) ? it.sort_by[0] : it.sort_by;
+      const wantedKey = String(
+        wanted?.header || wanted || it.header_hint || it.return_hint || "",
+      ).trim();
+      if (wantedKey) {
+        const bestCol = formulaUtils.bestHeaderInSheet(
+          sheetInfo,
+          sheetName,
+          formulaUtils.expandTermsFromText(wantedKey),
+          "lookup",
+        );
+        if (bestCol?.col?.columnLetter) {
+          return (
+            formulaUtils.columnLetterToIndex(bestCol.col.columnLetter) -
+            firstColIdx0 +
+            1
+          );
+        }
+      }
+      if (ctx.bestLookup?.columnLetter) {
+        return (
+          formulaUtils.columnLetterToIndex(ctx.bestLookup.columnLetter) -
+          firstColIdx0 +
+          1
+        );
+      }
+      if (ctx.bestReturn?.columnLetter) {
+        return (
+          formulaUtils.columnLetterToIndex(ctx.bestReturn.columnLetter) -
+          firstColIdx0 +
+          1
+        );
+      }
+      return null;
+    };
+
+    const criterionIdx = resolveSortIdx();
+    if (!Number.isFinite(criterionIdx) || criterionIdx <= 0) {
+      return `=ERROR("정렬 기준 열의 위치를 찾을 수 없습니다.")`;
+    }
+
     const n = Math.max(1, Number(it.top_n || it.limit || 1));
     const order =
       String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
-    const retIdxs = _resolveReturnIndexes(
-      metaEntries,
-      it.return_headers || it.select_headers || it.return_cols,
-      ["이름", "부서", "직급", "연봉"],
-    );
+    const requestedHeaders =
+      it.return_headers || it.select_headers || it.return_cols;
+    const retIdxs = _resolveReturnIndexes(metaEntries, requestedHeaders, [
+      "이름",
+      "부서",
+      "직급",
+      "연봉",
+    ]);
 
     const mask = _maskExprForTopN(ctx, sheetName, sheetInfo);
     const src = mask ? `FILTER(${fullA1}, ${mask})` : fullA1;

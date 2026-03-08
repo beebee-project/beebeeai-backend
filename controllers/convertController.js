@@ -745,6 +745,15 @@ function applyExtremeRowOverride(message, intent) {
     /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
   if (!wantsRowFields) return intent;
 
+  const requestedCount = Number(
+    msg.match(/(?:상위|top)\s*(\d+)/i)?.[1] ||
+      msg.match(/(\d+)\s*명/)?.[1] ||
+      0,
+  );
+  if (Number.isFinite(requestedCount) && requestedCount > 1) {
+    return intent;
+  }
+
   const isMax =
     /(가장\s*높|최고|최대|top|highest|max)/i.test(msg) &&
     !/(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
