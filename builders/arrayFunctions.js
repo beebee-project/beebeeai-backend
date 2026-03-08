@@ -919,6 +919,7 @@ function _extremeRow(ctx, which) {
   const it = ctx.intent || {};
   const best = ctx.bestReturn;
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
+
   const sheetName = best.sheetName;
   const sheetInfo = ctx.allSheetsData?.[sheetName];
   if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
@@ -935,12 +936,13 @@ function _extremeRow(ctx, which) {
   const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
   const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
-  // ✅ columnLetter 기반 "상대 인덱스" 계산 (CHOOSECOLS는 1-based)
   const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol); // 0-based
   const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
+
   const findMetaByContains = (needle) => {
     const n = String(needle || "").trim();
     if (!n) return null;
+
     for (const [h, m] of metaEntries) {
       if (String(h).trim() === n) return m;
     }
@@ -950,39 +952,58 @@ function _extremeRow(ctx, which) {
     return null;
   };
 
-  // 연봉 헤더는 실제 파일에서 "연봉(만원)" 처럼 올 수 있으니 contains 매칭
-  const salaryMeta =
-    byName.get("연봉") ||
-    findMetaByContains("연봉") ||
-    findMetaByContains(String(it.header_hint || "")) ||
+  // ✅ 정렬 기준 열: 하드코딩 "연봉" 제거
+  const baseMeta =
+    best ||
+    byName.get(String(it.header_hint || "").trim()) ||
+    findMetaByContains(String(it.header_hint || "").trim()) ||
+    findMetaByContains(String(it.return_hint || "").trim()) ||
     null;
-  if (!salaryMeta?.columnLetter)
-    return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
-  const salaryIdx =
-    formulaUtils.columnLetterToIndex(salaryMeta.columnLetter) -
-    firstColIdx0 +
-    1;
 
-  const want = Array.isArray(it.return_headers)
-    ? it.return_headers
-    : ["이름", "부서", "직급", "연봉"];
+  if (!baseMeta?.columnLetter) {
+    return `=ERROR("정렬 기준 열의 위치를 찾을 수 없습니다.")`;
+  }
+
+  const baseIdx =
+    formulaUtils.columnLetterToIndex(baseMeta.columnLetter) - firstColIdx0 + 1;
+
+  // ✅ 요청 필드만 반환
+  const want =
+    Array.isArray(it.return_headers) && it.return_headers.length
+      ? it.return_headers
+      : Array.isArray(it.select_headers) && it.select_headers.length
+        ? it.select_headers
+        : ["이름"];
+
   const retIdxs = want
     .map((h) => {
-      const key = String(h).trim();
+      const key =
+        typeof h === "string"
+          ? h.trim()
+          : h && typeof h === "object" && h.header
+            ? String(h.header).trim()
+            : "";
+
+      if (!key) return null;
+
       const m =
         byName.get(key) ||
         findMetaByContains(key) ||
         (key === "연봉" ? findMetaByContains("연봉") : null);
+
       if (!m?.columnLetter) return null;
+
       return (
         formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
       );
     })
     .filter((v) => Number.isFinite(v));
+
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${salaryIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${baseIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----

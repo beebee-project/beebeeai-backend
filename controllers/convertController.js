@@ -739,23 +739,52 @@ function applyExtremeRowOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
-  const wantsRowFields =
-    /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
-  if (!wantsRowFields) return intent;
-
   const isMax =
     /(가장\s*높|최고|최대|top|highest|max)/i.test(msg) &&
     !/(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
   const isMin = /(가장\s*낮|최저|최소|bottom|lowest|min)/i.test(msg);
 
-  if (isMax) intent.operation = "maxrow";
-  else if (isMin) intent.operation = "minrow";
-  else return intent;
+  if (!isMax && !isMin) return intent;
 
-  if (!intent.header_hint && !intent.return_hint) intent.header_hint = "연봉";
-  if (!intent.return_headers && !intent.select_headers) {
-    intent.return_headers = ["이름", "부서", "직급", "연봉"];
+  // "행 반환" 계열인지 판단:
+  // 이름/부서/직급/ID/정보/출력/가져와줘 등 결과 행/필드를 요구하는 경우
+  const wantsRowResult =
+    /(이름|성명|부서|직급|연봉|급여|직원\s*id|사번|id|정보|출력|보여|가져와)/i.test(
+      msg,
+    );
+
+  if (!wantsRowResult) return intent;
+
+  intent.operation = isMax ? "maxrow" : "minrow";
+
+  // 기준 열 기본값 보강: 사용자가 기준 열을 안 줬을 때만 연봉 fallback
+  if (!intent.header_hint && !intent.return_hint) {
+    if (/(연봉|급여|salary)/i.test(msg)) intent.header_hint = "연봉";
   }
+
+  // ✅ 사용자가 실제 요청한 반환 컬럼만 추출
+  const requested = [];
+
+  if (/(직원\s*id|사번|\bid\b)/i.test(msg)) requested.push("직원 ID");
+  if (/(이름|성명)/i.test(msg)) requested.push("이름");
+  if (/부서/.test(msg)) requested.push("부서");
+  if (/직급/.test(msg)) requested.push("직급");
+  if (/(연봉|급여|salary)/i.test(msg)) requested.push("연봉");
+
+  // "정보"라고 했으면 상세 기본셋
+  const wantsFullInfo = /(정보|상세|전체)/i.test(msg);
+
+  if (!intent.return_headers && !intent.select_headers) {
+    if (requested.length) {
+      intent.return_headers = requested;
+    } else if (wantsFullInfo) {
+      intent.return_headers = ["이름", "부서", "직급", "연봉"];
+    } else {
+      // 아무 필드도 명시 안 했으면 최소 1개라도 반환되게
+      intent.return_headers = ["이름"];
+    }
+  }
+
   return intent;
 }
 
