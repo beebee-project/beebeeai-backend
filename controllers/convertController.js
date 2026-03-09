@@ -730,13 +730,10 @@ const OP_ALIASES = {
   argmin: "minrow",
   top1: "maxrow",
   bottom1: "minrow",
+  topnrows: "topnrows",
+  rankcolumn: "rankcolumn",
 
   sortby: "sortby",
-  rank: "rankcolumn",
-  ranking: "rankcolumn",
-  rankeq: "rankcolumn",
-  rank_column: "rankcolumn",
-  rankcolumn: "rankcolumn",
   regexmatch: "regexmatch",
   textsplit: "textsplit",
 };
@@ -926,14 +923,17 @@ function applyRecentTopNOverride(message, intent) {
   const wantsId = /직원\s*id|사번|id/i.test(msg);
   const wantsName =
     /(이름|성명)/.test(msg) || /직원\s*\d+\s*명|직원|사람/.test(msg);
-  const wantsSalaryField =
-    /연봉/.test(msg) &&
-    (/(이름|성명|직원\s*id|사번|id)\s*[,와과및]\s*(이름|성명|연봉)/i.test(
+  const explicitNameOnly =
+    /(이름만|성명만|이름\s*만\s*보여|이름만\s*보여)/.test(msg);
+  const explicitSalaryPair =
+    /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름\s*와\s*연봉|연봉\s*와\s*이름|이름\s*및\s*연봉|연봉\s*및\s*이름)/.test(
       msg,
     ) ||
-      /(직원\s*id|사번|id).*(이름|성명).*(연봉)/i.test(msg) ||
-      /(연봉).*(직원\s*id|사번|id|이름|성명)/i.test(msg) ||
-      /(같이|함께|포함)/.test(msg));
+    /(직원\s*id|사번|id).*(이름|성명).*(연봉)/i.test(msg) ||
+    /(연봉).*(직원\s*id|사번|id|이름|성명)/i.test(msg) ||
+    /연봉\s*포함|연봉도|연봉까지|같이|함께/.test(msg);
+  const wantsSalaryField =
+    /연봉/.test(msg) && !explicitNameOnly && explicitSalaryPair;
   const wantsHireDateField =
     /(이름\s*과\s*입사일|입사일\s*과\s*이름|입사일\s*포함)/.test(msg);
   const wantsDeptField = /이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함/.test(
@@ -949,8 +949,11 @@ function applyRecentTopNOverride(message, intent) {
   if (wantsTitleField) headers.push("직급");
   if (wantsSalaryField) headers.push("연봉");
   if (wantsHireDateField) headers.push("입사일");
+  if (explicitNameOnly) intent.return_headers = ["이름"];
 
-  intent.return_headers = [...new Set(headers.length ? headers : ["이름"])];
+  if (!Array.isArray(intent.return_headers) || !intent.return_headers.length) {
+    intent.return_headers = [...new Set(headers.length ? headers : ["이름"])];
+  }
 
   delete intent.select_headers;
 
@@ -1017,20 +1020,62 @@ function applySortListOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
+  const currentOp = String(intent.operation || "").toLowerCase();
+  if (["topnrows", "maxrow", "minrow", "rankcolumn"].includes(currentOp)) {
+    return intent;
+  }
+
+  const explicitTopNSignal =
+    /top\s*\d+/i.test(msg) ||
+    /(상위|하위)\s*\d+\s*명?/.test(msg) ||
+    /\d+\s*명(?:의|을|만|씩|중)?/.test(msg);
+  if (explicitTopNSignal) return intent;
+
+  const wantsNameList = /(이름\s*목록|직원\s*이름|이름\s*리스트|이름)/i.test(
+    msg,
+  );
   const wantsSalaryOrder =
     /(연봉|salary)/i.test(msg) &&
     /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
-  const wantsRowList =
-    /(보여줘|목록|리스트|직원|사람|명|행)/.test(msg) ||
-    /부서/.test(msg) ||
-    /\d+\s*(이상|이하|초과|미만)/.test(msg);
-
-  if (!(wantsSalaryOrder && wantsRowList)) return intent;
+  if (!(wantsNameList && wantsSalaryOrder)) return intent;
 
   intent.operation = "sortby";
+  intent.return_hint = "이름";
   intent.lookup_hint = "연봉";
   intent.header_hint = "연봉";
-  intent.sort_by = "연봉";
+  intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
+    ? "asc"
+    : "desc";
+
+  const explicitSalaryPair =
+    /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름\s*와\s*연봉|연봉\s*와\s*이름|이름\s*및\s*연봉|연봉\s*및\s*이름)/.test(
+      msg,
+    );
+  intent.return_headers = explicitSalaryPair ? ["이름", "연봉"] : ["이름"];
+  return intent;
+}
+
+function applyFilteredSortOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const currentOp = String(intent.operation || "").toLowerCase();
+  if (["topnrows", "maxrow", "minrow", "rankcolumn"].includes(currentOp)) {
+    return intent;
+  }
+
+  const hasSortCue = /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/.test(
+    msg,
+  );
+  const sortHeader = _detectHeaderHintFromMessage(msg);
+  const hasEmployeeListCue = /(직원|사람|행|목록|리스트|보여줘)/.test(msg);
+  const hasFilterCue = /(부서|평가\s*등급|이상|이하|초과|미만)/.test(msg);
+  if (!(hasSortCue && sortHeader && hasEmployeeListCue && hasFilterCue))
+    return intent;
+
+  intent.operation = "sortby";
+  intent.lookup_hint = sortHeader;
+  intent.header_hint = sortHeader;
   intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
     ? "asc"
     : "desc";
@@ -1043,82 +1088,52 @@ function applySortListOverride(message, intent) {
       value: deptMatch[1],
     });
   }
-
-  const gteMatch = msg.match(/연봉\s*(\d+(?:\.\d+)?)\s*(이상|초과)/);
-  if (gteMatch) {
+  const gradeMatch = msg.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+  if (gradeMatch) {
+    _appendCondition(intent, {
+      target: "평가 등급",
+      operator: "=",
+      value: gradeMatch[1].toUpperCase(),
+    });
+  }
+  const salaryThreshold = msg.match(
+    /연봉\s*([0-9][0-9,]*)\s*(이상|이하|초과|미만)/,
+  );
+  if (salaryThreshold) {
+    const opMap = { 이상: ">=", 이하: "<=", 초과: ">", 미만: "<" };
     _appendCondition(intent, {
       target: "연봉",
-      operator: gteMatch[2] === "초과" ? ">" : ">=",
-      value: Number(gteMatch[1]),
+      operator: opMap[salaryThreshold[2]] || ">=",
+      value: String(salaryThreshold[1]).replace(/,/g, ""),
     });
   }
 
-  const lteMatch = msg.match(/연봉\s*(\d+(?:\.\d+)?)\s*(이하|미만)/);
-  if (lteMatch) {
-    _appendCondition(intent, {
-      target: "연봉",
-      operator: lteMatch[2] === "미만" ? "<" : "<=",
-      value: Number(lteMatch[1]),
-    });
-  }
+  const explicitNameOnly = /(이름만|성명만|이름\s*만\s*보여)/.test(msg);
+  const explicitNameSalary =
+    /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름\s*와\s*연봉|연봉\s*와\s*이름|연봉\s*포함)/.test(
+      msg,
+    );
+  if (explicitNameOnly) intent.return_headers = ["이름"];
+  else if (explicitNameSalary) intent.return_headers = ["이름", "연봉"];
+  else intent.return_headers = ["이름", "부서", "직급", sortHeader];
 
-  const headers = [];
-  const wantsId = /직원\s*id|사번|id/i.test(msg);
-  const wantsName = /(이름|성명)/.test(msg);
-  const wantsDept =
-    /부서/.test(msg) && /(이름|연봉|직급|id|정보|직원)/i.test(msg);
-  const wantsTitle = /직급/.test(msg);
-  const wantsSalary =
-    /연봉/.test(msg) &&
-    (/(이름|성명|직원\s*id|사번|id|직급|부서)\s*[,와과및]\s*연봉/i.test(msg) ||
-      /연봉\s*(도|까지|포함|함께|같이)/.test(msg) ||
-      /(이름|성명).*(연봉)|(연봉).*(이름|성명)/i.test(msg));
-  const wantsHireDate = /입사일/.test(msg);
-
-  if (wantsId) headers.push("직원ID");
-  if (wantsName) headers.push("이름");
-  if (wantsDept) headers.push("부서");
-  if (wantsTitle) headers.push("직급");
-  if (wantsSalary) headers.push("연봉");
-  if (wantsHireDate) headers.push("입사일");
-
-  if (!headers.length) {
-    if (/(직원|사람)/.test(msg)) {
-      headers.push("이름", "부서", "직급", "연봉");
-    } else {
-      headers.push("이름", "연봉");
-    }
-  }
-
-  intent.return_headers = [...new Set(headers)];
-  if (intent.return_headers.length === 1) {
-    intent.return_hint = intent.return_headers[0];
-  } else {
-    delete intent.return_hint;
-  }
-  delete intent.select_headers;
   return intent;
 }
 
-function applyRankOverride(message, intent) {
+function applyRankColumnOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
+  if (!/(순위\s*열|순위열|등수\s*열|랭크\s*열|순위\s*만들)/.test(msg))
+    return intent;
 
-  const wantsRankColumn =
-    /(순위|등수|랭크)/.test(msg) && /(열|컬럼|만들어|생성|추가|표시)/.test(msg);
-  if (!wantsRankColumn) return intent;
-
-  const headerHint = _detectHeaderHintFromMessage(msg) || "연봉";
+  const headerHint =
+    _detectHeaderHintFromMessage(msg) || intent.header_hint || "연봉";
   intent.operation = "rankcolumn";
   intent.header_hint = headerHint;
-  intent.lookup_hint = headerHint;
-  intent.sort_by = headerHint;
-  intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
+  intent.return_hint = headerHint;
+  intent.sort_order = /(낮은\s*순|오름차순|작은\s*값)/i.test(msg)
     ? "asc"
     : "desc";
-  intent.return_headers = ["순위"];
-  delete intent.return_hint;
-  delete intent.select_headers;
   return intent;
 }
 
@@ -1161,14 +1176,33 @@ function _detectSortOrderFromMessage(msg = "") {
 
 function _appendCondition(intent, cond) {
   if (!intent.conditions) intent.conditions = [];
+  const normTarget = (v) => {
+    if (v && typeof v === "object") {
+      return String(v.header || v.target || v.hint || "")
+        .trim()
+        .toLowerCase();
+    }
+    return String(v || "")
+      .trim()
+      .toLowerCase();
+  };
+  const normOp = (v) =>
+    String(v || "=")
+      .trim()
+      .toLowerCase();
+  const normVal = (v) =>
+    String(v ?? "")
+      .trim()
+      .toLowerCase();
   const exists = intent.conditions.some(
     (c) =>
       c &&
       typeof c === "object" &&
       !c.logical_operator &&
-      String(c.target || "") === String(cond.target || "") &&
-      String(c.operator || "=") === String(cond.operator || "=") &&
-      String(c.value ?? "") === String(cond.value ?? ""),
+      normTarget(c.target || c.header) ===
+        normTarget(cond.target || cond.header) &&
+      normOp(c.operator) === normOp(cond.operator) &&
+      normVal(c.value) === normVal(cond.value),
   );
   if (!exists) intent.conditions.push(cond);
 }
@@ -1696,7 +1730,8 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyYearCountOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
     intent = applySortListOverride(message, intent);
-    intent = applyRankOverride(message, intent);
+    intent = applyFilteredSortOverride(message, intent);
+    intent = applyRankColumnOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
@@ -2005,7 +2040,8 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyYearCountOverride(nl, intent);
   intent = applyUniqueSortOverride(nl, intent);
   intent = applySortListOverride(nl, intent);
-  intent = applyRankOverride(nl, intent);
+  intent = applyFilteredSortOverride(nl, intent);
+  intent = applyRankColumnOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
 
   // 2) 기본 컨텍스트 재료
