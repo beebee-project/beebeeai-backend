@@ -818,8 +818,17 @@ function applyExtremeRowOverride(message, intent) {
     }
   }
 
+  // ✅ "개발 부서 최고 연봉" 같은 숫자 집계 요청을 row-return으로 오인하지 않기
+  //    row-return은 사람/행 정보 요청이 명확할 때만 허용
+  const hasPersonCue =
+    /(이름|성명|정보|직원|사람)/.test(msg) && !/직원\s*수/.test(msg);
+  const hasExplicitRowField =
+    /(이름|성명|정보)/.test(msg) ||
+    /(직원).*(이름|성명|부서|직급|연봉)/.test(msg) ||
+    /(이름|성명).*(부서|직급|연봉)/.test(msg);
+
   const wantsRowFields =
-    /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
+    /(연봉|salary)/i.test(msg) && (hasPersonCue || hasExplicitRowField);
   if (!wantsRowFields) return intent;
 
   const isMax =
@@ -1012,20 +1021,94 @@ function applySortListOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
-  const wantsNameList = /(이름\s*목록|직원\s*이름|이름\s*리스트|이름)/i.test(
-    msg,
-  );
-  const wantsSalaryOrder =
+  const wantsSortedList =
     /(연봉|salary)/i.test(msg) &&
     /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
-  if (!(wantsNameList && wantsSalaryOrder)) return intent;
+  if (!wantsSortedList) return intent;
 
-  intent.operation = "sortby";
-  intent.return_hint = "이름";
-  intent.lookup_hint = "연봉";
+  // ✅ Top N은 recentTopNOverride가 이미 처리하므로 여기선 "리스트형 정렬"만 담당
+  if (
+    /\btop\s*\d+\b/i.test(msg) ||
+    /(상위|하위)\s*\d+\s*명?/.test(msg) ||
+    /\d+\s*명(?:의|을|만|씩|중)?/.test(msg)
+  ) {
+    return intent;
+  }
+
+  intent.operation = "filter";
+  intent.sorted = true;
+  intent.sort_by = "연봉";
   intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
     ? "asc"
     : "desc";
+
+  // --- 조건 보강 ---
+  const deptMatch = msg.match(/([가-힣A-Za-z0-9]+)\s*부서/);
+  if (deptMatch) {
+    _appendCondition(intent, {
+      target: "부서",
+      operator: "=",
+      value: deptMatch[1],
+    });
+  }
+
+  const gradeMatch = msg.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+  if (gradeMatch) {
+    _appendCondition(intent, {
+      target: "평가 등급",
+      operator: "=",
+      value: gradeMatch[1].toUpperCase(),
+    });
+  }
+
+  const salaryCondMatch = msg.match(
+    /연봉\s*([0-9][0-9,\.]*)\s*(이상|초과|이하|미만)/i,
+  );
+  if (salaryCondMatch) {
+    const rawNum = String(salaryCondMatch[1]).replace(/,/g, "");
+    const rawOp = salaryCondMatch[2];
+    let op = ">=";
+    if (/초과/.test(rawOp)) op = ">";
+    else if (/이하/.test(rawOp)) op = "<=";
+    else if (/미만/.test(rawOp)) op = "<";
+
+    _appendCondition(intent, {
+      target: "연봉",
+      operator: op,
+      value: rawNum,
+    });
+  }
+
+  // --- 반환 열 재정규화 ---
+  const headers = [];
+  const wantsId = /직원\s*id|사번|id/i.test(msg);
+  const wantsName = /(이름|성명)/.test(msg) || /직원|사람/.test(msg);
+  const wantsSalaryField =
+    /연봉/.test(msg) &&
+    (/(이름|성명|직원\s*id|사번|id).*(연봉)/i.test(msg) ||
+      /(연봉).*(이름|성명|직원\s*id|사번|id)/i.test(msg) ||
+      /(같이|함께|포함)/.test(msg));
+  const wantsDeptField = /부서\s*와\s*이름|이름\s*과\s*부서|부서\s*포함/.test(
+    msg,
+  );
+  const wantsTitleField = /직급\s*과\s*이름|이름\s*과\s*직급|직급\s*포함/.test(
+    msg,
+  );
+
+  if (wantsId) headers.push("직원ID");
+  if (wantsName || !wantsId) headers.push("이름");
+  if (wantsDeptField) headers.push("부서");
+  if (wantsTitleField) headers.push("직급");
+  if (wantsSalaryField || /연봉 높은 순|연봉 낮은 순|연봉 순으로/i.test(msg)) {
+    headers.push("연봉");
+  }
+
+  intent.return_headers = [
+    ...new Set(headers.length ? headers : ["이름", "연봉"]),
+  ];
+  intent.return_hint = intent.return_headers[0];
+  delete intent.select_headers;
+
   return intent;
 }
 
