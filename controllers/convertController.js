@@ -842,8 +842,7 @@ function applyRecentTopNOverride(message, intent) {
   const takeN = nMatch ? Number(nMatch[1]) : null;
   if (!Number.isFinite(takeN) || takeN <= 0) return intent;
 
-  const wantsList = /(보여줘|목록|리스트|명|행|직원)/.test(msg);
-
+  const wantsList = /(보여줘|목록|리스트|명|행|직원|사람)/.test(msg);
   const hasRankingCue =
     /(top|상위|하위|높은\s*순|낮은\s*순|가장\s*빠른|가장\s*늦은|가장\s*최근|최근\s*순|최신\s*순|오래된\s*순|오래\s*된\s*순|내림차순|오름차순)/i.test(
       msg,
@@ -851,7 +850,6 @@ function applyRecentTopNOverride(message, intent) {
 
   if (!(wantsList && hasRankingCue)) return intent;
 
-  // 이미 row 반환용 연산으로 충분히 명확하면 보수적으로 유지
   const currentOp = String(intent.operation || "").toLowerCase();
   if (["maxrow", "minrow", "monthcount", "yearcount"].includes(currentOp)) {
     return intent;
@@ -861,7 +859,6 @@ function applyRecentTopNOverride(message, intent) {
   const isHireDateTopN = /(입사|입사일|근무)/.test(msg);
   const isSalaryTopN = /(연봉|salary)/i.test(msg);
 
-  // 기준 열이 명확한 경우만 topnrows로 승격
   const resolvedHeader =
     (isSalaryTopN && "연봉") || (isHireDateTopN && "입사일") || headerHint;
 
@@ -881,7 +878,6 @@ function applyRecentTopNOverride(message, intent) {
   intent.sort_order = sortOrder;
   intent.take_n = takeN;
 
-  // --- 조건 보강: 명확한 패턴만 최소 반영 ---
   const deptMatch = msg.match(/([가-힣A-Za-z0-9]+)\s*부서/);
   if (deptMatch) {
     _appendCondition(intent, {
@@ -900,7 +896,6 @@ function applyRecentTopNOverride(message, intent) {
     });
   }
 
-  // --- 반환 열 보강: "정렬 기준 열"과 "반환 열"을 분리해서 보수적으로 추론 ---
   if (!intent.return_headers && !intent.select_headers) {
     const headers = [];
 
@@ -919,7 +914,6 @@ function applyRecentTopNOverride(message, intent) {
     const wantsTitleField =
       /이름\s*과\s*직급|직급\s*과\s*이름|직급\s*포함/.test(msg);
 
-    // 1) 명시된 반환 열 우선
     if (wantsOnlyId) headers.push("직원ID");
     if (wantsName || /직원\s*\d+\s*명|직원|사람/.test(msg))
       headers.push("이름");
@@ -928,8 +922,6 @@ function applyRecentTopNOverride(message, intent) {
     if (wantsSalaryField) headers.push("연봉");
     if (wantsHireDateField) headers.push("입사일");
 
-    // 2) "이름과 연봉"처럼 복수 필드가 명확하지 않으면 기본은 이름만
-    //    정렬 기준 열(연봉/입사일)을 자동으로 반환 열에 넣지 않는다.
     intent.return_headers = headers.length ? [...new Set(headers)] : ["이름"];
   }
 
