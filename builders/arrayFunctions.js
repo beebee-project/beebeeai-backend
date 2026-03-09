@@ -682,6 +682,8 @@ const arrayFunctionBuilder = {
   // ✅ 최고/최저 직원 정보(행 반환)
   maxrow: (ctx) => _extremeRow(ctx, "max"),
   minrow: (ctx) => _extremeRow(ctx, "min"),
+  topnrows: (ctx) => _topNRows(ctx),
+  monthcount: (ctx) => _monthCountTable(ctx),
 
   // ---------------------- SORT ----------------------
   sort: (ctx) => {
@@ -1009,6 +1011,97 @@ function _extremeRow(ctx, which) {
 
   const order = which === "min" ? 1 : -1;
   return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+}
+
+function _topNRows(ctx) {
+  const it = ctx.intent || {};
+  const best = ctx.bestReturn;
+  if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
+
+  const sheetName = best.sheetName;
+  const sheetInfo = ctx.allSheetsData?.[sheetName];
+  if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
+
+  const metaEntries = Object.entries(sheetInfo.metaData || {}).sort(
+    (a, b) =>
+      formulaUtils.columnLetterToIndex(a[1].columnLetter) -
+      formulaUtils.columnLetterToIndex(b[1].columnLetter),
+  );
+  if (!metaEntries.length)
+    return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
+
+  const firstCol = metaEntries[0][1].columnLetter;
+  const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
+  const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
+
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
+  const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
+  const findMetaByContains = (needle) => {
+    const n = String(needle || "").trim();
+    if (!n) return null;
+    for (const [h, m] of metaEntries) {
+      if (String(h).trim() === n) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      if (String(h).includes(n)) return m;
+    }
+    return null;
+  };
+
+  const sortHint =
+    (typeof it.sort_by === "string" && it.sort_by) ||
+    (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
+    it.lookup_hint ||
+    it.header_hint ||
+    best.header ||
+    "입사일";
+
+  const criterionMeta =
+    byName.get(String(sortHint).trim()) ||
+    findMetaByContains(String(sortHint).trim()) ||
+    null;
+  if (!criterionMeta?.columnLetter) {
+    return `=ERROR("정렬 기준 열의 위치를 찾을 수 없습니다.")`;
+  }
+
+  const criterionIdx =
+    formulaUtils.columnLetterToIndex(criterionMeta.columnLetter) -
+    firstColIdx0 +
+    1;
+
+  const want =
+    Array.isArray(it.return_headers) && it.return_headers.length
+      ? it.return_headers
+      : ["이름"];
+
+  const retIdxs = want
+    .map((h) => {
+      const key = String(h).trim();
+      const m = byName.get(key) || findMetaByContains(key);
+      if (!m?.columnLetter) return null;
+      return (
+        formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
+      );
+    })
+    .filter((v) => Number.isFinite(v));
+  if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+
+  const n = Math.max(1, Number(it.take_n || it.limit || 5));
+  const order =
+    String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
+}
+
+function _monthCountTable(ctx) {
+  const best = ctx.bestReturn;
+  if (!best) return `=ERROR("날짜 열을 찾을 수 없습니다.")`;
+
+  const dateRange = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
+  const normalized = `IFERROR(DATEVALUE(TRIM(${dateRange}&"")), ${dateRange})`;
+  const monthKey = `TEXT(${normalized}, "yyyy-mm")`;
+
+  return `=LET(m, ${monthKey}, keys, SORT(UNIQUE(FILTER(m, m<>""))), HSTACK(keys, MAP(keys, LAMBDA(k, COUNTIF(m, k)))))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----

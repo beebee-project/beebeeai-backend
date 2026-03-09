@@ -808,6 +808,48 @@ function applyExtremeRowOverride(message, intent) {
   return intent;
 }
 
+function applyRecentTopNOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const wantsTopNRows =
+    /(보여줘|목록|리스트|명)/.test(msg) &&
+    /(최근\s*순|최신\s*순|내림차순|가장\s*최근)/.test(msg) &&
+    /(입사|입사일)/.test(msg);
+
+  if (!wantsTopNRows) return intent;
+
+  const nMatch = msg.match(/(\d+)\s*명/);
+  const takeN = nMatch ? Number(nMatch[1]) : 5;
+
+  intent.operation = "topnrows";
+  intent.header_hint = "입사일";
+  intent.sort_order = "desc";
+  intent.take_n = takeN;
+
+  if (!intent.return_headers && !intent.select_headers) {
+    intent.return_headers = ["이름"];
+  }
+  return intent;
+}
+
+function applyMonthCountOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const wantsMonthCount =
+    /(월별|월\s*단위)/.test(msg) &&
+    /(입사|입사일)/.test(msg) &&
+    /(직원\s*수|입사자\s*수|개수|인원수|표)/.test(msg);
+
+  if (!wantsMonthCount) return intent;
+
+  intent.operation = "monthcount";
+  intent.header_hint = "입사일";
+  intent.return_hint = "입사일";
+  return intent;
+}
+
 function applyUniqueSortOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
@@ -1419,6 +1461,8 @@ exports.handleConversion = async (req, res, next) => {
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
+    intent = applyRecentTopNOverride(message, intent);
+    intent = applyMonthCountOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
     intent = applySortListOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
@@ -1723,6 +1767,8 @@ async function convert(nl, options = {}, meta = {}) {
   let intent = normalizeLookupIntent(baseIntent);
   intent = applyMedianOverride(nl, intent);
   intent = applyExtremeRowOverride(nl, intent);
+  intent = applyRecentTopNOverride(nl, intent);
+  intent = applyMonthCountOverride(nl, intent);
   intent = applyUniqueSortOverride(nl, intent);
   intent = applySortListOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
