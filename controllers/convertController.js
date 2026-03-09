@@ -889,7 +889,16 @@ function applyGroupedAggregateOverride(message, intent) {
 
   // 1) 핵심 집계 구조
   intent.operation = aggOp;
-  intent.group_by = intent.group_by || groupBy;
+  if (groupBy) {
+    intent.group_by = groupBy;
+    if (
+      intent.group_by &&
+      typeof intent.group_by === "object" &&
+      intent.group_by.header
+    ) {
+      intent.group_by = intent.group_by.header;
+    }
+  }
 
   // 2) 집계 대상 열 보정
   // count는 header_hint가 없어도 되지만,
