@@ -833,28 +833,86 @@ function applyRecentTopNOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
-  const wantsTopNRows =
-    /(보여줘|목록|리스트|명)/.test(msg) &&
-    /(최근\s*순|최신\s*순|내림차순|오래된\s*순|오래\s*된\s*순|오름차순)/.test(
+  const nMatch =
+    msg.match(/\btop\s*(\d+)\b/i) ||
+    msg.match(/상위\s*(\d+)\s*명?/) ||
+    msg.match(/하위\s*(\d+)\s*명?/) ||
+    msg.match(/(\d+)\s*명/);
+
+  const takeN = nMatch ? Number(nMatch[1]) : null;
+  if (!Number.isFinite(takeN) || takeN <= 0) return intent;
+
+  const wantsList = /(보여줘|목록|리스트|명|행|직원)/.test(msg);
+
+  const hasRankingCue =
+    /(top|상위|하위|높은\s*순|낮은\s*순|가장\s*빠른|가장\s*늦은|가장\s*최근|최근\s*순|최신\s*순|오래된\s*순|오래\s*된\s*순|내림차순|오름차순)/i.test(
       msg,
-    ) &&
-    /(입사|입사일)/.test(msg);
+    );
 
-  if (!wantsTopNRows) return intent;
+  if (!(wantsList && hasRankingCue)) return intent;
 
-  const nMatch = msg.match(/(\d+)\s*명/);
-  const takeN = nMatch ? Number(nMatch[1]) : 5;
+  // 이미 row 반환용 연산으로 충분히 명확하면 보수적으로 유지
+  const currentOp = String(intent.operation || "").toLowerCase();
+  if (["maxrow", "minrow", "monthcount", "yearcount"].includes(currentOp)) {
+    return intent;
+  }
+
+  const headerHint = _detectHeaderHintFromMessage(msg);
+  const isHireDateTopN = /(입사|입사일|근무)/.test(msg);
+  const isSalaryTopN = /(연봉|salary)/i.test(msg);
+
+  // 기준 열이 명확한 경우만 topnrows로 승격
+  const resolvedHeader =
+    (isSalaryTopN && "연봉") || (isHireDateTopN && "입사일") || headerHint;
+
+  if (!resolvedHeader) return intent;
+
+  let sortOrder = _detectSortOrderFromMessage(msg);
+  if (!sortOrder) {
+    if (/(하위|낮은\s*순|가장\s*빠른|오래된\s*순|오래\s*된\s*순)/i.test(msg)) {
+      sortOrder = "asc";
+    } else {
+      sortOrder = "desc";
+    }
+  }
 
   intent.operation = "topnrows";
-  intent.header_hint = "입사일";
-  intent.sort_order = /(오래된\s*순|오래\s*된\s*순|오름차순)/.test(msg)
-    ? "asc"
-    : "desc";
+  intent.header_hint = resolvedHeader;
+  intent.sort_order = sortOrder;
   intent.take_n = takeN;
 
-  if (!intent.return_headers && !intent.select_headers) {
-    intent.return_headers = ["이름"];
+  // --- 조건 보강: 명확한 패턴만 최소 반영 ---
+  const deptMatch = msg.match(/([가-힣A-Za-z0-9]+)\s*부서/);
+  if (deptMatch) {
+    _appendCondition(intent, {
+      target: "부서",
+      operator: "=",
+      value: deptMatch[1],
+    });
   }
+
+  const gradeMatch = msg.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+  if (gradeMatch) {
+    _appendCondition(intent, {
+      target: "평가 등급",
+      operator: "=",
+      value: gradeMatch[1].toUpperCase(),
+    });
+  }
+
+  // --- 반환 열 보강: 문장에 드러난 항목만 최소 추론 ---
+  if (!intent.return_headers && !intent.select_headers) {
+    const headers = [];
+    if (/직원\s*id|사번|id/i.test(msg)) headers.push("직원ID");
+    if (/(이름|성명)/.test(msg)) headers.push("이름");
+    if (/부서/.test(msg)) headers.push("부서");
+    if (/직급/.test(msg)) headers.push("직급");
+    if (/(연봉|salary)/i.test(msg)) headers.push("연봉");
+    if (/(입사|입사일)/.test(msg)) headers.push("입사일");
+
+    intent.return_headers = headers.length ? headers : ["이름"];
+  }
+
   return intent;
 }
 
