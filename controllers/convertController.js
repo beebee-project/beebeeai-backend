@@ -814,7 +814,7 @@ function applyRecentTopNOverride(message, intent) {
 
   const wantsTopNRows =
     /(보여줘|목록|리스트|명)/.test(msg) &&
-    /(최근\s*순|최신\s*순|내림차순|가장\s*최근)/.test(msg) &&
+    /(최근\s*순|최신\s*순|내림차순)/.test(msg) &&
     /(입사|입사일)/.test(msg);
 
   if (!wantsTopNRows) return intent;
@@ -845,6 +845,23 @@ function applyMonthCountOverride(message, intent) {
   if (!wantsMonthCount) return intent;
 
   intent.operation = "monthcount";
+  intent.header_hint = "입사일";
+  intent.return_hint = "입사일";
+  return intent;
+}
+
+function applyYearCountOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const wantsYearCount =
+    /(연도별|년도별|연\s*단위)/.test(msg) &&
+    /(입사|입사일)/.test(msg) &&
+    /(직원\s*수|입사자\s*수|개수|인원수|표)/.test(msg);
+
+  if (!wantsYearCount) return intent;
+
+  intent.operation = "yearcount";
   intent.header_hint = "입사일";
   intent.return_hint = "입사일";
   return intent;
@@ -1463,6 +1480,7 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyExtremeRowOverride(message, intent);
     intent = applyRecentTopNOverride(message, intent);
     intent = applyMonthCountOverride(message, intent);
+    intent = applyYearCountOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
     intent = applySortListOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
@@ -1769,6 +1787,7 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyExtremeRowOverride(nl, intent);
   intent = applyRecentTopNOverride(nl, intent);
   intent = applyMonthCountOverride(nl, intent);
+  intent = applyYearCountOverride(nl, intent);
   intent = applyUniqueSortOverride(nl, intent);
   intent = applySortListOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);

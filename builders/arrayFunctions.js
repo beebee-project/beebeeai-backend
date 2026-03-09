@@ -684,6 +684,7 @@ const arrayFunctionBuilder = {
   minrow: (ctx) => _extremeRow(ctx, "min"),
   topnrows: (ctx) => _topNRows(ctx),
   monthcount: (ctx) => _monthCountTable(ctx),
+  yearcount: (ctx) => _yearCountTable(ctx),
 
   // ---------------------- SORT ----------------------
   sort: (ctx) => {
@@ -1101,7 +1102,18 @@ function _monthCountTable(ctx) {
   const normalized = `IFERROR(DATEVALUE(TRIM(${dateRange}&"")), ${dateRange})`;
   const monthKey = `IFERROR(TEXT(${normalized}, "yyyy-mm"), "")`;
 
-  return `=LET(m, ${monthKey}, keys, SORT(UNIQUE(FILTER(m, m<>""))), HSTACK(keys, COUNTIF(m, keys)))`;
+  return `=LET(d, ${normalized}, m, ${monthKey}, keys, SORT(UNIQUE(FILTER(m, m<>""))), HSTACK(keys, BYROW(keys, LAMBDA(k, SUM(--(m=k))))))`;
+}
+
+function _yearCountTable(ctx) {
+  const best = ctx.bestReturn;
+  if (!best) return `=ERROR("날짜 열을 찾을 수 없습니다.")`;
+
+  const dateRange = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
+  const normalized = `IFERROR(DATEVALUE(TRIM(${dateRange}&"")), ${dateRange})`;
+  const yearKey = `IFERROR(TEXT(${normalized}, "yyyy"), "")`;
+
+  return `=LET(d, ${normalized}, y, ${yearKey}, keys, SORT(UNIQUE(FILTER(y, y<>""))), HSTACK(keys, BYROW(keys, LAMBDA(k, SUM(--(y=k))))))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----
