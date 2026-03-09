@@ -124,7 +124,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         return `SUMIFS(${sumRange}, ${pairsPlus})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     if (!conditionPairs.length) {
       return this._buildSimpleAggregate("sum", ctx);
@@ -154,7 +154,7 @@ const mathStatsFunctionBuilder = {
         const pairsPlus = `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`;
         return `AVERAGEIFS(${avgRange}, ${pairsPlus})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     // group_by가 없을 때만 단일 평균
     if (!intent.conditions || intent.conditions.length === 0) {
@@ -185,7 +185,7 @@ const mathStatsFunctionBuilder = {
         const pairsPlus = `${conditionPairs.join(", ")}, ${keyRef.range}, ${kSym}`;
         return `COUNTIFS(${pairsPlus})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     // group_by가 없을 때만 단일 count
     if (!intent.conditions || intent.conditions.length === 0) {
@@ -218,7 +218,7 @@ const mathStatsFunctionBuilder = {
         const pairsPlus = `${base}, ${keyRef.range}, ${kSym}`;
         return `COUNTIFS(${pairsPlus})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=COUNTIFS(${tgt}, "<>", ${pairs.join(", ")})`;
   },
@@ -253,7 +253,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         return `MINIFS(${tgt}, ${pairsPlus})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     if (!intent.conditions || intent.conditions.length === 0) {
       return `=MIN(${tgt})`;
@@ -281,7 +281,7 @@ const mathStatsFunctionBuilder = {
           : `${keyRef.range}, ${kSym}`;
         return `MAXIFS(${tgt}, ${pairsPlus})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     if (!intent.conditions || intent.conditions.length === 0) {
       return `=MAX(${tgt})`;
@@ -313,7 +313,7 @@ const mathStatsFunctionBuilder = {
         );
         return `MEDIAN(${filteredK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     if (!intent.conditions || intent.conditions.length === 0) {
       return `=MEDIAN(${tgt})`;
@@ -350,7 +350,7 @@ const mathStatsFunctionBuilder = {
         );
         return `STDEV.S(${filteredK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=STDEV.S(${filtered})`;
   },
@@ -377,7 +377,7 @@ const mathStatsFunctionBuilder = {
         );
         return `STDEV.P(${filteredK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=STDEV.P(${filtered})`;
   },
@@ -404,7 +404,7 @@ const mathStatsFunctionBuilder = {
         );
         return `VAR.S(${filteredK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=VAR.S(${_buildFilterCall(tgt, pairs)})`;
   },
@@ -431,7 +431,7 @@ const mathStatsFunctionBuilder = {
         );
         return `VAR.P(${filteredK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=VAR.P(${_buildFilterCall(tgt, pairs)})`;
   },
@@ -460,7 +460,7 @@ const mathStatsFunctionBuilder = {
         );
         return `PERCENTILE.INC(${filteredK}, ${K})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=PERCENTILE.INC(${_buildFilterCall(tgt, pairs)}, ${k})`;
   },
@@ -489,7 +489,7 @@ const mathStatsFunctionBuilder = {
         );
         return `QUARTILE.INC(${filteredK}, ${Q})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=QUARTILE.INC(${_buildFilterCall(tgt, pairs)}, ${q})`;
   },
@@ -710,7 +710,7 @@ const mathStatsFunctionBuilder = {
         const wK = `FILTER(${wExpr}, ${allClauses})`;
         return `IF(SUM(${wK})=0, "", SUMPRODUCT(${vK}, ${wK}) / SUM(${wK}))`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
     return `=IF(${den} = 0, "", ${num} / ${den})`;
@@ -770,7 +770,7 @@ const mathStatsFunctionBuilder = {
         );
         return `PERCENTRANK.INC(${filteredK}, ${xExpr})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
     return `=PERCENTRANK.INC(${filtered}, ${xExpr})`;
   },
@@ -831,7 +831,7 @@ const mathStatsFunctionBuilder = {
         );
         return `SLOPE(${yK}, ${xK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
     return `=SLOPE(${yF}, ${xF})`;
@@ -893,7 +893,7 @@ const mathStatsFunctionBuilder = {
         );
         return `INTERCEPT(${yK}, ${xK})`;
       };
-      return _wrapGroupByWithMaker(keyRef, inner);
+      return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
     return `=INTERCEPT(${yF}, ${xF})`;
