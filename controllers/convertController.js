@@ -359,27 +359,43 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
-  // ✅ 2. 조건부 합계 / 평균 / 개수 패턴
-  // 예: "지점별 매출 합계", "서울 지역 평균 매출", "카테고리별 개수"
-  if (/(sum|합계|total|평균|average|count|개수)/.test(s)) {
-    intent.conditions = [];
-    // 단순 조건 키워드 추출 ("서울", "지점", "카테고리")
-    const condMatch = s.match(
-      /(지역|지점|카테고리|부서|분류|도시|날짜|월|년도|날)/,
-    );
-    if (condMatch) {
-      intent.conditions.push({
-        target: condMatch[1],
-        operator: "=",
-        value: "", // 나중에 LLM이 보완
-      });
+  // ✅ 2. 집계 / 그룹 집계 패턴
+  // 예: "부서별 직원 수", "평가 등급별 평균 연봉", "부서별 평가 등급 A 직원 수"
+  if (
+    /(sum|합계|total|평균|average|count|개수|갯수|인원수|직원\s*수|최고|최저|중앙값|정렬|순으로)/.test(
+      s,
+    )
+  ) {
+    const groupBy = _detectGroupByFromMessage(original);
+    const aggOp = _detectAggregateOpFromMessage(original, intent.operation);
+    const headerHint = _detectHeaderHintFromMessage(original);
+    const sortOrder = _detectSortOrderFromMessage(original);
+
+    if (groupBy) intent.group_by = groupBy;
+    intent.operation = aggOp;
+
+    if (!intent.header_hint && !intent.return_hint) {
+      if (aggOp !== "count" && headerHint) {
+        intent.header_hint = headerHint;
+      }
     }
 
-    // 대상 열 추론
-    if (/매출|sales?/.test(s)) intent.header_hint = "매출액";
-    if (/평균/.test(s)) intent.operation = "averageifs";
-    if (/합계|sum|total/.test(s)) intent.operation = "sumifs";
-    if (/count|개수|갯수/.test(s)) intent.operation = "countifs";
+    const gradeMatch = original.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+    if (gradeMatch) {
+      intent.conditions = [
+        {
+          target: "평가 등급",
+          operator: "=",
+          value: gradeMatch[1].toUpperCase(),
+        },
+      ];
+    }
+
+    if (sortOrder) {
+      intent.sorted = true;
+      intent.sort_order = sortOrder;
+    }
+
     return intent;
   }
 
@@ -799,6 +815,126 @@ function applySortListOverride(message, intent) {
   intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
     ? "asc"
     : "desc";
+  return intent;
+}
+
+function _detectGroupByFromMessage(msg = "") {
+  const s = String(msg || "");
+  if (/부서별|부서\s*기준|각\s*부서/.test(s)) return "부서";
+  if (/직급별|직급\s*기준|각\s*직급/.test(s)) return "직급";
+  if (/평가\s*등급별|등급별|평가별/.test(s)) return "평가 등급";
+  return null;
+}
+
+function _detectHeaderHintFromMessage(msg = "") {
+  const s = String(msg || "");
+  if (/(연봉|salary)/i.test(s)) return "연봉";
+  if (/(입사일|입사\s*날짜)/.test(s)) return "입사일";
+  if (/(평가\s*등급|등급)/.test(s)) return "평가 등급";
+  if (/직급/.test(s)) return "직급";
+  if (/부서/.test(s)) return "부서";
+  return null;
+}
+
+function _detectAggregateOpFromMessage(msg = "", fallbackOp = "") {
+  const s = String(msg || "");
+  if (/(평균|average|avg|mean)/i.test(s)) return "average";
+  if (/(합계|총합|sum|total)/i.test(s)) return "sum";
+  if (/(개수|갯수|건수|인원수|직원\s*수|count)/i.test(s)) return "count";
+  if (/(최고|최대|가장\s*높|max|highest)/i.test(s)) return "max";
+  if (/(최저|최소|가장\s*낮|min|lowest)/i.test(s)) return "min";
+  if (/(중앙값|중간값|가운데\s*값|median)/i.test(s)) return "median";
+  return fallbackOp || "formula";
+}
+
+function _detectSortOrderFromMessage(msg = "") {
+  const s = String(msg || "");
+  if (/(적은\s*순|낮은\s*순|오름차순|asc|작은\s*순)/i.test(s)) return "asc";
+  if (/(많은\s*순|높은\s*순|내림차순|desc|큰\s*순)/i.test(s)) return "desc";
+  return null;
+}
+
+function _appendCondition(intent, cond) {
+  if (!intent.conditions) intent.conditions = [];
+  const exists = intent.conditions.some(
+    (c) =>
+      c &&
+      typeof c === "object" &&
+      !c.logical_operator &&
+      String(c.target || "") === String(cond.target || "") &&
+      String(c.operator || "=") === String(cond.operator || "=") &&
+      String(c.value ?? "") === String(cond.value ?? ""),
+  );
+  if (!exists) intent.conditions.push(cond);
+}
+
+function applyGroupedAggregateOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const groupBy = _detectGroupByFromMessage(msg);
+  const aggOp = _detectAggregateOpFromMessage(msg, intent.operation);
+  const headerHint = _detectHeaderHintFromMessage(msg);
+  const sortOrder = _detectSortOrderFromMessage(msg);
+
+  const looksGrouped =
+    !!groupBy &&
+    /(개수|갯수|인원수|직원\s*수|평균|합계|총합|최고|최저|중앙값|정렬|순으로|많은\s*순|높은\s*순|낮은\s*순)/.test(
+      msg,
+    );
+
+  if (!looksGrouped) return intent;
+
+  // 1) 핵심 집계 구조
+  intent.operation = aggOp;
+  intent.group_by = intent.group_by || groupBy;
+
+  // 2) 집계 대상 열 보정
+  // count는 header_hint가 없어도 되지만,
+  // average/max/min/median/sum은 연봉류가 없으면 흔들릴 수 있어 기본 보정
+  if (!intent.header_hint && !intent.return_hint) {
+    if (aggOp !== "count") {
+      intent.header_hint = /(연봉|salary)/i.test(msg)
+        ? "연봉"
+        : headerHint || "연봉";
+    }
+  }
+
+  // 3) "평가 등급 A 직원 수" 같은 조건 추론
+  const gradeMatch = msg.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+  if (gradeMatch) {
+    _appendCondition(intent, {
+      target: "평가 등급",
+      operator: "=",
+      value: gradeMatch[1].toUpperCase(),
+    });
+  } else {
+    const bareGradeMatch = msg.match(
+      /(?:^|\s)([ABCDFS][\+\-]?)(?:\s*등급|\s*직원|\s*인원|\s*$)/i,
+    );
+    if (bareGradeMatch && /등급|직원|인원/.test(msg)) {
+      _appendCondition(intent, {
+        target: "평가 등급",
+        operator: "=",
+        value: bareGradeMatch[1].toUpperCase(),
+      });
+    }
+  }
+
+  // 4) 정렬 보정
+  if (sortOrder) {
+    intent.sorted = true;
+    intent.sort_order = sortOrder;
+  }
+
+  // 5) count 계열은 sortby가 아니라 count 집계로 되돌린다
+  if (
+    String(intent.operation || "").toLowerCase() === "sortby" &&
+    /(개수|갯수|인원수|직원\s*수)/.test(msg)
+  ) {
+    intent.operation = "count";
+  }
+
   return intent;
 }
 
@@ -1242,6 +1378,7 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyExtremeRowOverride(message, intent);
     intent = applyUniqueSortOverride(message, intent);
     intent = applySortListOverride(message, intent);
+    intent = applyGroupedAggregateOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 

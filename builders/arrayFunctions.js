@@ -999,8 +999,26 @@ function _extremeRow(ctx, which) {
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----
 function pipeSortIfRequested(ctx, intent, expr, selectedIndexMap) {
   const fmt = (x) => String(x || "").trim();
+  const hasGroupBy = !!intent.group_by;
   const sortKey = intent.sort_by || intent.order_by;
-  if (!sortKey) return `=${expr}`;
+  const hasSortSignal =
+    !!sortKey ||
+    intent.sorted === true ||
+    intent.sort === true ||
+    !!intent.sort_order;
+
+  if (!hasSortSignal) return `=${expr}`;
+
+  const order =
+    String(intent.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+  // ✅ 그룹 집계 결과(HSTACK(keys, values))는 기본적으로 2열(집계값) 기준 정렬
+  // - sort_by가 명시되지 않았더라도
+  //   "많은 순 / 높은 순 / 낮은 순" 같은 요청으로 sort_order만 들어오면 동작
+  // - 2열이 없을 가능성까지 고려해 IFERROR로 안전 처리
+  if (!sortKey && hasGroupBy) {
+    return `=IFERROR(SORTBY(${expr}, CHOOSECOLS(${expr}, 2), ${order}), ${expr})`;
+  }
 
   if (Array.isArray(sortKey) && sortKey.length) {
     const pairs = [];
@@ -1025,6 +1043,10 @@ function pipeSortIfRequested(ctx, intent, expr, selectedIndexMap) {
         if (idx) pairs.push(`CHOOSECOLS(${expr}, ${idx})`, ord);
       }
     }
+    // ✅ 그룹 결과인데 sort_by를 못 찾았으면 2열 기준 fallback
+    if (!pairs.length && hasGroupBy) {
+      return `=IFERROR(SORTBY(${expr}, CHOOSECOLS(${expr}, 2), ${order}), ${expr})`;
+    }
     return pairs.length ? `=SORTBY(${expr}, ${pairs.join(", ")})` : `=${expr}`;
   }
 
@@ -1037,10 +1059,13 @@ function pipeSortIfRequested(ctx, intent, expr, selectedIndexMap) {
   const nameToIndex = new Map(meta.map(([h, m], i) => [h, i + 1]));
   const idx =
     selectedIndexMap?.get?.(fmt(sortKey)) || nameToIndex.get(fmt(sortKey));
-  const order =
-    String(intent.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
   if (idx) return `=SORTBY(${expr}, CHOOSECOLS(${expr}, ${idx}), ${order})`;
+
+  // ✅ 단일 sort_key를 못 찾았지만 group_by 결과면 집계값 열(2열)로 fallback
+  if (hasGroupBy) {
+    return `=IFERROR(SORTBY(${expr}, CHOOSECOLS(${expr}, 2), ${order}), ${expr})`;
+  }
 
   const joinSpec = (intent.joins || [])[0];
   if (

@@ -238,63 +238,65 @@ const mathStatsFunctionBuilder = {
   min: function (ctx, formatValue, buildConditionPairs) {
     const { intent, bestReturn } = ctx;
     const tgt = _targetRangeFromBest(bestReturn);
-    if (!intent.conditions || intent.conditions.length === 0) {
-      return `=MIN(${tgt})`;
-    }
+
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
-    if (pairs.length === 0)
-      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
+
     if (ctx.intent?.group_by) {
       const keyRef =
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+      const basePairs = pairs || [];
       const inner = (kSym) => {
-        const pairsPlus = pairs.length
-          ? `${pairs.join(", ")}, ${keyRef.range}, ${kSym}`
+        const pairsPlus = basePairs.length
+          ? `${basePairs.join(", ")}, ${keyRef.range}, ${kSym}`
           : `${keyRef.range}, ${kSym}`;
         return `MINIFS(${tgt}, ${pairsPlus})`;
       };
       return _wrapGroupByWithMaker(keyRef, inner);
     }
+    if (!intent.conditions || intent.conditions.length === 0) {
+      return `=MIN(${tgt})`;
+    }
+    if (pairs.length === 0)
+      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     return `=MINIFS(${tgt}, ${pairs.join(", ")})`;
   },
 
   max: function (ctx, formatValue, buildConditionPairs) {
     const { intent, bestReturn } = ctx;
     const tgt = _targetRangeFromBest(bestReturn);
-    if (!intent.conditions || intent.conditions.length === 0) {
-      return `=MAX(${tgt})`;
-    }
+
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
-    if (pairs.length === 0)
-      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
+
     if (ctx.intent?.group_by) {
       const keyRef =
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
         refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
+      const basePairs = pairs || [];
       const inner = (kSym) => {
-        const pairsPlus = pairs.length
-          ? `${pairs.join(", ")}, ${keyRef.range}, ${kSym}`
+        const pairsPlus = basePairs.length
+          ? `${basePairs.join(", ")}, ${keyRef.range}, ${kSym}`
           : `${keyRef.range}, ${kSym}`;
         return `MAXIFS(${tgt}, ${pairsPlus})`;
       };
       return _wrapGroupByWithMaker(keyRef, inner);
     }
+    if (!intent.conditions || intent.conditions.length === 0) {
+      return `=MAX(${tgt})`;
+    }
+    if (pairs.length === 0)
+      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     return `=MAXIFS(${tgt}, ${pairs.join(", ")})`;
   },
 
   median: function (ctx, formatValue, buildConditionPairs) {
     const { intent, bestReturn } = ctx;
     const tgt = _targetRangeFromBest(bestReturn);
-    if (!intent.conditions || intent.conditions.length === 0) {
-      return `=MEDIAN(${tgt})`;
-    }
+
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
-    if (pairs.length === 0)
-      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
-    const filtered = _buildFilterCall(tgt, pairs);
+
     if (ctx.intent?.group_by) {
       const keyRef =
         refFromHeaderSpec(ctx, ctx.intent.group_by) ||
@@ -313,6 +315,12 @@ const mathStatsFunctionBuilder = {
       };
       return _wrapGroupByWithMaker(keyRef, inner);
     }
+    if (!intent.conditions || intent.conditions.length === 0) {
+      return `=MEDIAN(${tgt})`;
+    }
+    if (pairs.length === 0)
+      return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
+    const filtered = _buildFilterCall(tgt, pairs);
     return `=MEDIAN(${filtered})`;
   },
 
