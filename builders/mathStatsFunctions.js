@@ -900,14 +900,24 @@ const mathStatsFunctionBuilder = {
   },
 };
 
-function _wrapGroupByWithMaker(keyRef, makeInnerWithK) {
+function _wrapGroupByWithMaker(ctx, keyRef, makeInnerWithK) {
   // ✅ "표" 형태로 반환: [키, 값]
   // keys: UNIQUE(keyRange)
   // vals: MAP(keys, LAMBDA(k, inner(k)))
   // result: HSTACK(keys, vals)
-  return `=LET(keys, UNIQUE(${keyRef.range}), HSTACK(keys, MAP(keys, LAMBDA(k, ${makeInnerWithK(
+  const baseExpr = `LET(keys, UNIQUE(${keyRef.range}), HSTACK(keys, MAP(keys, LAMBDA(k, ${makeInnerWithK(
     "k",
   )}))))`;
+
+  const it = ctx?.intent || {};
+  const wantsSort = it.sorted === true || it.sort === true || !!it.sort_order;
+  if (!wantsSort) return `=${baseExpr}`;
+
+  const order =
+    String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+  // 그룹 집계 결과는 2열(집계값) 기준 정렬
+  return `=IFERROR(SORTBY(${baseExpr}, CHOOSECOLS(${baseExpr}, 2), ${order}), ${baseExpr})`;
 }
 const _op = (o) => (o ? String(o) : "=");
 

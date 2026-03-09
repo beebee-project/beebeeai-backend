@@ -1677,7 +1677,12 @@ exports.handleFeedback = async (req, res, next) => {
 async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-  const intent = normalizeLookupIntent(baseIntent);
+  let intent = normalizeLookupIntent(baseIntent);
+  intent = applyMedianOverride(nl, intent);
+  intent = applyExtremeRowOverride(nl, intent);
+  intent = applyUniqueSortOverride(nl, intent);
+  intent = applySortListOverride(nl, intent);
+  intent = applyGroupedAggregateOverride(nl, intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
