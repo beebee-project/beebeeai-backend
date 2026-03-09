@@ -35,19 +35,19 @@ function _resolveGroupKeyRef(ctx, groupBySpec) {
   const direct =
     refFromHeaderSpec(ctx, groupBySpec) ||
     refFromHeaderSpec(ctx, { header: groupBySpec });
+
   const wanted =
     typeof groupBySpec === "string"
       ? String(groupBySpec).trim()
       : String(groupBySpec?.header || "").trim();
 
-  // direct가 정확 일치면 그대로 사용
-  if (direct && String(direct.header || "").trim() === wanted) return direct;
+  if (!wanted) return direct;
 
   const allSheetsData = ctx.allSheetsData || {};
   const preferredSheet =
     direct?.sheetName || ctx.bestReturn?.sheetName || ctx.bestLookup?.sheetName;
 
-  const scanSheet = (sheetName) => {
+  const scanExact = (sheetName) => {
     const info = allSheetsData[sheetName];
     if (!info?.metaData) return null;
     for (const [header, meta] of Object.entries(info.metaData)) {
@@ -64,19 +64,16 @@ function _resolveGroupKeyRef(ctx, groupBySpec) {
     return null;
   };
 
-  // 1) 현재 시트 exact match 우선
   if (preferredSheet) {
-    const exact = scanSheet(preferredSheet);
+    const exact = scanExact(preferredSheet);
     if (exact) return exact;
   }
 
-  // 2) 전체 시트 exact match
   for (const sheetName of Object.keys(allSheetsData)) {
-    const exact = scanSheet(sheetName);
+    const exact = scanExact(sheetName);
     if (exact) return exact;
   }
 
-  // 3) fallback
   return direct;
 }
 
