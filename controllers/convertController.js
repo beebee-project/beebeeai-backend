@@ -9,7 +9,6 @@ const crypto = require("crypto");
 const { classifyReason } = require("../utils/reasonClassifier");
 const { validateFormula } = require("../utils/outputValidator");
 const { buildDebugMeta } = require("../utils/debugMetaBuilder");
-const { buildGroupFormula } = require("./groupEngine");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -1350,21 +1349,6 @@ exports.handleConversion = async (req, res, next) => {
         });
         return res.json({ result: safeOut });
       }
-    }
-
-    // GROUP ENGINE 처리
-    if (intent.group_by && context.bestReturn) {
-      const groupRange = `'${context.bestReturn.sheetName}'!${context.bestReturn.columnLetter}${context.bestReturn.startRow}:${context.bestReturn.columnLetter}${context.bestReturn.lastDataRow}`;
-      const valueRange = groupRange;
-
-      return res.json({
-        result: buildGroupFormula({
-          groupRange,
-          valueRange,
-          aggregate: intent.operation,
-          sort: intent.sort_order === "desc",
-        }),
-      });
     }
 
     // 6) 빌더 호출
