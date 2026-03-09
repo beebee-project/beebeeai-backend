@@ -752,6 +752,27 @@ function applyMedianOverride(message, intent) {
   return intent;
 }
 
+function applyDateBoundaryOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+  if (!Array.isArray(intent.conditions)) return intent;
+
+  const yearAfterMatch = msg.match(/(20\d{2})년\s*이후/);
+  if (!yearAfterMatch) return intent;
+
+  const y = yearAfterMatch[1];
+  intent.conditions = intent.conditions.map((c) => {
+    if (!c || typeof c !== "object") return c;
+    if (!/(입사일|날짜)/.test(String(c.target || ""))) return c;
+    return {
+      ...c,
+      operator: ">=",
+      value: `${y}-01-01`,
+    };
+  });
+  return intent;
+}
+
 function applyExtremeRowOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
@@ -1481,6 +1502,7 @@ exports.handleConversion = async (req, res, next) => {
 
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
+    intent = applyDateBoundaryOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
     intent = applyRecentTopNOverride(message, intent);
     intent = applyMonthCountOverride(message, intent);
@@ -1789,6 +1811,7 @@ async function convert(nl, options = {}, meta = {}) {
   let intent = normalizeLookupIntent(baseIntent);
   intent = applyMedianOverride(nl, intent);
   intent = applyExtremeRowOverride(nl, intent);
+  intent = applyDateBoundaryOverride(nl, intent);
   intent = applyRecentTopNOverride(nl, intent);
   intent = applyMonthCountOverride(nl, intent);
   intent = applyYearCountOverride(nl, intent);
