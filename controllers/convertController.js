@@ -777,6 +777,15 @@ function applyExtremeRowOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
+  // ✅ Top N / N명 / Top3 / 상위 3명 문장은 extreme-row(1건)가 아니라
+  //    뒤 단계의 topnrows가 처리하도록 여기서는 건드리지 않는다.
+  const hasExplicitTopN =
+    /\btop\s*[2-9]\d*\b/i.test(msg) ||
+    /(상위|하위)\s*[2-9]\d*\s*명?/.test(msg) ||
+    /[2-9]\d*\s*명/.test(msg);
+
+  if (hasExplicitTopN) return intent;
+
   // ✅ 1) 날짜 extreme-row: 최근 입사 / 가장 오래 근무
   const wantsDateRow =
     /(이름|성명|직원|정보)/.test(msg) && /(입사|입사일|근무)/.test(msg);
