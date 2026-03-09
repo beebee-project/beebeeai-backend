@@ -814,7 +814,9 @@ function applyRecentTopNOverride(message, intent) {
 
   const wantsTopNRows =
     /(보여줘|목록|리스트|명)/.test(msg) &&
-    /(최근\s*순|최신\s*순|내림차순)/.test(msg) &&
+    /(최근\s*순|최신\s*순|내림차순|오래된\s*순|오래\s*된\s*순|오름차순)/.test(
+      msg,
+    ) &&
     /(입사|입사일)/.test(msg);
 
   if (!wantsTopNRows) return intent;
@@ -824,7 +826,9 @@ function applyRecentTopNOverride(message, intent) {
 
   intent.operation = "topnrows";
   intent.header_hint = "입사일";
-  intent.sort_order = "desc";
+  intent.sort_order = /(오래된\s*순|오래\s*된\s*순|오름차순)/.test(msg)
+    ? "asc"
+    : "desc";
   intent.take_n = takeN;
 
   if (!intent.return_headers && !intent.select_headers) {
