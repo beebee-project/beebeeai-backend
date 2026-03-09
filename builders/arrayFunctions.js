@@ -961,22 +961,37 @@ function _extremeRow(ctx, which) {
     return null;
   };
 
-  // 연봉 헤더는 실제 파일에서 "연봉(만원)" 처럼 올 수 있으니 contains 매칭
-  const salaryMeta =
-    byName.get("연봉") ||
-    findMetaByContains("연봉") ||
-    findMetaByContains(String(it.header_hint || "")) ||
+  // ✅ 기준 열 일반화:
+  // 1) intent.header_hint / lookup_hint / sort_by 우선
+  // 2) 없으면 bestReturn.header fallback
+  const sortHint =
+    (typeof it.sort_by === "string" && it.sort_by) ||
+    (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
+    it.lookup_hint ||
+    it.header_hint ||
+    best.header ||
+    "연봉";
+
+  const criterionMeta =
+    byName.get(String(sortHint).trim()) ||
+    findMetaByContains(String(sortHint).trim()) ||
+    // 연봉은 파일에서 "연봉(만원)"처럼 올 수 있어 fallback 유지
+    (String(sortHint).trim() !== "연봉" ? null : findMetaByContains("연봉")) ||
     null;
-  if (!salaryMeta?.columnLetter)
-    return `=ERROR("기준(연봉) 열의 위치를 찾을 수 없습니다.")`;
-  const salaryIdx =
-    formulaUtils.columnLetterToIndex(salaryMeta.columnLetter) -
+
+  if (!criterionMeta?.columnLetter) {
+    return `=ERROR("기준 열의 위치를 찾을 수 없습니다.")`;
+  }
+
+  const criterionIdx =
+    formulaUtils.columnLetterToIndex(criterionMeta.columnLetter) -
     firstColIdx0 +
     1;
 
-  const want = Array.isArray(it.return_headers)
-    ? it.return_headers
-    : ["이름", "부서", "직급", "연봉"];
+  const want =
+    Array.isArray(it.return_headers) && it.return_headers.length
+      ? it.return_headers
+      : ["이름", "부서", "직급", "연봉"];
   const retIdxs = want
     .map((h) => {
       const key = String(h).trim();
@@ -993,7 +1008,7 @@ function _extremeRow(ctx, which) {
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${salaryIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----

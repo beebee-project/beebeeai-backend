@@ -756,6 +756,38 @@ function applyExtremeRowOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
+  // ✅ 1) 날짜 extreme-row: 최근 입사 / 가장 오래 근무
+  const wantsDateRow =
+    /(이름|성명|직원|정보)/.test(msg) && /(입사|입사일|근무)/.test(msg);
+
+  if (wantsDateRow) {
+    const isRecentHire =
+      /(가장\s*최근|최근\s*입사|최신|most\s*recent|latest)/i.test(msg) &&
+      /(입사|입사일)/i.test(msg);
+
+    const isOldestTenure =
+      /(가장\s*오래|오래\s*근무|최장\s*근무|earliest|oldest)/i.test(msg) &&
+      /(근무|입사|입사일)/i.test(msg);
+
+    if (isRecentHire) {
+      intent.operation = "maxrow";
+      intent.header_hint = "입사일";
+      if (!intent.return_headers && !intent.select_headers) {
+        intent.return_headers = ["이름"];
+      }
+      return intent;
+    }
+
+    if (isOldestTenure) {
+      intent.operation = "minrow";
+      intent.header_hint = "입사일";
+      if (!intent.return_headers && !intent.select_headers) {
+        intent.return_headers = ["이름"];
+      }
+      return intent;
+    }
+  }
+
   const wantsRowFields =
     /(이름|성명|부서|직급|정보|직원)/.test(msg) && /(연봉|salary)/i.test(msg);
   if (!wantsRowFields) return intent;
