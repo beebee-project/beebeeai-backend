@@ -1099,9 +1099,9 @@ function _monthCountTable(ctx) {
 
   const dateRange = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
   const normalized = `IFERROR(DATEVALUE(TRIM(${dateRange}&"")), ${dateRange})`;
-  const monthKey = `TEXT(${normalized}, "yyyy-mm")`;
+  const monthKey = `IFERROR(TEXT(${normalized}, "yyyy-mm"), "")`;
 
-  return `=LET(m, ${monthKey}, keys, SORT(UNIQUE(FILTER(m, m<>""))), HSTACK(keys, MAP(keys, LAMBDA(k, COUNTIF(m, k)))))`;
+  return `=LET(m, ${monthKey}, keys, SORT(UNIQUE(FILTER(m, m<>""))), HSTACK(keys, COUNTIF(m, keys)))`;
 }
 
 // ---- 정렬 파이프 헬퍼: FILTER/CHOOSECOLS/HSTACK 결과에 SORT or SORTBY 적용 ----
