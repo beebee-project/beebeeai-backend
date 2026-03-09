@@ -1049,6 +1049,22 @@ function _topNRows(ctx) {
     return null;
   };
 
+  const normalizeColExpr = (colExpr, headerName) => {
+    const h = String(headerName || "").trim();
+    if (/(입사일|날짜|일자)/.test(h)) {
+      return `IFERROR(DATEVALUE(TRIM(${colExpr}&"")), ${colExpr})`;
+    }
+    return `IFERROR(VALUE(TRIM(${colExpr}&"")), ${colExpr})`;
+  };
+
+  const formatCriterionValue = (v) => {
+    if (v == null) return `""`;
+    if (typeof v === "number") return String(v);
+    const s = String(v).trim();
+    if (/^-?\d+(\.\d+)?$/.test(s)) return s;
+    return formulaUtils.formatValue(s);
+  };
+
   const sortHint =
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
@@ -1091,7 +1107,56 @@ function _topNRows(ctx) {
   const order =
     String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
+  const conds = Array.isArray(it.conditions)
+    ? it.conditions.filter(Boolean)
+    : [];
+  if (!conds.length) {
+    return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
+  }
+
+  const maskParts = [];
+  for (const c of conds) {
+    if (!c || typeof c !== "object") continue;
+    const targetName = String(c.target || c.header || "").trim();
+    if (!targetName) continue;
+
+    const meta = byName.get(targetName) || findMetaByContains(targetName);
+    if (!meta?.columnLetter) continue;
+
+    const relIdx =
+      formulaUtils.columnLetterToIndex(meta.columnLetter) - firstColIdx0 + 1;
+    const colExpr = `CHOOSECOLS(t, ${relIdx})`;
+    const op = String(c.operator || "=").trim();
+    const rawVal = c.value;
+
+    if (op === "=" || op === "==" || op === "eq") {
+      maskParts.push(
+        `(TRIM(${colExpr}&"")=${formulaUtils.formatValue(String(rawVal ?? "").trim())})`,
+      );
+      continue;
+    }
+    if (op === "<>" || op === "!=" || op === "ne") {
+      maskParts.push(
+        `(TRIM(${colExpr}&"")<>${formulaUtils.formatValue(String(rawVal ?? "").trim())})`,
+      );
+      continue;
+    }
+
+    const left = normalizeColExpr(colExpr, targetName);
+    const right = normalizeColExpr(formatCriterionValue(rawVal), targetName);
+
+    if (op === ">=" || op === "gte") maskParts.push(`(${left}>=${right})`);
+    else if (op === "<=" || op === "lte") maskParts.push(`(${left}<=${right})`);
+    else if (op === ">" || op === "gt") maskParts.push(`(${left}>${right})`);
+    else if (op === "<" || op === "lt") maskParts.push(`(${left}<${right})`);
+  }
+
+  if (!maskParts.length) {
+    return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
+  }
+
+  const maskExpr = maskParts.join(" * ");
+  return `=LET(t, ${fullA1}, f, FILTER(t, ${maskExpr}), s, SORTBY(f, CHOOSECOLS(f, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
 }
 
 function _monthCountTable(ctx) {
