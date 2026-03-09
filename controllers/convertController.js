@@ -916,19 +916,28 @@ function applyRecentTopNOverride(message, intent) {
   }
 
   // ✅ Top N 문장은 기존 return_headers를 그대로 믿지 말고 재정규화
+  // - "연봉 상위 5명 이름"처럼 정렬 기준(연봉)만 언급된 경우 연봉 열을 자동 포함하지 않음
+  // - "이름과 연봉", "직원ID, 이름, 연봉"처럼 반환 열이 명시될 때만 연봉 열 포함
   const headers = [];
 
-  const wantsId = /직원\s*id|사번|id/i.test(msg);
+  const wantsId = /직원\s*id|사번|ID/i.test(msg);
+  const wantsOnlyName = /(이름|성명)만\s*보여줘?/.test(msg);
   const wantsName =
-    /(이름|성명)/.test(msg) || /직원\s*\d+\s*명|직원|사람/.test(msg);
+    wantsOnlyName ||
+    /(이름|성명)/.test(msg) ||
+    /직원\s*\d+\s*명|직원|사람/.test(msg);
+
   const wantsSalaryField =
     /연봉/.test(msg) &&
-    (/(이름|성명|직원\s*id|사번|id)\s*[,와과및]\s*(이름|성명|연봉)/i.test(
-      msg,
-    ) ||
-      /(직원\s*id|사번|id).*(이름|성명).*(연봉)/i.test(msg) ||
-      /(연봉).*(직원\s*id|사번|id|이름|성명)/i.test(msg) ||
-      /(같이|함께|포함)/.test(msg));
+    (/(이름|성명)\s*(과|와|및|,|하고)\s*연봉/.test(msg) ||
+      /연봉\s*(과|와|및|,|하고)\s*(이름|성명)/.test(msg) ||
+      /(직원\s*id|사번|ID).*(이름|성명).*(연봉)/i.test(msg) ||
+      /(연봉).*(직원\s*id|사번|ID).*(이름|성명)/i.test(msg) ||
+      /(직원\s*id|사번|ID).*(연봉)/i.test(msg) ||
+      /(연봉).*(직원\s*id|사번|ID)/i.test(msg) ||
+      /(연봉\s*포함|연봉까지|연봉도|연봉 같이|연봉 함께)/.test(msg)) &&
+    !wantsOnlyName;
+
   const wantsHireDateField =
     /(이름\s*과\s*입사일|입사일\s*과\s*이름|입사일\s*포함)/.test(msg);
   const wantsDeptField = /이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함/.test(

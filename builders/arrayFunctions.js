@@ -949,36 +949,72 @@ function _extremeRow(ctx, which) {
   const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
   const fullA1 = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
 
-  // ✅ columnLetter 기반 "상대 인덱스" 계산 (CHOOSECOLS는 1-based)
-  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol); // 0-based
+  const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
   const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
+  const normHeader = (v) =>
+    String(v || "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "")
+      .trim();
   const findMetaByContains = (needle) => {
     const n = String(needle || "").trim();
     if (!n) return null;
+    const nn = normHeader(n);
     for (const [h, m] of metaEntries) {
       if (String(h).trim() === n) return m;
     }
     for (const [h, m] of metaEntries) {
+      if (normHeader(h) === nn) return m;
+    }
+    for (const [h, m] of metaEntries) {
       if (String(h).includes(n)) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      const hh = normHeader(h);
+      if (hh.includes(nn) || nn.includes(hh)) return m;
     }
     return null;
   };
 
-  // ✅ 기준 열 일반화:
-  // 1) intent.header_hint / lookup_hint / sort_by 우선
-  // 2) 없으면 bestReturn.header fallback
+  const normalizeColExpr = (colExpr, headerName) => {
+    const h = String(headerName || "").trim();
+    if (/(입사일|날짜|일자)/.test(h)) {
+      return `IFERROR(DATEVALUE(TRIM(${colExpr}&"")), ${colExpr})`;
+    }
+    return `IFERROR(VALUE(TRIM(${colExpr}&"")), ${colExpr})`;
+  };
+
+  const formatCriterionValue = (v) => {
+    if (v == null) return `""`;
+    if (typeof v === "number") return String(v);
+    const s = String(v).trim();
+    if (/^-?\d+(\.\d+)?$/.test(s)) return s;
+    return formulaUtils.formatValue(s);
+  };
+
+  // ✅ 기준 열 고정 우선순위:
+  // header_hint(사용자 질문에서 추론) > lookup_hint > sort_by > best.header
+  const explicitHeaderHint =
+    typeof it.header_hint === "string" ? it.header_hint.trim() : "";
+  const explicitLookupHint =
+    typeof it.lookup_hint === "string" ? it.lookup_hint.trim() : "";
+  const explicitSortBy =
+    (typeof it.sort_by === "string" && it.sort_by.trim()) ||
+    (it.sort_by &&
+      typeof it.sort_by === "object" &&
+      String(it.sort_by.header || "").trim()) ||
+    "";
+
   const sortHint =
-    (typeof it.sort_by === "string" && it.sort_by) ||
-    (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
-    it.lookup_hint ||
-    it.header_hint ||
+    explicitHeaderHint ||
+    explicitLookupHint ||
+    explicitSortBy ||
     best.header ||
     "연봉";
 
   const criterionMeta =
     byName.get(String(sortHint).trim()) ||
     findMetaByContains(String(sortHint).trim()) ||
-    // 연봉은 파일에서 "연봉(만원)"처럼 올 수 있어 fallback 유지
     (String(sortHint).trim() !== "연봉" ? null : findMetaByContains("연봉")) ||
     null;
 
@@ -1010,8 +1046,59 @@ function _extremeRow(ctx, which) {
     .filter((v) => Number.isFinite(v));
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
+  const criterionExpr = normalizeColExpr(
+    `CHOOSECOLS(t, ${criterionIdx})`,
+    sortHint,
+  );
   const order = which === "min" ? 1 : -1;
-  return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+
+  const conds = Array.isArray(it.conditions)
+    ? it.conditions.filter(Boolean)
+    : [];
+  const maskParts = [];
+
+  for (const c of conds) {
+    if (!c || typeof c !== "object") continue;
+    const targetName = String(c.target || c.header || "").trim();
+    if (!targetName) continue;
+
+    const meta = byName.get(targetName) || findMetaByContains(targetName);
+    if (!meta?.columnLetter) continue;
+
+    const relIdx =
+      formulaUtils.columnLetterToIndex(meta.columnLetter) - firstColIdx0 + 1;
+    const colExpr = `CHOOSECOLS(t, ${relIdx})`;
+    const op = String(c.operator || "=").trim();
+    const rawVal = c.value;
+
+    if (op === "=" || op === "==" || op === "eq") {
+      maskParts.push(
+        `(TRIM(${colExpr}&"")=${formulaUtils.formatValue(String(rawVal ?? "").trim())})`,
+      );
+      continue;
+    }
+    if (op === "<>" || op === "!=" || op === "ne") {
+      maskParts.push(
+        `(TRIM(${colExpr}&"")<>${formulaUtils.formatValue(String(rawVal ?? "").trim())})`,
+      );
+      continue;
+    }
+
+    const left = normalizeColExpr(colExpr, targetName);
+    const right = normalizeColExpr(formatCriterionValue(rawVal), targetName);
+
+    if (op === ">=" || op === "gte") maskParts.push(`(${left}>=${right})`);
+    else if (op === "<=" || op === "lte") maskParts.push(`(${left}<=${right})`);
+    else if (op === ">" || op === "gt") maskParts.push(`(${left}>${right})`);
+    else if (op === "<" || op === "lt") maskParts.push(`(${left}<${right})`);
+  }
+
+  if (!maskParts.length) {
+    return `=LET(t, ${fullA1}, s, SORTBY(t, ${criterionExpr}, ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
+  }
+
+  const maskExpr = maskParts.join(" * ");
+  return `=LET(t, ${fullA1}, f, FILTER(t, ${maskExpr}), s, SORTBY(f, ${normalizeColExpr(`CHOOSECOLS(f, ${criterionIdx})`, sortHint)}, ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
 function _topNRows(ctx) {
