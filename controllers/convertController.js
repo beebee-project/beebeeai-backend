@@ -900,17 +900,37 @@ function applyRecentTopNOverride(message, intent) {
     });
   }
 
-  // --- 반환 열 보강: 문장에 드러난 항목만 최소 추론 ---
+  // --- 반환 열 보강: "정렬 기준 열"과 "반환 열"을 분리해서 보수적으로 추론 ---
   if (!intent.return_headers && !intent.select_headers) {
     const headers = [];
-    if (/직원\s*id|사번|id/i.test(msg)) headers.push("직원ID");
-    if (/(이름|성명)/.test(msg)) headers.push("이름");
-    if (/부서/.test(msg)) headers.push("부서");
-    if (/직급/.test(msg)) headers.push("직급");
-    if (/(연봉|salary)/i.test(msg)) headers.push("연봉");
-    if (/(입사|입사일)/.test(msg)) headers.push("입사일");
 
-    intent.return_headers = headers.length ? headers : ["이름"];
+    const wantsName = /(이름|성명)/.test(msg);
+    const wantsSalaryField =
+      /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름,\s*연봉|연봉,\s*이름)/.test(
+        msg,
+      ) ||
+      (/연봉/.test(msg) && /(함께|같이|포함)/.test(msg));
+    const wantsHireDateField =
+      /(이름\s*과\s*입사일|입사일\s*과\s*이름|입사일\s*포함)/.test(msg);
+    const wantsOnlyId = /직원\s*id|사번|id/i.test(msg);
+    const wantsDeptField = /이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함/.test(
+      msg,
+    );
+    const wantsTitleField =
+      /이름\s*과\s*직급|직급\s*과\s*이름|직급\s*포함/.test(msg);
+
+    // 1) 명시된 반환 열 우선
+    if (wantsOnlyId) headers.push("직원ID");
+    if (wantsName || /직원\s*\d+\s*명|직원|사람/.test(msg))
+      headers.push("이름");
+    if (wantsDeptField) headers.push("부서");
+    if (wantsTitleField) headers.push("직급");
+    if (wantsSalaryField) headers.push("연봉");
+    if (wantsHireDateField) headers.push("입사일");
+
+    // 2) "이름과 연봉"처럼 복수 필드가 명확하지 않으면 기본은 이름만
+    //    정렬 기준 열(연봉/입사일)을 자동으로 반환 열에 넣지 않는다.
+    intent.return_headers = headers.length ? [...new Set(headers)] : ["이름"];
   }
 
   return intent;
