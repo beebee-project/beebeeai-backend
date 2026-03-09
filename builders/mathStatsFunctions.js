@@ -20,9 +20,64 @@ function _buildFilterCall(targetRange, conditionPairs) {
   for (let i = 0; i < conditionPairs.length; i += 2) {
     const rng = conditionPairs[i];
     const crit = conditionPairs[i + 1];
-    clauses.push(`${rng}, ${crit}`);
+    if (!rng || crit == null) continue;
+    // Excel FILTER는 include 인수에 불리언 배열이 필요함.
+    // ex) FILTER(H:H, C:C=k)
+    clauses.push(`(${rng}=${crit})`);
   }
-  return `FILTER(${targetRange}, ${clauses.join(", ")})`;
+  if (!clauses.length) return targetRange;
+  return `FILTER(${targetRange}, ${clauses.join("*")})`;
+}
+
+function _resolveGroupKeyRef(ctx, groupBySpec) {
+  if (!ctx || !groupBySpec) return null;
+
+  const direct =
+    refFromHeaderSpec(ctx, groupBySpec) ||
+    refFromHeaderSpec(ctx, { header: groupBySpec });
+  const wanted =
+    typeof groupBySpec === "string"
+      ? String(groupBySpec).trim()
+      : String(groupBySpec?.header || "").trim();
+
+  // direct가 정확 일치면 그대로 사용
+  if (direct && String(direct.header || "").trim() === wanted) return direct;
+
+  const allSheetsData = ctx.allSheetsData || {};
+  const preferredSheet =
+    direct?.sheetName || ctx.bestReturn?.sheetName || ctx.bestLookup?.sheetName;
+
+  const scanSheet = (sheetName) => {
+    const info = allSheetsData[sheetName];
+    if (!info?.metaData) return null;
+    for (const [header, meta] of Object.entries(info.metaData)) {
+      if (String(header).trim() !== wanted) continue;
+      return {
+        sheetName,
+        header,
+        columnLetter: meta.columnLetter,
+        startRow: info.startRow,
+        lastDataRow: info.lastDataRow,
+        range: `'${sheetName}'!${meta.columnLetter}${info.startRow}:${meta.columnLetter}${info.lastDataRow}`,
+      };
+    }
+    return null;
+  };
+
+  // 1) 현재 시트 exact match 우선
+  if (preferredSheet) {
+    const exact = scanSheet(preferredSheet);
+    if (exact) return exact;
+  }
+
+  // 2) 전체 시트 exact match
+  for (const sheetName of Object.keys(allSheetsData)) {
+    const exact = scanSheet(sheetName);
+    if (exact) return exact;
+  }
+
+  // 3) fallback
+  return direct;
 }
 
 function _evalSubExprToRange(ctx, formatValue, node) {
@@ -114,9 +169,7 @@ const mathStatsFunctionBuilder = {
       formatValue,
     );
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const inner = (kSym) => {
         const pairsPlus = conditionPairs.length
@@ -142,9 +195,7 @@ const mathStatsFunctionBuilder = {
       formatValue,
     );
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const inner = (kSym) => {
         // ✅ 조건이 없으면 AVERAGEIF, 조건이 있으면 AVERAGEIFS
@@ -175,9 +226,7 @@ const mathStatsFunctionBuilder = {
       formatValue,
     );
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const inner = (kSym) => {
         // ✅ 조건이 없으면 key만으로 COUNTIFS
@@ -207,9 +256,7 @@ const mathStatsFunctionBuilder = {
     if (pairs.length === 0)
       return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const inner = (kSym) => {
         const base = pairs.length
@@ -242,9 +289,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -270,9 +315,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -298,9 +341,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -335,9 +376,7 @@ const mathStatsFunctionBuilder = {
       return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     const filtered = _buildFilterCall(tgt, pairs);
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -362,9 +401,7 @@ const mathStatsFunctionBuilder = {
     const filtered = _buildFilterCall(tgt, pairs);
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -389,9 +426,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
     if (!pairs.length) return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -416,9 +451,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
     if (!pairs.length) return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -444,9 +477,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
     if (!pairs.length) return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const K = ctx.intent.k ?? 0.9;
       const basePairs = pairs || [];
@@ -473,9 +504,7 @@ const mathStatsFunctionBuilder = {
     const pairs = _collectPairs(ctx, intent, buildConditionPairs, formatValue);
     if (!pairs.length) return `=ERROR("조건에 맞는 열을 찾을 수 없습니다.")`;
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const Q = ctx.intent.quartile ?? 3;
       const basePairs = pairs || [];
@@ -692,9 +721,7 @@ const mathStatsFunctionBuilder = {
     const den = `SUM(${wExpr})`;
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
 
       const baseClauses = [];
@@ -755,9 +782,7 @@ const mathStatsFunctionBuilder = {
     }
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -812,9 +837,7 @@ const mathStatsFunctionBuilder = {
     const yF = pairs.length ? _buildFilterCall(yExpr, pairs) : yExpr;
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
@@ -874,9 +897,7 @@ const mathStatsFunctionBuilder = {
     const yF = pairs.length ? _buildFilterCall(yExpr, pairs) : yExpr;
 
     if (ctx.intent?.group_by) {
-      const keyRef =
-        refFromHeaderSpec(ctx, ctx.intent.group_by) ||
-        refFromHeaderSpec(ctx, { header: ctx.intent.group_by });
+      const keyRef = _resolveGroupKeyRef(ctx, ctx.intent.group_by);
       if (!keyRef) return `=ERROR("group_by: 키 열을 찾을 수 없습니다.")`;
       const basePairs = pairs || [];
       const inner = (kSym) => {
