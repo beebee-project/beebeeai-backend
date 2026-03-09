@@ -780,9 +780,9 @@ function applyExtremeRowOverride(message, intent) {
   // ✅ Top N / N명 / Top3 / 상위 3명 문장은 extreme-row(1건)가 아니라
   //    뒤 단계의 topnrows가 처리하도록 여기서는 건드리지 않는다.
   const hasExplicitTopN =
-    /\btop\s*[2-9]\d*\b/i.test(msg) ||
+    /\btop\s*\d+/i.test(msg) ||
     /(상위|하위)\s*[2-9]\d*\s*명?/.test(msg) ||
-    /[2-9]\d*\s*명/.test(msg);
+    /\d+\s*명(?:의|을|만|씩|중)?/.test(msg);
 
   if (hasExplicitTopN) return intent;
 
@@ -860,7 +860,17 @@ function applyRecentTopNOverride(message, intent) {
   if (!(wantsList && hasRankingCue)) return intent;
 
   const currentOp = String(intent.operation || "").toLowerCase();
-  if (["maxrow", "minrow", "monthcount", "yearcount"].includes(currentOp)) {
+  const explicitTopNSignal =
+    /\btop\s*\d+\b/i.test(msg) ||
+    /(상위|하위)\s*\d+\s*명?/.test(msg) ||
+    /\d+\s*명(?:의|을|만|씩|중)?/.test(msg);
+
+  // monthcount/yearcount는 유지
+  // maxrow/minrow는 "명시적 Top N" 문장이라면 topnrows가 덮어쓰게 허용
+  if (
+    ["monthcount", "yearcount"].includes(currentOp) ||
+    ((currentOp === "maxrow" || currentOp === "minrow") && !explicitTopNSignal)
+  ) {
     return intent;
   }
 
