@@ -301,7 +301,8 @@ function _deduceOp(text = "") {
   if (/(xlookup|lookup|찾아|조회|검색|참조)/.test(s)) return "xlookup";
   if (/(filter|필터)/.test(s)) return "filter";
   if (/\b(if|조건|만약)\b/.test(s)) return "if";
-  if (/(median|중앙값|중간값|가운데\s*값)/.test(s)) return "median";
+  if (/(median|중앙값|중간값|가운데\s*값|중앙\s*(연봉|급여|값|금액)?)/.test(s))
+    return "median";
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
   if (/(sortby|정렬)/.test(s)) return "sortby";
@@ -362,7 +363,7 @@ function buildLocalIntentFromText(text = "") {
   // ✅ 2. 집계 / 그룹 집계 패턴
   // 예: "부서별 직원 수", "평가 등급별 평균 연봉", "부서별 평가 등급 A 직원 수"
   if (
-    /(sum|합계|total|평균|average|count|개수|갯수|인원수|직원\s*수|최고|최저|중앙값|정렬|순으로)/.test(
+    /(sum|합계|total|평균|average|count|개수|갯수|인원수|직원\s*수|최고|최저|중앙값|중간값|중앙\s*(연봉|급여|값|금액)?|정렬|순으로)/.test(
       s,
     )
   ) {
@@ -843,7 +844,8 @@ function _detectAggregateOpFromMessage(msg = "", fallbackOp = "") {
   if (/(개수|갯수|건수|인원수|직원\s*수|count)/i.test(s)) return "count";
   if (/(최고|최대|가장\s*높|max|highest)/i.test(s)) return "max";
   if (/(최저|최소|가장\s*낮|min|lowest)/i.test(s)) return "min";
-  if (/(중앙값|중간값|가운데\s*값|median)/i.test(s)) return "median";
+  if (/(중앙값|중간값|가운데\s*값|median|중앙\s*(연봉|급여|값|금액)?)/i.test(s))
+    return "median";
   return fallbackOp || "formula";
 }
 
@@ -879,7 +881,7 @@ function applyGroupedAggregateOverride(message, intent) {
 
   const looksGrouped =
     !!groupBy &&
-    /(개수|갯수|인원수|직원\s*수|평균|합계|총합|최고|최저|중앙값|정렬|순으로|많은\s*순|높은\s*순|낮은\s*순)/.test(
+    /(개수|갯수|인원수|직원\s*수|평균|합계|총합|최고|최저|중앙값|중간값|중앙\s*(연봉|급여|값|금액)?|정렬|순으로|많은\s*순|높은\s*순|낮은\s*순)/.test(
       msg,
     );
 
