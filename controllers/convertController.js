@@ -896,34 +896,40 @@ function applyRecentTopNOverride(message, intent) {
     });
   }
 
-  if (!intent.return_headers && !intent.select_headers) {
-    const headers = [];
+  // ✅ Top N 문장은 LLM/cached intent의 return_headers를 그대로 믿지 말고
+  //    사용자 문장 기준으로 보수적으로 재정규화한다.
+  const headers = [];
 
-    const wantsName = /(이름|성명)/.test(msg);
-    const wantsSalaryField =
-      /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름,\s*연봉|연봉,\s*이름)/.test(
-        msg,
-      ) ||
-      (/연봉/.test(msg) && /(함께|같이|포함)/.test(msg));
-    const wantsHireDateField =
-      /(이름\s*과\s*입사일|입사일\s*과\s*이름|입사일\s*포함)/.test(msg);
-    const wantsOnlyId = /직원\s*id|사번|id/i.test(msg);
-    const wantsDeptField = /이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함/.test(
+  const wantsName = /(이름|성명)/.test(msg);
+  const wantsPersonList = /직원\s*\d+\s*명|직원|사람/.test(msg);
+  const wantsOnlyId = /직원\s*id|사번|id/i.test(msg);
+
+  const wantsSalaryField =
+    /(이름\s*과\s*연봉|연봉\s*과\s*이름|직원\s*id\s*[,와과및]\s*이름\s*[,와과및]\s*연봉|연봉\s*포함)/.test(
       msg,
-    );
-    const wantsTitleField =
-      /이름\s*과\s*직급|직급\s*과\s*이름|직급\s*포함/.test(msg);
+    ) ||
+    (/(연봉)/.test(msg) && /(같이|함께|포함)/.test(msg));
 
-    if (wantsOnlyId) headers.push("직원ID");
-    if (wantsName || /직원\s*\d+\s*명|직원|사람/.test(msg))
-      headers.push("이름");
-    if (wantsDeptField) headers.push("부서");
-    if (wantsTitleField) headers.push("직급");
-    if (wantsSalaryField) headers.push("연봉");
-    if (wantsHireDateField) headers.push("입사일");
+  const wantsHireDateField =
+    /(이름\s*과\s*입사일|입사일\s*과\s*이름|입사일\s*포함)/.test(msg);
 
-    intent.return_headers = headers.length ? [...new Set(headers)] : ["이름"];
-  }
+  const wantsDeptField = /(이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함)/.test(
+    msg,
+  );
+
+  const wantsTitleField =
+    /(이름\s*과\s*직급|직급\s*과\s*이름|직급\s*포함)/.test(msg);
+
+  if (wantsOnlyId) headers.push("직원ID");
+  if (wantsName || wantsPersonList || !wantsOnlyId) headers.push("이름");
+  if (wantsDeptField) headers.push("부서");
+  if (wantsTitleField) headers.push("직급");
+  if (wantsSalaryField) headers.push("연봉");
+  if (wantsHireDateField) headers.push("입사일");
+
+  // "평가 등급 A 직원 중 연봉 상위 3명"처럼 반환 열이 안 적혀 있으면 기본은 이름
+  intent.return_headers = [...new Set(headers.length ? headers : ["이름"])];
+  delete intent.select_headers;
 
   return intent;
 }
