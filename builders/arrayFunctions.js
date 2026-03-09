@@ -1037,14 +1037,27 @@ function _topNRows(ctx) {
 
   const firstColIdx0 = formulaUtils.columnLetterToIndex(firstCol);
   const byName = new Map(metaEntries.map(([h, m]) => [String(h).trim(), m]));
+  const normHeader = (v) =>
+    String(v || "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "")
+      .trim();
   const findMetaByContains = (needle) => {
     const n = String(needle || "").trim();
     if (!n) return null;
+    const nn = normHeader(n);
     for (const [h, m] of metaEntries) {
       if (String(h).trim() === n) return m;
     }
     for (const [h, m] of metaEntries) {
+      if (normHeader(h) === nn) return m;
+    }
+    for (const [h, m] of metaEntries) {
       if (String(h).includes(n)) return m;
+    }
+    for (const [h, m] of metaEntries) {
+      const hh = normHeader(h);
+      if (hh.includes(nn) || nn.includes(hh)) return m;
     }
     return null;
   };

@@ -853,7 +853,7 @@ function applyRecentTopNOverride(message, intent) {
 
   const wantsList = /(보여줘|목록|리스트|명|행|직원|사람)/.test(msg);
   const hasRankingCue =
-    /(top|상위|하위|높은\s*순|낮은\s*순|가장\s*빠른|가장\s*늦은|가장\s*최근|최근\s*순|최신\s*순|오래된\s*순|오래\s*된\s*순|내림차순|오름차순)/i.test(
+    /(top|상위|하위|높은\s*순|낮은\s*순|가장\s*높|가장\s*낮|최고|최저|가장\s*빠른|가장\s*늦은|가장\s*최근|최근\s*순|최신\s*순|오래된\s*순|오래\s*된\s*순|내림차순|오름차순)/i.test(
       msg,
     );
 
