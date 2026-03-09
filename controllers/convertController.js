@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const { classifyReason } = require("../utils/reasonClassifier");
 const { validateFormula } = require("../utils/outputValidator");
 const { buildDebugMeta } = require("../utils/debugMetaBuilder");
+const { buildGroupFormula } = require("./groupEngine");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -785,14 +786,20 @@ function applySortListOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
-  const wantsNameList = /(이름\s*목록|직원\s*이름|이름\s*리스트|이름)/i.test(msg);
-  const wantsSalaryOrder = /(연봉|salary)/i.test(msg) && /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
+  const wantsNameList = /(이름\s*목록|직원\s*이름|이름\s*리스트|이름)/i.test(
+    msg,
+  );
+  const wantsSalaryOrder =
+    /(연봉|salary)/i.test(msg) &&
+    /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
   if (!(wantsNameList && wantsSalaryOrder)) return intent;
 
   intent.operation = "sortby";
   intent.return_hint = "이름";
   intent.lookup_hint = "연봉";
-  intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg) ? "asc" : "desc";
+  intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
+    ? "asc"
+    : "desc";
   return intent;
 }
 
@@ -1343,6 +1350,21 @@ exports.handleConversion = async (req, res, next) => {
         });
         return res.json({ result: safeOut });
       }
+    }
+
+    // GROUP ENGINE 처리
+    if (intent.group_by && context.bestReturn) {
+      const groupRange = `'${context.bestReturn.sheetName}'!${context.bestReturn.columnLetter}${context.bestReturn.startRow}:${context.bestReturn.columnLetter}${context.bestReturn.lastDataRow}`;
+      const valueRange = groupRange;
+
+      return res.json({
+        result: buildGroupFormula({
+          groupRange,
+          valueRange,
+          aggregate: intent.operation,
+          sort: intent.sort_order === "desc",
+        }),
+      });
     }
 
     // 6) 빌더 호출
