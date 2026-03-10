@@ -26,62 +26,6 @@ function _bestColumnByHint(hint, ctx, role = "lookup") {
     : null;
 }
 
-function _resolveLookupValueExpr(it, ctx, FV) {
-  if (
-    it.lookup_value &&
-    typeof it.lookup_value === "object" &&
-    it.lookup_value.operation
-  ) {
-    return evalSubIntentToScalar(ctx, FV, it.lookup_value);
-  }
-
-  if (it.lookup_value != null) {
-    if (
-      typeof it.lookup_value === "object" &&
-      typeof it.lookup_value.cell === "string"
-    ) {
-      const cell = it.lookup_value.cell.trim();
-      return cell ? cell : null;
-    }
-
-    if (typeof it.lookup_value === "string") {
-      const v = it.lookup_value.trim();
-      if (!v) return null;
-      return FV(v, { forceText: true });
-    }
-
-    if (typeof it.lookup_value === "number") {
-      return String(it.lookup_value);
-    }
-
-    return FV(it.lookup_value, { forceText: true });
-  }
-
-  return null;
-}
-
-function _resolveReturnHints(it) {
-  const arr = Array.isArray(it.return_hints)
-    ? it.return_hints
-    : Array.isArray(it.return_headers)
-      ? it.return_headers
-      : [];
-
-  const normalized = arr
-    .map((v) => {
-      if (typeof v === "string") return v.trim();
-      if (v && typeof v === "object" && v.header) {
-        return String(v.header).trim();
-      }
-      return null;
-    })
-    .filter(Boolean);
-
-  if (normalized.length > 0) return normalized;
-  if (it.return_hint) return [String(it.return_hint).trim()];
-  return [];
-}
-
 /* =========================
  * Lookup 유틸
  * ========================= */
@@ -556,55 +500,24 @@ const referenceFunctionBuilder = {
         ? formatValue(v, opts)
         : referenceFunctionBuilder._fv(v, opts);
 
-    // 1) lookup_value 해석
-    const lookupValue = _resolveLookupValueExpr(it, ctx, FV);
+    // lookup_value
+    let lookupValue =
+      it.lookup_value &&
+      typeof it.lookup_value === "object" &&
+      it.lookup_value.operation
+        ? evalSubIntentToScalar(ctx, FV, it.lookup_value)
+        : it.lookup_value != null
+          ? FV(it.lookup_value, { forceText: true })
+          : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
-    // 2) lookup 열 해석
-    const lookupHint =
-      it.lookup_hint ||
-      it.lookup?.header ||
-      it.lookup_array?.header ||
-      (/(직원\s*id|사번|id)/i.test(String(it.original_text || it.message || ""))
-        ? "직원 ID"
-        : null) ||
-      (/(직원\s*이름|이름|성명)/i.test(
-        String(it.original_text || it.message || ""),
-      )
-        ? "이름"
-        : null);
+    // lookup/return 열(반환 시트 기준 정렬)
+    const bestLookup = _bestColumnByHint(it.lookup_hint, ctx, "lookup");
+    const bestReturn = _bestColumnByHint(it.return_hint, ctx, "return");
+    if (!bestLookup || !bestReturn)
+      return `=ERROR("XLOOKUP: lookup/return 열을 찾지 못했습니다.")`;
 
-    const bestLookup = _bestColumnByHint(lookupHint, ctx, "lookup");
-    if (!bestLookup) {
-      return `=ERROR("XLOOKUP: lookup 열을 찾지 못했습니다.")`;
-    }
-
-    // 3) 반환 열들 해석 (다중 반환 지원)
-    const rawReturnHints = _resolveReturnHints(it);
-    const returnHints = rawReturnHints.filter(
-      (h) =>
-        !it.lookup_hint || String(h).trim() !== String(it.lookup_hint).trim(),
-    );
-
-    if (!returnHints.length) {
-      return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
-    }
-
-    const returnCols = returnHints
-      .map((hint) => ({
-        hint,
-        col: _bestColumnByHint(hint, ctx, "return"),
-      }))
-      .filter((x) => x.col);
-
-    if (!returnCols.length) {
-      return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
-    }
-
-    // 4) 기본 기준 시트
-    const primarySheet = returnCols[0]?.col?.sheetName || bestLookup.sheetName;
-
-    // lookup 열을 반환 시트 기준으로 다시 맞춤
+    const primarySheet = bestReturn.sheetName || bestLookup.sheetName;
     const lookCol =
       bestLookup.sheetName === primarySheet
         ? bestLookup
@@ -613,45 +526,26 @@ const referenceFunctionBuilder = {
             primarySheet,
             ctx,
           );
-
-    if (!lookCol) {
+    if (!lookCol)
       return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
-    }
 
     const lookupRange = `'${primarySheet}'!${lookCol.columnLetter}${lookCol.startRow}:${lookCol.columnLetter}${lookCol.lastDataRow}`;
+    const returnRange = `'${primarySheet}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 
-    // 5) 반환 열들을 primarySheet 기준으로 정렬
-    const alignedReturnRanges = returnCols
-      .map(({ hint, col }) => {
-        const aligned =
-          col.sheetName === primarySheet
-            ? col
-            : resolveHeaderInSheet(col.header || hint, primarySheet, ctx);
-        if (!aligned) return null;
-        return `'${primarySheet}'!${aligned.columnLetter}${aligned.startRow}:${aligned.columnLetter}${aligned.lastDataRow}`;
-      })
-      .filter(Boolean);
-
-    if (!alignedReturnRanges.length) {
-      return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
-    }
-
-    // 6) 옵션
+    // if_not_found, match/search
     const ifNF =
-      it.value_if_not_found != null ? FV(it.value_if_not_found) : null;
-
+      it.value_if_not_found != null ? `, ${FV(it.value_if_not_found)}` : "";
     const mm = (() => {
       const v = it.match_mode;
-      if (v == null) return 0;
+      if (v == null) return null;
       if (typeof v === "number") return v;
       const s = String(v).toLowerCase();
       if (s === "exact") return 0;
+      if (s === "approx" || s === "lte" || s === "lteq") return -1;
+      if (s === "gte" || s === "gteq") return 1;
       if (s === "wildcard") return 2;
-      if (s === "nextsmaller" || s === "lte" || s === "approx") return -1;
-      if (s === "nextlarger" || s === "gte") return 1;
       return 0;
     })();
-
     const sm = (() => {
       const v = it.search_mode;
       if (v == null) return null;
@@ -659,30 +553,35 @@ const referenceFunctionBuilder = {
       const s = String(v).toLowerCase();
       if (s === "first") return 1;
       if (s === "last") return -1;
-      return null;
+      if (s === "asc") return 2;
+      if (s === "desc") return -2;
+      return 1;
     })();
 
-    // 7) 단일 반환
-    if (alignedReturnRanges.length === 1) {
-      const args = [lookupValue, lookupRange, alignedReturnRanges[0]];
-      if (ifNF != null) args.push(ifNF);
-      if (mm != null) args.push(mm);
-      if (sm != null) args.push(sm);
-      return `=XLOOKUP(${args.join(", ")})`;
+    // 멀티키 조합
+    let lookupArray = lookupRange;
+    if (Array.isArray(it.multi_keys) && it.multi_keys.length > 0) {
+      const cols = it.multi_keys
+        .map((k) => _bestColumnByHint(k.hint, ctx, "lookup"))
+        .filter(Boolean)
+        .map(
+          (c) =>
+            `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`,
+        );
+      if (cols.length > 0) {
+        lookupArray = cols.map((c) => `(${c})`).join(`&"|"&`);
+        if (!it.lookup_value) {
+          const keyVals = it.multi_keys
+            .map((k) => (k.value != null ? FV(k.value) : `""`))
+            .join(`&"|"&`);
+          lookupValue = keyVals;
+        }
+      }
     }
 
-    // 8) 다중 반환
-    // XLOOKUP이 다중 열 return array를 안정적으로 받는 환경도 있지만,
-    // 현재 엔진 호환성을 위해 HSTACK(XLOOKUP(...), XLOOKUP(...))로 고정
-    const parts = alignedReturnRanges.map((retRange) => {
-      const args = [lookupValue, lookupRange, retRange];
-      if (ifNF != null) args.push(ifNF);
-      if (mm != null) args.push(mm);
-      if (sm != null) args.push(sm);
-      return `XLOOKUP(${args.join(", ")})`;
-    });
-
-    return `=HSTACK(${parts.join(", ")})`;
+    const mmArg = mm != null ? `, ${mm}` : "";
+    const smArg = sm != null ? `, ${sm}` : "";
+    return `=XLOOKUP(${lookupValue}, ${lookupArray}, ${returnRange}${ifNF}${mmArg}${smArg})`;
   },
 
   hlookup(ctx, formatValue) {
