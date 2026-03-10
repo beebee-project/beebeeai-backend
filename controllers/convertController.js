@@ -309,48 +309,6 @@ function _deduceOp(text = "") {
   return "formula";
 }
 
-function _normalizeLookupHeaderName(raw = "") {
-  const s = String(raw || "")
-    .trim()
-    .replace(/\s+/g, "")
-    .toLowerCase();
-
-  if (/^(직원id|사번|empid|employeeid|id)$/.test(s)) return "직원ID";
-  if (/^(이름|성명|name)$/.test(s)) return "이름";
-  if (/^(부서|department|dept)$/.test(s)) return "부서";
-  if (/^(직급|직책|title|position|role)$/.test(s)) return "직급";
-  if (/^(연봉|급여|salary|pay)$/.test(s)) return "연봉";
-  if (/^(입사일|입사|hiredate|joindate)$/.test(s)) return "입사일";
-
-  return String(raw || "").trim();
-}
-
-function _extractLookupReturnHeaders(message = "") {
-  const msg = String(message || "");
-  const headers = [];
-
-  const push = (h) => {
-    const normalized = _normalizeLookupHeaderName(h);
-    if (normalized && !headers.includes(normalized)) headers.push(normalized);
-  };
-
-  if (/(이름|성명)/i.test(msg)) push("이름");
-  if (/(부서)/i.test(msg)) push("부서");
-  if (/(직급|직책)/i.test(msg)) push("직급");
-  if (/(연봉|급여)/i.test(msg)) push("연봉");
-  if (/(입사일|입사)/i.test(msg)) push("입사일");
-  if (/(직원\s*id|사번|\bID\b)/i.test(msg)) push("직원ID");
-
-  return headers;
-}
-
-function _hasPlaceholderLookupValue(message = "") {
-  const msg = String(message || "");
-  return /(특정\s*직원|존재하지\s*않는\s*직원\s*id|없는\s*직원\s*id|알\s*수\s*없는\s*직원)/i.test(
-    msg,
-  );
-}
-
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -385,72 +343,20 @@ function buildLocalIntentFromText(text = "") {
   }
 
   // ✅ 1. Lookup / 조회 패턴 감지
-  if (op.includes("lookup") || /찾|조회|검색|lookup|가져와줘/.test(s)) {
+  // 예: "홍길동의 매출", "이름으로 점수 찾기"
+  const lookupMatch = s.match(
+    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
+  );
+  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
     intent.operation = "xlookup";
-
-    const originalMsg = String(text || "");
-
-    // 1) "J4에 있는 직원 ID의 이름, 부서, 직급을 동시에 가져와줘"
-    const cellLookupMatch = originalMsg.match(
-      /([A-Z]+\d+)\s*에\s*있는\s*([가-힣A-Za-z\s]+?)\s*(?:의|로)/i,
-    );
-    if (cellLookupMatch) {
-      intent.lookup_value = cellLookupMatch[1].toUpperCase();
-      intent.lookup_hint = _normalizeLookupHeaderName(cellLookupMatch[2]);
+    if (lookupMatch) {
+      intent.lookup_hint = lookupMatch[1];
+      intent.return_hint = lookupMatch[2];
+    } else {
+      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
+      if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
+      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
     }
-
-    // 2) "직원 ID로 부서와 직급을 동시에 가져와줘"
-    if (!intent.lookup_hint) {
-      const byMatch = originalMsg.match(
-        /(직원\s*ID|사번|\bID\b|이름|성명)\s*로/i,
-      );
-      if (byMatch) {
-        intent.lookup_hint = _normalizeLookupHeaderName(byMatch[1]);
-      }
-    }
-
-    // 3) "홍길동의 부서", "1001의 이름" 형태
-    if (intent.lookup_value == null && !intent.lookup_hint) {
-      const possessiveLookupMatch = originalMsg.match(
-        /([가-힣A-Za-z0-9_-]+)\s*의\s*(이름|성명|부서|직급|연봉|급여|입사일)/i,
-      );
-      if (possessiveLookupMatch && !_hasPlaceholderLookupValue(originalMsg)) {
-        intent.lookup_value = possessiveLookupMatch[1];
-        intent.return_hint = _normalizeLookupHeaderName(
-          possessiveLookupMatch[2],
-        );
-      }
-    }
-
-    // 4) 반환 열 다중 추출
-    const returnHeaders = _extractLookupReturnHeaders(originalMsg).filter(
-      (h) => h !== intent.lookup_hint,
-    );
-
-    if (returnHeaders.length > 1) {
-      intent.return_headers = returnHeaders;
-      delete intent.return_hint;
-    } else if (returnHeaders.length === 1) {
-      intent.return_hint = returnHeaders[0];
-      delete intent.return_headers;
-    }
-
-    // 5) 기본 fallback
-    if (!intent.lookup_hint && /직원\s*id|사번|\bID\b/i.test(originalMsg)) {
-      intent.lookup_hint = "직원ID";
-    }
-    if (!intent.return_hint && !intent.return_headers?.length) {
-      if (/(이름|성명)/i.test(originalMsg)) intent.return_hint = "이름";
-      else if (/(부서)/i.test(originalMsg)) intent.return_hint = "부서";
-      else if (/(직급|직책)/i.test(originalMsg)) intent.return_hint = "직급";
-      else if (/(연봉|급여)/i.test(originalMsg)) intent.return_hint = "연봉";
-    }
-
-    // 6) placeholder 문구는 lookup_value로 박지 않음
-    if (_hasPlaceholderLookupValue(originalMsg)) {
-      delete intent.lookup_value;
-    }
-
     return intent;
   }
 
@@ -574,6 +480,38 @@ function normalizeLookupIntent(intent) {
   const op = String(intent.operation).toLowerCase();
   if (op !== "xlookup" && op !== "lookup") return intent;
 
+  // ✅ 0. return_hints 표준화
+  // - LLM/로컬 intent가 return_headers, return_cols, select_headers 등으로 줄 수 있는 값을
+  //   조회 전용 다중 반환 필드 return_hints 로 통일
+  if (!Array.isArray(intent.return_hints) || intent.return_hints.length === 0) {
+    const multiCandidates = [
+      intent.return_headers,
+      intent.select_headers,
+      intent.return_cols,
+      intent.return_columns,
+    ].find((v) => Array.isArray(v) && v.length > 0);
+
+    if (multiCandidates) {
+      intent.return_hints = multiCandidates
+        .map((v) => {
+          if (typeof v === "string") return v.trim();
+          if (v && typeof v === "object" && v.header) {
+            return String(v.header).trim();
+          }
+          return null;
+        })
+        .filter(Boolean);
+    }
+  }
+
+  // 단일 return_hint만 있고 return_hints가 비어 있으면 배열화
+  if (
+    (!intent.return_hints || intent.return_hints.length === 0) &&
+    intent.return_hint
+  ) {
+    intent.return_hints = [String(intent.return_hint).trim()];
+  }
+
   // ✅ 1. LLM 출력 보정: lookup_key → lookup_array 변환
   if (intent.lookup_key) {
     if (intent.lookup_value == null)
@@ -594,7 +532,27 @@ function normalizeLookupIntent(intent) {
     };
   }
 
-  // ✅ 3. 중첩 구조 통일 (referenceFunctions 호환용)
+  // ✅ 2-1. return_hints가 있으면 첫 번째를 return_hint / return_array에 기본 반영
+  if (
+    Array.isArray(intent.return_hints) &&
+    intent.return_hints.length > 0 &&
+    !intent.return_hint
+  ) {
+    intent.return_hint = intent.return_hints[0];
+  }
+
+  if (
+    Array.isArray(intent.return_hints) &&
+    intent.return_hints.length > 0 &&
+    !intent.return_array
+  ) {
+    intent.return_array = {
+      sheet: intent.return?.sheet || intent.lookup_array?.sheet,
+      header: intent.return_hints[0],
+    };
+  }
+
+  // ✅ 3. 중첩 구조 통일
   intent.lookup = intent.lookup || {};
   if (intent.lookup_value != null && intent.lookup.value == null) {
     intent.lookup.value = intent.lookup_value;
@@ -610,29 +568,6 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
-  }
-
-  if (Array.isArray(intent.return_headers)) {
-    intent.return_headers = [...new Set(intent.return_headers.filter(Boolean))];
-  }
-
-  if (
-    Array.isArray(intent.return_headers) &&
-    intent.return_headers.length >= 1 &&
-    !intent.return_hint
-  ) {
-    // ✅ 다중 반환이어도 첫 번째 반환열을 대표 return_hint로 둔다.
-    // 컨트롤러의 사전 열 매핑(findBestSheetAndColumns)과 검증 단계가
-    // return_hint를 기준으로 움직이는 구간이 있어서 필요하다.
-    intent.return_hint = intent.return_headers[0];
-  }
-
-  // ✅ placeholder lookup value 최종 차단
-  if (
-    intent.lookup_value != null &&
-    _hasPlaceholderLookupValue(String(intent.lookup_value))
-  ) {
-    delete intent.lookup_value;
   }
 
   return intent;
@@ -1940,16 +1875,8 @@ exports.handleConversion = async (req, res, next) => {
       );
 
       if (hasHints) {
-        const primaryReturnHint =
-          intent.return_hint ||
-          (Array.isArray(intent.return_headers) && intent.return_headers.length
-            ? intent.return_headers[0]
-            : "") ||
-          intent.header_hint ||
-          "";
-
         const searchTerms = {
-          return: primaryReturnHint,
+          return: intent.return_hint || intent.header_hint || "",
           lookup: intent.lookup_hint || "",
         };
 
@@ -2254,18 +2181,11 @@ async function convert(nl, options = {}, meta = {}) {
       hasHints &&
       typeof formulaUtils.findBestSheetAndColumns === "function"
     ) {
-      const primaryReturnHint =
-        intent.return_hint ||
-        (Array.isArray(intent.return_headers) && intent.return_headers.length
-          ? intent.return_headers[0]
-          : "") ||
-        intent.header_hint ||
-        "";
-
       const searchTerms = {
-        return: primaryReturnHint,
+        return: intent.return_hint || intent.header_hint || "",
         lookup: intent.lookup_hint || "",
       };
+
       const joint = formulaUtils.findBestSheetAndColumns(
         allSheetsData,
         searchTerms,
