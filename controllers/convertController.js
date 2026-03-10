@@ -2275,7 +2275,11 @@ exports.handleFeedback = async (req, res, next) => {
 async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-  let intent = normalizeLookupIntent(baseIntent);
+
+  let intent = baseIntent;
+  intent = applyLookupReferenceOverride(nl, intent);
+  intent = normalizeLookupIntent(intent);
+
   intent = applyMedianOverride(nl, intent);
   intent = applyExtremeRowOverride(nl, intent);
   intent = applyDateBoundaryOverride(nl, intent);

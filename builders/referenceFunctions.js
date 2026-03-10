@@ -50,6 +50,10 @@ function _resolveLookupValueExpr(it, ctx, FV) {
       return FV(v, { forceText: true });
     }
 
+    if (typeof it.lookup_value === "number") {
+      return String(it.lookup_value);
+    }
+
     return FV(it.lookup_value, { forceText: true });
   }
 
