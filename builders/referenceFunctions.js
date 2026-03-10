@@ -507,7 +507,9 @@ const referenceFunctionBuilder = {
       it.lookup_value.operation
         ? evalSubIntentToScalar(ctx, FV, it.lookup_value)
         : it.lookup_value != null
-          ? FV(it.lookup_value, { forceText: true })
+          ? /^[A-Z]{1,3}\d{1,7}$/i.test(String(it.lookup_value).trim())
+            ? FV(String(it.lookup_value).trim())
+            : FV(it.lookup_value, { forceText: true })
           : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 

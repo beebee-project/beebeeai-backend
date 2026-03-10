@@ -388,6 +388,23 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
+  // ✅ lookup 키로 사용한 열은 반환열 후보에서 제거
+  if (intent.lookup_hint === "직원 ID") {
+    const filtered = wants.filter((h) => h !== "직원 ID");
+    if (filtered.length) {
+      wants.length = 0;
+      wants.push(...filtered);
+    }
+  }
+
+  if (intent.lookup_hint === "이름") {
+    const filtered = wants.filter((h) => h !== "이름");
+    if (filtered.length) {
+      wants.length = 0;
+      wants.push(...filtered);
+    }
+  }
+
   // ✅ 2. 집계 / 그룹 집계 패턴
   // 예: "부서별 직원 수", "평가 등급별 평균 연봉", "부서별 평가 등급 A 직원 수"
   if (
@@ -1885,15 +1902,18 @@ exports.handleConversion = async (req, res, next) => {
     _tBuildStart = process.hrtime.bigint();
     const context = { intent, formulaBuilder };
     if (isFileAttached && allSheetsData) {
-      const hasHints = !!(
+      const primaryReturnHint =
         intent.return_hint ||
         intent.header_hint ||
-        intent.lookup_hint
-      );
+        (Array.isArray(intent.return_headers) && intent.return_headers.length
+          ? intent.return_headers[0]
+          : "");
+
+      const hasHints = !!(primaryReturnHint || intent.lookup_hint);
 
       if (hasHints) {
         const searchTerms = {
-          return: intent.return_hint || intent.header_hint || "",
+          return: primaryReturnHint,
           lookup: intent.lookup_hint || "",
         };
 
@@ -1908,7 +1928,16 @@ exports.handleConversion = async (req, res, next) => {
         const bestReturn = joint.return;
         const bestLookup = joint.lookup;
 
-        if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+        const opLower = String(intent.operation || "").toLowerCase();
+
+        // ✅ xlookup/lookup은 참조 빌더가 return_headers를 직접 해석하므로
+        //    여기서 성급히 막지 말고 builder까지 보낸다.
+        if (
+          !bestReturn &&
+          primaryReturnHint &&
+          opLower !== "xlookup" &&
+          opLower !== "lookup"
+        ) {
           return res.json({
             result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
           });
@@ -2189,18 +2218,18 @@ async function convert(nl, options = {}, meta = {}) {
 
   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
   if (allSheetsData) {
-    const hasHints = !!(
+    const primaryReturnHint =
       intent.return_hint ||
       intent.header_hint ||
-      intent.lookup_hint
-    );
+      (Array.isArray(intent.return_headers) && intent.return_headers.length
+        ? intent.return_headers[0]
+        : "");
 
-    if (
-      hasHints &&
-      typeof formulaUtils.findBestSheetAndColumns === "function"
-    ) {
+    const hasHints = !!(primaryReturnHint || intent.lookup_hint);
+
+    if (hasHints) {
       const searchTerms = {
-        return: intent.return_hint || intent.header_hint || "",
+        return: primaryReturnHint,
         lookup: intent.lookup_hint || "",
       };
 
@@ -2212,13 +2241,22 @@ async function convert(nl, options = {}, meta = {}) {
         },
       );
 
-      const bestReturn = joint?.return || null;
-      const bestLookup = joint?.lookup || null;
+      const bestReturn = joint.return;
+      const bestLookup = joint.lookup;
 
-      // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
-      // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
-        return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
+      const opLower = String(intent.operation || "").toLowerCase();
+
+      // ✅ xlookup/lookup은 참조 빌더가 return_headers를 직접 해석하므로
+      //    여기서 성급히 막지 말고 builder까지 보낸다.
+      if (
+        !bestReturn &&
+        primaryReturnHint &&
+        opLower !== "xlookup" &&
+        opLower !== "lookup"
+      ) {
+        return res.json({
+          result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
+        });
       }
 
       mergedMeta = {
