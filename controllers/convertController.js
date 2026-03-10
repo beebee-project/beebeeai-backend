@@ -309,6 +309,48 @@ function _deduceOp(text = "") {
   return "formula";
 }
 
+function _normalizeLookupHeaderName(raw = "") {
+  const s = String(raw || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+  if (/^(직원id|사번|empid|employeeid|id)$/.test(s)) return "직원ID";
+  if (/^(이름|성명|name)$/.test(s)) return "이름";
+  if (/^(부서|department|dept)$/.test(s)) return "부서";
+  if (/^(직급|직책|title|position|role)$/.test(s)) return "직급";
+  if (/^(연봉|급여|salary|pay)$/.test(s)) return "연봉";
+  if (/^(입사일|입사|hiredate|joindate)$/.test(s)) return "입사일";
+
+  return String(raw || "").trim();
+}
+
+function _extractLookupReturnHeaders(message = "") {
+  const msg = String(message || "");
+  const headers = [];
+
+  const push = (h) => {
+    const normalized = _normalizeLookupHeaderName(h);
+    if (normalized && !headers.includes(normalized)) headers.push(normalized);
+  };
+
+  if (/(이름|성명)/i.test(msg)) push("이름");
+  if (/(부서)/i.test(msg)) push("부서");
+  if (/(직급|직책)/i.test(msg)) push("직급");
+  if (/(연봉|급여)/i.test(msg)) push("연봉");
+  if (/(입사일|입사)/i.test(msg)) push("입사일");
+  if (/(직원\s*id|사번|\bID\b)/i.test(msg)) push("직원ID");
+
+  return headers;
+}
+
+function _hasPlaceholderLookupValue(message = "") {
+  const msg = String(message || "");
+  return /(특정\s*직원|존재하지\s*않는\s*직원\s*id|없는\s*직원\s*id|알\s*수\s*없는\s*직원)/i.test(
+    msg,
+  );
+}
+
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -343,20 +385,72 @@ function buildLocalIntentFromText(text = "") {
   }
 
   // ✅ 1. Lookup / 조회 패턴 감지
-  // 예: "홍길동의 매출", "이름으로 점수 찾기"
-  const lookupMatch = s.match(
-    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
-  );
-  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
+  if (op.includes("lookup") || /찾|조회|검색|lookup|가져와줘/.test(s)) {
     intent.operation = "xlookup";
-    if (lookupMatch) {
-      intent.lookup_hint = lookupMatch[1];
-      intent.return_hint = lookupMatch[2];
-    } else {
-      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
-      if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
-      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
+
+    const originalMsg = String(text || "");
+
+    // 1) "J4에 있는 직원 ID의 이름, 부서, 직급을 동시에 가져와줘"
+    const cellLookupMatch = originalMsg.match(
+      /([A-Z]+\d+)\s*에\s*있는\s*([가-힣A-Za-z\s]+?)\s*(?:의|로)/i,
+    );
+    if (cellLookupMatch) {
+      intent.lookup_value = cellLookupMatch[1].toUpperCase();
+      intent.lookup_hint = _normalizeLookupHeaderName(cellLookupMatch[2]);
     }
+
+    // 2) "직원 ID로 부서와 직급을 동시에 가져와줘"
+    if (!intent.lookup_hint) {
+      const byMatch = originalMsg.match(
+        /(직원\s*ID|사번|\bID\b|이름|성명)\s*로/i,
+      );
+      if (byMatch) {
+        intent.lookup_hint = _normalizeLookupHeaderName(byMatch[1]);
+      }
+    }
+
+    // 3) "홍길동의 부서", "1001의 이름" 형태
+    if (intent.lookup_value == null && !intent.lookup_hint) {
+      const possessiveLookupMatch = originalMsg.match(
+        /([가-힣A-Za-z0-9_-]+)\s*의\s*(이름|성명|부서|직급|연봉|급여|입사일)/i,
+      );
+      if (possessiveLookupMatch && !_hasPlaceholderLookupValue(originalMsg)) {
+        intent.lookup_value = possessiveLookupMatch[1];
+        intent.return_hint = _normalizeLookupHeaderName(
+          possessiveLookupMatch[2],
+        );
+      }
+    }
+
+    // 4) 반환 열 다중 추출
+    const returnHeaders = _extractLookupReturnHeaders(originalMsg).filter(
+      (h) => h !== intent.lookup_hint,
+    );
+
+    if (returnHeaders.length > 1) {
+      intent.return_headers = returnHeaders;
+      delete intent.return_hint;
+    } else if (returnHeaders.length === 1) {
+      intent.return_hint = returnHeaders[0];
+      delete intent.return_headers;
+    }
+
+    // 5) 기본 fallback
+    if (!intent.lookup_hint && /직원\s*id|사번|\bID\b/i.test(originalMsg)) {
+      intent.lookup_hint = "직원ID";
+    }
+    if (!intent.return_hint && !intent.return_headers?.length) {
+      if (/(이름|성명)/i.test(originalMsg)) intent.return_hint = "이름";
+      else if (/(부서)/i.test(originalMsg)) intent.return_hint = "부서";
+      else if (/(직급|직책)/i.test(originalMsg)) intent.return_hint = "직급";
+      else if (/(연봉|급여)/i.test(originalMsg)) intent.return_hint = "연봉";
+    }
+
+    // 6) placeholder 문구는 lookup_value로 박지 않음
+    if (_hasPlaceholderLookupValue(originalMsg)) {
+      delete intent.lookup_value;
+    }
+
     return intent;
   }
 
@@ -516,6 +610,14 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
+  }
+
+  if (
+    Array.isArray(intent.return_headers) &&
+    intent.return_headers.length === 1 &&
+    !intent.return_hint
+  ) {
+    intent.return_hint = intent.return_headers[0];
   }
 
   return intent;

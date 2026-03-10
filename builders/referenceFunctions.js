@@ -507,17 +507,36 @@ const referenceFunctionBuilder = {
       it.lookup_value.operation
         ? evalSubIntentToScalar(ctx, FV, it.lookup_value)
         : it.lookup_value != null
-          ? FV(it.lookup_value, { forceText: true })
+          ? FV(it.lookup_value)
           : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
-    // lookup/return 열(반환 시트 기준 정렬)
+    // lookup / return 열
     const bestLookup = _bestColumnByHint(it.lookup_hint, ctx, "lookup");
-    const bestReturn = _bestColumnByHint(it.return_hint, ctx, "return");
-    if (!bestLookup || !bestReturn)
+
+    const requestedReturns =
+      Array.isArray(it.return_headers) && it.return_headers.length
+        ? [...new Set(it.return_headers)]
+        : it.return_hint
+          ? [it.return_hint]
+          : [];
+
+    const resolvedReturnCols = requestedReturns
+      .map((h) => _bestColumnByHint(h, ctx, "return"))
+      .filter(Boolean);
+
+    const bestReturn =
+      resolvedReturnCols[0] ||
+      (it.return_hint
+        ? _bestColumnByHint(it.return_hint, ctx, "return")
+        : null);
+
+    if (!bestLookup || !bestReturn) {
       return `=ERROR("XLOOKUP: lookup/return 열을 찾지 못했습니다.")`;
+    }
 
     const primarySheet = bestReturn.sheetName || bestLookup.sheetName;
+
     const lookCol =
       bestLookup.sheetName === primarySheet
         ? bestLookup
@@ -526,15 +545,28 @@ const referenceFunctionBuilder = {
             primarySheet,
             ctx,
           );
-    if (!lookCol)
+
+    if (!lookCol) {
       return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
+    }
 
     const lookupRange = `'${primarySheet}'!${lookCol.columnLetter}${lookCol.startRow}:${lookCol.columnLetter}${lookCol.lastDataRow}`;
-    const returnRange = `'${primarySheet}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+
+    const normalizedReturnCols =
+      resolvedReturnCols.length > 0
+        ? resolvedReturnCols
+            .map((col) =>
+              col.sheetName === primarySheet
+                ? col
+                : resolveHeaderInSheet(col.header, primarySheet, ctx),
+            )
+            .filter(Boolean)
+        : [bestReturn];
 
     // if_not_found, match/search
     const ifNF =
       it.value_if_not_found != null ? `, ${FV(it.value_if_not_found)}` : "";
+
     const mm = (() => {
       const v = it.match_mode;
       if (v == null) return null;
@@ -546,6 +578,7 @@ const referenceFunctionBuilder = {
       if (s === "wildcard") return 2;
       return 0;
     })();
+
     const sm = (() => {
       const v = it.search_mode;
       if (v == null) return null;
@@ -568,6 +601,7 @@ const referenceFunctionBuilder = {
           (c) =>
             `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`,
         );
+
       if (cols.length > 0) {
         lookupArray = cols.map((c) => `(${c})`).join(`&"|"&`);
         if (!it.lookup_value) {
@@ -581,7 +615,17 @@ const referenceFunctionBuilder = {
 
     const mmArg = mm != null ? `, ${mm}` : "";
     const smArg = sm != null ? `, ${sm}` : "";
-    return `=XLOOKUP(${lookupValue}, ${lookupArray}, ${returnRange}${ifNF}${mmArg}${smArg})`;
+
+    const buildSingleXlookup = (returnCol) => {
+      const returnRange = `'${primarySheet}'!${returnCol.columnLetter}${returnCol.startRow}:${returnCol.columnLetter}${returnCol.lastDataRow}`;
+      return `XLOOKUP(${lookupValue}, ${lookupArray}, ${returnRange}${ifNF}${mmArg}${smArg})`;
+    };
+
+    if (normalizedReturnCols.length === 1) {
+      return `=${buildSingleXlookup(normalizedReturnCols[0])}`;
+    }
+
+    return `=HSTACK(${normalizedReturnCols.map(buildSingleXlookup).join(", ")})`;
   },
 
   hlookup(ctx, formatValue) {
