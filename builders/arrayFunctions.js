@@ -114,42 +114,6 @@ function _coerceDate(expr) {
   return `IFERROR(DATEVALUE(${_trimText(expr)}), ${expr})`;
 }
 
-function _normalizeConditionValueKey(value) {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? String(value) : "";
-  }
-
-  const raw = String(value).trim();
-  const noComma = raw.replace(/,/g, "");
-  if (/^-?\d+(?:\.\d+)?$/.test(noComma)) return noComma;
-
-  return raw.toLowerCase();
-}
-
-function _conditionKey(cond) {
-  if (!cond || typeof cond !== "object" || cond.logical_operator) return null;
-  return `${String(cond?.target || cond?.header || "")
-    .trim()
-    .toLowerCase()}|${String(cond?.operator || "=")
-    .trim()
-    .toLowerCase()}|${_normalizeConditionValueKey(cond?.value)}`;
-}
-
-function _dedupeConditions(conds = []) {
-  const uniqueConds = [];
-  const seen = new Set();
-
-  for (const c of Array.isArray(conds) ? conds : []) {
-    const key = _conditionKey(c);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    uniqueConds.push(c);
-  }
-
-  return uniqueConds;
-}
-
 function _isSheetsContext(ctx) {
   // ctx / intent에 "Sheets" 힌트가 있으면 Sheets로 간주
   const it = ctx?.intent || {};
@@ -857,7 +821,21 @@ const arrayFunctionBuilder = {
       const conds = Array.isArray(it.conditions)
         ? it.conditions.filter(Boolean)
         : [];
-      const uniqueConds = _dedupeConditions(conds);
+      const uniqueConds = [];
+      const seen = new Set();
+      for (const c of conds) {
+        const key = `${String(c?.target || c?.header || "")
+          .trim()
+          .toLowerCase()}|${String(c?.operator || "=")
+          .trim()
+          .toLowerCase()}|${String(c?.value ?? "")
+          .trim()
+          .toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueConds.push(c);
+        }
+      }
 
       if (!uniqueConds.length) {
         return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
@@ -1221,8 +1199,21 @@ function _extremeRow(ctx, which) {
   const conds = Array.isArray(it.conditions)
     ? it.conditions.filter(Boolean)
     : [];
-  const uniqueConds = _dedupeConditions(conds);
-
+  const uniqueConds = [];
+  const seen = new Set();
+  for (const c of conds) {
+    const key = `${String(c?.target || c?.header || "")
+      .trim()
+      .toLowerCase()}|${String(c?.operator || "=")
+      .trim()
+      .toLowerCase()}|${String(c?.value ?? "")
+      .trim()
+      .toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueConds.push(c);
+    }
+  }
   if (!uniqueConds.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
   }

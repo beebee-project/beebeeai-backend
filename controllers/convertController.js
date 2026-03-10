@@ -1231,77 +1231,35 @@ function _detectSortOrderFromMessage(msg = "") {
   return null;
 }
 
-function _normalizeConditionValue(value) {
-  if (value === null || value === undefined) return "";
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? String(value) : "";
-  }
-
-  const raw = String(value).trim();
-  const noComma = raw.replace(/,/g, "");
-  if (/^-?\d+(?:\.\d+)?$/.test(noComma)) return noComma;
-
-  return raw.toLowerCase();
-}
-
-function _buildConditionKey(cond) {
-  if (!cond || typeof cond !== "object" || cond.logical_operator) return null;
-
-  const target = String(cond.target || cond.header || "")
-    .trim()
-    .toLowerCase();
-  const op = String(cond.operator || "=")
-    .trim()
-    .toLowerCase();
-  const value = _normalizeConditionValue(cond.value);
-
-  return `${target}|${op}|${value}`;
-}
-
-function normalizeConditions(intent) {
-  if (!intent || typeof intent !== "object") return intent;
-  if (!Array.isArray(intent.conditions)) return intent;
-
-  const seen = new Set();
-  const normalized = [];
-
-  for (const cond of intent.conditions) {
-    if (!cond || typeof cond !== "object") continue;
-
-    if (cond.logical_operator && Array.isArray(cond.conditions)) {
-      const childIntent = { conditions: cond.conditions };
-      normalizeConditions(childIntent);
-
-      const nextGroup = {
-        ...cond,
-        conditions: childIntent.conditions,
-      };
-
-      if (nextGroup.conditions.length) normalized.push(nextGroup);
-      continue;
-    }
-
-    const key = _buildConditionKey(cond);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    normalized.push(cond);
-  }
-
-  intent.conditions = normalized;
-  return intent;
-}
-
 function _appendCondition(intent, cond) {
   if (!intent || !cond || typeof cond !== "object") return;
   if (!intent.conditions) intent.conditions = [];
 
-  const incomingKey = _buildConditionKey(cond);
-  if (!incomingKey) return;
+  const incomingTarget = String(cond.target || cond.header || "")
+    .trim()
+    .toLowerCase();
+  const incomingOp = String(cond.operator || "=")
+    .trim()
+    .toLowerCase();
+  const incomingValue = String(cond.value ?? "")
+    .trim()
+    .toLowerCase();
 
-  const exists = intent.conditions.some(
-    (c) => _buildConditionKey(c) === incomingKey,
-  );
+  const exists = intent.conditions.some((c) => {
+    if (!c || typeof c !== "object" || c.logical_operator) return false;
+    const target = String(c.target || c.header || "")
+      .trim()
+      .toLowerCase();
+    const op = String(c.operator || "=")
+      .trim()
+      .toLowerCase();
+    const value = String(c.value ?? "")
+      .trim()
+      .toLowerCase();
+    return (
+      target === incomingTarget && op === incomingOp && value === incomingValue
+    );
+  });
 
   if (!exists) {
     intent.conditions.push(cond);
@@ -1834,7 +1792,6 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyFilteredSortOverride(message, intent);
     intent = applyRankColumnOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
-    intent = normalizeConditions(intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
@@ -2145,7 +2102,6 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyFilteredSortOverride(nl, intent);
   intent = applyRankColumnOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
-  intent = normalizeConditions(intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
