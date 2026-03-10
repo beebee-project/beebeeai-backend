@@ -659,9 +659,21 @@ const referenceFunctionBuilder = {
       }
     }
 
-    const mmArg = mm != null ? `, ${mm}` : "";
-    const smArg = sm != null ? `, ${sm}` : "";
-    return `=XLOOKUP(${lookupValue}, ${finalLookupArray}, ${finalReturnRange}${ifNF}${mmArg}${smArg})`;
+    const args = [lookupValue, finalLookupArray, finalReturnRange];
+
+    if (it.value_if_not_found != null || mm != null || sm != null) {
+      args.push(it.value_if_not_found != null ? FV(it.value_if_not_found) : "");
+    }
+
+    if (mm != null || sm != null) {
+      args.push(mm != null ? String(mm) : "");
+    }
+
+    if (sm != null) {
+      args.push(String(sm));
+    }
+
+    return `=XLOOKUP(${args.join(", ")})`;
   },
 
   hlookup(ctx, formatValue) {
