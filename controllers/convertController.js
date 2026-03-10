@@ -372,17 +372,37 @@ function buildLocalIntentFromText(text = "") {
     if (/연봉/.test(original)) headers.push("연봉");
     if (/입사일/.test(original)) headers.push("입사일");
 
-    if (headers.length) {
-      intent.return_headers = [...new Set(headers)];
-      if (intent.return_headers.length === 1) {
-        intent.return_hint = intent.return_headers[0];
+    // ✅ lookup 기준열은 반환열에서 제거
+    const uniqueHeaders = [...new Set(headers)].filter(
+      (h) => !intent.lookup_hint || h !== intent.lookup_hint,
+    );
+
+    if (uniqueHeaders.length) {
+      intent.return_headers = uniqueHeaders;
+      if (uniqueHeaders.length === 1) {
+        intent.return_hint = uniqueHeaders[0];
+      } else {
+        delete intent.return_hint;
       }
     } else {
-      // 최소 fallback
-      if (/부서/.test(s)) intent.return_hint = "부서";
-      else if (/직급/.test(s)) intent.return_hint = "직급";
-      else if (/연봉/.test(s)) intent.return_hint = "연봉";
-      else if (/이름|name/.test(s)) intent.return_hint = "이름";
+      // 반환열이 비면 lookup 열과 다른 최소 fallback만 허용
+      const fallbackCandidates = [];
+      if (/부서/.test(s)) fallbackCandidates.push("부서");
+      if (/직급/.test(s)) fallbackCandidates.push("직급");
+      if (/연봉/.test(s)) fallbackCandidates.push("연봉");
+      if (/입사일/.test(s)) fallbackCandidates.push("입사일");
+      if (/이름|name/.test(s)) fallbackCandidates.push("이름");
+
+      const filtered = fallbackCandidates.filter(
+        (h) => !intent.lookup_hint || h !== intent.lookup_hint,
+      );
+
+      if (filtered.length === 1) {
+        intent.return_hint = filtered[0];
+      } else if (filtered.length > 1) {
+        intent.return_headers = [...new Set(filtered)];
+        delete intent.return_hint;
+      }
     }
 
     return intent;
@@ -550,6 +570,23 @@ function normalizeLookupIntent(intent) {
         header: intent.lookup_key.header,
       };
     }
+  }
+
+  // ✅ 빈 lookup_value 정리
+  if (
+    typeof intent.lookup_value === "string" &&
+    intent.lookup_value.trim() === ""
+  ) {
+    delete intent.lookup_value;
+  }
+
+  if (
+    intent.lookup_value &&
+    typeof intent.lookup_value === "object" &&
+    typeof intent.lookup_value.cell === "string" &&
+    !intent.lookup_value.cell.trim()
+  ) {
+    delete intent.lookup_value;
   }
 
   // ✅ 2. return → return_array 변환

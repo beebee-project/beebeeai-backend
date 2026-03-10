@@ -40,8 +40,16 @@ function _resolveLookupValueExpr(it, ctx, FV) {
       typeof it.lookup_value === "object" &&
       typeof it.lookup_value.cell === "string"
     ) {
-      return it.lookup_value.cell.trim();
+      const cell = it.lookup_value.cell.trim();
+      return cell ? cell : null;
     }
+
+    if (typeof it.lookup_value === "string") {
+      const v = it.lookup_value.trim();
+      if (!v) return null;
+      return FV(v, { forceText: true });
+    }
+
     return FV(it.lookup_value, { forceText: true });
   }
 
@@ -568,7 +576,12 @@ const referenceFunctionBuilder = {
     }
 
     // 3) 반환 열들 해석 (다중 반환 지원)
-    const returnHints = _resolveReturnHints(it);
+    const rawReturnHints = _resolveReturnHints(it);
+    const returnHints = rawReturnHints.filter(
+      (h) =>
+        !it.lookup_hint || String(h).trim() !== String(it.lookup_hint).trim(),
+    );
+
     if (!returnHints.length) {
       return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
     }
