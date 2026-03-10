@@ -501,14 +501,25 @@ const referenceFunctionBuilder = {
         : referenceFunctionBuilder._fv(v, opts);
 
     // lookup_value
-    let lookupValue =
+    const rawLookupValue =
       it.lookup_value &&
       typeof it.lookup_value === "object" &&
       it.lookup_value.operation
         ? evalSubIntentToScalar(ctx, FV, it.lookup_value)
         : it.lookup_value != null
-          ? FV(it.lookup_value)
+          ? it.lookup_value
           : null;
+
+    const isPlaceholderLookup =
+      rawLookupValue != null &&
+      /(특정\s*직원|존재하지\s*않는\s*직원\s*id|없는\s*직원\s*id|알\s*수\s*없는\s*직원)/i.test(
+        String(rawLookupValue),
+      );
+
+    let lookupValue =
+      rawLookupValue != null && !isPlaceholderLookup
+        ? FV(rawLookupValue)
+        : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
     // lookup / return 열

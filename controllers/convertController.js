@@ -612,12 +612,27 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
   }
 
+  if (Array.isArray(intent.return_headers)) {
+    intent.return_headers = [...new Set(intent.return_headers.filter(Boolean))];
+  }
+
   if (
     Array.isArray(intent.return_headers) &&
-    intent.return_headers.length === 1 &&
+    intent.return_headers.length >= 1 &&
     !intent.return_hint
   ) {
+    // ✅ 다중 반환이어도 첫 번째 반환열을 대표 return_hint로 둔다.
+    // 컨트롤러의 사전 열 매핑(findBestSheetAndColumns)과 검증 단계가
+    // return_hint를 기준으로 움직이는 구간이 있어서 필요하다.
     intent.return_hint = intent.return_headers[0];
+  }
+
+  // ✅ placeholder lookup value 최종 차단
+  if (
+    intent.lookup_value != null &&
+    _hasPlaceholderLookupValue(String(intent.lookup_value))
+  ) {
+    delete intent.lookup_value;
   }
 
   return intent;
@@ -1925,8 +1940,16 @@ exports.handleConversion = async (req, res, next) => {
       );
 
       if (hasHints) {
+        const primaryReturnHint =
+          intent.return_hint ||
+          (Array.isArray(intent.return_headers) && intent.return_headers.length
+            ? intent.return_headers[0]
+            : "") ||
+          intent.header_hint ||
+          "";
+
         const searchTerms = {
-          return: intent.return_hint || intent.header_hint || "",
+          return: primaryReturnHint,
           lookup: intent.lookup_hint || "",
         };
 
@@ -2231,11 +2254,18 @@ async function convert(nl, options = {}, meta = {}) {
       hasHints &&
       typeof formulaUtils.findBestSheetAndColumns === "function"
     ) {
+      const primaryReturnHint =
+        intent.return_hint ||
+        (Array.isArray(intent.return_headers) && intent.return_headers.length
+          ? intent.return_headers[0]
+          : "") ||
+        intent.header_hint ||
+        "";
+
       const searchTerms = {
-        return: intent.return_hint || intent.header_hint || "",
+        return: primaryReturnHint,
         lookup: intent.lookup_hint || "",
       };
-
       const joint = formulaUtils.findBestSheetAndColumns(
         allSheetsData,
         searchTerms,
