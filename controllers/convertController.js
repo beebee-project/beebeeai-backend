@@ -309,6 +309,53 @@ function _deduceOp(text = "") {
   return "formula";
 }
 
+function _extractExplicitLookupRef(text = "") {
+  const raw = String(text || "");
+  const upper = raw.toUpperCase();
+
+  const withCell = upper.match(/\b([A-Z]{1,3}\d{1,7})\b\s*에\s*있(?:는|던)?/i);
+  if (withCell) return withCell[1];
+
+  const bareCell = upper.match(/\b([A-Z]{1,3}\d{1,7})\b/);
+  if (bareCell) return bareCell[1];
+
+  return null;
+}
+
+function _extractLookupTargetHint(text = "") {
+  const msg = String(text || "");
+  if (/(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg))
+    return "직원ID";
+  if (/(이름|성명|name)/i.test(msg)) return "이름";
+  return null;
+}
+
+function _extractReturnHeadersFromLookupText(text = "") {
+  const msg = String(text || "");
+  const headers = [];
+  const push = (h) => {
+    if (h && !headers.includes(h)) headers.push(h);
+  };
+
+  if (/(이름|성명)/.test(msg)) push("이름");
+  if (/부서/.test(msg)) push("부서");
+  if (/직급/.test(msg)) push("직급");
+  if (/연봉/.test(msg)) push("연봉");
+  if (/(입사일|입사\s*날짜|입사\s*일자)/.test(msg)) push("입사일");
+  if (/(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg))
+    push("직원ID");
+
+  return headers;
+}
+
+function _isPlaceholderLookupValue(v) {
+  const s = String(v || "").trim();
+  if (!s) return true;
+  return /^(특정\s*직원|존재하지\s*않는\s*직원\s*id|존재하지\s*않는\s*id|없는\s*직원\s*id|임의의\s*직원|어떤\s*직원|해당\s*직원)$/i.test(
+    s,
+  );
+}
+
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -349,14 +396,32 @@ function buildLocalIntentFromText(text = "") {
   );
   if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
     intent.operation = "xlookup";
+
+    const ref = _extractExplicitLookupRef(original);
+    const targetHint = _extractLookupTargetHint(original);
+    const returnHeaders = _extractReturnHeadersFromLookupText(original);
+
     if (lookupMatch) {
       intent.lookup_hint = lookupMatch[1];
       intent.return_hint = lookupMatch[2];
     } else {
-      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
       if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
-      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
+      if (/이름|name/.test(s))
+        intent.lookup_hint = intent.lookup_hint || "이름";
     }
+
+    if (targetHint) {
+      intent.lookup_hint = targetHint;
+    }
+    if (ref) {
+      intent.lookup_value = ref;
+    }
+    if (returnHeaders.length) {
+      intent.return_headers = returnHeaders;
+      if (returnHeaders.length === 1) intent.return_hint = returnHeaders[0];
+      else delete intent.return_hint;
+    }
+
     return intent;
   }
 
@@ -474,16 +539,42 @@ function buildLocalIntentFromText(text = "") {
  *      intent.lookup = { value, header, sheet }
  *      intent.return = { header, sheet }
  * -------------------------------------------*/
-function normalizeLookupIntent(intent) {
+function normalizeLookupIntent(message, intent) {
   if (!intent || !intent.operation) return intent;
 
   const op = String(intent.operation).toLowerCase();
   if (op !== "xlookup" && op !== "lookup") return intent;
 
-  // ✅ 1. LLM 출력 보정: lookup_key → lookup_array 변환
+  const msg = String(message || intent.raw_message || "");
+  const explicitRef = _extractExplicitLookupRef(msg);
+  const targetHint = _extractLookupTargetHint(msg);
+  const returnHeadersFromMsg = _extractReturnHeadersFromLookupText(msg);
+
+  if (targetHint && !intent.lookup_hint) intent.lookup_hint = targetHint;
+  if (explicitRef && intent.lookup_value == null)
+    intent.lookup_value = explicitRef;
+
+  if (
+    Array.isArray(returnHeadersFromMsg) &&
+    returnHeadersFromMsg.length &&
+    (!Array.isArray(intent.return_headers) || !intent.return_headers.length)
+  ) {
+    intent.return_headers = [...new Set(returnHeadersFromMsg)];
+  }
+
+  if (
+    Array.isArray(intent.return_headers) &&
+    intent.return_headers.length === 1 &&
+    !intent.return_hint
+  ) {
+    intent.return_hint = intent.return_headers[0];
+  }
+
+  // 1. lookup_key → lookup_array
   if (intent.lookup_key) {
-    if (intent.lookup_value == null)
+    if (intent.lookup_value == null) {
       intent.lookup_value = intent.lookup_key.value;
+    }
     if (!intent.lookup_array) {
       intent.lookup_array = {
         sheet: intent.lookup_key.sheet,
@@ -492,7 +583,7 @@ function normalizeLookupIntent(intent) {
     }
   }
 
-  // ✅ 2. return → return_array 변환
+  // 2. return → return_array
   if (intent.return && !intent.return_array) {
     intent.return_array = {
       sheet: intent.return.sheet,
@@ -500,7 +591,7 @@ function normalizeLookupIntent(intent) {
     };
   }
 
-  // ✅ 3. 중첩 구조 통일 (referenceFunctions 호환용)
+  // 3. 중첩 구조 통일
   intent.lookup = intent.lookup || {};
   if (intent.lookup_value != null && intent.lookup.value == null) {
     intent.lookup.value = intent.lookup_value;
@@ -516,6 +607,19 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
+  }
+
+  const hasConcreteLookupValue =
+    intent.lookup_value != null &&
+    !_isPlaceholderLookupValue(intent.lookup_value);
+
+  const hasRowSelectorValue =
+    intent.row_selector &&
+    intent.row_selector.value != null &&
+    !_isPlaceholderLookupValue(intent.row_selector.value);
+
+  if (!hasConcreteLookupValue && !hasRowSelectorValue) {
+    intent.__ambiguousLookup = true;
   }
 
   return intent;
@@ -1780,7 +1884,7 @@ exports.handleConversion = async (req, res, next) => {
       }
     }
 
-    intent = normalizeLookupIntent(intent);
+    intent = normalizeLookupIntent(message, intent);
     intent = applyMedianOverride(message, intent);
     intent = applyDateBoundaryOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
@@ -1793,6 +1897,11 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyRankColumnOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
     intent.raw_message = message;
+    if (intent.__ambiguousLookup) {
+      return res.json({
+        result: `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`,
+      });
+    }
     _dbgIntent = intent;
 
     _tIntentEnd = process.hrtime.bigint();
@@ -2090,7 +2199,7 @@ exports.handleFeedback = async (req, res, next) => {
 async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-  let intent = normalizeLookupIntent(baseIntent);
+  let intent = normalizeLookupIntent(nl, baseIntent);
   intent = applyMedianOverride(nl, intent);
   intent = applyExtremeRowOverride(nl, intent);
   intent = applyDateBoundaryOverride(nl, intent);
@@ -2102,6 +2211,9 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyFilteredSortOverride(nl, intent);
   intent = applyRankColumnOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
+  if (intent.__ambiguousLookup) {
+    return '=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")';
+  }
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
