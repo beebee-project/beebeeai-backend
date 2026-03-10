@@ -87,48 +87,6 @@ function _q(s) {
   return `"${String(s ?? "").replace(/"/g, '""')}"`;
 }
 
-function _normalizeCondOp(op) {
-  const s = String(op || "=")
-    .trim()
-    .toLowerCase();
-  if (s === "==" || s === "eq") return "=";
-  if (s === "!=" || s === "<>" || s === "ne") return "<>";
-  if (s === "gte") return ">=";
-  if (s === "lte") return "<=";
-  if (s === "gt") return ">";
-  if (s === "lt") return "<";
-  return s || "=";
-}
-
-function _normalizeCondValue(v) {
-  if (v == null) return "";
-  const s = String(v).trim().replace(/,/g, "");
-  if (/^-?\d+(\.\d+)?$/.test(s)) return String(Number(s));
-  return s.toLowerCase();
-}
-
-function _dedupeConditions(list) {
-  const arr = Array.isArray(list) ? list.filter(Boolean) : [];
-  const seen = new Set();
-
-  return arr.filter((c) => {
-    if (!c || typeof c !== "object") return false;
-    if (c.logical_operator) return true;
-
-    const key = [
-      String(c.target || c.header || "")
-        .trim()
-        .toLowerCase(),
-      _normalizeCondOp(c.operator),
-      _normalizeCondValue(c.value),
-    ].join("::");
-
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function _dateVal(iso) {
   return `DATEVALUE(${_q(iso)})`;
 }
@@ -154,6 +112,42 @@ function _coerceNumber(expr) {
 function _coerceDate(expr) {
   // 텍스트 날짜면 DATEVALUE로, 이미 날짜/시리얼이면 원본 유지
   return `IFERROR(DATEVALUE(${_trimText(expr)}), ${expr})`;
+}
+
+function _normalizeConditionValueKey(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "";
+  }
+
+  const raw = String(value).trim();
+  const noComma = raw.replace(/,/g, "");
+  if (/^-?\d+(?:\.\d+)?$/.test(noComma)) return noComma;
+
+  return raw.toLowerCase();
+}
+
+function _conditionKey(cond) {
+  if (!cond || typeof cond !== "object" || cond.logical_operator) return null;
+  return `${String(cond?.target || cond?.header || "")
+    .trim()
+    .toLowerCase()}|${String(cond?.operator || "=")
+    .trim()
+    .toLowerCase()}|${_normalizeConditionValueKey(cond?.value)}`;
+}
+
+function _dedupeConditions(conds = []) {
+  const uniqueConds = [];
+  const seen = new Set();
+
+  for (const c of Array.isArray(conds) ? conds : []) {
+    const key = _conditionKey(c);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    uniqueConds.push(c);
+  }
+
+  return uniqueConds;
 }
 
 function _isSheetsContext(ctx) {
@@ -860,7 +854,10 @@ const arrayFunctionBuilder = {
 
       const order =
         String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
-      const uniqueConds = _dedupeConditions(it.conditions);
+      const conds = Array.isArray(it.conditions)
+        ? it.conditions.filter(Boolean)
+        : [];
+      const uniqueConds = _dedupeConditions(conds);
 
       if (!uniqueConds.length) {
         return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
@@ -1221,7 +1218,11 @@ function _extremeRow(ctx, which) {
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
-  const uniqueConds = _dedupeConditions(it.conditions);
+  const conds = Array.isArray(it.conditions)
+    ? it.conditions.filter(Boolean)
+    : [];
+  const uniqueConds = _dedupeConditions(conds);
+
   if (!uniqueConds.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
   }
@@ -1382,7 +1383,22 @@ function _topNRows(ctx) {
   const order =
     String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
-  const conds = _dedupeConditions(it.conditions);
+  const rawConds = Array.isArray(it.conditions)
+    ? it.conditions.filter(Boolean)
+    : [];
+
+  const seenCondKeys = new Set();
+  const conds = rawConds.filter((c) => {
+    if (!c || typeof c !== "object") return false;
+    const key = [
+      String(c.target || c.header || "").trim(),
+      String(c.operator || "=").trim(),
+      String(c.value ?? "").trim(),
+    ].join("::");
+    if (seenCondKeys.has(key)) return false;
+    seenCondKeys.add(key);
+    return true;
+  });
   if (!conds.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
   }
