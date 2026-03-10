@@ -549,7 +549,20 @@ const referenceFunctionBuilder = {
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
     // 2) lookup 열 해석
-    const bestLookup = _bestColumnByHint(it.lookup_hint, ctx, "lookup");
+    const lookupHint =
+      it.lookup_hint ||
+      it.lookup?.header ||
+      it.lookup_array?.header ||
+      (/(직원\s*id|사번|id)/i.test(String(it.original_text || it.message || ""))
+        ? "직원 ID"
+        : null) ||
+      (/(직원\s*이름|이름|성명)/i.test(
+        String(it.original_text || it.message || ""),
+      )
+        ? "이름"
+        : null);
+
+    const bestLookup = _bestColumnByHint(lookupHint, ctx, "lookup");
     if (!bestLookup) {
       return `=ERROR("XLOOKUP: lookup 열을 찾지 못했습니다.")`;
     }

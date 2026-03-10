@@ -298,7 +298,9 @@ function _deduceOp(text = "") {
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
-  if (/(xlookup|lookup|찾아|조회|검색|참조)/.test(s)) return "xlookup";
+  if (/(xlookup|lookup|찾아|조회|검색|참조|가져와|불러와|매칭)/.test(s)) {
+    return "xlookup";
+  }
   if (/(filter|필터)/.test(s)) return "filter";
   if (/\b(if|조건|만약)\b/.test(s)) return "if";
   if (/(median|중앙값|중간값|가운데\s*값|중앙\s*(연봉|급여|값|금액)?)/.test(s))
@@ -343,20 +345,46 @@ function buildLocalIntentFromText(text = "") {
   }
 
   // ✅ 1. Lookup / 조회 패턴 감지
-  // 예: "홍길동의 매출", "이름으로 점수 찾기"
-  const lookupMatch = s.match(
-    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
-  );
-  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
+  if (
+    op.includes("lookup") ||
+    /찾|조회|검색|lookup|참조|가져와|불러와|매칭/.test(s)
+  ) {
     intent.operation = "xlookup";
-    if (lookupMatch) {
-      intent.lookup_hint = lookupMatch[1];
-      intent.return_hint = lookupMatch[2];
-    } else {
-      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
-      if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
-      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
+
+    // ✅ lookup 기준열
+    if (/(직원\s*id|사번|id)/i.test(original)) {
+      intent.lookup_hint = "직원 ID";
+    } else if (/(직원\s*이름|이름|성명)/i.test(original)) {
+      intent.lookup_hint = "이름";
     }
+
+    // ✅ 셀 참조
+    const cellMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
+    if (cellMatch) {
+      intent.lookup_value = { cell: cellMatch[1].toUpperCase() };
+    }
+
+    // ✅ 반환열
+    const headers = [];
+    if (/(이름|성명)/.test(original)) headers.push("이름");
+    if (/부서/.test(original)) headers.push("부서");
+    if (/직급/.test(original)) headers.push("직급");
+    if (/연봉/.test(original)) headers.push("연봉");
+    if (/입사일/.test(original)) headers.push("입사일");
+
+    if (headers.length) {
+      intent.return_headers = [...new Set(headers)];
+      if (intent.return_headers.length === 1) {
+        intent.return_hint = intent.return_headers[0];
+      }
+    } else {
+      // 최소 fallback
+      if (/부서/.test(s)) intent.return_hint = "부서";
+      else if (/직급/.test(s)) intent.return_hint = "직급";
+      else if (/연봉/.test(s)) intent.return_hint = "연봉";
+      else if (/이름|name/.test(s)) intent.return_hint = "이름";
+    }
+
     return intent;
   }
 
@@ -789,6 +817,73 @@ const OP_ALIASES = {
   regexmatch: "regexmatch",
   textsplit: "textsplit",
 };
+
+function applyLookupReferenceOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  const hasLookupCue =
+    /(가져와줘|가져오기|불러와줘|불러오기|찾아줘|찾기|조회|검색|참조|매칭)/i.test(
+      msg,
+    );
+
+  const hasEmployeeKeyCue =
+    /(직원\s*id|사번|id)/i.test(msg) || /(직원\s*이름|이름|성명)/i.test(msg);
+
+  const hasReturnFieldCue = /(이름|성명|부서|직급|연봉|입사일)/i.test(msg);
+
+  if (!(hasLookupCue && hasEmployeeKeyCue && hasReturnFieldCue)) {
+    return intent;
+  }
+
+  // ✅ 무조건 lookup 계열로 보정
+  intent.operation = "xlookup";
+
+  // ✅ lookup key 추론
+  if (/(직원\s*id|사번|id)/i.test(msg)) {
+    intent.lookup_hint = "직원 ID";
+  } else if (/(직원\s*이름|이름|성명)/i.test(msg)) {
+    intent.lookup_hint = "이름";
+  }
+
+  // ✅ 셀 참조 추출: "J2에 있는", "J4 값", "A10의" 등
+  const cellMatch =
+    msg.match(/\b([A-Z]{1,3}\d{1,7})\b/) ||
+    msg.match(/([A-Z]{1,3}\d{1,7})\s*에\s*있/i) ||
+    msg.match(/([A-Z]{1,3}\d{1,7})\s*값/i);
+
+  if (cellMatch) {
+    intent.lookup_value = { cell: cellMatch[1].toUpperCase() };
+  }
+
+  // ✅ 반환 열 추출
+  const headers = [];
+  const pushUnique = (h) => {
+    if (!headers.includes(h)) headers.push(h);
+  };
+
+  if (/(이름|성명)/.test(msg)) pushUnique("이름");
+  if (/부서/.test(msg)) pushUnique("부서");
+  if (/직급/.test(msg)) pushUnique("직급");
+  if (/연봉/.test(msg)) pushUnique("연봉");
+  if (/입사일/.test(msg)) pushUnique("입사일");
+
+  // "전체", "전체를", "모두" 같은 표현이면 직원표 기본 전체셋
+  if (!headers.length && /(전체|모두|전부)/.test(msg)) {
+    headers.push("이름", "부서", "직급", "연봉");
+  }
+
+  if (headers.length) {
+    intent.return_headers = headers;
+    if (headers.length === 1) intent.return_hint = headers[0];
+    else delete intent.return_hint;
+  }
+
+  // ✅ lookup value가 문장에 없더라도 lookup key 열은 유지
+  // 예: "직원 ID로 부서와 직급을 동시에 가져와줘"
+  // 이 경우 후속 단계/LLM이 lookup_value를 추가해야 하므로 operation과 lookup_hint는 고정
+  return intent;
+}
 
 // ✅ LLM이 평균으로 오판하는 케이스를 중앙값에 한해 안전하게 보정
 function applyMedianOverride(message, intent) {
@@ -1832,6 +1927,7 @@ exports.handleConversion = async (req, res, next) => {
       }
     }
 
+    intent = applyLookupReferenceOverride(message, intent);
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
     intent = applyDateBoundaryOverride(message, intent);
