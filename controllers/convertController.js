@@ -325,9 +325,22 @@ function _extractExplicitLookupRef(text = "") {
 
 function _extractLookupTargetHint(text = "") {
   const msg = String(text || "");
-  if (/(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg))
+
+  if (/(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg)) {
     return "직원ID";
-  if (/(이름|성명|name)/i.test(msg)) return "이름";
+  }
+
+  if (/(이름|성명|name)/i.test(msg)) {
+    return "이름";
+  }
+
+  // "J4에 있는 직원의 부서/직급" 같은 문장은 실제 조회키가
+  // 직원 자체가 아니라 셀값(대개 직원ID 또는 이름)인 경우가 많다.
+  // plain "직원"은 lookup 열 힌트로 쓰지 않음.
+  if (/직원/.test(msg)) {
+    return null;
+  }
+
   return null;
 }
 
@@ -425,6 +438,24 @@ function buildLocalIntentFromText(text = "") {
 
     if (targetHint) {
       intent.lookup_hint = targetHint;
+    }
+    // "직원의 부서/직급"에서 lookupMatch가 "직원"을 뽑는 경우 제거
+    if (intent.lookup_hint && String(intent.lookup_hint).trim() === "직원") {
+      delete intent.lookup_hint;
+    }
+
+    // 셀 참조가 있고, 문장에 직원 ID/사번이 명시되면 lookup 키를 직원ID로 고정
+    if (
+      ref &&
+      /(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(original)
+    ) {
+      intent.lookup_hint = "직원ID";
+    }
+
+    // 셀 참조가 있고 "직원의 ..." 형태지만 ID/이름 명시가 없으면
+    // 잘못된 "직원" 힌트 대신 빈 상태로 두고 normalize/열탐색에 맡김
+    if (ref && !intent.lookup_hint) {
+      // noop: lookup_value만 유지
     }
     if (ref) {
       intent.lookup_value = ref;
@@ -566,6 +597,16 @@ function normalizeLookupIntent(message, intent) {
   if (targetHint && !intent.lookup_hint) intent.lookup_hint = targetHint;
   if (explicitRef && intent.lookup_value == null)
     intent.lookup_value = explicitRef;
+  if (intent.lookup_hint && String(intent.lookup_hint).trim() === "직원") {
+    delete intent.lookup_hint;
+  }
+
+  if (
+    explicitRef &&
+    /(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg)
+  ) {
+    intent.lookup_hint = "직원ID";
+  }
 
   if (
     Array.isArray(returnHeadersFromMsg) &&
