@@ -298,7 +298,8 @@ function _deduceOp(text = "") {
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
-  if (/(xlookup|lookup|찾아|조회|검색|참조)/.test(s)) return "xlookup";
+  if (/(xlookup|lookup|찾아|조회|검색|참조|가져와|불러와|반환)/.test(s))
+    return "xlookup";
   if (/(filter|필터)/.test(s)) return "filter";
   if (/\b(if|조건|만약)\b/.test(s)) return "if";
   if (/(median|중앙값|중간값|가운데\s*값|중앙\s*(연봉|급여|값|금액)?)/.test(s))
@@ -401,9 +402,12 @@ function buildLocalIntentFromText(text = "") {
   // ✅ 1. Lookup / 조회 패턴 감지
   // 예: "홍길동의 매출", "이름으로 점수 찾기"
   const lookupMatch = s.match(
-    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
+    /([가-힣a-z0-9]+)[의\s]*(이름|부서|직급|연봉|입사일|매출|점수|금액|값|수량|가격)/i,
   );
-  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
+  if (
+    op.includes("lookup") ||
+    /찾|조회|검색|lookup|가져와|불러와|반환/.test(s)
+  ) {
     intent.operation = "xlookup";
 
     const ref = _extractExplicitLookupRef(original);
