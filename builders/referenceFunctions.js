@@ -511,13 +511,32 @@ const referenceFunctionBuilder = {
           : null;
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
-    // lookup/return 열(반환 시트 기준 정렬)
+    // lookup 열
     const bestLookup = _bestColumnByHint(it.lookup_hint, ctx, "lookup");
-    const bestReturn = _bestColumnByHint(it.return_hint, ctx, "return");
-    if (!bestLookup || !bestReturn)
-      return `=ERROR("XLOOKUP: lookup/return 열을 찾지 못했습니다.")`;
 
-    const primarySheet = bestReturn.sheetName || bestLookup.sheetName;
+    // ✅ 단일/다중 반환열 모두 지원
+    const returnHints =
+      Array.isArray(it.return_headers) && it.return_headers.length
+        ? [
+            ...new Set(
+              it.return_headers.map((v) => String(v).trim()).filter(Boolean),
+            ),
+          ]
+        : it.return_hint
+          ? [String(it.return_hint).trim()]
+          : [];
+
+    const bestReturns = returnHints
+      .map((h) => _bestColumnByHint(h, ctx, "return"))
+      .filter(Boolean);
+
+    if (!bestLookup || !bestReturns.length) {
+      return `=ERROR("XLOOKUP: lookup/return 열을 찾지 못했습니다.")`;
+    }
+
+    // 기준 시트: 첫 반환열 시트 우선
+    const primarySheet = bestReturns[0]?.sheetName || bestLookup.sheetName;
+
     const lookCol =
       bestLookup.sheetName === primarySheet
         ? bestLookup
@@ -526,15 +545,40 @@ const referenceFunctionBuilder = {
             primarySheet,
             ctx,
           );
-    if (!lookCol)
+
+    if (!lookCol) {
       return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
+    }
 
     const lookupRange = `'${primarySheet}'!${lookCol.columnLetter}${lookCol.startRow}:${lookCol.columnLetter}${lookCol.lastDataRow}`;
-    const returnRange = `'${primarySheet}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+
+    // ✅ 반환열들을 primarySheet 기준으로 재해결
+    const resolvedReturns = bestReturns
+      .map((col) =>
+        col.sheetName === primarySheet
+          ? col
+          : resolveHeaderInSheet(col.header, primarySheet, ctx),
+      )
+      .filter(Boolean);
+
+    if (!resolvedReturns.length) {
+      return `=ERROR("XLOOKUP: 반환 열을 찾지 못했습니다.")`;
+    }
+
+    const baseReturnRange =
+      resolvedReturns.length === 1
+        ? `'${primarySheet}'!${resolvedReturns[0].columnLetter}${resolvedReturns[0].startRow}:${resolvedReturns[0].columnLetter}${resolvedReturns[0].lastDataRow}`
+        : `HSTACK(${resolvedReturns
+            .map(
+              (col) =>
+                `'${primarySheet}'!${col.columnLetter}${col.startRow}:${col.columnLetter}${col.lastDataRow}`,
+            )
+            .join(", ")})`;
 
     // if_not_found, match/search
     const ifNF =
       it.value_if_not_found != null ? `, ${FV(it.value_if_not_found)}` : "";
+
     const mm = (() => {
       const v = it.match_mode;
       if (v == null) return null;
@@ -546,6 +590,7 @@ const referenceFunctionBuilder = {
       if (s === "wildcard") return 2;
       return 0;
     })();
+
     const sm = (() => {
       const v = it.search_mode;
       if (v == null) return null;
@@ -564,10 +609,18 @@ const referenceFunctionBuilder = {
       const cols = it.multi_keys
         .map((k) => _bestColumnByHint(k.hint, ctx, "lookup"))
         .filter(Boolean)
-        .map(
-          (c) =>
-            `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`,
-        );
+        .map((c) => {
+          const sameSheetCol =
+            c.sheetName === primarySheet
+              ? c
+              : resolveHeaderInSheet(c.header || c.hint, primarySheet, ctx);
+
+          return sameSheetCol
+            ? `'${primarySheet}'!${sameSheetCol.columnLetter}${sameSheetCol.startRow}:${sameSheetCol.columnLetter}${sameSheetCol.lastDataRow}`
+            : null;
+        })
+        .filter(Boolean);
+
       if (cols.length > 0) {
         lookupArray = cols.map((c) => `(${c})`).join(`&"|"&`);
         if (!it.lookup_value) {
@@ -579,9 +632,34 @@ const referenceFunctionBuilder = {
       }
     }
 
+    // ✅ "가장 최근 입사자" 대응: 입사일 기준 정렬 후 조회
+    let finalLookupArray = lookupArray;
+    let finalReturnRange = baseReturnRange;
+
+    const sortByHint = String(it.sort_by || "").trim();
+    const wantsLatestHireSort =
+      (it.search_mode === "last" || sm === -1) &&
+      (sortByHint === "입사일" || /입사/.test(sortByHint));
+
+    if (wantsLatestHireSort) {
+      const sortColRaw = _bestColumnByHint("입사일", ctx, "lookup");
+      const sortCol =
+        sortColRaw?.sheetName === primarySheet
+          ? sortColRaw
+          : resolveHeaderInSheet("입사일", primarySheet, ctx);
+
+      if (sortCol) {
+        const sortRange = `'${primarySheet}'!${sortCol.columnLetter}${sortCol.startRow}:${sortCol.columnLetter}${sortCol.lastDataRow}`;
+        const normalizedSortRange = `IFERROR(DATEVALUE(TRIM(${sortRange}&"")), ${sortRange})`;
+
+        finalLookupArray = `SORTBY(${lookupArray}, ${normalizedSortRange}, -1)`;
+        finalReturnRange = `SORTBY(${baseReturnRange}, ${normalizedSortRange}, -1)`;
+      }
+    }
+
     const mmArg = mm != null ? `, ${mm}` : "";
     const smArg = sm != null ? `, ${sm}` : "";
-    return `=XLOOKUP(${lookupValue}, ${lookupArray}, ${returnRange}${ifNF}${mmArg}${smArg})`;
+    return `=XLOOKUP(${lookupValue}, ${finalLookupArray}, ${finalReturnRange}${ifNF}${mmArg}${smArg})`;
   },
 
   hlookup(ctx, formatValue) {
