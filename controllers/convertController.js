@@ -920,38 +920,49 @@ function applyRecentTopNOverride(message, intent) {
   // ✅ Top N 문장은 기존 return_headers를 그대로 믿지 말고 재정규화
   const headers = [];
 
+  const explicitNameOnly =
+    /(이름만|성명만)/.test(msg) ||
+    (/(이름|성명)/.test(msg) &&
+      !/(이름\s*(과|와|,|및|하고)\s*(연봉|부서|직급|입사일|직원\s*id|사번|id))/.test(
+        msg,
+      ) &&
+      !/((연봉|부서|직급|입사일|직원\s*id|사번|id)\s*(과|와|,|및|하고)\s*(이름|성명))/.test(
+        msg,
+      ) &&
+      !/(포함|같이|함께)/.test(msg));
+
   const wantsId = /직원\s*id|사번|id/i.test(msg);
   const wantsName =
     /(이름|성명)/.test(msg) || /직원\s*\d+\s*명|직원|사람/.test(msg);
-  const explicitNameOnly =
-    /(이름만|성명만|이름\s*만\s*보여|이름만\s*보여)/.test(msg);
-  const explicitSalaryPair =
-    /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름\s*와\s*연봉|연봉\s*와\s*이름|이름\s*및\s*연봉|연봉\s*및\s*이름)/.test(
+
+  // 정렬 기준으로 등장한 "연봉"은 반환열에 자동 포함하지 않는다.
+  const wantsSalaryField =
+    /(이름|성명|직원\s*id|사번|id|부서|직급|입사일)\s*(과|와|,|및|하고)\s*연봉/i.test(
       msg,
     ) ||
-    /(직원\s*id|사번|id).*(이름|성명).*(연봉)/i.test(msg) ||
-    /(연봉).*(직원\s*id|사번|id|이름|성명)/i.test(msg) ||
-    /연봉\s*포함|연봉도|연봉까지|같이|함께/.test(msg);
-  const wantsSalaryField =
-    /연봉/.test(msg) && !explicitNameOnly && explicitSalaryPair;
+    /연봉\s*(과|와|,|및|하고)\s*(이름|성명|직원\s*id|사번|id|부서|직급|입사일)/i.test(
+      msg,
+    ) ||
+    /(연봉\s*포함|연봉도|연봉까지|이름과\s*연봉|이름\s*,\s*연봉)/i.test(msg);
+
   const wantsHireDateField =
     /(이름\s*과\s*입사일|입사일\s*과\s*이름|입사일\s*포함)/.test(msg);
-  const wantsDeptField = /이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함/.test(
+  const wantsDeptField = /(이름\s*과\s*부서|부서\s*와\s*이름|부서\s*포함)/.test(
     msg,
   );
-  const wantsTitleField = /이름\s*과\s*직급|직급\s*과\s*이름|직급\s*포함/.test(
-    msg,
-  );
+  const wantsTitleField =
+    /(이름\s*과\s*직급|직급\s*과\s*이름|직급\s*포함)/.test(msg);
 
-  if (wantsId) headers.push("직원ID");
-  if (wantsName || !wantsId) headers.push("이름");
-  if (wantsDeptField) headers.push("부서");
-  if (wantsTitleField) headers.push("직급");
-  if (wantsSalaryField) headers.push("연봉");
-  if (wantsHireDateField) headers.push("입사일");
-  if (explicitNameOnly) intent.return_headers = ["이름"];
+  if (explicitNameOnly) {
+    intent.return_headers = ["이름"];
+  } else {
+    if (wantsId) headers.push("직원ID");
+    if (wantsName || !wantsId) headers.push("이름");
+    if (wantsDeptField) headers.push("부서");
+    if (wantsTitleField) headers.push("직급");
+    if (wantsSalaryField) headers.push("연봉");
+    if (wantsHireDateField) headers.push("입사일");
 
-  if (!Array.isArray(intent.return_headers) || !intent.return_headers.length) {
     intent.return_headers = [...new Set(headers.length ? headers : ["이름"])];
   }
 
