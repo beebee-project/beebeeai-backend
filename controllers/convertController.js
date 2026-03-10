@@ -1051,39 +1051,8 @@ function applySortListOverride(message, intent) {
     ? "asc"
     : "desc";
 
-  // 기존 조건을 안전하게 정규화
-  if (!Array.isArray(intent.conditions)) {
-    intent.conditions = [];
-  }
-
-  const hasSameCondition = (target, operator, value) => {
-    const t = String(target || "")
-      .trim()
-      .toLowerCase();
-    const o = String(operator || "=")
-      .trim()
-      .toLowerCase();
-    const v = String(value ?? "")
-      .trim()
-      .toLowerCase();
-
-    return intent.conditions.some((c) => {
-      if (!c || typeof c !== "object" || c.logical_operator) return false;
-      const ct = String(c.target || c.header || "")
-        .trim()
-        .toLowerCase();
-      const co = String(c.operator || "=")
-        .trim()
-        .toLowerCase();
-      const cv = String(c.value ?? "")
-        .trim()
-        .toLowerCase();
-      return ct === t && co === o && cv === v;
-    });
-  };
-
   const deptMatch = msg.match(/([가-힣A-Za-z0-9]+)\s*부서/);
-  if (deptMatch && !hasSameCondition("부서", "=", deptMatch[1])) {
+  if (deptMatch) {
     _appendCondition(intent, {
       target: "부서",
       operator: "=",
@@ -1091,30 +1060,22 @@ function applySortListOverride(message, intent) {
     });
   }
 
-  const gteMatch = msg.match(/연봉\s*([0-9][0-9,]*)\s*(이상|초과)/);
+  const gteMatch = msg.match(/연봉\s*(\d+(?:\.\d+)?)\s*(이상|초과)/);
   if (gteMatch) {
-    const op = gteMatch[2] === "초과" ? ">" : ">=";
-    const val = String(gteMatch[1]).replace(/,/g, "");
-    if (!hasSameCondition("연봉", op, val)) {
-      _appendCondition(intent, {
-        target: "연봉",
-        operator: op,
-        value: val,
-      });
-    }
+    _appendCondition(intent, {
+      target: "연봉",
+      operator: gteMatch[2] === "초과" ? ">" : ">=",
+      value: Number(gteMatch[1]),
+    });
   }
 
-  const lteMatch = msg.match(/연봉\s*([0-9][0-9,]*)\s*(이하|미만)/);
+  const lteMatch = msg.match(/연봉\s*(\d+(?:\.\d+)?)\s*(이하|미만)/);
   if (lteMatch) {
-    const op = lteMatch[2] === "미만" ? "<" : "<=";
-    const val = String(lteMatch[1]).replace(/,/g, "");
-    if (!hasSameCondition("연봉", op, val)) {
-      _appendCondition(intent, {
-        target: "연봉",
-        operator: op,
-        value: val,
-      });
-    }
+    _appendCondition(intent, {
+      target: "연봉",
+      operator: lteMatch[2] === "미만" ? "<" : "<=",
+      value: Number(lteMatch[1]),
+    });
   }
 
   const explicitNameOnly =
@@ -1137,7 +1098,6 @@ function applySortListOverride(message, intent) {
   } else if (explicitNameSalary) {
     intent.return_headers = ["이름", "연봉"];
   } else {
-    // 조건 있는 정렬 조회의 기본 반환은 이름만
     intent.return_headers = ["이름"];
   }
 

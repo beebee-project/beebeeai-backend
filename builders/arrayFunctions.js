@@ -87,6 +87,48 @@ function _q(s) {
   return `"${String(s ?? "").replace(/"/g, '""')}"`;
 }
 
+function _normalizeCondOp(op) {
+  const s = String(op || "=")
+    .trim()
+    .toLowerCase();
+  if (s === "==" || s === "eq") return "=";
+  if (s === "!=" || s === "<>" || s === "ne") return "<>";
+  if (s === "gte") return ">=";
+  if (s === "lte") return "<=";
+  if (s === "gt") return ">";
+  if (s === "lt") return "<";
+  return s || "=";
+}
+
+function _normalizeCondValue(v) {
+  if (v == null) return "";
+  const s = String(v).trim().replace(/,/g, "");
+  if (/^-?\d+(\.\d+)?$/.test(s)) return String(Number(s));
+  return s.toLowerCase();
+}
+
+function _dedupeConditions(list) {
+  const arr = Array.isArray(list) ? list.filter(Boolean) : [];
+  const seen = new Set();
+
+  return arr.filter((c) => {
+    if (!c || typeof c !== "object") return false;
+    if (c.logical_operator) return true;
+
+    const key = [
+      String(c.target || c.header || "")
+        .trim()
+        .toLowerCase(),
+      _normalizeCondOp(c.operator),
+      _normalizeCondValue(c.value),
+    ].join("::");
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function _dateVal(iso) {
   return `DATEVALUE(${_q(iso)})`;
 }
@@ -818,24 +860,7 @@ const arrayFunctionBuilder = {
 
       const order =
         String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
-      const conds = Array.isArray(it.conditions)
-        ? it.conditions.filter(Boolean)
-        : [];
-      const uniqueConds = [];
-      const seen = new Set();
-      for (const c of conds) {
-        const key = `${String(c?.target || c?.header || "")
-          .trim()
-          .toLowerCase()}|${String(c?.operator || "=")
-          .trim()
-          .toLowerCase()}|${String(c?.value ?? "")
-          .trim()
-          .toLowerCase()}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueConds.push(c);
-        }
-      }
+      const uniqueConds = _dedupeConditions(it.conditions);
 
       if (!uniqueConds.length) {
         return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
@@ -1196,24 +1221,7 @@ function _extremeRow(ctx, which) {
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order = which === "min" ? 1 : -1;
-  const conds = Array.isArray(it.conditions)
-    ? it.conditions.filter(Boolean)
-    : [];
-  const uniqueConds = [];
-  const seen = new Set();
-  for (const c of conds) {
-    const key = `${String(c?.target || c?.header || "")
-      .trim()
-      .toLowerCase()}|${String(c?.operator || "=")
-      .trim()
-      .toLowerCase()}|${String(c?.value ?? "")
-      .trim()
-      .toLowerCase()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueConds.push(c);
-    }
-  }
+  const uniqueConds = _dedupeConditions(it.conditions);
   if (!uniqueConds.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
   }
@@ -1374,22 +1382,7 @@ function _topNRows(ctx) {
   const order =
     String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
-  const rawConds = Array.isArray(it.conditions)
-    ? it.conditions.filter(Boolean)
-    : [];
-
-  const seenCondKeys = new Set();
-  const conds = rawConds.filter((c) => {
-    if (!c || typeof c !== "object") return false;
-    const key = [
-      String(c.target || c.header || "").trim(),
-      String(c.operator || "=").trim(),
-      String(c.value ?? "").trim(),
-    ].join("::");
-    if (seenCondKeys.has(key)) return false;
-    seenCondKeys.add(key);
-    return true;
-  });
+  const conds = _dedupeConditions(it.conditions);
   if (!conds.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
   }
