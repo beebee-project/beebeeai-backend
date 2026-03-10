@@ -343,66 +343,21 @@ function buildLocalIntentFromText(text = "") {
   }
 
   // ✅ 1. Lookup / 조회 패턴 감지
-  if (op.includes("lookup") || /찾|조회|검색|lookup|가져와/.test(s)) {
+  // 예: "홍길동의 매출", "이름으로 점수 찾기"
+  const lookupMatch = s.match(
+    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
+  );
+  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
     intent.operation = "xlookup";
-
-    // 조회 키 열 추론
-    if (/직원\s*id|사번|\bid\b/i.test(original)) {
-      intent.lookup_hint = "직원 ID";
-    } else if (/(이름|성명|직원)/.test(original)) {
-      intent.lookup_hint = "이름";
+    if (lookupMatch) {
+      intent.lookup_hint = lookupMatch[1];
+      intent.return_hint = lookupMatch[2];
+    } else {
+      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
+      if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
+      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
     }
-
-    // 조회 값 셀 추출 (예: J2에 있는, J4에 있는)
-    const cellRefMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
-    if (cellRefMatch) {
-      intent.lookup_value = cellRefMatch[1];
-    }
-
-    // 다중 반환열 추출
-    const wants = [];
-    if (/(이름|성명)/.test(original)) wants.push("이름");
-    if (/부서/.test(original)) wants.push("부서");
-    if (/직급/.test(original)) wants.push("직급");
-    if (/(직원\s*id|사번|\bid\b)/i.test(original)) wants.push("직원 ID");
-    if (/(연봉|salary)/i.test(original)) wants.push("연봉");
-    if (/(입사일|입사\s*날짜)/.test(original)) wants.push("입사일");
-
-    if (wants.length >= 2 || /(동시에|한번에|같이|함께)/.test(original)) {
-      intent.return_headers = [...new Set(wants)];
-      delete intent.return_hint;
-    } else if (wants.length === 1) {
-      intent.return_hint = wants[0];
-    }
-
-    // "중복된 경우 가장 최근 입사자" → 마지막 매칭/최근 입사 기준 조회
-    if (
-      /(중복).*(가장\s*최근|최근|최신)/.test(original) &&
-      /(입사|입사일)/.test(original)
-    ) {
-      intent.search_mode = "last";
-      intent.sort_by = "입사일";
-      intent.sort_order = "desc";
-    }
-
     return intent;
-  }
-
-  // ✅ lookup 키로 사용한 열은 반환열 후보에서 제거
-  if (intent.lookup_hint === "직원 ID") {
-    const filtered = wants.filter((h) => h !== "직원 ID");
-    if (filtered.length) {
-      wants.length = 0;
-      wants.push(...filtered);
-    }
-  }
-
-  if (intent.lookup_hint === "이름") {
-    const filtered = wants.filter((h) => h !== "이름");
-    if (filtered.length) {
-      wants.length = 0;
-      wants.push(...filtered);
-    }
   }
 
   // ✅ 2. 집계 / 그룹 집계 패턴
@@ -561,21 +516,6 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
-  }
-
-  // ✅ 4. 다중 반환열 표준화
-  if (
-    Array.isArray(intent.return_headers) &&
-    intent.return_headers.length > 0 &&
-    !intent.return_arrays
-  ) {
-    intent.return_arrays = intent.return_headers.map((h) => ({
-      sheet:
-        intent.return?.sheet ||
-        intent.return_array?.sheet ||
-        intent.lookup?.sheet,
-      header: h,
-    }));
   }
 
   return intent;
@@ -897,31 +837,6 @@ function applyExtremeRowOverride(message, intent) {
   if (!intent.return_headers && !intent.select_headers) {
     intent.return_headers = ["이름", "부서", "직급", "연봉"];
   }
-  return intent;
-}
-
-function applyLatestDuplicateLookupOverride(message, intent) {
-  const msg = String(message || "");
-  if (!intent || typeof intent !== "object") return intent;
-
-  const hasDupCue = /(중복된?\s*경우|중복)/.test(msg);
-  const hasLatestCue = /(가장\s*최근|최근|최신)/.test(msg);
-  const hasHireCue = /(입사|입사일)/.test(msg);
-  const hasIdCue = /(직원\s*id|사번|\bid\b)/i.test(msg);
-  const hasSalaryCue = /(연봉|salary)/i.test(msg);
-
-  if (!(hasDupCue && hasLatestCue && hasHireCue && hasIdCue && hasSalaryCue)) {
-    return intent;
-  }
-
-  intent.operation = "xlookup";
-  intent.lookup_hint = "직원 ID";
-  intent.return_hint = "연봉";
-  intent.search_mode = "last";
-
-  if (!intent.sort_by) intent.sort_by = "입사일";
-  if (!intent.sort_order) intent.sort_order = "desc";
-
   return intent;
 }
 
@@ -1877,7 +1792,6 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyFilteredSortOverride(message, intent);
     intent = applyRankColumnOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
-    intent = applyLatestDuplicateLookupOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
@@ -1902,18 +1816,15 @@ exports.handleConversion = async (req, res, next) => {
     _tBuildStart = process.hrtime.bigint();
     const context = { intent, formulaBuilder };
     if (isFileAttached && allSheetsData) {
-      const primaryReturnHint =
+      const hasHints = !!(
         intent.return_hint ||
         intent.header_hint ||
-        (Array.isArray(intent.return_headers) && intent.return_headers.length
-          ? intent.return_headers[0]
-          : "");
-
-      const hasHints = !!(primaryReturnHint || intent.lookup_hint);
+        intent.lookup_hint
+      );
 
       if (hasHints) {
         const searchTerms = {
-          return: primaryReturnHint,
+          return: intent.return_hint || intent.header_hint || "",
           lookup: intent.lookup_hint || "",
         };
 
@@ -1928,16 +1839,7 @@ exports.handleConversion = async (req, res, next) => {
         const bestReturn = joint.return;
         const bestLookup = joint.lookup;
 
-        const opLower = String(intent.operation || "").toLowerCase();
-
-        // ✅ xlookup/lookup은 참조 빌더가 return_headers를 직접 해석하므로
-        //    여기서 성급히 막지 말고 builder까지 보낸다.
-        if (
-          !bestReturn &&
-          primaryReturnHint &&
-          opLower !== "xlookup" &&
-          opLower !== "lookup"
-        ) {
+        if (!bestReturn && (intent.header_hint || intent.return_hint)) {
           return res.json({
             result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
           });
@@ -2200,7 +2102,6 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyFilteredSortOverride(nl, intent);
   intent = applyRankColumnOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
-  intent = applyLatestDuplicateLookupOverride(nl, intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
@@ -2218,18 +2119,18 @@ async function convert(nl, options = {}, meta = {}) {
 
   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
   if (allSheetsData) {
-    const primaryReturnHint =
+    const hasHints = !!(
       intent.return_hint ||
       intent.header_hint ||
-      (Array.isArray(intent.return_headers) && intent.return_headers.length
-        ? intent.return_headers[0]
-        : "");
+      intent.lookup_hint
+    );
 
-    const hasHints = !!(primaryReturnHint || intent.lookup_hint);
-
-    if (hasHints) {
+    if (
+      hasHints &&
+      typeof formulaUtils.findBestSheetAndColumns === "function"
+    ) {
       const searchTerms = {
-        return: primaryReturnHint,
+        return: intent.return_hint || intent.header_hint || "",
         lookup: intent.lookup_hint || "",
       };
 
@@ -2241,22 +2142,13 @@ async function convert(nl, options = {}, meta = {}) {
         },
       );
 
-      const bestReturn = joint.return;
-      const bestLookup = joint.lookup;
+      const bestReturn = joint?.return || null;
+      const bestLookup = joint?.lookup || null;
 
-      const opLower = String(intent.operation || "").toLowerCase();
-
-      // ✅ xlookup/lookup은 참조 빌더가 return_headers를 직접 해석하므로
-      //    여기서 성급히 막지 말고 builder까지 보낸다.
-      if (
-        !bestReturn &&
-        primaryReturnHint &&
-        opLower !== "xlookup" &&
-        opLower !== "lookup"
-      ) {
-        return res.json({
-          result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
-        });
+      // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
+      // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
+      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+        return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
       }
 
       mergedMeta = {
