@@ -342,8 +342,17 @@ function _extractReturnHeadersFromLookupText(text = "") {
   if (/직급/.test(msg)) push("직급");
   if (/연봉/.test(msg)) push("연봉");
   if (/(입사일|입사\s*날짜|입사\s*일자)/.test(msg)) push("입사일");
-  if (/(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg))
+
+  // ✅ "직원 ID"는 조회 기준일 가능성이 높아서 반환열에는 기본 포함하지 않음
+  // 정말 반환열로 원할 때만 포함
+  if (
+    /(직원\s*id|사번|employee\s*id|emp\s*id|\bid\b)/i.test(msg) &&
+    /(직원\s*id.*(반환|보여|가져와)|반환.*직원\s*id|직원\s*id\s*포함)/i.test(
+      msg,
+    )
+  ) {
     push("직원ID");
+  }
 
   return headers;
 }
@@ -1925,15 +1934,22 @@ exports.handleConversion = async (req, res, next) => {
     _tBuildStart = process.hrtime.bigint();
     const context = { intent, formulaBuilder };
     if (isFileAttached && allSheetsData) {
-      const hasHints = !!(
+      const primaryReturnHint =
         intent.return_hint ||
         intent.header_hint ||
-        intent.lookup_hint
+        (Array.isArray(intent.return_headers) && intent.return_headers.length
+          ? intent.return_headers[0]
+          : "");
+
+      const hasHints = !!(
+        primaryReturnHint ||
+        intent.lookup_hint ||
+        (Array.isArray(intent.return_headers) && intent.return_headers.length)
       );
 
       if (hasHints) {
         const searchTerms = {
-          return: intent.return_hint || intent.header_hint || "",
+          return: primaryReturnHint || "",
           lookup: intent.lookup_hint || "",
         };
 
@@ -1948,7 +1964,15 @@ exports.handleConversion = async (req, res, next) => {
         const bestReturn = joint.return;
         const bestLookup = joint.lookup;
 
-        if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+        // ✅ 단일 반환은 기존처럼 return 열이 꼭 있어야 함
+        // ✅ 다중 반환은 첫 반환열만 앵커로 잡히면 충분
+        if (
+          !bestReturn &&
+          (intent.header_hint ||
+            intent.return_hint ||
+            (Array.isArray(intent.return_headers) &&
+              intent.return_headers.length))
+        ) {
           return res.json({
             result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
           });
@@ -2231,18 +2255,22 @@ async function convert(nl, options = {}, meta = {}) {
 
   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
   if (allSheetsData) {
-    const hasHints = !!(
+    const primaryReturnHint =
       intent.return_hint ||
       intent.header_hint ||
-      intent.lookup_hint
+      (Array.isArray(intent.return_headers) && intent.return_headers.length
+        ? intent.return_headers[0]
+        : "");
+
+    const hasHints = !!(
+      primaryReturnHint ||
+      intent.lookup_hint ||
+      (Array.isArray(intent.return_headers) && intent.return_headers.length)
     );
 
-    if (
-      hasHints &&
-      typeof formulaUtils.findBestSheetAndColumns === "function"
-    ) {
+    if (hasHints) {
       const searchTerms = {
-        return: intent.return_hint || intent.header_hint || "",
+        return: primaryReturnHint || "",
         lookup: intent.lookup_hint || "",
       };
 
@@ -2254,21 +2282,28 @@ async function convert(nl, options = {}, meta = {}) {
         },
       );
 
-      const bestReturn = joint?.return || null;
-      const bestLookup = joint?.lookup || null;
+      const bestReturn = joint.return;
+      const bestLookup = joint.lookup;
 
-      // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
-      // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
-        return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
+      // ✅ 단일 반환은 기존처럼 return 열이 꼭 있어야 함
+      // ✅ 다중 반환은 첫 반환열만 앵커로 잡히면 충분
+      if (
+        !bestReturn &&
+        (intent.header_hint ||
+          intent.return_hint ||
+          (Array.isArray(intent.return_headers) &&
+            intent.return_headers.length))
+      ) {
+        return res.json({
+          result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
+        });
       }
 
-      mergedMeta = {
-        ...mergedMeta,
-        allSheetsData,
+      Object.assign(context, {
         bestReturn,
         bestLookup,
-      };
+        allSheetsData,
+      });
     } else {
       mergedMeta = { ...mergedMeta, allSheetsData };
     }
