@@ -1031,38 +1031,83 @@ function applySortListOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
 
+  const hasSortCue =
+    /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
+  const hasSalaryCue = /(연봉|salary)/i.test(msg);
+  const hasListCue = /(보여줘|목록|리스트|직원|사람|이름|성명)/i.test(msg);
+
+  if (!(hasSortCue && hasSalaryCue && hasListCue)) return intent;
+
   const currentOp = String(intent.operation || "").toLowerCase();
   if (["topnrows", "maxrow", "minrow", "rankcolumn"].includes(currentOp)) {
     return intent;
   }
 
-  const explicitTopNSignal =
-    /top\s*\d+/i.test(msg) ||
-    /(상위|하위)\s*\d+\s*명?/.test(msg) ||
-    /\d+\s*명(?:의|을|만|씩|중)?/.test(msg);
-  if (explicitTopNSignal) return intent;
-
-  const wantsNameList = /(이름\s*목록|직원\s*이름|이름\s*리스트|이름)/i.test(
-    msg,
-  );
-  const wantsSalaryOrder =
-    /(연봉|salary)/i.test(msg) &&
-    /(높은\s*순|낮은\s*순|내림차순|오름차순|정렬|순으로)/i.test(msg);
-  if (!(wantsNameList && wantsSalaryOrder)) return intent;
-
   intent.operation = "sortby";
-  intent.return_hint = "이름";
-  intent.lookup_hint = "연봉";
   intent.header_hint = "연봉";
+  intent.lookup_hint = "연봉";
+  intent.sort_by = "연봉";
   intent.sort_order = /(낮은\s*순|오름차순|작은\s*순)/i.test(msg)
     ? "asc"
     : "desc";
 
-  const explicitSalaryPair =
-    /(이름\s*과\s*연봉|연봉\s*과\s*이름|이름\s*와\s*연봉|연봉\s*와\s*이름|이름\s*및\s*연봉|연봉\s*및\s*이름)/.test(
-      msg,
-    );
-  intent.return_headers = explicitSalaryPair ? ["이름", "연봉"] : ["이름"];
+  const deptMatch = msg.match(/([가-힣A-Za-z0-9]+)\s*부서/);
+  if (deptMatch) {
+    _appendCondition(intent, {
+      target: "부서",
+      operator: "=",
+      value: deptMatch[1],
+    });
+  }
+
+  const gteMatch = msg.match(/연봉\s*(\d+(?:\.\d+)?)\s*(이상|초과)/);
+  if (gteMatch) {
+    _appendCondition(intent, {
+      target: "연봉",
+      operator: gteMatch[2] === "초과" ? ">" : ">=",
+      value: Number(gteMatch[1]),
+    });
+  }
+
+  const lteMatch = msg.match(/연봉\s*(\d+(?:\.\d+)?)\s*(이하|미만)/);
+  if (lteMatch) {
+    _appendCondition(intent, {
+      target: "연봉",
+      operator: lteMatch[2] === "미만" ? "<" : "<=",
+      value: Number(lteMatch[1]),
+    });
+  }
+
+  const explicitNameOnly =
+    /(이름만|성명만)/.test(msg) ||
+    (/(이름|성명)/.test(msg) &&
+      !/(이름\s*(과|와|,|및|하고)\s*(연봉|부서|직급|입사일|직원\s*id|사번|id))/.test(
+        msg,
+      ) &&
+      !/((연봉|부서|직급|입사일|직원\s*id|사번|id)\s*(과|와|,|및|하고)\s*(이름|성명))/.test(
+        msg,
+      ) &&
+      !/(포함|같이|함께)/.test(msg));
+
+  const explicitNameSalary =
+    /(이름|성명).*(연봉)|(연봉).*(이름|성명)/i.test(msg) ||
+    /(연봉\s*포함|연봉도|연봉까지)/.test(msg);
+
+  if (explicitNameOnly) {
+    intent.return_headers = ["이름"];
+  } else if (explicitNameSalary) {
+    intent.return_headers = ["이름", "연봉"];
+  } else {
+    intent.return_headers = ["이름"];
+  }
+
+  if (intent.return_headers.length === 1) {
+    intent.return_hint = intent.return_headers[0];
+  } else {
+    delete intent.return_hint;
+  }
+  delete intent.select_headers;
+
   return intent;
 }
 
@@ -1200,6 +1245,7 @@ function _appendCondition(intent, cond) {
     .toLowerCase();
 
   const exists = intent.conditions.some((c) => {
+    if (!c || typeof c !== "object" || c.logical_operator) return false;
     const target = String(c.target || c.header || "")
       .trim()
       .toLowerCase();
@@ -1209,7 +1255,6 @@ function _appendCondition(intent, cond) {
     const value = String(c.value ?? "")
       .trim()
       .toLowerCase();
-
     return (
       target === incomingTarget && op === incomingOp && value === incomingValue
     );
