@@ -1374,9 +1374,22 @@ function _topNRows(ctx) {
   const order =
     String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
 
-  const conds = Array.isArray(it.conditions)
+  const rawConds = Array.isArray(it.conditions)
     ? it.conditions.filter(Boolean)
     : [];
+
+  const seenCondKeys = new Set();
+  const conds = rawConds.filter((c) => {
+    if (!c || typeof c !== "object") return false;
+    const key = [
+      String(c.target || c.header || "").trim(),
+      String(c.operator || "=").trim(),
+      String(c.value ?? "").trim(),
+    ].join("::");
+    if (seenCondKeys.has(key)) return false;
+    seenCondKeys.add(key);
+    return true;
+  });
   if (!conds.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
   }

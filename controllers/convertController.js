@@ -1186,36 +1186,38 @@ function _detectSortOrderFromMessage(msg = "") {
 }
 
 function _appendCondition(intent, cond) {
+  if (!intent || !cond || typeof cond !== "object") return;
   if (!intent.conditions) intent.conditions = [];
-  const normTarget = (v) => {
-    if (v && typeof v === "object") {
-      return String(v.header || v.target || v.hint || "")
-        .trim()
-        .toLowerCase();
-    }
-    return String(v || "")
+
+  const incomingTarget = String(cond.target || cond.header || "")
+    .trim()
+    .toLowerCase();
+  const incomingOp = String(cond.operator || "=")
+    .trim()
+    .toLowerCase();
+  const incomingValue = String(cond.value ?? "")
+    .trim()
+    .toLowerCase();
+
+  const exists = intent.conditions.some((c) => {
+    const target = String(c.target || c.header || "")
       .trim()
       .toLowerCase();
-  };
-  const normOp = (v) =>
-    String(v || "=")
+    const op = String(c.operator || "=")
       .trim()
       .toLowerCase();
-  const normVal = (v) =>
-    String(v ?? "")
+    const value = String(c.value ?? "")
       .trim()
       .toLowerCase();
-  const exists = intent.conditions.some(
-    (c) =>
-      c &&
-      typeof c === "object" &&
-      !c.logical_operator &&
-      normTarget(c.target || c.header) ===
-        normTarget(cond.target || cond.header) &&
-      normOp(c.operator) === normOp(cond.operator) &&
-      normVal(c.value) === normVal(cond.value),
-  );
-  if (!exists) intent.conditions.push(cond);
+
+    return (
+      target === incomingTarget && op === incomingOp && value === incomingValue
+    );
+  });
+
+  if (!exists) {
+    intent.conditions.push(cond);
+  }
 }
 
 function applyGroupedAggregateOverride(message, intent) {
