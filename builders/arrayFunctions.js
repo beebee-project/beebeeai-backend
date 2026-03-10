@@ -1440,18 +1440,26 @@ function _topNRows(ctx) {
 }
 
 function _rankColumn(ctx) {
-  const best = ctx.bestReturn;
   const it = ctx.intent || {};
-  if (!best) return `=ERROR("순위 기준 열을 찾을 수 없습니다.")`;
+  const best = ctx.bestReturn;
+  if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
 
-  const range = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
-  const normalized = /(입사일|날짜|일자)/.test(
-    String(it.header_hint || best.header || ""),
-  )
-    ? `IFERROR(DATEVALUE(TRIM(${range}&"")), ${range})`
-    : `IFERROR(VALUE(TRIM(${range}&"")), ${range})`;
-  const order = String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : 0;
-  return `=LET(r, ${normalized}, MAP(r, LAMBDA(x, RANK.EQ(x, r, ${order}))))`;
+  const sheetName = best.sheetName;
+  const col = best.columnLetter;
+  const startRow = best.startRow;
+  const lastRow = best.lastDataRow;
+
+  const rangeExpr = `'${sheetName}'!${col}${startRow}:${col}${lastRow}`;
+  const order =
+    String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+  const normalized = `IFERROR(VALUE(TRIM(${rangeExpr}&"")), ${rangeExpr})`;
+
+  if (order === -1) {
+    return `=LET(r, ${normalized}, u, SORT(UNIQUE(r),, -1), MAP(r, LAMBDA(x, XMATCH(x, u, 0))))`;
+  }
+
+  return `=LET(r, ${normalized}, u, SORT(UNIQUE(r),, 1), MAP(r, LAMBDA(x, XMATCH(x, u, 0))))`;
 }
 
 function _monthCountTable(ctx) {
