@@ -1,5 +1,36 @@
 const { parseExplicitCellOrRange } = require("../utils/formulaUtils");
 
+function hasExplicitRangeIntent(it = {}) {
+  const raw = String(it?.raw_message || "");
+  if (it?.range || it?.target_cell) return true;
+  return !!parseExplicitCellOrRange(raw);
+}
+
+function hasHeaderDrivenIntent(it = {}) {
+  return Boolean(
+    it?.header_hint ||
+    it?.return_hint ||
+    it?.lookup_hint ||
+    it?.group_by ||
+    (Array.isArray(it?.return_fields) && it.return_fields.length) ||
+    (Array.isArray(it?.filters) && it.filters.length) ||
+    (Array.isArray(it?.conditions) && it.conditions.length) ||
+    it?.lookup?.key_header,
+  );
+}
+
+function shouldRejectDirectForUploadedSheet(ctx) {
+  const it = ctx?.intent || {};
+  const hasSheetsMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+
+  if (!hasSheetsMeta) return false;
+  if (!hasExplicitRangeIntent(it)) return true;
+  if (hasHeaderDrivenIntent(it)) return true;
+
+  return false;
+}
+
 // === 유틸 ===
 function isCellRef(v) {
   return /^[A-Z]{1,3}[0-9]{1,7}$/i.test(String(v || "").trim());
@@ -29,30 +60,58 @@ function needRangeError(funcName) {
 }
 
 // === 집계 공용 ===
-function simpleAggregate(it, funcName) {
+function simpleAggregate(it, funcName, ctx) {
+  if (ctx && shouldRejectDirectForUploadedSheet(ctx)) {
+    return `=ERROR("${funcName.toUpperCase()}: 업로드 파일 기반 요청은 헤더/조건 엔진으로 처리해야 합니다.")`;
+  }
+
   const r = getRangeOrCell(it);
   if (!r) return needRangeError(funcName);
   return `=${funcName.toUpperCase()}(${r})`;
 }
 
-function average(it) {
-  return simpleAggregate(it, "AVERAGE");
+function average(
+  it,
+  _formatValue,
+  _buildConditionPairs,
+  _buildConditionMask,
+  ctx,
+) {
+  return simpleAggregate(it, "AVERAGE", ctx);
 }
 
-function sum(it) {
-  return simpleAggregate(it, "SUM");
+function sum(it, _formatValue, _buildConditionPairs, _buildConditionMask, ctx) {
+  return simpleAggregate(it, "SUM", ctx);
 }
 
-function count(it) {
-  return simpleAggregate(it, "COUNT");
+function count(
+  it,
+  _formatValue,
+  _buildConditionPairs,
+  _buildConditionMask,
+  ctx,
+) {
+  return simpleAggregate(it, "COUNT", ctx);
 }
 
-function minf(it) {
-  return simpleAggregate(it, "MIN");
+function minf(
+  it,
+  _formatValue,
+  _buildConditionPairs,
+  _buildConditionMask,
+  ctx,
+) {
+  return simpleAggregate(it, "MIN", ctx);
 }
 
-function maxf(it) {
-  return simpleAggregate(it, "MAX");
+function maxf(
+  it,
+  _formatValue,
+  _buildConditionPairs,
+  _buildConditionMask,
+  ctx,
+) {
+  return simpleAggregate(it, "MAX", ctx);
 }
 
 function iff(it) {
@@ -336,20 +395,20 @@ function formula(ctx) {
 }
 
 module.exports = {
-  canHandleWithoutFile,
-  buildFormula,
-  handlers,
-  average,
-  sum,
-  count,
-  minf,
-  maxf,
-  iff,
-  textjoin,
-  concat,
-  left,
-  right,
-  len,
-  formula,
-  direct: formula,
+  average: (ctx) => average(ctx.intent || {}, null, null, null, ctx),
+  sum: (ctx) => sum(ctx.intent || {}, null, null, null, ctx),
+  count: (ctx) => count(ctx.intent || {}, null, null, null, ctx),
+  min: (ctx) => minf(ctx.intent || {}, null, null, null, ctx),
+  max: (ctx) => maxf(ctx.intent || {}, null, null, null, ctx),
+  if: (ctx) => iff(ctx.intent || {}),
+  textjoin: (ctx) => textjoin(ctx.intent || {}),
+  concat: (ctx) => concat(ctx.intent || {}),
+  left: (ctx) => left(ctx.intent || {}),
+  right: (ctx) => right(ctx.intent || {}),
+  len: (ctx) => len(ctx.intent || {}),
+  today,
+  now,
+  year: (ctx) => year(ctx.intent || {}),
+  month: (ctx) => month(ctx.intent || {}),
+  day: (ctx) => day(ctx.intent || {}),
 };

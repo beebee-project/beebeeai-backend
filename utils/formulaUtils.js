@@ -420,9 +420,40 @@ function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
 ========================================= */
 const SYNONYMS = {
   매출: ["매출", "총매출", "매출액", "revenue", "sales", "판매액", "판매금액"],
-  연봉: ["연봉", "salary", "annual salary", "pay"],
+  연봉: ["연봉", "급여", "salary", "annual salary", "pay"],
   점수: ["점수", "성적", "평점", "score", "grade"],
-  재고: ["재고", "재고 수량", "inventory", "stock", "qty", "quantity"],
+  재고: ["재고", "재고수량", "inventory", "stock", "qty", "quantity"],
+  판매량: [
+    "판매량",
+    "판매수량",
+    "출고량",
+    "sold",
+    "sales volume",
+    "units sold",
+  ],
+  카테고리: ["카테고리", "분류", "품목", "category", "type"],
+  후기등급: [
+    "후기등급",
+    "리뷰등급",
+    "평점등급",
+    "review grade",
+    "rating grade",
+  ],
+  안전재고: [
+    "안전재고",
+    "적정재고",
+    "최소재고",
+    "safety stock",
+    "buffer stock",
+  ],
+  입고일: ["입고일", "입고 날짜", "입고날짜", "inbound date", "received date"],
+  상품명: ["상품명", "제품명", "품명", "item", "product", "product name"],
+  직원ID: ["직원id", "사번", "employeeid", "emp id", "id"],
+  이름: ["이름", "성명", "직원명", "사원명", "name"],
+  부서: ["부서", "소속", "팀", "department"],
+  직급: ["직급", "직책", "position", "title"],
+  평가등급: ["평가등급", "평가 등급", "등급", "grade", "rating"],
+  입사일: ["입사일", "입사 날짜", "입사날짜", "hire date", "joining date"],
 };
 
 function norm(s = "") {
@@ -436,10 +467,17 @@ function norm(s = "") {
 function expandTermsFromText(text = "") {
   const base = norm(text);
   const terms = new Set([base]);
+
   Object.values(SYNONYMS).forEach((list) => {
-    if (list.some((v) => base.includes(norm(v))))
+    const norms = list.map(norm);
+    if (
+      norms.includes(base) ||
+      norms.some((v) => base.includes(v) || v.includes(base))
+    ) {
       list.forEach((v) => terms.add(norm(v)));
+    }
   });
+
   return terms;
 }
 

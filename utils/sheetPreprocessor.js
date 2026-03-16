@@ -3,6 +3,7 @@ const XLSX = require("xlsx");
 const { readMetaCache, writeMetaCache } = require("./storage");
 const { buildAllSheetsData } = require("./sheetMetaBuilder");
 const { shouldLogCache } = require("./cacheLog");
+const { makeSheetStateSig } = require("./sheetStateSig");
 
 function md5Buffer(buf) {
   return crypto.createHash("md5").update(buf).digest("hex");
@@ -34,7 +35,13 @@ async function getOrBuildAllSheetsData(fileBuffer) {
     if (shouldLogCache()) {
       console.log("[metaCache] HIT", hash.slice(0, 8));
     }
-    return { fileHash: hash, allSheetsData: cached.allSheetsData };
+    return {
+      fileHash: hash,
+      allSheetsData: cached.allSheetsData,
+      sheetStateSig:
+        cached.sheetStateSig || makeSheetStateSig(cached.allSheetsData),
+      metaVersion: cached.metaVersion || "v2",
+    };
   }
 
   if (shouldLogCache()) {
@@ -43,10 +50,21 @@ async function getOrBuildAllSheetsData(fileBuffer) {
 
   const workbook = XLSX.read(fileBuffer, { type: "buffer" });
   const allSheetsData = buildAllSheetsData(workbook);
+  const sheetStateSig = makeSheetStateSig(allSheetsData);
 
-  await writeMetaCache(cacheKey, { allSheetsData });
+  await writeMetaCache(cacheKey, {
+    allSheetsData,
+    sheetStateSig,
+    metaVersion: "v2",
+    builtAt: Date.now(),
+  });
 
-  return { fileHash: hash, allSheetsData };
+  return {
+    fileHash: hash,
+    allSheetsData,
+    sheetStateSig,
+    metaVersion: "v2",
+  };
 }
 
 module.exports = { getOrBuildAllSheetsData };

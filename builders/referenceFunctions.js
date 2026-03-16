@@ -6,6 +6,109 @@ const {
   asArray,
 } = require("../utils/builderHelpers");
 
+function _resolvedReturnColumns(ctx) {
+  return Array.isArray(ctx?.resolved?.returnColumns) &&
+    ctx.resolved.returnColumns.length
+    ? ctx.resolved.returnColumns
+    : ctx?.bestReturn
+      ? [ctx.bestReturn]
+      : [];
+}
+
+function _resolvedLookupColumn(ctx) {
+  return ctx?.resolved?.lookupColumn || ctx?.bestLookup || null;
+}
+
+function _resolvedDateColumn(ctx) {
+  const fromResolved = ctx?.resolved?.dateColumn;
+  if (fromResolved?.range) return fromResolved;
+
+  const hdr =
+    ctx?.intent?.date_header || ctx?.intent?.window?.date_header || "입사일";
+
+  return _bestColumnByHint(hdr, ctx, "lookup") || null;
+}
+
+function _lookupValueExpr(it, FV, ctx) {
+  if (it?.lookup?.value_ref) return String(it.lookup.value_ref).trim();
+
+  if (
+    it?.lookup_value &&
+    typeof it.lookup_value === "object" &&
+    it.lookup_value.operation
+  ) {
+    return evalSubIntentToScalar(ctx, FV, it.lookup_value);
+  }
+
+  if (it?.lookup?.value_ref) return String(it.lookup.value_ref).trim();
+
+  if (it?.lookup_value != null) {
+    return FV(it.lookup_value, { forceText: true });
+  }
+
+  if (it?.lookup?.value != null) {
+    return FV(it.lookup.value, { forceText: true });
+  }
+
+  return null;
+}
+
+function _notFoundExpr(it, FV) {
+  return it?.value_if_not_found != null ? FV(it.value_if_not_found) : null;
+}
+
+function _buildLookupExactFormula({
+  lookupValue,
+  lookupRange,
+  returnRange,
+  ifNotFound,
+}) {
+  const exists = `SUMPRODUCT(--(${lookupRange}=${lookupValue}))>0`;
+  const core = `INDEX(${returnRange}, MATCH(${lookupValue}, ${lookupRange}, 0))`;
+  return `=${_wrapIfNotFound(core, true, exists, ifNotFound)}`;
+}
+
+function _buildLookupMultiReturnFormula({
+  lookupValue,
+  lookupRange,
+  returnRanges,
+  ifNotFound,
+}) {
+  const exists = `SUMPRODUCT(--(${lookupRange}=${lookupValue}))>0`;
+  const cols = returnRanges.join(", ");
+  const core = `HSTACK(${returnRanges.map((r) => `INDEX(${r}, MATCH(${lookupValue}, ${lookupRange}, 0))`).join(", ")})`;
+  return `=${_wrapIfNotFound(core, true, exists, ifNotFound)}`;
+}
+
+function _buildLookupLatestByDateFormula({
+  lookupValue,
+  lookupRange,
+  returnRange,
+  dateRange,
+  ifNotFound,
+}) {
+  const exists = `SUMPRODUCT(--(${lookupRange}=${lookupValue}))>0`;
+  const core =
+    `TAKE(SORTBY(FILTER(${returnRange}, ${lookupRange}=${lookupValue}), ` +
+    `FILTER(${dateRange}, ${lookupRange}=${lookupValue}), -1), 1)`;
+  return `=${_wrapIfNotFound(core, true, exists, ifNotFound)}`;
+}
+
+function _buildLookupLatestMultiReturnFormula({
+  lookupValue,
+  lookupRange,
+  returnRanges,
+  dateRange,
+  ifNotFound,
+}) {
+  const exists = `SUMPRODUCT(--(${lookupRange}=${lookupValue}))>0`;
+  const stacked = `HSTACK(${returnRanges.join(", ")})`;
+  const core =
+    `TAKE(SORTBY(FILTER(${stacked}, ${lookupRange}=${lookupValue}), ` +
+    `FILTER(${dateRange}, ${lookupRange}=${lookupValue}), -1), 1)`;
+  return `=${_wrapIfNotFound(core, true, exists, ifNotFound)}`;
+}
+
 /* =========================
  * 힌트 기반 열 선택
  * ========================= */
@@ -458,6 +561,17 @@ function buildTwoWayLookupFormula(args) {
   return ifNotFound ? `IF(${exists}, ${core}, ${ifNotFound})` : core;
 }
 
+function _buildLookupTopNFormula({
+  lookupRange,
+  returnRange,
+  metricRange,
+  lookupValue,
+  n = 5,
+  order = -1,
+}) {
+  return `=TAKE(SORTBY(FILTER(HSTACK(${returnRange}, ${metricRange}), ${lookupRange}=${lookupValue}), FILTER(${metricRange}, ${lookupRange}=${lookupValue}), ${order}), ${n})`;
+}
+
 /* =========================
  * 공개 빌더
  * ========================= */
@@ -475,22 +589,34 @@ const referenceFunctionBuilder = {
   },
 
   lookup(ctx, formatValue) {
-    const { bestReturn, bestLookup, intent } = ctx;
-    const sheetName = bestReturn.sheetName;
-    const returnRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
-    const lookupRange = `'${sheetName}'!${bestLookup.columnLetter}${bestLookup.startRow}:${bestLookup.columnLetter}${bestLookup.lastDataRow}`;
-    const lookupValue = formatValue(intent.lookup_value);
-    // 존재성 검사(정확일치 가정)
-    const exists = `SUMPRODUCT(--(${lookupRange}=${lookupValue}))>0`;
-    const core = `INDEX(${returnRange}, MATCH(${lookupValue}, ${lookupRange}, 0))`;
-    return `=${_wrapIfNotFound(
-      core,
-      true,
-      exists,
-      intent.value_if_not_found
-        ? JSON.stringify(String(intent.value_if_not_found))
-        : null,
-    )}`;
+    const it = ctx.intent || {};
+    const lookupCol = _resolvedLookupColumn(ctx);
+    const returnCols = _resolvedReturnColumns(ctx);
+    const lookupValue = _lookupValueExpr(it, formatValue, ctx);
+
+    if (!lookupValue) return `=ERROR("LOOKUP: lookup_value가 없습니다.")`;
+    if (!lookupCol?.range)
+      return `=ERROR("LOOKUP: 조회 열을 찾을 수 없습니다.")`;
+    if (!returnCols.length)
+      return `=ERROR("LOOKUP: 반환 열을 찾을 수 없습니다.")`;
+
+    const ifNotFound = _notFoundExpr(it, formatValue);
+
+    if (returnCols.length > 1) {
+      return _buildLookupMultiReturnFormula({
+        lookupValue,
+        lookupRange: lookupCol.range,
+        returnRanges: returnCols.map((c) => c.range),
+        ifNotFound,
+      });
+    }
+
+    return _buildLookupExactFormula({
+      lookupValue,
+      lookupRange: lookupCol.range,
+      returnRange: returnCols[0].range,
+      ifNotFound,
+    });
   },
 
   xlookup(ctx, formatValue) {
@@ -500,88 +626,64 @@ const referenceFunctionBuilder = {
         ? formatValue(v, opts)
         : referenceFunctionBuilder._fv(v, opts);
 
-    // lookup_value
-    let lookupValue =
-      it.lookup_value &&
-      typeof it.lookup_value === "object" &&
-      it.lookup_value.operation
-        ? evalSubIntentToScalar(ctx, FV, it.lookup_value)
-        : it.lookup_value != null
-          ? FV(it.lookup_value, { forceText: true })
-          : null;
+    const lookupValue = _lookupValueExpr(it, FV, ctx);
     if (!lookupValue) return `=ERROR("XLOOKUP: lookup_value가 없습니다.")`;
 
-    // lookup/return 열(반환 시트 기준 정렬)
-    const bestLookup = _bestColumnByHint(it.lookup_hint, ctx, "lookup");
-    const bestReturn = _bestColumnByHint(it.return_hint, ctx, "return");
-    if (!bestLookup || !bestReturn)
-      return `=ERROR("XLOOKUP: lookup/return 열을 찾지 못했습니다.")`;
+    const lookupCol = _resolvedLookupColumn(ctx);
+    const returnCols = _resolvedReturnColumns(ctx);
 
-    const primarySheet = bestReturn.sheetName || bestLookup.sheetName;
-    const lookCol =
-      bestLookup.sheetName === primarySheet
-        ? bestLookup
-        : resolveHeaderInSheet(
-            bestLookup.header || it.lookup_hint,
-            primarySheet,
-            ctx,
-          );
-    if (!lookCol)
-      return `=ERROR("XLOOKUP: return 시트에서 lookup 키 열을 찾지 못했습니다.")`;
+    if (!lookupCol?.range)
+      return `=ERROR("XLOOKUP: lookup 열을 찾지 못했습니다.")`;
+    if (!returnCols.length)
+      return `=ERROR("XLOOKUP: return 열을 찾지 못했습니다.")`;
 
-    const lookupRange = `'${primarySheet}'!${lookCol.columnLetter}${lookCol.startRow}:${lookCol.columnLetter}${lookCol.lastDataRow}`;
-    const returnRange = `'${primarySheet}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+    const ifNotFound = _notFoundExpr(it, FV);
 
-    // if_not_found, match/search
-    const ifNF =
-      it.value_if_not_found != null ? `, ${FV(it.value_if_not_found)}` : "";
-    const mm = (() => {
-      const v = it.match_mode;
-      if (v == null) return null;
-      if (typeof v === "number") return v;
-      const s = String(v).toLowerCase();
-      if (s === "exact") return 0;
-      if (s === "approx" || s === "lte" || s === "lteq") return -1;
-      if (s === "gte" || s === "gteq") return 1;
-      if (s === "wildcard") return 2;
-      return 0;
-    })();
-    const sm = (() => {
-      const v = it.search_mode;
-      if (v == null) return null;
-      if (typeof v === "number") return v;
-      const s = String(v).toLowerCase();
-      if (s === "first") return 1;
-      if (s === "last") return -1;
-      if (s === "asc") return 2;
-      if (s === "desc") return -2;
-      return 1;
-    })();
-
-    // 멀티키 조합
-    let lookupArray = lookupRange;
-    if (Array.isArray(it.multi_keys) && it.multi_keys.length > 0) {
-      const cols = it.multi_keys
-        .map((k) => _bestColumnByHint(k.hint, ctx, "lookup"))
-        .filter(Boolean)
-        .map(
-          (c) =>
-            `'${c.sheetName}'!${c.columnLetter}${c.startRow}:${c.columnLetter}${c.lastDataRow}`,
-        );
-      if (cols.length > 0) {
-        lookupArray = cols.map((c) => `(${c})`).join(`&"|"&`);
-        if (!it.lookup_value) {
-          const keyVals = it.multi_keys
-            .map((k) => (k.value != null ? FV(k.value) : `""`))
-            .join(`&"|"&`);
-          lookupValue = keyVals;
-        }
+    // 중복 최신값 규칙
+    const duplicateRule =
+      it.duplicate_rule || it?.lookup?.duplicate_rule || null;
+    if (duplicateRule === "latest") {
+      const dateCol = _resolvedDateColumn(ctx);
+      if (!dateCol?.range) {
+        return `=ERROR("XLOOKUP: latest 중복 처리용 날짜 열을 찾지 못했습니다.")`;
       }
+
+      if (returnCols.length > 1) {
+        return _buildLookupLatestMultiReturnFormula({
+          lookupValue,
+          lookupRange: lookupCol.range,
+          returnRanges: returnCols.map((c) => c.range),
+          dateRange: dateCol.range,
+          ifNotFound,
+        });
+      }
+
+      return _buildLookupLatestByDateFormula({
+        lookupValue,
+        lookupRange: lookupCol.range,
+        returnRange: returnCols[0].range,
+        dateRange: dateCol.range,
+        ifNotFound,
+      });
     }
 
-    const mmArg = mm != null ? `, ${mm}` : "";
-    const smArg = sm != null ? `, ${sm}` : "";
-    return `=XLOOKUP(${lookupValue}, ${lookupArray}, ${returnRange}${ifNF}${mmArg}${smArg})`;
+    // 다중 반환
+    if (returnCols.length > 1) {
+      return _buildLookupMultiReturnFormula({
+        lookupValue,
+        lookupRange: lookupCol.range,
+        returnRanges: returnCols.map((c) => c.range),
+        ifNotFound,
+      });
+    }
+
+    // 기본 exact
+    return _buildLookupExactFormula({
+      lookupValue,
+      lookupRange: lookupCol.range,
+      returnRange: returnCols[0].range,
+      ifNotFound,
+    });
   },
 
   hlookup(ctx, formatValue) {

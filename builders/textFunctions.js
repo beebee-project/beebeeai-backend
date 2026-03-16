@@ -4,6 +4,30 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
+function _resolvedPrimaryReturn(ctx) {
+  return ctx?.resolved?.returnColumns?.[0] || ctx?.bestReturn || null;
+}
+
+function _resolvedTargetFromCtx(ctx, kind = "text") {
+  const rr = _resolvedPrimaryReturn(ctx);
+  if (!rr) return null;
+
+  const scopeAll = String(ctx?.intent?.scope || "").toLowerCase() === "all";
+  if (scopeAll) {
+    return {
+      isRange: true,
+      range: rr.range,
+      sheetName: rr.sheetName,
+    };
+  }
+
+  return {
+    isRange: false,
+    cell: rr.cell,
+    sheetName: rr.sheetName,
+  };
+}
+
 /* 입력이 범위/스칼라인지에 따라 BYROW 또는 단일식으로 라우팅 */
 function _asUnaryByRowOrScalar(ctx, formatValue, inputSpec, gen) {
   const { isRange, expr } = _toRangeOrScalarExpr(ctx, formatValue, inputSpec);
@@ -23,7 +47,7 @@ function _evalSubExprToRange(ctx, formatValue, node) {
       fb,
       { ...ctx, intent: node },
       formatValue,
-      fb._buildConditionPairs
+      fb._buildConditionPairs,
     );
     if (typeof res === "string" && res.startsWith("=")) return res.slice(1);
     return res;
@@ -34,24 +58,33 @@ function _evalSubExprToRange(ctx, formatValue, node) {
 /* 대상 셀/범위 결정: scope="all"이면 range, 아니면 단일 cell */
 function _targetCellOrRange(ctx, kind = "text") {
   const it = ctx.intent || {};
+
+  // 1) resolved 우선
+  const resolvedTarget = _resolvedTargetFromCtx(ctx, kind);
+  if (resolvedTarget) return resolvedTarget;
+
+  // 2) 기존 hint 경로
   const hint = it.target_header || it.header_hint;
   if (it.scope === "all") {
     const r = hint
-      ? refFromHeaderSpec(hint, ctx)
+      ? refFromHeaderSpec(ctx, hint)
       : ctx.bestReturn
-      ? refFromHeaderSpec(
-          ctx.bestReturn.header ||
-            ctx.bestReturn.header_hint ||
-            ctx.bestReturn.columnLetter,
-          ctx
-        )
-      : null;
+        ? refFromHeaderSpec(
+            ctx,
+            ctx.bestReturn.header ||
+              ctx.bestReturn.header_hint ||
+              ctx.bestReturn.columnLetter,
+          )
+        : null;
     if (r) return { isRange: true, range: r.range, sheetName: r.sheetName };
   }
+
   if (hint) {
-    const r = refFromHeaderSpec(hint, ctx);
+    const r = refFromHeaderSpec(ctx, hint);
     if (r) return { isRange: false, cell: r.cell, sheetName: r.sheetName };
   }
+
+  // 3) legacy fallback
   if (ctx.bestReturn) {
     const br = ctx.bestReturn;
     return {
@@ -60,8 +93,12 @@ function _targetCellOrRange(ctx, kind = "text") {
       sheetName: br.sheetName,
     };
   }
-  if (it.target_cell)
+
+  // 4) explicit target cell
+  if (it.target_cell) {
     return { isRange: false, cell: it.target_cell, sheetName: null };
+  }
+
   return null;
 }
 
@@ -72,7 +109,7 @@ function _selectCellByRowSelector(ctx, headerSpec) {
   const keyCol = refFromHeaderSpec(it.row_selector.hint, ctx);
   const tgtCol = refFromHeaderSpec(
     headerSpec || it.target_header || it.header_hint,
-    ctx
+    ctx,
   );
   if (!keyCol || !tgtCol) return null;
   const keyVal =
@@ -86,7 +123,7 @@ function _selectCellByRowSelector(ctx, headerSpec) {
 function _routeTextUnary(
   t,
   innerFromX /* (xSym)=>"FUNC(xSym)" */,
-  rowPickExpr /* optional */
+  rowPickExpr /* optional */,
 ) {
   if (rowPickExpr) return `=${innerFromX(rowPickExpr)}`;
   if (!t) return `=ERROR("텍스트 대상 열을 찾을 수 없습니다.")`;
@@ -105,17 +142,17 @@ function _regexLiteFallbackExpr(kind, textExpr, patternExpr, formatValue) {
     const prefix = pat.slice(1);
     if (kind === "match")
       return `=LEFT(${textExpr}, LEN(${formatValue(prefix)})) = ${formatValue(
-        prefix
+        prefix,
       )}`;
     if (kind === "extract")
       return `=IF(LEFT(${textExpr}, LEN(${formatValue(prefix)}))=${formatValue(
-        prefix
+        prefix,
       )}, ${formatValue(prefix)}, "")`;
     if (kind === "replace")
       return `=IF(LEFT(${textExpr}, LEN(${formatValue(prefix)}))=${formatValue(
-        prefix
+        prefix,
       )}, "" & MID(${textExpr}, LEN(${formatValue(
-        prefix
+        prefix,
       )})+1, 10^6), ${textExpr})`;
   }
 
@@ -124,17 +161,17 @@ function _regexLiteFallbackExpr(kind, textExpr, patternExpr, formatValue) {
     const suffix = pat.slice(0, -1);
     if (kind === "match")
       return `=RIGHT(${textExpr}, LEN(${formatValue(suffix)})) = ${formatValue(
-        suffix
+        suffix,
       )}`;
     if (kind === "extract")
       return `=IF(RIGHT(${textExpr}, LEN(${formatValue(suffix)}))=${formatValue(
-        suffix
+        suffix,
       )}, ${formatValue(suffix)}, "")`;
     if (kind === "replace")
       return `=IF(RIGHT(${textExpr}, LEN(${formatValue(suffix)}))=${formatValue(
-        suffix
+        suffix,
       )}, LEFT(${textExpr}, LEN(${textExpr})-LEN(${formatValue(
-        suffix
+        suffix,
       )})), ${textExpr})`;
   }
 
@@ -144,7 +181,7 @@ function _regexLiteFallbackExpr(kind, textExpr, patternExpr, formatValue) {
       return `=ISNUMBER(SEARCH(${formatValue(pat)}, ${textExpr}))`;
     if (kind === "extract") {
       return `=IF(ISNUMBER(SEARCH(${formatValue(
-        pat
+        pat,
       )}, ${textExpr})), ${formatValue(pat)}, "")`;
     }
     if (kind === "replace") {
@@ -241,7 +278,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     const n = it.num_chars != null ? it.num_chars : 1;
     return _routeTextUnary(t, (x) => `LEFT(${x}, ${n})`, pick);
@@ -251,7 +288,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     const n = it.num_chars != null ? it.num_chars : 1;
     return _routeTextUnary(t, (x) => `RIGHT(${x}, ${n})`, pick);
@@ -261,7 +298,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     const s = it.start_num != null ? it.start_num : 1;
     const n = it.num_chars != null ? it.num_chars : 1;
@@ -272,7 +309,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `LEN(${x})`, pick);
   },
@@ -281,7 +318,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `UPPER(${x})`, pick);
   },
@@ -290,7 +327,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `LOWER(${x})`, pick);
   },
@@ -299,7 +336,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `PROPER(${x})`, pick);
   },
@@ -308,7 +345,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `TRIM(${x})`, pick);
   },
@@ -317,7 +354,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `VALUE(${x})`, pick);
   },
@@ -326,7 +363,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `T(${x})`, pick);
   },
@@ -335,7 +372,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     const fmt = it.format_text || "0";
     return _routeTextUnary(t, (x) => `TEXT(${x}, ${formatValue(fmt)})`, pick);
@@ -348,8 +385,8 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.find_text) ||
           formatValue("")
         : it.find_text != null
-        ? formatValue(it.find_text)
-        : formatValue("");
+          ? formatValue(it.find_text)
+          : formatValue("");
     const start = it.start_num != null ? it.start_num : 1;
 
     const withinRange = rangeFromSpec(ctx, it.within_text);
@@ -367,7 +404,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `FIND(${ft}, ${x}, ${start})`, pick);
   },
@@ -379,8 +416,8 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.find_text) ||
           formatValue("")
         : it.find_text != null
-        ? formatValue(it.find_text)
-        : formatValue("");
+          ? formatValue(it.find_text)
+          : formatValue("");
     const start = it.start_num != null ? it.start_num : 1;
 
     const withinRange = rangeFromSpec(ctx, it.within_text);
@@ -398,7 +435,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `SEARCH(${ft}, ${x}, ${start})`, pick);
   },
@@ -447,7 +484,7 @@ const textFunctionBuilder = {
       const t = _targetCellOrRange(ctx, "text");
       const pick = _selectCellByRowSelector(
         ctx,
-        it.target_header || it.header_hint
+        it.target_header || it.header_hint,
       );
       if (pick) args.push(pick);
       else if (t && t.isRange) args.push(t.range);
@@ -455,7 +492,7 @@ const textFunctionBuilder = {
     }
     if (args.length === 0) return `=ERROR("TEXTJOIN: 결합할 값이 없습니다.")`;
     return `=TEXTJOIN(${delim}, ${ignoreEmpty ? "TRUE" : "FALSE"}, ${args.join(
-      ", "
+      ", ",
     )})`;
   },
 
@@ -482,7 +519,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         if (pick) textExpr = pick;
         else if (t && !t.isRange) textExpr = t.cell;
@@ -544,7 +581,7 @@ const textFunctionBuilder = {
           .join("|")})`;
         if (targetRange) {
           return `=BYROW(${targetRange}, LAMBDA(x, TEXTSPLIT(REGEXREPLACE(x, ${formatValue(
-            pat
+            pat,
           )}, ${delimScalar}), ${delimScalar}, ${
             splitByEach ? "TRUE" : "FALSE"
           }, ${removeEmptySheets ? "TRUE" : "FALSE"})))`;
@@ -552,7 +589,7 @@ const textFunctionBuilder = {
         if (!textExpr)
           return `=ERROR("TEXTSPLIT: 분해할 텍스트를 찾지 못했습니다.")`;
         return `=TEXTSPLIT(REGEXREPLACE(${textExpr}, ${formatValue(
-          pat
+          pat,
         )}, ${delimScalar}), ${delimScalar}, ${
           splitByEach ? "TRUE" : "FALSE"
         }, ${removeEmptySheets ? "TRUE" : "FALSE"})`;
@@ -592,7 +629,7 @@ const textFunctionBuilder = {
     let textExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -606,7 +643,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         if (pick) textExpr = pick;
         else if (t && !t.isRange) textExpr = t.cell;
@@ -618,15 +655,15 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.old_text) ||
           formatValue("")
         : it.old_text != null
-        ? formatValue(it.old_text)
-        : formatValue("");
+          ? formatValue(it.old_text)
+          : formatValue("");
     const newT =
       it.new_text && typeof it.new_text === "object" && it.new_text.operation
         ? evalSubIntentToScalar(ctx, formatValue, it.new_text) ||
           formatValue("")
         : it.new_text != null
-        ? formatValue(it.new_text)
-        : formatValue("");
+          ? formatValue(it.new_text)
+          : formatValue("");
     const inst = it.instance_num != null ? `, ${it.instance_num}` : "";
 
     if (withinRange) {
@@ -642,7 +679,7 @@ const textFunctionBuilder = {
     let oldExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -656,7 +693,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         if (pick) oldExpr = pick;
         else if (t && !t.isRange) oldExpr = t.cell;
@@ -670,8 +707,8 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.new_text) ||
           formatValue("")
         : it.new_text != null
-        ? formatValue(it.new_text)
-        : formatValue("");
+          ? formatValue(it.new_text)
+          : formatValue("");
 
     if (withinRange) {
       return `=BYROW(${withinRange}, LAMBDA(x, REPLACE(x, ${start}, ${n}, ${newT})))`;
@@ -704,7 +741,7 @@ const textFunctionBuilder = {
       const t = _targetCellOrRange(ctx, "text");
       const pick = _selectCellByRowSelector(
         ctx,
-        it.target_header || it.header_hint
+        it.target_header || it.header_hint,
       );
       if (pick) args.push(pick);
       else if (t && t.isRange) args.push(t.range);
@@ -719,7 +756,7 @@ const textFunctionBuilder = {
     const t = _targetCellOrRange(ctx, "text");
     const pick = _selectCellByRowSelector(
       ctx,
-      it.target_header || it.header_hint
+      it.target_header || it.header_hint,
     );
     return _routeTextUnary(t, (x) => `CLEAN(${x})`, pick);
   },
@@ -769,7 +806,7 @@ const textFunctionBuilder = {
       const t = _targetCellOrRange(ctx, "text");
       const pick = _selectCellByRowSelector(
         ctx,
-        it.target_header || it.header_hint
+        it.target_header || it.header_hint,
       );
       leftExpr = pick || (t && !t.isRange ? t.cell : null) || formatValue("");
     }
@@ -787,7 +824,7 @@ const textFunctionBuilder = {
     let textExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -801,7 +838,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         textExpr = pick || (t && !t.isRange ? t.cell : null);
       }
@@ -848,7 +885,7 @@ const textFunctionBuilder = {
     let textExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -862,7 +899,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         textExpr = pick || (t && !t.isRange ? t.cell : null);
       }
@@ -910,7 +947,7 @@ const textFunctionBuilder = {
       ctx,
       formatValue,
       it.within_text || it.target_header || it.header_hint,
-      (x) => gen(_maybeTrim(x, ctx))
+      (x) => gen(_maybeTrim(x, ctx)),
     );
   },
 
@@ -927,7 +964,7 @@ const textFunctionBuilder = {
       ctx,
       formatValue,
       it.within_text || it.target_header || it.header_hint,
-      (x) => gen(_maybeTrim(x, ctx))
+      (x) => gen(_maybeTrim(x, ctx)),
     );
   },
 
@@ -944,7 +981,7 @@ const textFunctionBuilder = {
       ctx,
       formatValue,
       it.within_text || it.target_header || it.header_hint,
-      (x) => gen(_maybeTrim(x, ctx))
+      (x) => gen(_maybeTrim(x, ctx)),
     );
   },
 
@@ -955,7 +992,7 @@ const textFunctionBuilder = {
     let tExpr = null,
       tRange = rangeFromSpec(
         ctx,
-        it.within_text || it.target_header || it.header_hint
+        it.within_text || it.target_header || it.header_hint,
       );
     if (!tRange) {
       if (
@@ -968,7 +1005,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         tExpr = pick || (t && !t.isRange ? t.cell : null);
       }
@@ -989,7 +1026,7 @@ const textFunctionBuilder = {
     const scalars = list.map((s) => _toScalarExpr(ctx, formatValue, s) || `""`);
     const pick = scalars.reduceRight(
       (acc, cur) => `IF(LEN(TRIM(${cur}))>0, ${cur}, ${acc})`,
-      `""`
+      `""`,
     );
     return `=${pick}`;
   },
@@ -1017,7 +1054,7 @@ const textFunctionBuilder = {
     const src = _toRangeOrScalarExpr(
       ctx,
       formatValue,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!src.expr) return `=ERROR("slugify: 대상 텍스트를 찾지 못했습니다.")`;
 
@@ -1041,7 +1078,7 @@ const textFunctionBuilder = {
     const src = _toRangeOrScalarExpr(
       ctx,
       formatValue,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!src.expr)
       return `=ERROR("extract_number: 대상 텍스트를 찾지 못했습니다.")`;
@@ -1065,7 +1102,7 @@ const textFunctionBuilder = {
     const src = _toRangeOrScalarExpr(
       ctx,
       formatValue,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!src.expr) return `=ERROR("pad_left: 대상 텍스트를 찾지 못했습니다.")`;
     const fx = (x) => `IF(LEN(${x})>=${len}, ${x}, REPT(${ch}, ${len}) & ${x})`;
@@ -1080,7 +1117,7 @@ const textFunctionBuilder = {
     const src = _toRangeOrScalarExpr(
       ctx,
       formatValue,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!src.expr) return `=ERROR("pad_right: 대상 텍스트를 찾지 못했습니다.")`;
     const fx = (x) => `IF(LEN(${x})>=${len}, ${x}, ${x} & REPT(${ch}, ${len}))`;
@@ -1096,7 +1133,7 @@ const textFunctionBuilder = {
     if (/^BYROW\(/.test(condExpr)) {
       return `=${condExpr.replace(
         /^BYROW\((.+)\)$/,
-        `BYROW($1, LAMBDA(x, IF(x, ${vT}, ${vF})))`
+        `BYROW($1, LAMBDA(x, IF(x, ${vT}, ${vF})))`,
       )}`;
     }
     return `=IF(${condExpr}, ${vT}, ${vF})`;
@@ -1110,7 +1147,7 @@ const textFunctionBuilder = {
     if (/^BYROW\(/.test(condExpr)) {
       return `=${condExpr.replace(
         /^BYROW\((.+)\)$/,
-        `BYROW($1, LAMBDA(x, IF(x, ${vT}, ${vF})))`
+        `BYROW($1, LAMBDA(x, IF(x, ${vT}, ${vF})))`,
       )}`;
     }
     return `=IF(${condExpr}, ${vT}, ${vF})`;
@@ -1124,7 +1161,7 @@ const textFunctionBuilder = {
     if (/^BYROW\(/.test(condExpr)) {
       return `=${condExpr.replace(
         /^BYROW\((.+)\)$/,
-        `BYROW($1, LAMBDA(x, IF(x, ${vT}, ${vF})))`
+        `BYROW($1, LAMBDA(x, IF(x, ${vT}, ${vF})))`,
       )}`;
     }
     return `=IF(${condExpr}, ${vT}, ${vF})`;
@@ -1138,7 +1175,7 @@ const textFunctionBuilder = {
     let textExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -1152,7 +1189,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         textExpr = pick || (t && !t.isRange ? t.cell : null);
       }
@@ -1162,8 +1199,8 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.find_text) ||
           formatValue("")
         : it.find_text != null
-        ? formatValue(it.find_text)
-        : formatValue("");
+          ? formatValue(it.find_text)
+          : formatValue("");
 
     if (isSheets) {
       if (withinRange)
@@ -1196,7 +1233,7 @@ const textFunctionBuilder = {
     let textExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -1210,7 +1247,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         textExpr = pick || (t && !t.isRange ? t.cell : null);
       }
@@ -1220,8 +1257,8 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.find_text) ||
           formatValue("")
         : it.find_text != null
-        ? formatValue(it.find_text)
-        : formatValue("");
+          ? formatValue(it.find_text)
+          : formatValue("");
 
     if (isSheets) {
       if (withinRange)
@@ -1244,7 +1281,7 @@ const textFunctionBuilder = {
       "extract",
       textExpr,
       pattern,
-      formatValue
+      formatValue,
     );
     return (
       fb || `=ERROR("REGEXEXTRACT는 Sheets 전용입니다(간단 패턴만 우회 가능).")`
@@ -1259,7 +1296,7 @@ const textFunctionBuilder = {
     let textExpr = null;
     const withinRange = rangeFromSpec(
       ctx,
-      it.within_text || it.target_header || it.header_hint
+      it.within_text || it.target_header || it.header_hint,
     );
     if (!withinRange) {
       if (
@@ -1273,7 +1310,7 @@ const textFunctionBuilder = {
         const t = _targetCellOrRange(ctx, "text");
         const pick = _selectCellByRowSelector(
           ctx,
-          it.target_header || it.header_hint
+          it.target_header || it.header_hint,
         );
         textExpr = pick || (t && !t.isRange ? t.cell : null);
       }
@@ -1283,15 +1320,15 @@ const textFunctionBuilder = {
         ? evalSubIntentToScalar(ctx, formatValue, it.old_text) ||
           formatValue("")
         : it.old_text != null
-        ? formatValue(it.old_text)
-        : formatValue("");
+          ? formatValue(it.old_text)
+          : formatValue("");
     const repl =
       it.new_text && typeof it.new_text === "object" && it.new_text.operation
         ? evalSubIntentToScalar(ctx, formatValue, it.new_text) ||
           formatValue("")
         : it.new_text != null
-        ? formatValue(it.new_text)
-        : formatValue("");
+          ? formatValue(it.new_text)
+          : formatValue("");
 
     if (isSheets) {
       if (withinRange)
@@ -1314,7 +1351,7 @@ const textFunctionBuilder = {
       "replace",
       textExpr,
       pattern,
-      formatValue
+      formatValue,
     );
     return (
       fb || `=ERROR("REGEXREPLACE는 Sheets 전용입니다(간단 패턴만 우회 가능).")`

@@ -9,6 +9,16 @@ const crypto = require("crypto");
 const { classifyReason } = require("../utils/reasonClassifier");
 const { validateFormula } = require("../utils/outputValidator");
 const { buildDebugMeta } = require("../utils/debugMetaBuilder");
+const {
+  normalizeIntentSchema,
+  normalizePolicy,
+} = require("../utils/intentSchema");
+const {
+  resolveIntent,
+  buildResolvedContext,
+} = require("../utils/intentResolver");
+const { detectFormulaCompatibility } = require("../utils/formulaCompatibility");
+const { buildConditionMask } = require("../utils/conditionEngine");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -290,6 +300,31 @@ const DEFAULT_FORMAT_OPTIONS = {
 //   ].join("||");
 // }
 
+function shouldUseDirectBuilder(intent = {}, ctx = {}) {
+  const raw = String(intent?.raw_message || "");
+  const explicit =
+    formulaUtils.parseExplicitCellOrRange(raw) ||
+    intent?.range ||
+    intent?.target_cell;
+
+  const hasSheetMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+  const headerDriven = Boolean(
+    intent?.header_hint ||
+    intent?.return_hint ||
+    intent?.lookup_hint ||
+    intent?.group_by ||
+    (Array.isArray(intent?.return_fields) && intent.return_fields.length) ||
+    (Array.isArray(intent?.filters) && intent.filters.length) ||
+    (Array.isArray(intent?.conditions) && intent.conditions.length) ||
+    intent?.lookup?.key_header,
+  );
+
+  if (!explicit) return false;
+  if (hasSheetMeta && headerDriven) return false;
+  return true;
+}
+
 /* ---------------------------------------------
  * 로컬 의도 추론 (LLM 미사용 시 폴백)
  * -------------------------------------------*/
@@ -521,85 +556,23 @@ function normalizeLookupIntent(intent) {
   return intent;
 }
 
-/* ---------------------------------------------
- * normalizeIntentPolicy(intent)
- * -------------------------------------------
- * 역할:
- *  - Intent 객체에 지정된 engine / mode / 기본값 정책을
- *    시스템 전역 기본값(DEFAULT_*) 기준으로 정규화한다.
- *
- * 처리 내용:
- *  1) engine: "excel" / "sheets" 이외의 값 → "excel"로 통일
- *  2) policy: mode / value_if_not_found / value_if_error 확정
- *  3) formatOptions: policy.mode에 따라 포맷팅 동작 제어
- *      - strict 모드 → 대소문자 구분, trim 비활성, 숫자 강제 변환 비활성
- *      - loose 모드 → 기본값(대소문자 무시, trim 활성, 숫자 변환)
- *
- * 결과:
- *  - { engine, policy, formatOptions } 반환
- * -------------------------------------------*/
-function normalizeIntentPolicy(intent = {}) {
-  const engineRaw =
-    intent.engine || intent.platform || intent.target_engine || "";
-  const engine =
-    engineRaw === "sheets" || engineRaw === "googlesheets" ? "sheets" : "excel";
+function buildCtx(rawCtx) {
+  const rawIntent = rawCtx.intent || {};
+  const message = rawCtx.message || rawIntent.raw_message || "";
 
-  const policy = {
-    mode: intent.mode === "strict" ? "strict" : DEFAULT_POLICY.mode,
-    value_if_not_found:
-      intent.value_if_not_found != null
-        ? String(intent.value_if_not_found)
-        : DEFAULT_POLICY.value_if_not_found,
-    value_if_error:
-      intent.value_if_error != null
-        ? String(intent.value_if_error)
-        : DEFAULT_POLICY.value_if_error,
+  const intent = normalizeIntentSchema(rawIntent, message);
+  const { engine, policy, formatOptions } = normalizePolicy(intent);
+
+  const baseCtx = {
+    ...rawCtx,
+    intent,
+    engine,
+    policy,
+    formatOptions,
   };
 
-  const formatOptions = { ...DEFAULT_FORMAT_OPTIONS };
-  if (policy.mode === "strict") {
-    formatOptions.case_sensitive = true;
-    formatOptions.trim_text = false;
-    formatOptions.coerce_number = false;
-  }
-
-  return { engine, policy, formatOptions };
-}
-
-/* ---------------------------------------------
- * buildCtx(rawCtx)
- * -------------------------------------------
- * 역할:
- *  - Intent 및 환경 정보를 기반으로 최종 Context 객체를 구성한다.
- *  - Builder 함수들이 참조할 모든 전역 설정을 이 단계에서 주입.
- *
- * 입력(rawCtx) 예시:
- *  {
- *    message: "홍길동의 매출 조회",
- *    intent: { operation: "xlookup", lookup_hint: "이름", return_hint: "매출" },
- *    engine: "excel",
- *    policy: { mode: "loose", value_if_not_found: "", value_if_error: "" },
- *    allSheetsData: {...},
- *    bestReturn: {...},
- *    bestLookup: {...}
- *  }
- *
- * 결과(Context):
- *  {
- *    intent,
- *    engine,
- *    policy,
- *    formatOptions,
- *    allSheetsData,
- *    bestReturn,
- *    bestLookup,
- *    formulaBuilder
- *  }
- * -------------------------------------------*/
-function buildCtx(rawCtx) {
-  const intent = rawCtx.intent || {};
-  const { engine, policy, formatOptions } = normalizeIntentPolicy(intent);
-  return { ...rawCtx, engine, policy, formatOptions };
+  const resolved = resolveIntent(baseCtx);
+  return buildResolvedContext(baseCtx, resolved);
 }
 
 /* ---------------------------------------------
@@ -681,6 +654,15 @@ const formulaBuilder = {
         return `${range}, ${val}`;
       })
       .filter(Boolean);
+  },
+
+  _buildConditionMask: function (ctx) {
+    return buildConditionMask(ctx, (v, o) =>
+      formulaUtils.formatValue(v, {
+        ...(ctx?.formatOptions || {}),
+        ...(o || {}),
+      }),
+    );
   },
 };
 Object.assign(formulaBuilder, logicalFunctionBuilder);
@@ -1712,6 +1694,8 @@ exports.handleConversion = async (req, res, next) => {
 
     // 3) 의도 추출 (OpenAI 있으면 LLM, 없으면 로컬)
     let intent = buildLocalIntentFromText(message);
+    intent = normalizeIntentSchema(intent, message);
+
     const openai = getOpenAI();
 
     _tIntentStart = process.hrtime.bigint();
@@ -1780,6 +1764,7 @@ exports.handleConversion = async (req, res, next) => {
       }
     }
 
+    intent = normalizeIntentSchema(intent, message);
     intent = normalizeLookupIntent(intent);
     intent = applyMedianOverride(message, intent);
     intent = applyDateBoundaryOverride(message, intent);
@@ -1814,7 +1799,14 @@ exports.handleConversion = async (req, res, next) => {
 
     // 4) 컨텍스트 구성 + 자동 열 매핑
     _tBuildStart = process.hrtime.bigint();
-    const context = { intent, formulaBuilder };
+    let context = buildCtx({
+      intent,
+      message,
+      formulaBuilder,
+      allSheetsData,
+      bestReturn,
+      bestLookup,
+    });
     if (isFileAttached && allSheetsData) {
       const hasHints = !!(
         intent.return_hint ||
@@ -1856,7 +1848,11 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     // 5) direct(파일無) 빠른 경로
-    if (!isFileAttached && direct?.canHandleWithoutFile?.(intent)) {
+    if (
+      !isFileAttached &&
+      direct?.canHandleWithoutFile?.(intent) &&
+      shouldUseDirectBuilder(intent, context)
+    ) {
       const f = direct.buildFormula(intent);
       if (f) {
         // ✅ 6-1: 출력 검증(Direct도 동일 적용)
@@ -1895,9 +1891,23 @@ exports.handleConversion = async (req, res, next) => {
               build: _ms(_tBuildStart, _tBuildEnd),
               total: Date.now() - startedAt,
             },
+            extra: {
+              compatibility: directCompatibility,
+              resolvedBaseSheet: context?.resolved?.baseSheet || null,
+              resolvedReturnHeaders: (
+                context?.resolved?.returnColumns || []
+              ).map((x) => x.header),
+              resolvedLookupHeader:
+                context?.resolved?.lookupColumn?.header || null,
+              resolvedGroupHeader:
+                context?.resolved?.groupColumn?.header || null,
+            },
           }),
         });
-        return res.json({ result: safeOut });
+        return res.json({
+          result: safeOut,
+          compatibility: directCompatibility,
+        });
       }
     }
 
@@ -1916,9 +1926,12 @@ exports.handleConversion = async (req, res, next) => {
         context,
         formulaBuilder._formatValue,
         formulaBuilder._buildConditionPairs,
+        formulaBuilder._buildConditionMask,
       );
     }
     _tBuildEnd = process.hrtime.bigint();
+
+    const compatibility = detectFormulaCompatibility(finalFormula || "");
 
     if (req.user?.id && shouldCountConversion(finalFormula)) {
       await bumpUsage(req.user.id, "formulaConversions", 1);
@@ -1956,16 +1969,32 @@ exports.handleConversion = async (req, res, next) => {
         cacheHit: _dbgCacheHit,
         intentOp: intent?.operation,
         intentCacheKey: _dbgIntentCacheKey,
-        validator: v,
+        validator: validationResult,
         timing: {
           preprocess: _ms(_tPreStart, _tPreEnd),
           intent: _ms(_tIntentStart, _tIntentEnd),
           build: _ms(_tBuildStart, _tBuildEnd),
           total: Date.now() - startedAt,
         },
+        extra: {
+          compatibility,
+          resolvedBaseSheet: context?.resolved?.baseSheet || null,
+          resolvedReturnHeaders: (context?.resolved?.returnColumns || []).map(
+            (x) => x.header,
+          ),
+          resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
+          resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+        },
       }),
     });
-    return res.json({ result: safeFinal });
+    const finalCompatibility = detectFormulaCompatibility(
+      safeFinal || finalFormula || "",
+    );
+
+    return res.json({
+      result: safeFinal,
+      compatibility: finalCompatibility,
+    });
   } catch (err) {
     const rawReason = "EXCEPTION";
     const reasonNorm = classifyReason({
@@ -1995,7 +2024,12 @@ exports.handleConversion = async (req, res, next) => {
           build: _ms(_tBuildStart, _tBuildEnd),
           total: Date.now() - startedAt,
         },
-        extra: { error: err?.message, stack: err?.stack?.slice?.(0, 500) },
+        extra: {
+          error: err?.message,
+          stack: err?.stack?.slice?.(0, 500),
+          compatibility: _dbgCompatibility || null,
+          resolvedBaseSheet: _dbgCtx?.resolved?.baseSheet || null,
+        },
       }),
     });
     console.error("[handleConversion][error]", err);
@@ -2174,6 +2208,7 @@ async function convert(nl, options = {}, meta = {}) {
     (v, o) =>
       formulaUtils.formatValue(v, { ...ctx.formatOptions, ...(o || {}) }),
     formulaBuilder._buildConditionPairs,
+    formulaBuilder._buildConditionMask,
   );
   // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
   if (ctx.__errorFormula) return ctx.__errorFormula;

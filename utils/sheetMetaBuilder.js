@@ -1,5 +1,33 @@
 const XLSX = require("xlsx");
 
+function nonEmptyCount(row = []) {
+  let n = 0;
+  for (const cell of row) {
+    if (cell != null && String(cell).trim() !== "") n++;
+  }
+  return n;
+}
+
+function textLikeCount(row = []) {
+  let n = 0;
+  for (const cell of row) {
+    if (cell != null && String(cell).trim() !== "" && typeof cell === "string")
+      n++;
+  }
+  return n;
+}
+
+function scoreHeaderRowCandidate(row = []) {
+  const nonEmpty = nonEmptyCount(row);
+  if (!nonEmpty) return 0;
+
+  const textLike = textLikeCount(row);
+  const textRatio = textLike / nonEmpty;
+
+  // 숫자만 많은 행은 헤더로 약하게
+  return nonEmpty * 2 + textRatio * 10;
+}
+
 function indexToColumnLetter(idx) {
   let n = idx + 1,
     s = "";
@@ -42,7 +70,7 @@ function isDateLike(v) {
   // "2025-01-01 12:34" 같이 날짜+시간
   if (
     /^\d{4}[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\s+\d{1,2}:\d{2}/.test(
-      s
+      s,
     )
   ) {
     return true;
@@ -78,7 +106,7 @@ function isDateLikeString(s) {
 function isDateTimeLikeString(s) {
   // 2024-01-01 09:30 / 2024-01-01T09:30:00
   return /^(19|20)\d{2}[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])[ T]([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(
-    s
+    s,
   );
 }
 
@@ -194,7 +222,7 @@ function detectHeaderRowIndex(json, maxScanRows = 10) {
       const row = json[i] || [];
       if (
         row.some(
-          (c) => c !== null && c !== undefined && String(c).trim() !== ""
+          (c) => c !== null && c !== undefined && String(c).trim() !== "",
         )
       ) {
         return i; // 첫 non-empty 행
@@ -256,6 +284,20 @@ function buildAllSheetsData(workbook) {
 
     if (headerRowIndexes.length === 0) continue;
 
+    const headerCandidates = headerRowIndexes
+      .map((idx) => {
+        const row = json[idx] || [];
+        return {
+          rowIndex: idx,
+          score: scoreHeaderRowCandidate(row),
+          nonEmpty: nonEmptyCount(row),
+          textLike: textLikeCount(row),
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const bestHeaderCandidate = headerCandidates[0] || null;
+
     // 3) 헤더처럼 보이는 각 행에서 metaData 채우기
     const metaData = {};
 
@@ -295,9 +337,11 @@ function buildAllSheetsData(workbook) {
 
         metaData[name] = {
           columnLetter: indexToColumnLetter(idx),
-          // ✅ 이 컬럼의 실제 데이터 시작/끝 행 (1-based)
           startRow: dataStart + 1,
           lastRow: lastNonEmpty + 1,
+          headerRow: headerIndex + 1,
+          columnIndex: idx + 1,
+          canonicalKey: null,
           ...stats,
         };
       });
@@ -311,10 +355,16 @@ function buildAllSheetsData(workbook) {
     const lastDataRow = lastNonEmpty + 1;
 
     allSheetsData[sheetName] = {
+      sheetName,
       rowCount,
       startRow,
       lastDataRow,
       metaData,
+      headerCandidates,
+      bestHeaderRow:
+        bestHeaderCandidate?.rowIndex != null
+          ? bestHeaderCandidate.rowIndex + 1
+          : startRow - 1,
     };
   }
 

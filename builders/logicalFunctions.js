@@ -5,6 +5,24 @@ const {
   evalSubIntentToScalar,
 } = require("../utils/builderHelpers");
 
+function _resolvedColumnByHeader(ctx, header) {
+  if (!header) return null;
+
+  const all = [
+    ...(ctx?.resolved?.returnColumns || []),
+    ctx?.resolved?.lookupColumn,
+    ctx?.resolved?.groupColumn,
+    ctx?.resolved?.sortColumn,
+  ].filter(Boolean);
+
+  const hit = all.find(
+    (x) => String(x?.header || "").trim() === String(header).trim(),
+  );
+  if (hit) return hit;
+
+  return refFromHeaderSpec(ctx, { header });
+}
+
 // --- NEW: 객체/배열 호환용 시트 배열 변환
 function _sheetsArray(allSheetsData) {
   if (!allSheetsData) return [];
@@ -121,7 +139,9 @@ function _buildConditionString(condition, formatValue, ctx) {
     let left;
     if (typeof condition.target === "object" && condition.target !== null) {
       if (condition.target.header) {
-        const ref = refFromHeaderSpec(ctx, condition.target);
+        const ref =
+          _resolvedColumnByHeader(ctx, condition.target.header) ||
+          refFromHeaderSpec(ctx, condition.target);
         left = ref ? ref.cell : `ERROR("타겟 열을 찾을 수 없음")`;
       } else if (condition.target.operation) {
         const sub = evalSubIntentToScalar(ctx, formatValue, condition.target);
@@ -138,7 +158,9 @@ function _buildConditionString(condition, formatValue, ctx) {
     let right;
     if (typeof condition.value === "object" && condition.value !== null) {
       if (condition.value.header) {
-        const ref = refFromHeaderSpec(ctx, condition.value);
+        const ref =
+          _resolvedColumnByHeader(ctx, condition.value.header) ||
+          refFromHeaderSpec(ctx, condition.value);
         right = ref ? ref.cell : `ERROR("비교 열을 찾을 수 없음")`;
       } else if (condition.value.operation) {
         const sub = evalSubIntentToScalar(ctx, formatValue, condition.value);
@@ -345,9 +367,7 @@ const logicalFunctionBuilder = {
       }
     })(cond);
     if (headers.size >= 3) {
-      const refs = [...headers].map((h) =>
-        refFromHeaderSpec(ctx, { header: h }),
-      );
+      const refs = [...headers].map((h) => _resolvedColumnByHeader(ctx, h));
       if (refs.some((r) => !r)) return `=ERROR("조건 열을 찾을 수 없습니다.")`;
       const aligned = refs
         .map((r) => `(${formulaUtils.ALIGN_TO(r.range, "col")})`)
@@ -782,7 +802,7 @@ function buildIfVectorSameHeaderLogic(ctx, formatValue) {
   )
     return null;
 
-  const L = refFromHeaderSpec(ctx, { header: first });
+  const L = _resolvedColumnByHeader(ctx, first);
   if (!L) return null;
 
   const tests = cond.conditions.map((c) => {
@@ -825,8 +845,8 @@ function buildIfVectorTwoHeadersLogic(ctx, formatValue) {
   )
     return null;
 
-  const A = refFromHeaderSpec(ctx, { header: h1 });
-  const B = refFromHeaderSpec(ctx, { header: h2 });
+  const A = _resolvedColumnByHeader(ctx, h1);
+  const B = _resolvedColumnByHeader(ctx, h2);
   if (!A || !B) return null;
 
   const aR = `(${formulaUtils.ALIGN_TO(A.range, "col")})`;

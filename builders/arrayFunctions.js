@@ -1,6 +1,28 @@
 const formulaUtils = require("../utils/formulaUtils");
 const { rangeFromSpec } = require("../utils/builderHelpers");
 
+function _resolvedPrimaryReturn(ctx) {
+  return ctx?.resolved?.returnColumns?.[0] || ctx?.bestReturn || null;
+}
+
+function _resolvedReturnColumns(ctx) {
+  return Array.isArray(ctx?.resolved?.returnColumns) &&
+    ctx.resolved.returnColumns.length
+    ? ctx.resolved.returnColumns
+    : ctx?.bestReturn
+      ? [ctx.bestReturn]
+      : [];
+}
+
+function _resolvedSortColumn(ctx) {
+  return ctx?.resolved?.sortColumn || ctx?.bestReturn || null;
+}
+
+function _buildMask(ctx, buildConditionMask) {
+  if (typeof buildConditionMask !== "function") return null;
+  return buildConditionMask(ctx) || null;
+}
+
 // A1 / 'Sheet'!A1 / range 인지 (따옴표 금지)
 function _isA1RefOrRange(s) {
   const t = String(s || "").trim();
@@ -284,32 +306,88 @@ function _resolveRangeOrError(it, ctx) {
 
 const arrayFunctionBuilder = {
   // ---------------------- FILTER ----------------------
-  filter: function (ctx) {
-    const { bestReturn, intent, allSheetsData } = ctx;
-    if (!bestReturn) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
+  filter: function (
+    ctx,
+    _formatValue,
+    _buildConditionPairs,
+    buildConditionMask,
+  ) {
+    // ✅ 새 resolved + mask 우선 경로
+    const { intent, allSheetsData } = ctx;
+    const returnCols = _resolvedReturnColumns(ctx);
+    const primary = returnCols[0];
 
-    const sheetName = bestReturn.sheetName;
-    const sheetInfo = allSheetsData[sheetName];
+    if (!primary) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
+
+    const sheetName = primary.sheetName;
+    const sheetInfo = allSheetsData?.[sheetName];
     if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
 
+    const maskExpr = _buildMask(ctx, buildConditionMask);
+
+    const stackedReturn =
+      returnCols.length === 1
+        ? returnCols[0].range
+        : `HSTACK(${returnCols.map((c) => c.range).join(", ")})`;
+
+    if (maskExpr) {
+      let baseExpr = `FILTER(${stackedReturn}, ${maskExpr})`;
+
+      const sortCol = _resolvedSortColumn(ctx);
+      const wantsSort =
+        intent?.sorted === true ||
+        !!intent?.sort ||
+        !!intent?.sort_order ||
+        !!ctx?.resolved?.sortColumn;
+
+      if (wantsSort && sortCol?.range) {
+        const order =
+          String(
+            intent?.sort?.order || intent?.sort_order || "desc",
+          ).toLowerCase() === "asc"
+            ? 1
+            : -1;
+
+        const sortBase = `FILTER(${sortCol.range}, ${maskExpr})`;
+        baseExpr = `SORTBY(${baseExpr}, ${sortBase}, ${order})`;
+      }
+
+      if (Number(intent?.limit || 0) > 0) {
+        return `=TAKE(${baseExpr}, ${Number(intent.limit)})`;
+      }
+
+      return `=${baseExpr}`;
+    }
+
+    // ✅ 기존 legacy fallback
+    const { bestReturn } = ctx;
+    if (!bestReturn) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
+
+    const legacySheetName = bestReturn.sheetName;
+    const legacySheetInfo = allSheetsData?.[legacySheetName];
+    if (!legacySheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
+
     // 0) 시트 전체 폭 (FILTER→CHOOSECOLS를 위한 기본 fullRange)
-    const metaEntries = Object.entries(sheetInfo.metaData || {});
+    const metaEntries = Object.entries(legacySheetInfo.metaData || {});
     if (!metaEntries.length)
       return `=ERROR("시트의 열 정보를 찾을 수 없습니다.")`;
+
     metaEntries.sort((a, b) => {
       const ai = formulaUtils.columnLetterToIndex(a[1].columnLetter);
       const bi = formulaUtils.columnLetterToIndex(b[1].columnLetter);
       return ai - bi;
     });
+
     const firstCol = metaEntries[0][1].columnLetter;
     const lastCol = metaEntries[metaEntries.length - 1][1].columnLetter;
-    const fullRange = `'${sheetName}'!${firstCol}${sheetInfo.startRow}:${lastCol}${sheetInfo.lastDataRow}`;
-    const returnRangeSingle = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+    const fullRange = `'${legacySheetName}'!${firstCol}${legacySheetInfo.startRow}:${lastCol}${legacySheetInfo.lastDataRow}`;
+    const returnRangeSingle = `'${legacySheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 
     // 1) 조건 마스크 (AND/*, OR/+)
     // Step2: regex가 Excel에서 불가하므로, 필요 시 조기에 ERROR 반환
     let earlyError = null;
     const isSheets = _isSheetsContext(ctx);
+
     // ✅ intent.conditions가 ConditionNode( target/header ) 형태여도 지원
     const rawConds = Array.isArray(intent.conditions) ? intent.conditions : [];
     const inlineGroups = rawConds.filter(
@@ -333,20 +411,23 @@ const arrayFunctionBuilder = {
       .map((cond) => {
         const hint = _condHint(cond);
         if (!hint) return null;
+
         const termSet = formulaUtils.expandTermsFromText(hint);
         const bestCol = formulaUtils.bestHeaderInSheet(
-          sheetInfo,
-          sheetName,
+          legacySheetInfo,
+          legacySheetName,
           termSet,
           "lookup",
         );
         if (!bestCol?.col) return null;
+
         // Step1 연계: 열 후보가 모호하면 오답 대신 중단
         if (bestCol.isAmbiguous) {
           earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
           return null;
         }
-        const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+
+        const colA1 = `'${legacySheetName}'!${bestCol.col.columnLetter}${legacySheetInfo.startRow}:${bestCol.col.columnLetter}${legacySheetInfo.lastDataRow}`;
 
         const rawOp = String(cond.operator || "=").toLowerCase();
         const op = _normalizeOp(rawOp);
@@ -359,12 +440,20 @@ const arrayFunctionBuilder = {
           return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
 
         const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+
         if (["contains", "포함"].includes(rawOp))
           return _containsExpr(colA1, rawVal, cs);
-        if (["startswith", "startsWith"].includes(rawOp))
+
+        if (
+          ["startswith", "startsWith", "starts_with", "start_with"].includes(
+            rawOp,
+          )
+        )
           return _startsWithExpr(colA1, rawVal, cs);
-        if (["endswith", "endsWith"].includes(rawOp))
+
+        if (["endswith", "endsWith", "ends_with", "end_with"].includes(rawOp))
           return _endsWithExpr(colA1, rawVal, cs);
+
         if (
           ["in", "any_of"].includes(rawOp) &&
           Array.isArray(cond.values) &&
@@ -383,28 +472,33 @@ const arrayFunctionBuilder = {
           });
           return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
         }
+
         if (rawOp === "between" && cond.min != null && cond.max != null) {
           const isNum =
             _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
           const isDate = _isISODate(cond.min) && _isISODate(cond.max);
+
           if (isNum) {
             const L = String(cond.min).replace(/,/g, "");
             const R = String(cond.max).replace(/,/g, "");
             const left = _coerceNumber(colA1);
             return `(${left}>=${L})*(${left}<=${R})`;
           }
+
           if (isDate) {
             const L = _dateVal(String(cond.min));
             const R = _dateVal(String(cond.max));
             const left = _coerceDate(colA1);
             return `(${left}>=${L})*(${left}<=${R})`;
           }
+
           // fallback
           const L = _q(cond.min);
           const R = _q(cond.max);
           const left = _trimText(colA1);
           return `(${left}>=${L})*(${left}<=${R})`;
         }
+
         if (["matches", "regex"].includes(rawOp)) {
           // Step2: REGEXMATCH는 Sheets 전용으로 운영(Excel이면 안전하게 중단)
           if (!isSheets) {
@@ -415,6 +509,7 @@ const arrayFunctionBuilder = {
             (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
           return _regexMatchExpr(colA1, rawVal, cs, strict);
         }
+
         // ✅ 문자열/셀참조 비교: J3 같은 셀은 따옴표 금지
         return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
       })
@@ -427,37 +522,46 @@ const arrayFunctionBuilder = {
         : []),
       ...inlineGroups,
     ];
+
     const groupMasks = groups
       .map((g) => {
         const list = Array.isArray(g.conditions) ? g.conditions : [];
         const isOr = String(g.logical_operator || "AND").toUpperCase() === "OR";
+
         const masksInGroup = list
           .map((cond) => {
             const hint = _condHint(cond);
             if (!hint) return null;
+
             const termSet = formulaUtils.expandTermsFromText(hint);
             const bestCol = formulaUtils.bestHeaderInSheet(
-              sheetInfo,
-              sheetName,
+              legacySheetInfo,
+              legacySheetName,
               termSet,
               "lookup",
             );
             if (!bestCol?.col) return null;
+
             if (bestCol.isAmbiguous) {
               earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
               return null;
             }
-            const colA1 = `'${sheetName}'!${bestCol.col.columnLetter}${sheetInfo.startRow}:${bestCol.col.columnLetter}${sheetInfo.lastDataRow}`;
+
+            const colA1 = `'${legacySheetName}'!${bestCol.col.columnLetter}${legacySheetInfo.startRow}:${bestCol.col.columnLetter}${legacySheetInfo.lastDataRow}`;
             const rawOp = String(cond.operator || "=").toLowerCase();
             const op = _normalizeOp(rawOp);
             const rawVal = cond.value;
+
             if (_isISODate(rawVal))
               return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
             if (_isNumericLiteral(rawVal))
               return `${_coerceNumber(colA1)}${op}${String(rawVal).replace(/,/g, "")}`;
+
             const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
+
             if (["contains", "포함"].includes(rawOp))
               return _containsExpr(colA1, rawVal, cs);
+
             if (
               [
                 "startswith",
@@ -467,14 +571,18 @@ const arrayFunctionBuilder = {
               ].includes(rawOp)
             )
               return _startsWithExpr(colA1, rawVal, cs);
+
             if (
               ["endswith", "endsWith", "ends_with", "end_with"].includes(rawOp)
             )
               return _endsWithExpr(colA1, rawVal, cs);
+
             return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
           })
           .filter(Boolean);
+
         if (!masksInGroup.length) return null;
+
         const safeGroupMasks = masksInGroup.map((m) => `(${m})`);
         return `(${safeGroupMasks.join(isOr ? " + " : " * ")})`;
       })
@@ -485,12 +593,15 @@ const arrayFunctionBuilder = {
       String(
         intent.logical || intent.conditions_logical || "AND",
       ).toUpperCase() === "OR";
+
     const safeMasks = masks.map((m) => `(${m})`);
     const baseMask = safeMasks.length
       ? `(${safeMasks.join(isOR ? " + " : " * ")})`
       : "";
+
     const groupsLogicalOR =
       String(intent.groups_logical || "AND").toUpperCase() === "OR";
+
     const combinedMask = [baseMask, ...groupMasks]
       .filter(Boolean)
       .join(groupsLogicalOR ? " + " : " * ");
@@ -499,49 +610,59 @@ const arrayFunctionBuilder = {
     const blanks = Array.isArray(intent.exclude_blank_in)
       ? intent.exclude_blank_in
       : [];
+
     const blankMasks = blanks
       .map((h) => {
         const termSet = formulaUtils.expandTermsFromText(h);
         const colInfo = formulaUtils.bestHeaderInSheet(
-          sheetInfo,
-          sheetName,
+          legacySheetInfo,
+          legacySheetName,
           termSet,
           "lookup",
         );
         if (!colInfo?.col) return null;
-        const a1 = `'${sheetName}'!${colInfo.col.columnLetter}${sheetInfo.startRow}:${colInfo.col.columnLetter}${sheetInfo.lastDataRow}`;
+
+        const a1 = `'${legacySheetName}'!${colInfo.col.columnLetter}${legacySheetInfo.startRow}:${colInfo.col.columnLetter}${legacySheetInfo.lastDataRow}`;
         return `LEN(TRIM(${a1}&""))>0`;
       })
       .filter(Boolean);
+
     const blankMaskExpr = blankMasks.length
       ? ` * (${blankMasks.join(" * ")})`
       : "";
 
     const finalMask = (combinedMask || "TRUE") + blankMaskExpr; // 조건 없을 때도 TRUE에서 시작
-    let maskExpr = finalMask;
+    let finalMaskExpr = finalMask;
+
     if (earlyError) return earlyError;
 
     // 2) 조인(inner/left) 및 오른쪽 열 픽업
     const joins = Array.isArray(intent.joins) ? intent.joins : [];
     const rightPickExprs = [];
+
     for (const j of joins) {
       if (!j?.sheet || !Array.isArray(j.on) || !j.on.length) continue;
+
       const leftRanges = [];
       const rightRanges = [];
+
       for (const pair of j.on) {
         const lTerm = formulaUtils.expandTermsFromText(pair.left);
         const lCol = formulaUtils.bestHeaderInSheet(
-          sheetInfo,
-          sheetName,
+          legacySheetInfo,
+          legacySheetName,
           lTerm,
           "lookup",
         );
         if (!lCol?.col) continue;
+
         leftRanges.push(
-          `'${sheetName}'!${lCol.col.columnLetter}${sheetInfo.startRow}:${lCol.col.columnLetter}${sheetInfo.lastDataRow}`,
+          `'${legacySheetName}'!${lCol.col.columnLetter}${legacySheetInfo.startRow}:${lCol.col.columnLetter}${legacySheetInfo.lastDataRow}`,
         );
+
         const rightSheet = allSheetsData[j.sheet];
         if (!rightSheet) continue;
+
         const rTerm = formulaUtils.expandTermsFromText(pair.right);
         const rCol = formulaUtils.bestHeaderInSheet(
           rightSheet,
@@ -550,27 +671,33 @@ const arrayFunctionBuilder = {
           "lookup",
         );
         if (!rCol?.col) continue;
+
         rightRanges.push(
           `'${j.sheet}'!${rCol.col.columnLetter}${rightSheet.startRow}:${rCol.col.columnLetter}${rightSheet.lastDataRow}`,
         );
       }
+
       if (!leftRanges.length || !rightRanges.length) continue;
 
-      // Step3: JOIN 존재 마스크를 "행 단위(MAP)"로 고정 (배열 MATCH 흔들림 방지)
+      // Step3: JOIN 존재 마스크를 "행 단위(MAP)"로 고정
       const joinMasks = leftRanges.map((lr, i) => {
         const L = _normRange(lr);
         const R = _normRange(rightRanges[i]);
         return `MAP(${L}, LAMBDA(k, ISNUMBER(MATCH(k, ${R}, 0))))`;
       });
+
       const joinMaskExpr = joinMasks.join(" * ");
       const joinType = String(j.type || "inner").toLowerCase();
-      if (joinType === "inner") maskExpr = `${maskExpr} * (${joinMaskExpr})`;
+      if (joinType === "inner")
+        finalMaskExpr = `${finalMaskExpr} * (${joinMaskExpr})`;
 
       const picks = Array.isArray(j.pick_from_right) ? j.pick_from_right : [];
       const notFoundFill = j.if_not_found != null ? _q(j.if_not_found) : '""';
+
       for (const hdr of picks) {
         const rightSheet = allSheetsData[j.sheet];
         if (!rightSheet) continue;
+
         const term = formulaUtils.expandTermsFromText(hdr);
         const col = formulaUtils.bestHeaderInSheet(
           rightSheet,
@@ -579,12 +706,13 @@ const arrayFunctionBuilder = {
           "lookup",
         );
         if (!col?.col) continue;
+
         const retRange = `'${j.sheet}'!${col.col.columnLetter}${rightSheet.startRow}:${col.col.columnLetter}${rightSheet.lastDataRow}`;
+
         if (leftRanges.length === 1 && rightRanges.length === 1) {
           const L = _normRange(leftRanges[0]);
           const R = _normRange(rightRanges[0]);
           rightPickExprs.push(
-            // Step3: 픽업도 "행 단위(MAP)"로 고정
             `MAP(${L}, LAMBDA(k, XLOOKUP(k, ${R}, ${retRange}, ${notFoundFill}, 0)))`,
           );
         } else {
@@ -602,14 +730,16 @@ const arrayFunctionBuilder = {
     // --- 반환열 제어(선택)
     const headerOpts =
       intent.return_headers || intent.select_headers || intent.return_cols;
+
     if (!headerOpts || !Array.isArray(headerOpts) || headerOpts.length === 0) {
-      return `=FILTER(${returnRangeSingle}, ${maskExpr})`;
+      return `=FILTER(${returnRangeSingle}, ${finalMaskExpr})`;
     }
 
-    const filteredAll = `FILTER(${fullRange}, ${maskExpr})`;
+    const filteredAll = `FILTER(${fullRange}, ${finalMaskExpr})`;
 
     const nameToIndex = new Map(metaEntries.map(([h, m], i) => [h, i + 1]));
     const wantedIdx = [];
+
     for (const hSpec of headerOpts) {
       let hName = null;
       if (typeof hSpec === "string") {
@@ -618,6 +748,7 @@ const arrayFunctionBuilder = {
       } else if (hSpec && typeof hSpec === "object" && hSpec.header) {
         hName = String(hSpec.header).trim();
       }
+
       const idx = nameToIndex.get(hName);
       if (idx) wantedIdx.push(idx);
     }
@@ -644,6 +775,7 @@ const arrayFunctionBuilder = {
         selectedIndexMap,
       );
     }
+
     return pipeSortIfRequested(ctx, intent, pickedLeft, selectedIndexMap);
   },
 
@@ -786,13 +918,19 @@ const arrayFunctionBuilder = {
         return formulaUtils.formatValue(s);
       };
 
+      const resolvedSort = _resolvedSortColumn(ctx);
+      const resolvedPrimary = _resolvedPrimaryReturn(ctx);
+
       const sortHint =
+        resolvedSort?.header ||
         (typeof it.sort_by === "string" && it.sort_by) ||
         (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
         it.lookup_hint ||
         it.header_hint ||
         bestLookup?.header ||
-        bestReturn.header;
+        resolvedPrimary?.header ||
+        bestReturn?.header ||
+        null;
       const criterionMeta =
         byName.get(String(sortHint || "").trim()) ||
         findMetaByContains(String(sortHint || "").trim()) ||
@@ -1093,7 +1231,8 @@ const arrayFunctionBuilder = {
 
 function _extremeRow(ctx, which) {
   const it = ctx.intent || {};
-  const best = ctx.bestReturn;
+  const best = _resolvedPrimaryReturn(ctx);
+  const resolvedSort = _resolvedSortColumn(ctx);
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
   const sheetName = best.sheetName;
   const sheetInfo = ctx.allSheetsData?.[sheetName];
@@ -1161,11 +1300,12 @@ function _extremeRow(ctx, which) {
   const sortHint =
     (forceSalarySort && "연봉") ||
     (forceHireDateSort && "입사일") ||
-    it.header_hint ||
+    resolvedSort?.header ||
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
+    it.header_hint ||
     it.lookup_hint ||
-    best.header ||
+    best?.header ||
     "연봉";
   const criterionMeta =
     byName.get(String(sortHint).trim()) ||
@@ -1256,7 +1396,8 @@ function _extremeRow(ctx, which) {
 
 function _topNRows(ctx) {
   const it = ctx.intent || {};
-  const best = ctx.bestReturn;
+  const best = _resolvedPrimaryReturn(ctx);
+  const resolvedSort = _resolvedSortColumn(ctx);
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
 
   const sheetName = best.sheetName;
@@ -1333,11 +1474,12 @@ function _topNRows(ctx) {
   const sortHint =
     (forceSalarySort && "연봉") ||
     (forceHireDateSort && "입사일") ||
-    it.header_hint ||
+    resolvedSort?.header ||
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
+    it.header_hint ||
     it.lookup_hint ||
-    best.header ||
+    best?.header ||
     "입사일";
 
   const criterionMeta =
@@ -1441,7 +1583,7 @@ function _topNRows(ctx) {
 
 function _rankColumn(ctx) {
   const it = ctx.intent || {};
-  const best = ctx.bestReturn;
+  const best = _resolvedPrimaryReturn(ctx);
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
 
   const sheetName = best.sheetName;
