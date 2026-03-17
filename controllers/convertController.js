@@ -1957,7 +1957,7 @@ exports.handleConversion = async (req, res, next) => {
       ? finalFormula
       : `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
 
-    const compatibility = detectFormulaCompatibility(finalFormula || "");
+    const compatibility = detectFormulaCompatibility(safeFinal || "");
     _dbgCompatibility = compatibility;
 
     await writeRequestLog({
@@ -1965,7 +1965,7 @@ exports.handleConversion = async (req, res, next) => {
       userId: req.user?.id,
       route: "/convert",
       engine: "formula",
-      status: shouldCountConversion(finalFormula) ? "success" : "fail",
+      status: shouldCountConversion(safeFinal) ? "success" : "fail",
       reason: reasonNorm,
       isFallback: v.ok ? false : true,
       prompt: message,
@@ -1975,7 +1975,7 @@ exports.handleConversion = async (req, res, next) => {
         cacheHit: _dbgCacheHit,
         intentOp: intent?.operation,
         intentCacheKey: _dbgIntentCacheKey,
-        validator: validationResult,
+        validator: v,
         timing: {
           preprocess: _ms(_tPreStart, _tPreEnd),
           intent: _ms(_tIntentStart, _tIntentEnd),
