@@ -1807,8 +1807,6 @@ exports.handleConversion = async (req, res, next) => {
       message,
       formulaBuilder,
       allSheetsData,
-      bestReturn,
-      bestLookup,
     });
     _dbgCtx = context;
     if (isFileAttached && allSheetsData) {
@@ -1846,6 +1844,7 @@ exports.handleConversion = async (req, res, next) => {
           bestLookup,
           allSheetsData,
         });
+        _dbgCtx = context;
       } else {
         Object.assign(context, { allSheetsData });
       }
