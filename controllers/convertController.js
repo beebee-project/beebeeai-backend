@@ -1610,6 +1610,9 @@ function shouldCountConversion(result) {
  * 메인 컨버전 핸들러
  * -------------------------------------------*/
 exports.handleConversion = async (req, res, next) => {
+  // ===== DEBUG STATE =====
+  let _dbgCompatibility = null;
+  let _dbgCtx = null;
   // ---- debug-safe holders (so logging never crashes) ----
   let _dbgMessage = null;
   let _dbgIntent = null;
@@ -1807,6 +1810,7 @@ exports.handleConversion = async (req, res, next) => {
       bestReturn,
       bestLookup,
     });
+    _dbgCtx = context;
     if (isFileAttached && allSheetsData) {
       const hasHints = !!(
         intent.return_hint ||
@@ -1860,6 +1864,8 @@ exports.handleConversion = async (req, res, next) => {
         const safeOut = v.ok
           ? f
           : `=ERROR("결과 검증에 실패했습니다. (direct) 다시 시도해 주세요.")`;
+        const directCompatibility = detectFormulaCompatibility(safeOut || "");
+        _dbgCompatibility = directCompatibility;
         if (req.user?.id && shouldCountConversion(f)) {
           await bumpUsage(req.user.id, "formulaConversions", 1);
         }
@@ -1931,8 +1937,6 @@ exports.handleConversion = async (req, res, next) => {
     }
     _tBuildEnd = process.hrtime.bigint();
 
-    const compatibility = detectFormulaCompatibility(finalFormula || "");
-
     if (req.user?.id && shouldCountConversion(finalFormula)) {
       await bumpUsage(req.user.id, "formulaConversions", 1);
     }
@@ -1953,6 +1957,9 @@ exports.handleConversion = async (req, res, next) => {
     const safeFinal = v.ok
       ? finalFormula
       : `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
+
+    const compatibility = detectFormulaCompatibility(finalFormula || "");
+    _dbgCompatibility = compatibility;
 
     await writeRequestLog({
       traceId,
