@@ -5,6 +5,19 @@ function _resolvedPrimaryReturn(ctx) {
   return ctx?.resolved?.returnColumns?.[0] || ctx?.bestReturn || null;
 }
 
+function _resolvedSortColumn(ctx) {
+  return ctx?.resolved?.sortColumn || ctx?.bestReturn || null;
+}
+
+function _guardEmptyFilter(baseExpr, maskExpr) {
+  if (!maskExpr) return baseExpr;
+  return `IF(SUMPRODUCT(--(${maskExpr}))=0, "", ${baseExpr})`;
+}
+
+function _resolvedPrimaryReturn(ctx) {
+  return ctx?.resolved?.returnColumns?.[0] || ctx?.bestReturn || null;
+}
+
 function _resolvedReturnColumns(ctx) {
   return Array.isArray(ctx?.resolved?.returnColumns) &&
     ctx.resolved.returnColumns.length
@@ -353,10 +366,11 @@ const arrayFunctionBuilder = {
       }
 
       if (Number(intent?.limit || 0) > 0) {
-        return `=TAKE(${baseExpr}, ${Number(intent.limit)})`;
+        const limitedExpr = `TAKE(${baseExpr}, ${Number(intent.limit)})`;
+        return `=${_guardEmptyFilter(limitedExpr, maskExpr)}`;
       }
 
-      return `=${baseExpr}`;
+      return `=${_guardEmptyFilter(baseExpr, maskExpr)}`;
     }
 
     // ✅ 기존 legacy fallback
