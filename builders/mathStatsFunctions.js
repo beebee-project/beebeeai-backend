@@ -168,6 +168,22 @@ function _scalarFrom(spec, ctx, formatValue) {
   return formatValue(spec);
 }
 
+function _safeFilteredArray(expr, emptyFallback = '""') {
+  // FILTER(expr, ...) 자체가 빈 결과에서 터질 수 있으므로
+  // 외부에서 LET(arr, IFERROR(FILTER(...), fallback), ...) 패턴으로 받기 쉽게 통일
+  return `IFERROR(${expr}, ${emptyFallback})`;
+}
+
+function _safeAggFromFiltered(filterExpr, aggFn, emptyFallback = '""') {
+  // aggFn: "AVERAGE" | "MIN" | "MAX" | "MEDIAN"
+  // arr가 빈 배열/에러면 emptyFallback 반환
+  return `LET(arr, ${_safeFilteredArray(filterExpr)}, IF(COUNTA(arr)=0, ${emptyFallback}, ${aggFn}(arr)))`;
+}
+
+function _safeCountRows(filterExpr) {
+  return `LET(arr, ${_safeFilteredArray(filterExpr)}, IF(COUNTA(arr)=0, 0, ROWS(arr)))`;
+}
+
 const mathStatsFunctionBuilder = {
   sum: function (ctx, formatValue, buildConditionPairs, buildConditionMask) {
     const { intent } = ctx;
@@ -234,13 +250,21 @@ const mathStatsFunctionBuilder = {
         const mergedMask = conditionMask
           ? `(${conditionMask}*${keyMask})`
           : keyMask;
-        return `AVERAGE(FILTER(${avgRange}, ${mergedMask}))`;
+        return _safeAggFromFiltered(
+          `FILTER(${avgRange}, ${mergedMask})`,
+          "AVERAGE",
+          '""',
+        );
       };
       return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
     if (conditionMask) {
-      return `=AVERAGE(FILTER(${avgRange}, ${conditionMask}))`;
+      return `=${_safeAggFromFiltered(
+        `FILTER(${avgRange}, ${conditionMask})`,
+        "AVERAGE",
+        '""',
+      )}`;
     }
 
     if (!intent.conditions || intent.conditions.length === 0) {
@@ -275,7 +299,7 @@ const mathStatsFunctionBuilder = {
           ? `(${conditionMask}*${keyMask})`
           : keyMask;
         const base = targetRange || keyRef.range;
-        return `ROWS(FILTER(${base}, ${mergedMask}))`;
+        return _safeCountRows(`FILTER(${base}, ${mergedMask})`);
       };
       return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
@@ -286,7 +310,7 @@ const mathStatsFunctionBuilder = {
         ctx?.resolved?.lookupColumn?.range ||
         ctx?.bestLookup?.range;
       if (!base) return `=ERROR("개수를 계산할 기준 열을 찾을 수 없습니다.")`;
-      return `=ROWS(FILTER(${base}, ${conditionMask}))`;
+      return `=${_safeCountRows(`FILTER(${base}, ${conditionMask})`)}`;
     }
 
     if (!conditionPairs.length) {
@@ -347,12 +371,18 @@ const mathStatsFunctionBuilder = {
       const inner = (kSym) => {
         const keyMask = `(${keyRef.range}=${kSym})`;
         const mergedMask = mask ? `(${mask}*${keyMask})` : keyMask;
-        return `MIN(FILTER(${tgt}, ${mergedMask}))`;
+        return _safeAggFromFiltered(
+          `FILTER(${tgt}, ${mergedMask})`,
+          "MIN",
+          '""',
+        );
       };
       return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
-    if (mask) return `=MIN(FILTER(${tgt}, ${mask}))`;
+    if (mask) {
+      return `=${_safeAggFromFiltered(`FILTER(${tgt}, ${mask})`, "MIN", '""')}`;
+    }
     if (!pairs.length) return `=MIN(${tgt})`;
     return `=MIN(${_buildFilterCall(tgt, pairs, mask)})`;
   },
@@ -371,12 +401,18 @@ const mathStatsFunctionBuilder = {
       const inner = (kSym) => {
         const keyMask = `(${keyRef.range}=${kSym})`;
         const mergedMask = mask ? `(${mask}*${keyMask})` : keyMask;
-        return `MAX(FILTER(${tgt}, ${mergedMask}))`;
+        return _safeAggFromFiltered(
+          `FILTER(${tgt}, ${mergedMask})`,
+          "MAX",
+          '""',
+        );
       };
       return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
-    if (mask) return `=MAX(FILTER(${tgt}, ${mask}))`;
+    if (mask) {
+      return `=${_safeAggFromFiltered(`FILTER(${tgt}, ${mask})`, "MAX", '""')}`;
+    }
     if (!pairs.length) return `=MAX(${tgt})`;
     return `=MAX(${_buildFilterCall(tgt, pairs, mask)})`;
   },
@@ -395,12 +431,22 @@ const mathStatsFunctionBuilder = {
       const inner = (kSym) => {
         const keyMask = `(${keyRef.range}=${kSym})`;
         const mergedMask = mask ? `(${mask}*${keyMask})` : keyMask;
-        return `MEDIAN(FILTER(${tgt}, ${mergedMask}))`;
+        return _safeAggFromFiltered(
+          `FILTER(${tgt}, ${mergedMask})`,
+          "MEDIAN",
+          '""',
+        );
       };
       return _wrapGroupByWithMaker(ctx, keyRef, inner);
     }
 
-    if (mask) return `=MEDIAN(FILTER(${tgt}, ${mask}))`;
+    if (mask) {
+      return `=${_safeAggFromFiltered(
+        `FILTER(${tgt}, ${mask})`,
+        "MEDIAN",
+        '""',
+      )}`;
+    }
     if (!pairs.length) return `=MEDIAN(${tgt})`;
     return `=MEDIAN(${_buildFilterCall(tgt, pairs, mask)})`;
   },
