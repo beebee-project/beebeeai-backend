@@ -91,20 +91,51 @@ function normalizeReturnFields(intent = {}, rawMessage = "") {
 
   // 다중 반환 자연어 흔적 보정
   const msg = String(rawMessage || "");
-  const known = [
-    "이름",
-    "부서",
-    "직급",
-    "연봉",
-    "입사일",
-    "평가 등급",
-    "직원 ID",
-  ];
-  for (const k of known) {
-    if (msg.includes(k) && /가져와|보여줘|출력/.test(msg) && !out.includes(k)) {
-      out.push(k);
+  const isLookupOp = ["xlookup", "lookup"].includes(
+    String(intent.operation || "").toLowerCase(),
+  );
+
+  // lookup 계열에서 이미 명시적 반환 필드가 있으면
+  // raw-message 기반 known 자동 보강은 하지 않는다.
+  const hasExplicitReturn =
+    (Array.isArray(intent.return_fields) && intent.return_fields.length > 0) ||
+    !!intent.return_array?.header ||
+    !!intent.return?.header ||
+    !!intent.return_hint;
+
+  if (!(isLookupOp && hasExplicitReturn)) {
+    const known = [
+      "이름",
+      "부서",
+      "직급",
+      "연봉",
+      "입사일",
+      "평가 등급",
+      "직원 ID",
+    ];
+
+    for (const k of known) {
+      if (
+        msg.includes(k) &&
+        /가져와|보여줘|출력/.test(msg) &&
+        !out.includes(k)
+      ) {
+        out.push(k);
+      }
     }
   }
+
+  // lookup key는 return_fields에서 제외
+  const lookupKeyHeader =
+    intent.lookup_array?.header ||
+    intent.lookup?.header ||
+    intent.lookup_hint ||
+    null;
+
+  return [...new Set(out)].filter(
+    (x) =>
+      !lookupKeyHeader || String(x).trim() !== String(lookupKeyHeader).trim(),
+  );
 
   return [...new Set(out)];
 }
