@@ -1552,6 +1552,57 @@ function _extractNumericThresholdFromMessage(msg = "") {
   };
 }
 
+function applyTrimColumnOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  if (!/(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(msg)) return intent;
+  if (!/(이름|성명)/.test(msg)) return intent;
+
+  intent.operation = "trim";
+  intent.header_hint = "이름";
+  intent.target_header = "이름";
+  intent.scope = "all";
+
+  delete intent.delimiter;
+  delete intent.delimiters;
+  delete intent.values;
+  delete intent.a;
+  delete intent.b;
+
+  return intent;
+}
+
+function applyAverageThresholdIfOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  if (!/(연봉|급여)/.test(msg)) return intent;
+  if (!/(평균\s*(이상|이하|초과|미만)|average)/i.test(msg)) return intent;
+  if (!/이면|아니면|출력/.test(msg)) return intent;
+
+  let op = ">=";
+  if (/평균\s*이하/.test(msg)) op = "<=";
+  else if (/평균\s*초과/.test(msg)) op = ">";
+  else if (/평균\s*미만/.test(msg)) op = "<";
+
+  intent.operation = "if";
+  intent.scope = "all";
+  intent.condition = {
+    target: { header: "연봉" },
+    operator: op,
+    value: {
+      operation: "average",
+      header_hint: "연봉",
+    },
+  };
+
+  intent.value_if_true = "상";
+  intent.value_if_false = "하";
+
+  return intent;
+}
+
 function applyGroupedAggregateOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
@@ -2119,6 +2170,8 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyGroupedAggregateOverride(message, intent);
     intent = applyDuplicateLatestMetricOverride(message, intent);
     intent = applyRankThresholdCountOverride(message, intent);
+    intent = applyTrimColumnOverride(message, intent);
+    intent = applyAverageThresholdIfOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
@@ -2483,6 +2536,8 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyGroupedAggregateOverride(nl, intent);
   intent = applyDuplicateLatestMetricOverride(nl, intent);
   intent = applyRankThresholdCountOverride(nl, intent);
+  intent = applyTrimColumnOverride(nl, intent);
+  intent = applyAverageThresholdIfOverride(nl, intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
