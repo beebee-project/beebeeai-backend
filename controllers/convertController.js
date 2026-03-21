@@ -431,6 +431,47 @@ function buildLocalIntentFromText(text = "") {
       if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
       if (/이름|name/.test(s)) intent.lookup_hint = "이름";
     }
+    // 1) lookup key 힌트 보강
+    if (/(직원\s*id|사번|직원번호)/i.test(original)) {
+      intent.lookup_hint = "직원 ID";
+    }
+
+    // 2) lookup value_ref (예: J2) 보강
+    const cellRefMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
+    if (cellRefMatch) {
+      intent.lookup_value = cellRefMatch[1].toUpperCase();
+    }
+
+    // 3) multi-return 보강
+    const wantedFields = [];
+    if (/(이름|성명)/.test(original)) wantedFields.push("이름");
+    if (/부서/.test(original)) wantedFields.push("부서");
+    if (/직급/.test(original)) wantedFields.push("직급");
+    if (/(연봉|급여)/.test(original)) wantedFields.push("연봉");
+
+    if (wantedFields.length >= 2) {
+      intent.return_fields = [...new Set(wantedFields)];
+    } else if (wantedFields.length === 1) {
+      intent.return_hint = wantedFields[0];
+    }
+
+    // 4) latest duplicate 보강
+    if (
+      /(중복된\s*경우|중복일\s*경우|가장\s*최근|최근\s*입사|최신|latest)/i.test(
+        original,
+      )
+    ) {
+      intent.duplicate_rule = "latest";
+      if (!intent.date_header) intent.date_header = "입사일";
+    }
+
+    // 5) not-found fallback 보강
+    if (
+      /(존재하지\s*않는|없는)/.test(original) &&
+      intent.value_if_not_found == null
+    ) {
+      intent.value_if_not_found = "";
+    }
     return intent;
   }
 
@@ -628,6 +669,10 @@ function normalizeLookupIntent(intent) {
     if (!intent.return.header)
       intent.return.header = intent.return_array.header;
     if (!intent.return.sheet) intent.return.sheet = intent.return_array.sheet;
+  }
+
+  if (Array.isArray(intent.return_fields) && intent.return_fields.length) {
+    intent.return_fields = [...new Set(intent.return_fields.map(String))];
   }
 
   return intent;
