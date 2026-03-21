@@ -1588,6 +1588,11 @@ function applyAverageThresholdIfOverride(message, intent) {
 
   intent.operation = "if";
   intent.scope = "all";
+
+  // ✅ 부모 intent에도 힌트를 넣어서 사전 자동 열 매핑(bestReturn)이 돌게 한다
+  intent.header_hint = "연봉";
+  intent.target_header = "연봉";
+
   intent.condition = {
     target: { header: "연봉" },
     operator: op,
