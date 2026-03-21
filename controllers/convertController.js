@@ -476,6 +476,18 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
+  // ✅ 텍스트 공백 제거 패턴
+  if (
+    /(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(original) &&
+    /(이름|성명)/.test(original)
+  ) {
+    intent.operation = "trim";
+    intent.header_hint = "이름";
+    intent.target_header = "이름";
+    intent.scope = "all";
+    return intent;
+  }
+
   // ✅ 1-1. 텍스트 정리(공백 제거) 패턴
   if (
     /(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(original) &&
@@ -613,6 +625,34 @@ function buildLocalIntentFromText(text = "") {
     if (!intent.value_if_true) intent.value_if_true = "상";
     if (!intent.value_if_false) intent.value_if_false = "하";
 
+    return intent;
+  }
+
+  // ✅ 평균 이상/이하 IF 패턴
+  if (
+    /(연봉|급여)/.test(original) &&
+    /(평균\s*(이상|이하|초과|미만)|average)/i.test(original) &&
+    /이면|아니면/.test(original)
+  ) {
+    intent.operation = "if";
+    intent.scope = "all";
+
+    let op = ">=";
+    if (/평균\s*이하/.test(original)) op = "<=";
+    else if (/평균\s*초과/.test(original)) op = ">";
+    else if (/평균\s*미만/.test(original)) op = "<";
+
+    intent.condition = {
+      target: { header: "연봉" },
+      operator: op,
+      value: {
+        operation: "average",
+        header_hint: "연봉",
+      },
+    };
+
+    intent.value_if_true = "상";
+    intent.value_if_false = "하";
     return intent;
   }
 
