@@ -476,6 +476,18 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
+  // ✅ 1-1. 텍스트 정리(공백 제거) 패턴
+  if (
+    /(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(original) &&
+    /(이름|성명)/.test(original)
+  ) {
+    intent.operation = "trim";
+    intent.header_hint = /(성명)/.test(original) ? "이름" : "이름";
+    intent.target_header = intent.header_hint;
+    intent.scope = "all";
+    return intent;
+  }
+
   // ✅ 2. 집계 / 그룹 집계 패턴
   // 예: "부서별 직원 수", "평가 등급별 평균 연봉", "부서별 평가 등급 A 직원 수"
   if (
@@ -567,6 +579,40 @@ function buildLocalIntentFromText(text = "") {
     const numMatch = s.match(/([0-9]+[.,]?[0-9]*)/);
     if (numMatch) cond.value = numMatch[1];
     if (Object.keys(cond).length) intent.conditions = [cond];
+    return intent;
+  }
+
+  // ✅ 3-1. 평균 이상/이하 IF 패턴
+  if (
+    /(연봉|급여)/.test(original) &&
+    /(평균\s*(이상|이하|초과|미만)|average)/i.test(original) &&
+    /이면|아니면/.test(original)
+  ) {
+    intent.operation = "if";
+    intent.scope = "all";
+
+    let op = ">=";
+    if (/평균\s*이하/.test(original)) op = "<=";
+    else if (/평균\s*초과/.test(original)) op = ">";
+    else if (/평균\s*미만/.test(original)) op = "<";
+
+    intent.condition = {
+      target: { header: "연봉" },
+      operator: op,
+      value: {
+        operation: "average",
+        header_hint: "연봉",
+      },
+    };
+
+    // 따옴표가 없어도 "상/하" 추출
+    if (/상/.test(original)) intent.value_if_true = "상";
+    if (/하/.test(original)) intent.value_if_false = "하";
+
+    // 혹시 다른 표현도 허용
+    if (!intent.value_if_true) intent.value_if_true = "상";
+    if (!intent.value_if_false) intent.value_if_false = "하";
+
     return intent;
   }
 
@@ -1323,6 +1369,51 @@ function applyDuplicateLatestMetricOverride(message, intent) {
   return intent;
 }
 
+function applyRankThresholdCountOverride(message, intent) {
+  const msg = String(message || "");
+  if (!intent || typeof intent !== "object") return intent;
+
+  if (!/(직급)/.test(msg)) return intent;
+  if (!/(개수|갯수|인원수|직원\s*수|count)/.test(msg)) return intent;
+  if (!/(이상)/.test(msg)) return intent;
+
+  const rankOrder = [
+    "사원",
+    "주임",
+    "대리",
+    "과장",
+    "차장",
+    "부장",
+    "이사",
+    "상무",
+    "전무",
+    "대표",
+  ];
+  const hit = rankOrder.find((r) => msg.includes(r));
+  if (!hit) return intent;
+
+  const idx = rankOrder.indexOf(hit);
+  if (idx < 0) return intent;
+
+  const allowed = rankOrder.slice(idx);
+
+  intent.operation = "count";
+  intent.condition_groups = [
+    {
+      logical_operator: "OR",
+      conditions: allowed.map((r) => ({
+        target: "직급",
+        operator: "=",
+        value: r,
+      })),
+    },
+  ];
+
+  // 중복 방지: 단순 conditions는 제거
+  delete intent.conditions;
+  return intent;
+}
+
 function _detectGroupByFromMessage(msg = "") {
   const s = String(msg || "");
   if (/부서별|부서\s*기준|각\s*부서/.test(s)) return "부서";
@@ -1987,6 +2078,7 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyRankColumnOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
     intent = applyDuplicateLatestMetricOverride(message, intent);
+    intent = applyRankThresholdCountOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
@@ -2350,6 +2442,7 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyRankColumnOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
   intent = applyDuplicateLatestMetricOverride(nl, intent);
+  intent = applyRankThresholdCountOverride(nl, intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
