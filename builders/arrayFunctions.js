@@ -1,5 +1,5 @@
 const formulaUtils = require("../utils/formulaUtils");
-const { rangeFromSpec } = require("../utils/builderHelpers");
+const { rangeFromSpec, refFromHeaderSpec } = require("../utils/builderHelpers");
 
 function _resolvedPrimaryReturn(ctx) {
   return ctx?.resolved?.returnColumns?.[0] || ctx?.bestReturn || null;
