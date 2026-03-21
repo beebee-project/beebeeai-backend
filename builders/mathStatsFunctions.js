@@ -305,10 +305,26 @@ const mathStatsFunctionBuilder = {
     }
 
     if (conditionMask) {
+      const firstFilterRef =
+        ctx?.resolved?.filterColumns?.find((f) => f?.ref?.range)?.ref?.range ||
+        ctx?.resolved?.filterColumns
+          ?.find(
+            (f) =>
+              f?.logical_operator &&
+              Array.isArray(f.conditions) &&
+              f.conditions.find((x) => x?.ref?.range),
+          )
+          ?.conditions?.find((x) => x?.ref?.range)?.ref?.range ||
+        null;
+
       const base =
         targetRange ||
         ctx?.resolved?.lookupColumn?.range ||
-        ctx?.bestLookup?.range;
+        ctx?.bestLookup?.range ||
+        firstFilterRef ||
+        ctx?.resolved?.groupColumn?.range ||
+        null;
+
       if (!base) return `=ERROR("개수를 계산할 기준 열을 찾을 수 없습니다.")`;
       return `=${_safeCountRows(`FILTER(${base}, ${conditionMask})`)}`;
     }

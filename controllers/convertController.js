@@ -1178,7 +1178,9 @@ function applyFilteredSortOverride(message, intent) {
 
   const currentOp = String(intent.operation || "").toLowerCase();
   if (currentOp === "sortby") return intent;
-  if (["topnrows", "maxrow", "minrow", "rankcolumn"].includes(currentOp)) {
+  if (
+    ["topnrows", "maxrow", "minrow", "rankcolumn", "unique"].includes(currentOp)
+  ) {
     return intent;
   }
 
