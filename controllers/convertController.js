@@ -344,6 +344,45 @@ function _deduceOp(text = "") {
   return "formula";
 }
 
+function _extractDeptConditions(message = "") {
+  const out = [];
+  const m = String(message || "");
+
+  const deptNames = ["영업", "마케팅", "개발", "인사", "재무", "총무"];
+  for (const d of deptNames) {
+    if (new RegExp(`${d}\\s*부서|${d}`).test(m)) {
+      out.push(d);
+    }
+  }
+
+  return [...new Set(out)];
+}
+
+function _extractGradeCondition(message = "") {
+  const m = String(message || "");
+  const hit = m.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+  if (!hit) return null;
+  return hit[1].toUpperCase();
+}
+
+function _extractSalaryThreshold(message = "") {
+  const m = String(message || "");
+  const hit = m.match(
+    /(연봉|급여)\s*([0-9]+(?:[.,][0-9]+)?)\s*(이상|이하|초과|미만)?/,
+  );
+  if (!hit) return null;
+
+  const raw = hit[2].replace(/,/g, "");
+  const dir = hit[3] || "이상";
+
+  let operator = ">=";
+  if (/이하/.test(dir)) operator = "<=";
+  else if (/초과/.test(dir)) operator = ">";
+  else if (/미만/.test(dir)) operator = "<";
+
+  return { value: raw, operator };
+}
+
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -416,15 +455,53 @@ function buildLocalIntentFromText(text = "") {
       }
     }
 
-    const gradeMatch = original.match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
-    if (gradeMatch) {
-      intent.conditions = [
-        {
-          target: "평가 등급",
+    const conditions = [];
+    const conditionGroups = [];
+
+    const grade = _extractGradeCondition(original);
+    if (grade) {
+      conditions.push({
+        target: "평가 등급",
+        operator: "=",
+        value: grade,
+      });
+    }
+
+    const salaryCond = _extractSalaryThreshold(original);
+    if (salaryCond) {
+      conditions.push({
+        target: "연봉",
+        operator: salaryCond.operator,
+        value: salaryCond.value,
+        value_type: "number",
+      });
+    }
+
+    const depts = _extractDeptConditions(original);
+
+    // "영업 또는 마케팅" → OR 그룹
+    if (/(또는|or)/i.test(original) && depts.length >= 2) {
+      conditionGroups.push({
+        logical_operator: "OR",
+        conditions: depts.map((d) => ({
+          target: "부서",
           operator: "=",
-          value: gradeMatch[1].toUpperCase(),
-        },
-      ];
+          value: d,
+        })),
+      });
+    } else if (depts.length === 1) {
+      conditions.push({
+        target: "부서",
+        operator: "=",
+        value: depts[0],
+      });
+    }
+
+    if (conditions.length) {
+      intent.conditions = conditions;
+    }
+    if (conditionGroups.length) {
+      intent.condition_groups = conditionGroups;
     }
 
     if (sortOrder) {

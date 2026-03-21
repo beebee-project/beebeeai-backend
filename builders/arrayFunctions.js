@@ -95,6 +95,32 @@ function _normalizeOp(op) {
   return m[op] || op || "=";
 }
 
+function _normalizeTextOp(op = "") {
+  const s = String(op || "")
+    .trim()
+    .toLowerCase();
+
+  if (["contains", "포함", "like"].includes(s)) return "contains";
+
+  if (
+    ["startswith", "starts_with", "start_with", "시작", "startswith"].includes(
+      s,
+    )
+  ) {
+    return "starts_with";
+  }
+
+  if (
+    ["endswith", "ends_with", "end_with", "끝", "endswith", "끝나는"].includes(
+      s,
+    )
+  ) {
+    return "ends_with";
+  }
+
+  return s;
+}
+
 function _isISODate(v) {
   return /^\d{4}-\d{1,2}-\d{1,2}$/.test(String(v || "").trim());
 }
@@ -353,10 +379,10 @@ const arrayFunctionBuilder = {
       }
 
       if (Number(intent?.limit || 0) > 0) {
-        return `=TAKE(${baseExpr}, ${Number(intent.limit)})`;
+        baseExpr = `TAKE(${baseExpr}, ${Number(intent.limit)})`;
       }
 
-      return `=${baseExpr}`;
+      return `=IFERROR(${baseExpr}, "")`;
     }
 
     // ✅ 기존 legacy fallback
@@ -430,6 +456,7 @@ const arrayFunctionBuilder = {
         const colA1 = `'${legacySheetName}'!${bestCol.col.columnLetter}${legacySheetInfo.startRow}:${bestCol.col.columnLetter}${legacySheetInfo.lastDataRow}`;
 
         const rawOp = String(cond.operator || "=").toLowerCase();
+        const textOp = _normalizeTextOp(rawOp);
         const op = _normalizeOp(rawOp);
         const rawVal = cond.value;
 
@@ -441,18 +468,11 @@ const arrayFunctionBuilder = {
 
         const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
 
-        if (["contains", "포함"].includes(rawOp))
-          return _containsExpr(colA1, rawVal, cs);
+        if (textOp === "contains") return _containsExpr(colA1, rawVal, cs);
 
-        if (
-          ["startswith", "startsWith", "starts_with", "start_with"].includes(
-            rawOp,
-          )
-        )
-          return _startsWithExpr(colA1, rawVal, cs);
+        if (textOp === "starts_with") return _startsWithExpr(colA1, rawVal, cs);
 
-        if (["endswith", "endsWith", "ends_with", "end_with"].includes(rawOp))
-          return _endsWithExpr(colA1, rawVal, cs);
+        if (textOp === "ends_with") return _endsWithExpr(colA1, rawVal, cs);
 
         if (
           ["in", "any_of"].includes(rawOp) &&
@@ -549,6 +569,7 @@ const arrayFunctionBuilder = {
 
             const colA1 = `'${legacySheetName}'!${bestCol.col.columnLetter}${legacySheetInfo.startRow}:${bestCol.col.columnLetter}${legacySheetInfo.lastDataRow}`;
             const rawOp = String(cond.operator || "=").toLowerCase();
+            const textOp = _normalizeTextOp(rawOp);
             const op = _normalizeOp(rawOp);
             const rawVal = cond.value;
 
@@ -559,23 +580,12 @@ const arrayFunctionBuilder = {
 
             const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
 
-            if (["contains", "포함"].includes(rawOp))
-              return _containsExpr(colA1, rawVal, cs);
+            if (textOp === "contains") return _containsExpr(colA1, rawVal, cs);
 
-            if (
-              [
-                "startswith",
-                "startsWith",
-                "starts_with",
-                "start_with",
-              ].includes(rawOp)
-            )
+            if (textOp === "starts_with")
               return _startsWithExpr(colA1, rawVal, cs);
 
-            if (
-              ["endswith", "endsWith", "ends_with", "end_with"].includes(rawOp)
-            )
-              return _endsWithExpr(colA1, rawVal, cs);
+            if (textOp === "ends_with") return _endsWithExpr(colA1, rawVal, cs);
 
             return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
           })
@@ -732,10 +742,10 @@ const arrayFunctionBuilder = {
       intent.return_headers || intent.select_headers || intent.return_cols;
 
     if (!headerOpts || !Array.isArray(headerOpts) || headerOpts.length === 0) {
-      return `=FILTER(${returnRangeSingle}, ${finalMaskExpr})`;
+      return `=IFERROR(FILTER(${returnRangeSingle}, ${finalMaskExpr}), "")`;
     }
 
-    const filteredAll = `FILTER(${fullRange}, ${finalMaskExpr})`;
+    const filteredAll = `IFERROR(FILTER(${fullRange}, ${finalMaskExpr}), "")`;
 
     const nameToIndex = new Map(metaEntries.map(([h, m], i) => [h, i + 1]));
     const wantedIdx = [];
