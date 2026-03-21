@@ -451,6 +451,7 @@ function buildLocalIntentFromText(text = "") {
 
     if (wantedFields.length >= 2) {
       intent.return_fields = [...new Set(wantedFields)];
+      delete intent.return_hint;
     } else if (wantedFields.length === 1) {
       intent.return_hint = wantedFields[0];
     }
@@ -1302,6 +1303,26 @@ function applyRankColumnOverride(message, intent) {
   return intent;
 }
 
+function applyDuplicateLatestMetricOverride(message, intent) {
+  const msg = String(message || "");
+
+  if (!/중복/.test(msg)) return intent;
+  if (!/가장\s*최근|최신/.test(msg)) return intent;
+  if (!/(연봉|급여|이름|부서|직급)/.test(msg)) return intent;
+  if (!/(직원\s*id|사번|직원번호)/i.test(msg)) return intent;
+
+  intent.operation = "duplicate_latest_metric";
+  intent.lookup_hint = "직원 ID";
+  intent.date_header = "입사일";
+
+  if (/(연봉|급여)/.test(msg)) intent.return_hint = "연봉";
+  else if (/이름/.test(msg)) intent.return_hint = "이름";
+  else if (/부서/.test(msg)) intent.return_hint = "부서";
+  else if (/직급/.test(msg)) intent.return_hint = "직급";
+
+  return intent;
+}
+
 function _detectGroupByFromMessage(msg = "") {
   const s = String(msg || "");
   if (/부서별|부서\s*기준|각\s*부서/.test(s)) return "부서";
@@ -1965,6 +1986,7 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyFilteredSortOverride(message, intent);
     intent = applyRankColumnOverride(message, intent);
     intent = applyGroupedAggregateOverride(message, intent);
+    intent = applyDuplicateLatestMetricOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
@@ -2327,6 +2349,7 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applyFilteredSortOverride(nl, intent);
   intent = applyRankColumnOverride(nl, intent);
   intent = applyGroupedAggregateOverride(nl, intent);
+  intent = applyDuplicateLatestMetricOverride(nl, intent);
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;

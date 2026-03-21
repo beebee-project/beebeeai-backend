@@ -112,18 +112,31 @@ function resolveBaseSheet(ctx, schema) {
 
 function resolveReturnColumns(ctx, schema, baseSheet) {
   const out = [];
+  const seen = new Set();
+
   for (const rf of schema.return_fields || []) {
     const inBase = pickBestColumnInSheet(ctx, rf, baseSheet, "return");
     const any = inBase || pickBestColumnAnySheet(ctx, rf, "return");
-    if (any) out.push(any);
+    if (!any) continue;
+
+    const key = `${any.sheetName}::${any.header}::${any.columnLetter}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(any);
   }
 
   if (!out.length && ctx.bestReturn) {
-    out.push({
+    const fallback = {
       ...ctx.bestReturn,
       cell: `'${ctx.bestReturn.sheetName}'!${ctx.bestReturn.columnLetter}${ctx.bestReturn.startRow}`,
       range: `'${ctx.bestReturn.sheetName}'!${ctx.bestReturn.columnLetter}${ctx.bestReturn.startRow}:${ctx.bestReturn.columnLetter}${ctx.bestReturn.lastDataRow}`,
-    });
+    };
+
+    const key = `${fallback.sheetName}::${fallback.header}::${fallback.columnLetter}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(fallback);
+    }
   }
 
   return out;

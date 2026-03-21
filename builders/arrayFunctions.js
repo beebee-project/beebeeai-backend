@@ -1097,6 +1097,7 @@ const arrayFunctionBuilder = {
               : `SUM(${param})`);
     return `=BYROW(${range}, LAMBDA(${param}, ${body}))`;
   },
+
   bycol: function (ctx) {
     const it = ctx.intent || {};
     const range = _resolveRangeOrError(it, ctx) || "A1:C10";
@@ -1115,6 +1116,7 @@ const arrayFunctionBuilder = {
               : `MAX(${param})`);
     return `=BYCOL(${range}, LAMBDA(${param}, ${body}))`;
   },
+
   map: function (ctx) {
     const it = ctx.intent || {};
     const arrSpecs = Array.isArray(it.arrays)
@@ -1133,6 +1135,7 @@ const arrayFunctionBuilder = {
     const body = it.lambda_body || params[0] || "x";
     return `=MAP(${vectors.join(", ")}, LAMBDA(${params.join(", ")}, ${body}))`;
   },
+
   makearray: function (ctx) {
     const it = ctx.intent || {};
     const rows = Number(it.rows || it.m || 10);
@@ -1163,6 +1166,7 @@ const arrayFunctionBuilder = {
       }
       return `=VSTACK(${parts.join(", ")})`;
     })(),
+
   hstack: (ctx) =>
     (() => {
       const it = ctx.intent || {};
@@ -1173,6 +1177,7 @@ const arrayFunctionBuilder = {
       const parts = src.map((s) => rangeFromSpec(ctx, s) || s);
       return `=HSTACK(${parts.join(", ")})`;
     })(),
+
   tocol: (ctx) => {
     const it = ctx.intent || {};
     const rg = rangeFromSpec(ctx, it.range) || it.range || "A1:C5";
@@ -1180,6 +1185,7 @@ const arrayFunctionBuilder = {
     const scan = it.scan ?? 0;
     return `=TOCOL(${rg}, ${ignore}, ${scan})`;
   },
+
   torow: (ctx) => {
     const it = ctx.intent || {};
     const rg = rangeFromSpec(ctx, it.range) || it.range || "A1:C5";
@@ -1187,11 +1193,13 @@ const arrayFunctionBuilder = {
     const scan = it.scan ?? 0;
     return `=TOROW(${rg}, ${ignore}, ${scan})`;
   },
+
   transpose: (ctx) => {
     const it = ctx.intent || {};
     const rg = rangeFromSpec(ctx, it.range) || it.range || "A1:C5";
     return `=TRANSPOSE(${rg})`;
   },
+
   wraprows: (ctx) =>
     (() => {
       const it = ctx.intent || {};
@@ -1202,6 +1210,7 @@ const arrayFunctionBuilder = {
         ? `=WRAPROWS(${vec}, ${cnt}, ${pad})`
         : `=WRAPROWS(${vec}, ${cnt})`;
     })(),
+
   wrapcols: (ctx) =>
     (() => {
       const it = ctx.intent || {};
@@ -1228,6 +1237,7 @@ const arrayFunctionBuilder = {
     const helper = _alignTo(tr, ve);
     return `=${helper.asColumn}`; // 필요 시 indexAt는 호출부의 BYROW 안에서 사용
   },
+
   expand: function (ctx) {
     const it = ctx.intent || {};
     const arr = rangeFromSpec(ctx, it.array) || it.array || "A1:B2";
@@ -1236,6 +1246,27 @@ const arrayFunctionBuilder = {
     if (it.cols != null) args.push(String(it.cols));
     if (it.pad_with != null) args.push(_q(it.pad_with));
     return `=EXPAND(${args.join(", ")})`;
+  },
+
+  duplicate_latest_metric: function (ctx) {
+    const idCol =
+      ctx?.resolved?.lookupColumn ||
+      ctx?.resolved?.filterColumns?.find(
+        (f) => String(f?.header || "") === "직원 ID",
+      )?.ref ||
+      null;
+
+    const dateCol =
+      ctx?.resolved?.dateColumn ||
+      refFromHeaderSpec(ctx, { header: ctx.intent.date_header || "입사일" });
+
+    const retCol = ctx?.resolved?.returnColumns?.[0] || ctx?.bestReturn || null;
+
+    if (!idCol?.range || !dateCol?.range || !retCol?.range) {
+      return `=ERROR("중복 최신 값을 계산할 열을 찾을 수 없습니다.")`;
+    }
+
+    return `=LET(ids, ${idCol.range}, dts, ${dateCol.range}, vals, ${retCol.range}, dupMask, COUNTIF(ids, ids)>1, TAKE(SORTBY(FILTER(vals, dupMask), FILTER(dts, dupMask), -1), 1))`;
   },
 };
 
