@@ -155,11 +155,17 @@ function normalizeLookup(intent = {}) {
 }
 
 function normalizeFilters(intent = {}) {
-  const src = Array.isArray(intent.filters)
+  const flatFilters = Array.isArray(intent.filters)
     ? intent.filters
     : Array.isArray(intent.conditions)
       ? intent.conditions
       : [];
+
+  const groupedFilters = Array.isArray(intent.condition_groups)
+    ? intent.condition_groups
+    : [];
+
+  const src = [...flatFilters, ...groupedFilters];
 
   const out = [];
 
