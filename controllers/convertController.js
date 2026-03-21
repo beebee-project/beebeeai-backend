@@ -1098,7 +1098,9 @@ function applySortListOverride(message, intent) {
   if (!(hasSortCue && hasSalaryCue && hasListCue)) return intent;
 
   const currentOp = String(intent.operation || "").toLowerCase();
-  if (["topnrows", "maxrow", "minrow", "rankcolumn"].includes(currentOp)) {
+  if (
+    ["topnrows", "maxrow", "minrow", "rankcolumn", "unique"].includes(currentOp)
+  ) {
     return intent;
   }
 
@@ -1325,6 +1327,32 @@ function _appendCondition(intent, cond) {
   }
 }
 
+function _extractDeptsFromMessage(msg = "") {
+  const s = String(msg || "");
+  const candidates = ["영업", "마케팅", "개발", "인사", "재무", "총무"];
+  return candidates.filter((d) => new RegExp(`${d}\\s*부서|${d}`).test(s));
+}
+
+function _extractGradeFromMessage(msg = "") {
+  const m = String(msg || "").match(/평가\s*등급\s*([ABCDFS][\+\-]?)/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+function _extractNumericThresholdFromMessage(msg = "") {
+  const m = String(msg || "").match(
+    /(연봉|급여)\s*([0-9][0-9,]*)\s*(이상|이하|초과|미만)/,
+  );
+  if (!m) return null;
+
+  const opMap = { 이상: ">=", 이하: "<=", 초과: ">", 미만: "<" };
+  return {
+    target: /급여/.test(m[1]) ? "연봉" : "연봉",
+    operator: opMap[m[3]] || ">=",
+    value: m[2].replace(/,/g, ""),
+    value_type: "number",
+  };
+}
+
 function applyGroupedAggregateOverride(message, intent) {
   const msg = String(message || "");
   if (!intent || typeof intent !== "object") return intent;
@@ -1374,6 +1402,39 @@ function applyGroupedAggregateOverride(message, intent) {
       operator: "=",
       value: gradeMatch[1].toUpperCase(),
     });
+  }
+  const depts = _extractDeptsFromMessage(msg);
+  if (/(또는|or)/i.test(msg) && depts.length >= 2) {
+    intent.condition_groups = intent.condition_groups || [];
+
+    const existsSameOrGroup = intent.condition_groups.some((g) => {
+      if (!g || String(g.logical_operator || "").toUpperCase() !== "OR")
+        return false;
+      const vals = (g.conditions || []).map((c) => String(c.value || ""));
+      return depts.every((d) => vals.includes(d));
+    });
+
+    if (!existsSameOrGroup) {
+      intent.condition_groups.push({
+        logical_operator: "OR",
+        conditions: depts.map((d) => ({
+          target: "부서",
+          operator: "=",
+          value: d,
+        })),
+      });
+    }
+  } else if (depts.length === 1) {
+    _appendCondition(intent, {
+      target: "부서",
+      operator: "=",
+      value: depts[0],
+    });
+  }
+
+  const numericThreshold = _extractNumericThresholdFromMessage(msg);
+  if (numericThreshold) {
+    _appendCondition(intent, numericThreshold);
   } else {
     const bareGradeMatch = msg.match(
       /(?:^|\s)([ABCDFS][\+\-]?)(?:\s*등급|\s*직원|\s*인원|\s*$)/i,
