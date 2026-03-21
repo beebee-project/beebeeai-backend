@@ -960,26 +960,14 @@ function buildIfVectorTwoCols(ctx, formatValue) {
 function buildIfVectorColConst(ctx, formatValue) {
   const it = ctx.intent;
   const cond = it.condition || {};
-
   let L = refFromHeaderSpec(ctx, cond?.target);
-  if (!L && cond?.target?.header) {
+  if (!L && cond?.target?.header)
     L = refFromHeaderSpec(ctx, cond.target.header);
-  }
   if (!L) return null;
-
   const t = formatValue(it.value_if_true ?? "");
   const f = formatValue(it.value_if_false ?? "");
   const op = cond.operator || "=";
-
-  const right =
-    (typeof cond.value === "object" && cond.value?.operation
-      ? evalSubIntentToScalar(ctx, formatValue, cond.value)
-      : null) ||
-    (typeof cond.value === "object" && cond.value?.header
-      ? refFromHeaderSpec(ctx, cond.value)?.cell
-      : null) ||
-    formatValue(cond.value);
-
+  const right = formatValue(cond.value);
   return `=BYROW(${L.range}, LAMBDA(l, IF(l${op}${right}, ${t}, ${f})))`;
 }
 
