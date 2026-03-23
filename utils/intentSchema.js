@@ -77,67 +77,53 @@ function normalizePolicy(intent = {}) {
   return { engine, policy, formatOptions };
 }
 
-function normalizeReturnFields(intent = {}, rawMessage = "") {
+function normalizeReturnFields(intent = {}) {
   const out = [];
 
-  if (Array.isArray(intent.return_fields)) {
-    out.push(...intent.return_fields.filter(Boolean).map(String));
-  }
+  const pushUnique = (value) => {
+    if (value == null) return;
+    const s = String(value).trim();
+    if (!s) return;
+    if (!out.includes(s)) out.push(s);
+  };
 
-  if (intent.return_array?.header) out.push(String(intent.return_array.header));
-  if (intent.return?.header) out.push(String(intent.return.header));
-  if (intent.return_hint) out.push(String(intent.return_hint));
-  if (intent.header_hint && !out.length) out.push(String(intent.header_hint));
+  const explicitReturnFields = Array.isArray(intent.return_fields)
+    ? intent.return_fields.filter(Boolean).map(String)
+    : [];
 
-  // 다중 반환 자연어 흔적 보정
-  const msg = String(rawMessage || "");
-  const isLookupOp = ["xlookup", "lookup"].includes(
-    String(intent.operation || "").toLowerCase(),
-  );
+  const explicitSingleReturn =
+    intent.return_array?.header || intent.return?.header || intent.return_hint;
 
-  // lookup 계열에서 이미 명시적 반환 필드가 있으면
-  // raw-message 기반 known 자동 보강은 하지 않는다.
   const hasExplicitReturn =
-    (Array.isArray(intent.return_fields) && intent.return_fields.length > 0) ||
-    !!intent.return_array?.header ||
-    !!intent.return?.header ||
-    !!intent.return_hint;
+    explicitReturnFields.length > 0 || !!explicitSingleReturn;
 
-  if (!(isLookupOp && hasExplicitReturn)) {
-    const known = [
-      "이름",
-      "부서",
-      "직급",
-      "연봉",
-      "입사일",
-      "평가 등급",
-      "직원 ID",
-    ];
-
-    for (const k of known) {
-      if (
-        msg.includes(k) &&
-        /가져와|보여줘|출력/.test(msg) &&
-        !out.includes(k)
-      ) {
-        out.push(k);
-      }
-    }
+  if (explicitReturnFields.length) {
+    explicitReturnFields.forEach(pushUnique);
   }
 
-  // lookup key는 return_fields에서 제외
+  if (intent.return_array?.header) pushUnique(intent.return_array.header);
+  if (intent.return?.header) pushUnique(intent.return.header);
+  if (intent.return_hint) pushUnique(intent.return_hint);
+
+  // header_hint 는 "명시적 반환 필드가 전혀 없을 때만" 보조적으로 사용
+  if (!hasExplicitReturn && intent.header_hint) {
+    pushUnique(intent.header_hint);
+  }
+
+  // rawMessage 기반 known field 자동 확장은 제거
+  // -> return 후보 확장은 resolver / cluster 단계에서 처리
+
   const lookupKeyHeader =
     intent.lookup_array?.header ||
+    intent.lookup?.key_header ||
     intent.lookup?.header ||
     intent.lookup_hint ||
     null;
 
-  return [...new Set(out)].filter(
+  return out.filter(
     (x) =>
       !lookupKeyHeader || String(x).trim() !== String(lookupKeyHeader).trim(),
   );
-
-  return [...new Set(out)];
 }
 
 function normalizeLookup(intent = {}) {
@@ -274,7 +260,13 @@ function normalizeIntentSchema(rawIntent = {}, rawMessage = "") {
     ...intent,
     operation: intent.operation,
     engine: normalizeEngine(intent),
-    return_fields: normalizeReturnFields(intent, rawMessage),
+    return_fields: normalizeReturnFields(intent),
+    has_explicit_return:
+      (Array.isArray(intent.return_fields) &&
+        intent.return_fields.length > 0) ||
+      !!intent.return_array?.header ||
+      !!intent.return?.header ||
+      !!intent.return_hint,
     lookup: normalizeLookup(intent),
     filters: normalizeFilters(intent),
     sort: normalizeSort(intent),
