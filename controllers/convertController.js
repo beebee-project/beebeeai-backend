@@ -407,272 +407,116 @@ function buildLocalIntentFromText(text = "") {
   /** @type {Intent} */
   const intent = { operation: op };
 
-  // ✅ B(중앙값) 우선 해결:
-  // "중앙값" 요청인데 header_hint가 비면 bestReturn이 연봉이 아닌 숫자열로 잡힐 수 있음.
-  // 로컬 intent 경로에서는 확실히 연봉을 타게 유도한다.
-  if (intent.operation === "median") {
-    if (!intent.header_hint && !intent.return_hint) {
-      intent.header_hint = "연봉";
+  const headerHint = _detectHeaderHintFromMessage(original);
+  const groupBy = _detectGroupByFromMessage(original);
+  const aggOp = _detectAggregateOpFromMessage(original, intent.operation);
+  const sortOrder = _detectSortOrderFromMessage(original);
+
+  const explicitCellOrRange = formulaUtils.parseExplicitCellOrRange(original);
+  const explicitCellMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
+
+  const hasLookupCue =
+    op.includes("lookup") || /찾|조회|검색|lookup/i.test(original);
+  const hasGroup = Boolean(groupBy);
+  const hasMetric = Boolean(aggOp && aggOp !== "formula");
+
+  let basicCondition = null;
+  if (headerHint) {
+    let operator = null;
+    if (/(이상|greater|over|>=|>)/i.test(original)) operator = ">=";
+    else if (/(이하|under|<=|<|작은)/i.test(original)) operator = "<=";
+    else if (/(초과)/i.test(original)) operator = ">";
+    else if (/(미만)/i.test(original)) operator = "<";
+    else if (/(같|=|equal)/i.test(original)) operator = "=";
+
+    const numMatch = original.match(/([0-9][0-9,]*(?:\.[0-9]+)?)/);
+    if (operator && numMatch) {
+      basicCondition = {
+        target: headerHint,
+        operator,
+        value: numMatch[1].replace(/,/g, ""),
+      };
     }
   }
 
-  // ✅ 1. Lookup / 조회 패턴 감지
-  // 예: "홍길동의 매출", "이름으로 점수 찾기"
-  const lookupMatch = s.match(
-    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
-  );
-  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
+  if (hasLookupCue) {
     intent.operation = "xlookup";
-    if (lookupMatch) {
-      intent.lookup_hint = lookupMatch[1];
-      intent.return_hint = lookupMatch[2];
-    } else {
-      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
-      if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
-      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
-    }
-    // 1) lookup key 힌트 보강
+
     if (/(직원\s*id|사번|직원번호)/i.test(original)) {
       intent.lookup_hint = "직원 ID";
+    } else if (/(이름|성명|name)/i.test(original)) {
+      intent.lookup_hint = "이름";
     }
 
-    // 2) lookup value_ref (예: J2) 보강
-    const cellRefMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
-    if (cellRefMatch) {
-      intent.lookup_value = cellRefMatch[1].toUpperCase();
+    if (headerHint) {
+      intent.return_hint = headerHint;
     }
 
-    // 3) multi-return 보강
-    const wantedFields = [];
-    if (/(이름|성명)/.test(original)) wantedFields.push("이름");
-    if (/부서/.test(original)) wantedFields.push("부서");
-    if (/직급/.test(original)) wantedFields.push("직급");
-    if (/(연봉|급여)/.test(original)) wantedFields.push("연봉");
+    if (explicitCellOrRange?.ref) {
+      intent.lookup_value = explicitCellOrRange.ref;
+    } else if (explicitCellMatch) {
+      intent.lookup_value = explicitCellMatch[1].toUpperCase();
+    }
 
-    if (wantedFields.length >= 2) {
-      intent.return_fields = [...new Set(wantedFields)];
+    const returnFields = [];
+    if (/(이름|성명)/.test(original)) returnFields.push("이름");
+    if (/부서/.test(original)) returnFields.push("부서");
+    if (/직급/.test(original)) returnFields.push("직급");
+    if (/(연봉|급여)/.test(original)) returnFields.push("연봉");
+
+    if (returnFields.length > 1) {
+      intent.return_fields = [...new Set(returnFields)];
       delete intent.return_hint;
-    } else if (wantedFields.length === 1) {
-      intent.return_hint = wantedFields[0];
+    } else if (returnFields.length === 1 && !intent.return_hint) {
+      intent.return_hint = returnFields[0];
     }
 
-    // 4) latest duplicate 보강
-    if (
-      /(중복된\s*경우|중복일\s*경우|가장\s*최근|최근\s*입사|최신|latest)/i.test(
-        original,
-      )
-    ) {
-      intent.duplicate_rule = "latest";
-      if (!intent.date_header) intent.date_header = "입사일";
-    }
-
-    // 5) not-found fallback 보강
     if (
       /(존재하지\s*않는|없는)/.test(original) &&
       intent.value_if_not_found == null
     ) {
       intent.value_if_not_found = "";
     }
+
     return intent;
   }
 
-  // ✅ 텍스트 공백 제거 패턴
-  if (
-    /(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(original) &&
-    /(이름|성명)/.test(original)
-  ) {
-    intent.operation = "trim";
-    intent.header_hint = "이름";
-    intent.target_header = "이름";
-    intent.scope = "all";
-    return intent;
-  }
-
-  // ✅ 1-1. 텍스트 정리(공백 제거) 패턴
-  if (
-    /(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(original) &&
-    /(이름|성명)/.test(original)
-  ) {
-    intent.operation = "trim";
-    intent.header_hint = /(성명)/.test(original) ? "이름" : "이름";
-    intent.target_header = intent.header_hint;
-    intent.scope = "all";
-    return intent;
-  }
-
-  // ✅ 2. 집계 / 그룹 집계 패턴
-  // 예: "부서별 직원 수", "평가 등급별 평균 연봉", "부서별 평가 등급 A 직원 수"
-  if (
-    /(sum|합계|total|평균|average|count|개수|갯수|인원수|직원\s*수|최고|최저|중앙값|중간값|중앙\s*(연봉|급여|값|금액)?|정렬|순으로)/.test(
-      s,
-    )
-  ) {
-    const groupBy = _detectGroupByFromMessage(original);
-    const aggOp = _detectAggregateOpFromMessage(original, intent.operation);
-    const headerHint = _detectHeaderHintFromMessage(original);
-    const sortOrder = _detectSortOrderFromMessage(original);
-
-    if (groupBy) intent.group_by = groupBy;
+  if (hasGroup || hasMetric) {
     intent.operation = aggOp;
 
-    if (!intent.header_hint && !intent.return_hint) {
-      if (aggOp !== "count" && headerHint) {
-        intent.header_hint = headerHint;
-      }
+    if (groupBy) {
+      intent.group_by = groupBy;
     }
-
-    const conditions = [];
-    const conditionGroups = [];
-
-    const grade = _extractGradeCondition(original);
-    if (grade) {
-      conditions.push({
-        target: "평가 등급",
-        operator: "=",
-        value: grade,
-      });
+    if (headerHint && aggOp !== "count") {
+      intent.header_hint = headerHint;
     }
-
-    const salaryCond = _extractSalaryThreshold(original);
-    if (salaryCond) {
-      conditions.push({
-        target: "연봉",
-        operator: salaryCond.operator,
-        value: salaryCond.value,
-        value_type: "number",
-      });
+    if (basicCondition) {
+      intent.conditions = [basicCondition];
     }
-
-    const depts = _extractDeptConditions(original);
-
-    // "영업 또는 마케팅" → OR 그룹
-    if (/(또는|or)/i.test(original) && depts.length >= 2) {
-      conditionGroups.push({
-        logical_operator: "OR",
-        conditions: depts.map((d) => ({
-          target: "부서",
-          operator: "=",
-          value: d,
-        })),
-      });
-    } else if (depts.length === 1) {
-      conditions.push({
-        target: "부서",
-        operator: "=",
-        value: depts[0],
-      });
-    }
-
-    if (conditions.length) {
-      intent.conditions = conditions;
-    }
-    if (conditionGroups.length) {
-      intent.condition_groups = conditionGroups;
-    }
-
     if (sortOrder) {
       intent.sorted = true;
       intent.sort_order = sortOrder;
     }
-
     return intent;
   }
 
-  // ✅ 3. 필터 조건 패턴
-  // 예: "매출이 100만원 이상인 행", "이름이 홍길동인 데이터"
-  if (/(filter|필터|조건|만족|해당)/.test(s)) {
+  if (/(filter|필터|조건|만족|해당)/.test(s) || basicCondition) {
     intent.operation = "filter";
-    const cond = {};
-    const headerMatch = s.match(/(매출|금액|점수|나이|기간|날짜)/);
-    if (headerMatch) cond.target = headerMatch[1];
-    if (/(이상|greater|over|>)\b/.test(s)) cond.operator = ">=";
-    else if (/(이하|under|<|작은)\b/.test(s)) cond.operator = "<=";
-    else if (/(같|=|equal)/.test(s)) cond.operator = "=";
-    const numMatch = s.match(/([0-9]+[.,]?[0-9]*)/);
-    if (numMatch) cond.value = numMatch[1];
-    if (Object.keys(cond).length) intent.conditions = [cond];
+    if (basicCondition) {
+      intent.conditions = [basicCondition];
+    }
     return intent;
   }
 
-  // ✅ 3-1. 평균 이상/이하 IF 패턴
-  if (
-    /(연봉|급여)/.test(original) &&
-    /(평균\s*(이상|이하|초과|미만)|average)/i.test(original) &&
-    /이면|아니면/.test(original)
-  ) {
+  if (/\bif\b|조건|이면|아니면|참|거짓/.test(s) && basicCondition) {
     intent.operation = "if";
-    intent.scope = "all";
+    intent.condition = basicCondition;
 
-    let op = ">=";
-    if (/평균\s*이하/.test(original)) op = "<=";
-    else if (/평균\s*초과/.test(original)) op = ">";
-    else if (/평균\s*미만/.test(original)) op = "<";
-
-    intent.condition = {
-      target: { header: "연봉" },
-      operator: op,
-      value: {
-        operation: "average",
-        header_hint: "연봉",
-      },
-    };
-
-    // 따옴표가 없어도 "상/하" 추출
-    if (/상/.test(original)) intent.value_if_true = "상";
-    if (/하/.test(original)) intent.value_if_false = "하";
-
-    // 혹시 다른 표현도 허용
-    if (!intent.value_if_true) intent.value_if_true = "상";
-    if (!intent.value_if_false) intent.value_if_false = "하";
-
-    return intent;
-  }
-
-  // ✅ 평균 이상/이하 IF 패턴
-  if (
-    /(연봉|급여)/.test(original) &&
-    /(평균\s*(이상|이하|초과|미만)|average)/i.test(original) &&
-    /이면|아니면/.test(original)
-  ) {
-    intent.operation = "if";
-    intent.scope = "all";
-
-    let op = ">=";
-    if (/평균\s*이하/.test(original)) op = "<=";
-    else if (/평균\s*초과/.test(original)) op = ">";
-    else if (/평균\s*미만/.test(original)) op = "<";
-
-    intent.condition = {
-      target: { header: "연봉" },
-      operator: op,
-      value: {
-        operation: "average",
-        header_hint: "연봉",
-      },
-    };
-
-    intent.value_if_true = "상";
-    intent.value_if_false = "하";
-    return intent;
-  }
-
-  // ✅ 4. IF 조건형 문장
-  // 예: "매출이 100 이상이면 '우수', 아니면 '보통'"
-  if (/\bif\b|조건|이면|아니면|참|거짓/.test(s)) {
-    intent.operation = "if";
-    const cond = {};
-    const headerMatch = s.match(/(매출|점수|나이|금액|수량)/);
-    if (headerMatch) cond.target = headerMatch[1];
-    if (/(이상|greater|over|>)\b/.test(s)) cond.operator = ">=";
-    else if (/(이하|under|<|작은)\b/.test(s)) cond.operator = "<=";
-    const numMatch = s.match(/([0-9]+[.,]?[0-9]*)/);
-    if (numMatch) cond.value = numMatch[1];
     const labelMatches = s.match(/['"](.*?)['"]/g);
     if (labelMatches && labelMatches.length >= 2) {
       intent.value_if_true = labelMatches[0].replace(/['"]/g, "");
       intent.value_if_false = labelMatches[1].replace(/['"]/g, "");
     }
-    intent.condition = cond;
     return intent;
   }
 
@@ -691,6 +535,36 @@ function buildLocalIntentFromText(text = "") {
   }
 
   // ✅ 6. 기본 fallback
+  return intent;
+}
+
+function applyStructuralOverrides(intent) {
+  if (!intent || typeof intent !== "object") return intent;
+
+  if (Array.isArray(intent.return_fields) && intent.return_fields.length) {
+    intent.return_fields = [...new Set(intent.return_fields.map(String))];
+    delete intent.return_hint;
+  }
+
+  const hasLookup =
+    intent.lookup_value != null ||
+    !!intent.lookup_hint ||
+    !!intent.lookup?.value ||
+    !!intent.lookup?.header ||
+    !!intent.lookup?.key_header;
+
+  const hasGroup = !!intent.group_by;
+  const hasMetric = !!intent.header_hint || !!intent.return_hint;
+  const op = String(intent.operation || "").toLowerCase();
+
+  if (op === "xlookup" && hasGroup && !hasLookup) {
+    intent.operation = hasMetric ? "sum" : "count";
+  }
+
+  if (op === "xlookup" && hasLookup && hasGroup && !hasMetric) {
+    delete intent.group_by;
+  }
+
   return intent;
 }
 
@@ -2157,7 +2031,7 @@ exports.handleConversion = async (req, res, next) => {
 
     intent = normalizeIntentSchema(intent, message);
     intent = normalizeLookupIntent(intent);
-    intent = applyMedianOverride(message, intent);
+    intent = applyStructuralOverrides(intent);
     intent = applyDateBoundaryOverride(message, intent);
     intent = applyExtremeRowOverride(message, intent);
     intent = applyRecentTopNOverride(message, intent);
@@ -2167,7 +2041,6 @@ exports.handleConversion = async (req, res, next) => {
     intent = applySortListOverride(message, intent);
     intent = applyFilteredSortOverride(message, intent);
     intent = applyRankColumnOverride(message, intent);
-    intent = applyGroupedAggregateOverride(message, intent);
     intent = applyDuplicateLatestMetricOverride(message, intent);
     intent = applyRankThresholdCountOverride(message, intent);
     intent = applyTrimColumnOverride(message, intent);
@@ -2523,7 +2396,7 @@ async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
   let intent = normalizeLookupIntent(baseIntent);
-  intent = applyMedianOverride(nl, intent);
+  intent = applyStructuralOverrides(intent);
   intent = applyExtremeRowOverride(nl, intent);
   intent = applyDateBoundaryOverride(nl, intent);
   intent = applyRecentTopNOverride(nl, intent);
@@ -2533,7 +2406,6 @@ async function convert(nl, options = {}, meta = {}) {
   intent = applySortListOverride(nl, intent);
   intent = applyFilteredSortOverride(nl, intent);
   intent = applyRankColumnOverride(nl, intent);
-  intent = applyGroupedAggregateOverride(nl, intent);
   intent = applyDuplicateLatestMetricOverride(nl, intent);
   intent = applyRankThresholdCountOverride(nl, intent);
   intent = applyTrimColumnOverride(nl, intent);
