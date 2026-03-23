@@ -390,6 +390,114 @@ function _extractSalaryThreshold(message = "") {
   return { value: raw, operator };
 }
 
+const CANONICAL_FIELD_ALIASES = [
+  {
+    canonical: "직원 ID",
+    aliases: ["직원 id", "직원ID", "사번", "직원번호", "id"],
+  },
+  { canonical: "이름", aliases: ["이름", "성명", "name"] },
+  { canonical: "부서", aliases: ["부서", "소속", "팀"] },
+  { canonical: "직급", aliases: ["직급", "직함", "직책", "title"] },
+  { canonical: "연봉", aliases: ["연봉", "급여", "salary"] },
+  {
+    canonical: "입사일",
+    aliases: ["입사일", "등록일", "채용일", "입사 날짜", "등록 날짜"],
+  },
+  { canonical: "평가 등급", aliases: ["평가 등급", "평가", "등급", "rating"] },
+];
+
+function _escapeRegExp(s = "") {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function _findCanonicalFieldsInText(text = "") {
+  const src = String(text || "");
+  const found = [];
+
+  for (const spec of CANONICAL_FIELD_ALIASES) {
+    const hit = spec.aliases.some((alias) =>
+      new RegExp(
+        `(^|[^가-힣A-Za-z0-9])${_escapeRegExp(alias)}([^가-힣A-Za-z0-9]|$)`,
+        "i",
+      ).test(src),
+    );
+    if (hit) found.push(spec.canonical);
+  }
+
+  return [...new Set(found)];
+}
+
+function _extractReturnFieldsFromMessage(text = "") {
+  const found = _findCanonicalFieldsInText(text);
+  return found.filter((x) => x !== "직원 ID");
+}
+
+function _extractLookupFieldFromMessage(text = "") {
+  const src = String(text || "");
+
+  const byPatterns = [
+    /(직원\s*id|직원ID|사번|직원번호|id)\s*(으로|로|기준으로|기준)/i,
+    /(이름|성명|name)\s*(으로|로|기준으로|기준)/i,
+    /(부서|소속|팀)\s*(으로|로|기준으로|기준)/i,
+    /(직급|직함|직책)\s*(으로|로|기준으로|기준)/i,
+    /(연봉|급여|salary)\s*(으로|로|기준으로|기준)/i,
+  ];
+
+  for (const p of byPatterns) {
+    const m = src.match(p);
+    if (!m) continue;
+    const found = _findCanonicalFieldsInText(m[1]);
+    if (found.length) return found[0];
+  }
+
+  const equalityPatterns = [
+    /(직원\s*id|직원ID|사번|직원번호|id)\s*가\s*/i,
+    /(이름|성명|name)\s*이\s*/i,
+    /(부서|소속|팀)\s*가\s*/i,
+    /(직급|직함|직책)\s*이\s*/i,
+    /(연봉|급여|salary)\s*이\s*/i,
+  ];
+
+  for (const p of equalityPatterns) {
+    const m = src.match(p);
+    if (!m) continue;
+    const found = _findCanonicalFieldsInText(m[1]);
+    if (found.length) return found[0];
+  }
+
+  return null;
+}
+
+function _extractLookupValueFromMessage(text = "") {
+  const src = String(text || "").trim();
+
+  const cellRef = src.match(/\b([A-Z]{1,3}\d{1,7})\b/);
+  if (cellRef) return cellRef[1].toUpperCase();
+
+  const quoted = src.match(/["']([^"']+)["']/);
+  if (quoted) return quoted[1].trim();
+
+  const equality = src.match(
+    /(직원\s*id|직원ID|사번|직원번호|id|이름|성명|name|부서|소속|팀|직급|직함|직책|연봉|급여)\s*(?:가|이)\s*([A-Za-z0-9가-힣._-]+)/i,
+  );
+  if (equality) return equality[2].trim();
+
+  return null;
+}
+
+function _looksLikeStructuredLookup(text = "") {
+  const src = String(text || "");
+
+  if (/(찾아|조회|검색|lookup|xlookup|참조)/i.test(src)) return true;
+  if (
+    /(가져와|보여줘|출력|반환)/i.test(src) &&
+    /(으로|로|기준으로|기준|가|이)/.test(src)
+  )
+    return true;
+
+  return false;
+}
+
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -423,47 +531,68 @@ function buildLocalIntentFromText(text = "") {
     }
   }
 
-  // ✅ 1. Lookup / 조회 패턴 감지
-  // 예: "홍길동의 매출", "이름으로 점수 찾기"
+  // ✅ 1. Lookup / 조회 구조 감지
+  // - "사번으로 이름 가져와줘"
+  // - "직원 ID로 부서 보여줘"
+  // - "직원 ID가 1001인 이름 찾아줘"
+  // - "홍길동의 연봉"
   const lookupMatch = s.match(
-    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격)/i,
+    /([가-힣a-z0-9]+)[의\s]*(매출|점수|금액|이름|값|수량|가격|부서|직급|연봉|급여)/i,
   );
-  if (op.includes("lookup") || /찾|조회|검색|lookup/.test(s)) {
+
+  if (op.includes("lookup") || _looksLikeStructuredLookup(original)) {
     intent.operation = "xlookup";
+
+    const detectedLookup = _extractLookupFieldFromMessage(original);
+    const detectedReturns = _extractReturnFieldsFromMessage(original);
+    const detectedValue = _extractLookupValueFromMessage(original);
+
     if (lookupMatch) {
-      intent.lookup_hint = lookupMatch[1];
-      intent.return_hint = lookupMatch[2];
-    } else {
-      // "OO의 매출" 패턴이 없으면 기본 힌트 추정
-      if (/매출|sales?/.test(s)) intent.return_hint = "매출액";
-      if (/이름|name/.test(s)) intent.lookup_hint = "이름";
-    }
-    // 1) lookup key 힌트 보강
-    if (/(직원\s*id|사번|직원번호)/i.test(original)) {
-      intent.lookup_hint = "직원 ID";
-    }
+      const lhsFields = _findCanonicalFieldsInText(lookupMatch[1]);
+      const rhsFields = _findCanonicalFieldsInText(lookupMatch[2]);
 
-    // 2) lookup value_ref (예: J2) 보강
-    const cellRefMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
-    if (cellRefMatch) {
-      intent.lookup_value = cellRefMatch[1].toUpperCase();
+      if (lhsFields.length && !intent.lookup_hint) {
+        intent.lookup_hint = lhsFields[0];
+      }
+      if (rhsFields.length) {
+        if (rhsFields.length >= 2) {
+          intent.return_fields = [...new Set(rhsFields)];
+          delete intent.return_hint;
+        } else if (!intent.return_hint) {
+          intent.return_hint = rhsFields[0];
+        }
+      }
     }
 
-    // 3) multi-return 보강
-    const wantedFields = [];
-    if (/(이름|성명)/.test(original)) wantedFields.push("이름");
-    if (/부서/.test(original)) wantedFields.push("부서");
-    if (/직급/.test(original)) wantedFields.push("직급");
-    if (/(연봉|급여)/.test(original)) wantedFields.push("연봉");
+    if (!intent.lookup_hint && detectedLookup) {
+      intent.lookup_hint = detectedLookup;
+    }
 
-    if (wantedFields.length >= 2) {
-      intent.return_fields = [...new Set(wantedFields)];
+    const returnCandidates = detectedReturns.filter(
+      (x) => x && x !== intent.lookup_hint,
+    );
+
+    if (returnCandidates.length >= 2) {
+      intent.return_fields = [...new Set(returnCandidates)];
       delete intent.return_hint;
-    } else if (wantedFields.length === 1) {
-      intent.return_hint = wantedFields[0];
+    } else if (
+      returnCandidates.length === 1 &&
+      !intent.return_hint &&
+      !(Array.isArray(intent.return_fields) && intent.return_fields.length)
+    ) {
+      intent.return_hint = returnCandidates[0];
     }
 
-    // 4) latest duplicate 보강
+    if (detectedValue != null) {
+      intent.lookup_value = detectedValue;
+    }
+
+    // fallback: 이름만 언급됐는데 lookup도 return도 비어 있으면
+    if (!intent.lookup_hint && /(이름|성명|name)/i.test(original)) {
+      intent.lookup_hint = "이름";
+    }
+
+    // latest duplicate 보강
     if (
       /(중복된\s*경우|중복일\s*경우|가장\s*최근|최근\s*입사|최신|latest)/i.test(
         original,
@@ -473,13 +602,30 @@ function buildLocalIntentFromText(text = "") {
       if (!intent.date_header) intent.date_header = "입사일";
     }
 
-    // 5) not-found fallback 보강
+    // not-found fallback 보강
     if (
       /(존재하지\s*않는|없는)/.test(original) &&
       intent.value_if_not_found == null
     ) {
       intent.value_if_not_found = "";
     }
+
+    // lookup과 return이 같은 값이면 return 제거
+    if (
+      intent.lookup_hint &&
+      intent.return_hint &&
+      String(intent.lookup_hint).trim() === String(intent.return_hint).trim()
+    ) {
+      delete intent.return_hint;
+    }
+
+    if (Array.isArray(intent.return_fields) && intent.lookup_hint) {
+      intent.return_fields = intent.return_fields.filter(
+        (x) => String(x).trim() !== String(intent.lookup_hint).trim(),
+      );
+      if (!intent.return_fields.length) delete intent.return_fields;
+    }
+
     return intent;
   }
 
@@ -491,18 +637,6 @@ function buildLocalIntentFromText(text = "") {
     intent.operation = "trim";
     intent.header_hint = "이름";
     intent.target_header = "이름";
-    intent.scope = "all";
-    return intent;
-  }
-
-  // ✅ 1-1. 텍스트 정리(공백 제거) 패턴
-  if (
-    /(공백|띄어쓰기|앞뒤\s*공백|trim)/i.test(original) &&
-    /(이름|성명)/.test(original)
-  ) {
-    intent.operation = "trim";
-    intent.header_hint = /(성명)/.test(original) ? "이름" : "이름";
-    intent.target_header = intent.header_hint;
     intent.scope = "all";
     return intent;
   }
