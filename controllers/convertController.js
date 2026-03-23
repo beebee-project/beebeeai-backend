@@ -2348,12 +2348,15 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyAverageThresholdIfOverride(message, intent);
     intent.raw_message = message;
 
-    // ✅ stale cache / LLM merge로 잘못 남은 lookup_value 재정규화
+    // ✅ stale cache / LLM merge / schema normalize 이후 lookup_value 재정규화
     if (intent?.operation === "xlookup") {
       const freshLookupValue = _extractLookupValueFromMessage(message);
 
       if (freshLookupValue != null && freshLookupValue !== "") {
         intent.lookup_value = freshLookupValue;
+        intent.lookup = intent.lookup || {};
+        intent.lookup.value = freshLookupValue;
+        delete intent.needs_lookup_value;
       } else {
         delete intent.lookup_value;
 
@@ -2361,17 +2364,8 @@ exports.handleConversion = async (req, res, next) => {
           delete intent.lookup.value;
           delete intent.lookup.value_ref;
         }
-      }
 
-      // 값이 없는 구조형 lookup은 여기서 다시 표시
-      if (
-        !intent.lookup_value &&
-        !intent.lookup?.value &&
-        !intent.lookup?.value_ref
-      ) {
         intent.needs_lookup_value = true;
-      } else {
-        delete intent.needs_lookup_value;
       }
     }
 
