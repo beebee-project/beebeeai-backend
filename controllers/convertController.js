@@ -2347,6 +2347,34 @@ exports.handleConversion = async (req, res, next) => {
     intent = applyTrimColumnOverride(message, intent);
     intent = applyAverageThresholdIfOverride(message, intent);
     intent.raw_message = message;
+
+    // ✅ stale cache / LLM merge로 잘못 남은 lookup_value 재정규화
+    if (intent?.operation === "xlookup") {
+      const freshLookupValue = _extractLookupValueFromMessage(message);
+
+      if (freshLookupValue != null && freshLookupValue !== "") {
+        intent.lookup_value = freshLookupValue;
+      } else {
+        delete intent.lookup_value;
+
+        if (intent.lookup && typeof intent.lookup === "object") {
+          delete intent.lookup.value;
+          delete intent.lookup.value_ref;
+        }
+      }
+
+      // 값이 없는 구조형 lookup은 여기서 다시 표시
+      if (
+        !intent.lookup_value &&
+        !intent.lookup?.value &&
+        !intent.lookup?.value_ref
+      ) {
+        intent.needs_lookup_value = true;
+      } else {
+        delete intent.needs_lookup_value;
+      }
+    }
+
     _dbgIntent = intent;
 
     _tIntentEnd = process.hrtime.bigint();
@@ -2364,6 +2392,21 @@ exports.handleConversion = async (req, res, next) => {
         },
         600, // 10 min TTL (tune later)
       );
+    }
+
+    if (
+      intent?.operation === "xlookup" &&
+      intent?.needs_lookup_value === true &&
+      intent?.lookup_value == null &&
+      intent?.lookup?.value == null &&
+      intent?.lookup?.value_ref == null
+    ) {
+      return res.json({
+        result: '=ERROR("조회값이 없습니다. 예: 직원 ID가 1001인 이름 찾아줘")',
+        compatibility: detectFormulaCompatibility(
+          '=ERROR("조회값이 없습니다. 예: 직원 ID가 1001인 이름 찾아줘")',
+        ),
+      });
     }
 
     // 4) 컨텍스트 구성 + 자동 열 매핑
