@@ -471,17 +471,38 @@ function _extractLookupFieldFromMessage(text = "") {
 function _extractLookupValueFromMessage(text = "") {
   const src = String(text || "").trim();
 
+  // 1) 명시적 셀 참조
   const cellRef = src.match(/\b([A-Z]{1,3}\d{1,7})\b/);
   if (cellRef) return cellRef[1].toUpperCase();
 
+  // 2) 따옴표로 감싼 명시 값
   const quoted = src.match(/["']([^"']+)["']/);
-  if (quoted) return quoted[1].trim();
+  if (quoted) {
+    const v = quoted[1].trim();
+    return v || null;
+  }
 
+  // 3) "직원 ID가 1001", "이름이 홍길동" 같은 equality 구조만 허용
   const equality = src.match(
     /(직원\s*id|직원ID|사번|직원번호|id|이름|성명|name|부서|소속|팀|직급|직함|직책|연봉|급여)\s*(?:가|이)\s*([A-Za-z0-9가-힣._-]+)/i,
   );
-  if (equality) return equality[2].trim();
 
+  if (equality) {
+    const raw = String(equality[2] || "").trim();
+
+    // 동사/어미 잘못 캡처 방지
+    if (/^(가져와줘|보여줘|찾아줘|출력해줘|조회해줘|반환해줘)$/i.test(raw)) {
+      return null;
+    }
+
+    // 너무 짧은 꼬리값 방지
+    if (raw.length <= 1) return null;
+
+    return raw;
+  }
+
+  // 4) "으로/로" 구조는 lookup field 힌트일 뿐, value가 아님
+  //    예: "사번으로 이름 가져와줘" → value 없음
   return null;
 }
 
@@ -583,8 +604,10 @@ function buildLocalIntentFromText(text = "") {
       intent.return_hint = returnCandidates[0];
     }
 
-    if (detectedValue != null) {
+    if (detectedValue != null && detectedValue !== "") {
       intent.lookup_value = detectedValue;
+    } else {
+      delete intent.lookup_value;
     }
 
     // fallback: 이름만 언급됐는데 lookup도 return도 비어 있으면
@@ -624,6 +647,16 @@ function buildLocalIntentFromText(text = "") {
         (x) => String(x).trim() !== String(intent.lookup_hint).trim(),
       );
       if (!intent.return_fields.length) delete intent.return_fields;
+    }
+
+    // 값이 없는 구조형 lookup 문장은 formula 생성을 서두르지 않도록 표시
+    if (
+      intent.operation === "xlookup" &&
+      !intent.lookup_value &&
+      !intent.lookup?.value &&
+      !intent.lookup?.value_ref
+    ) {
+      intent.needs_lookup_value = true;
     }
 
     return intent;
@@ -2664,6 +2697,17 @@ async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
   let intent = normalizeLookupIntent(baseIntent);
+
+  if (
+    intent?.operation === "xlookup" &&
+    intent?.needs_lookup_value === true &&
+    intent?.lookup_value == null &&
+    intent?.lookup?.value == null &&
+    intent?.lookup?.value_ref == null
+  ) {
+    return '=ERROR("조회값이 없습니다. 예: 직원 ID가 1001인 이름 찾아줘")';
+  }
+
   intent = applyMedianOverride(nl, intent);
   intent = applyExtremeRowOverride(nl, intent);
   intent = applyDateBoundaryOverride(nl, intent);
