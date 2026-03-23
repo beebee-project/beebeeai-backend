@@ -301,6 +301,10 @@ const DEFAULT_FORMAT_OPTIONS = {
 // }
 
 function shouldUseDirectBuilder(intent = {}, ctx = {}) {
+  if (typeof direct?.isDirectEligible === "function") {
+    return direct.isDirectEligible(intent, ctx);
+  }
+
   const raw = String(intent?.raw_message || "");
   const explicit =
     formulaUtils.parseExplicitCellOrRange(raw) ||
@@ -309,6 +313,7 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
 
   const hasSheetMeta =
     !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+
   const headerDriven = Boolean(
     intent?.header_hint ||
     intent?.return_hint ||
@@ -320,8 +325,10 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
     intent?.lookup?.key_header,
   );
 
+  if (hasSheetMeta) return false;
+  if (headerDriven) return false;
   if (!explicit) return false;
-  if (hasSheetMeta && headerDriven) return false;
+
   return true;
 }
 
@@ -2245,10 +2252,10 @@ exports.handleConversion = async (req, res, next) => {
     // 5) direct(파일無) 빠른 경로
     if (
       !isFileAttached &&
-      direct?.canHandleWithoutFile?.(intent) &&
+      direct?.canHandleWithoutFile?.(intent, context) &&
       shouldUseDirectBuilder(intent, context)
     ) {
-      const f = direct.buildFormula(intent);
+      const f = direct.buildFormula(intent, context);
       if (f) {
         // ✅ 6-1: 출력 검증(Direct도 동일 적용)
         const v = validateFormula(f);

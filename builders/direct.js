@@ -31,6 +31,33 @@ function shouldRejectDirectForUploadedSheet(ctx) {
   return false;
 }
 
+function isDirectEligible(intent = {}, ctx = {}) {
+  const it = intent || {};
+  const op = String(it?.operation || "").toLowerCase();
+
+  const alwaysSafeNoFileOps = new Set(["today", "now", "rand"]);
+
+  if (alwaysSafeNoFileOps.has(op)) {
+    return true;
+  }
+
+  const hasSheetsMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+  if (hasSheetsMeta) {
+    return false;
+  }
+
+  if (hasHeaderDrivenIntent(it)) {
+    return false;
+  }
+
+  if (!hasExplicitRangeIntent(it)) {
+    return false;
+  }
+
+  return true;
+}
+
 // === 유틸 ===
 function isCellRef(v) {
   return /^[A-Z]{1,3}[0-9]{1,7}$/i.test(String(v || "").trim());
@@ -361,15 +388,21 @@ const handlers = {
   search: searchf,
 };
 
-function canHandleWithoutFile(intent) {
+function canHandleWithoutFile(intent, ctx = {}) {
   const op = String(intent?.operation || "").toLowerCase();
-  return !!handlers[op];
+  if (!handlers[op]) return false;
+  return isDirectEligible(intent, ctx);
 }
 
-function buildFormula(intent) {
+function buildFormula(intent, ctx = {}) {
   const op = String(intent?.operation || "").toLowerCase();
   const h = handlers[op];
   if (!h) return null;
+
+  if (!isDirectEligible(intent, ctx)) {
+    return null;
+  }
+
   return h(intent);
 }
 
@@ -411,4 +444,9 @@ module.exports = {
   year: (ctx) => year(ctx.intent || {}),
   month: (ctx) => month(ctx.intent || {}),
   day: (ctx) => day(ctx.intent || {}),
+
+  canHandleWithoutFile,
+  buildFormula,
+  isDirectEligible,
+  formula,
 };

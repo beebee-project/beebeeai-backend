@@ -87,23 +87,34 @@ function normalizeReturnFields(intent = {}, rawMessage = "") {
   if (intent.return_array?.header) out.push(String(intent.return_array.header));
   if (intent.return?.header) out.push(String(intent.return.header));
   if (intent.return_hint) out.push(String(intent.return_hint));
-  if (intent.header_hint && !out.length) out.push(String(intent.header_hint));
 
-  // 다중 반환 자연어 흔적 보정
+  // header_hint는 "반환 열"이 전혀 없을 때만 제한적으로 사용
+  if (!out.length && intent.header_hint) {
+    out.push(String(intent.header_hint));
+  }
+
   const msg = String(rawMessage || "");
   const isLookupOp = ["xlookup", "lookup"].includes(
     String(intent.operation || "").toLowerCase(),
   );
 
-  // lookup 계열에서 이미 명시적 반환 필드가 있으면
-  // raw-message 기반 known 자동 보강은 하지 않는다.
   const hasExplicitReturn =
     (Array.isArray(intent.return_fields) && intent.return_fields.length > 0) ||
     !!intent.return_array?.header ||
     !!intent.return?.header ||
     !!intent.return_hint;
 
-  if (!(isLookupOp && hasExplicitReturn)) {
+  const lookupKeyHeader =
+    intent.lookup_array?.header ||
+    intent.lookup?.header ||
+    intent.lookup_hint ||
+    null;
+
+  // explicit return이 있으면 자동 보강하지 않음
+  // lookup 계열도 자동 보강은 기본적으로 끔
+  const allowKnownFieldBackfill = !hasExplicitReturn && !isLookupOp;
+
+  if (allowKnownFieldBackfill && /가져와|보여줘|출력/.test(msg)) {
     const known = [
       "이름",
       "부서",
@@ -115,29 +126,21 @@ function normalizeReturnFields(intent = {}, rawMessage = "") {
     ];
 
     for (const k of known) {
+      if (!msg.includes(k)) continue;
       if (
-        msg.includes(k) &&
-        /가져와|보여줘|출력/.test(msg) &&
-        !out.includes(k)
-      ) {
-        out.push(k);
-      }
+        lookupKeyHeader &&
+        String(k).trim() === String(lookupKeyHeader).trim()
+      )
+        continue;
+      if (!out.includes(k)) out.push(k);
     }
   }
 
-  // lookup key는 return_fields에서 제외
-  const lookupKeyHeader =
-    intent.lookup_array?.header ||
-    intent.lookup?.header ||
-    intent.lookup_hint ||
-    null;
-
-  return [...new Set(out)].filter(
-    (x) =>
-      !lookupKeyHeader || String(x).trim() !== String(lookupKeyHeader).trim(),
-  );
-
-  return [...new Set(out)];
+  return [...new Set(out)].filter((x) => {
+    if (!x) return false;
+    if (!lookupKeyHeader) return true;
+    return String(x).trim() !== String(lookupKeyHeader).trim();
+  });
 }
 
 function normalizeLookup(intent = {}) {
