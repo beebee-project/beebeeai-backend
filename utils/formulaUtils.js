@@ -418,129 +418,43 @@ function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
 /* =========================================
    텍스트/스코어링 동의어
 ========================================= */
-const HEADER_CLUSTERS = {
-  revenue_metric: {
-    canonical: "매출",
-    roleHints: ["metric", "return"],
-    typeHint: "number",
-    aliases: [
-      "매출",
-      "총매출",
-      "매출액",
-      "revenue",
-      "sales",
-      "판매액",
-      "판매금액",
-    ],
-  },
-  amount_metric: {
-    canonical: "연봉",
-    roleHints: ["metric", "return"],
-    typeHint: "number",
-    aliases: ["연봉", "급여", "salary", "annual salary", "pay"],
-  },
-  score_metric: {
-    canonical: "점수",
-    roleHints: ["metric", "return"],
-    typeHint: "number",
-    aliases: ["점수", "성적", "평점", "score", "grade"],
-  },
-  inventory_metric: {
-    canonical: "재고",
-    roleHints: ["metric", "return"],
-    typeHint: "number",
-    aliases: ["재고", "재고수량", "inventory", "stock", "qty", "quantity"],
-  },
-  volume_metric: {
-    canonical: "판매량",
-    roleHints: ["metric", "return"],
-    typeHint: "number",
-    aliases: [
-      "판매량",
-      "판매수량",
-      "출고량",
-      "sold",
-      "sales volume",
-      "units sold",
-    ],
-  },
-  category_label: {
-    canonical: "카테고리",
-    roleHints: ["group", "filter", "return"],
-    typeHint: "text",
-    aliases: ["카테고리", "분류", "품목", "category", "type"],
-  },
-  rating_label: {
-    canonical: "평가 등급",
-    roleHints: ["filter", "group", "return"],
-    typeHint: "text",
-    aliases: ["평가등급", "평가 등급", "등급", "grade", "rating"],
-  },
-  date_field: {
-    canonical: "입사일",
-    roleHints: ["filter", "sort", "return"],
-    typeHint: "date",
-    aliases: ["입사일", "입사 날짜", "입사날짜", "hire date", "joining date"],
-  },
-  inbound_date_field: {
-    canonical: "입고일",
-    roleHints: ["filter", "sort", "return"],
-    typeHint: "date",
-    aliases: [
-      "입고일",
-      "입고 날짜",
-      "입고날짜",
-      "inbound date",
-      "received date",
-    ],
-  },
-  item_name: {
-    canonical: "상품명",
-    roleHints: ["lookup", "return", "group"],
-    typeHint: "text",
-    aliases: ["상품명", "제품명", "품명", "item", "product", "product name"],
-  },
-  id_key: {
-    canonical: "직원 ID",
-    roleHints: ["lookup", "filter", "return"],
-    typeHint: "text",
-    aliases: [
-      "직원id",
-      "직원 id",
-      "직원ID",
-      "사번",
-      "직원번호",
-      "employeeid",
-      "emp id",
-      "id",
-    ],
-  },
-  person_name: {
-    canonical: "이름",
-    roleHints: ["return", "lookup", "group"],
-    typeHint: "text",
-    aliases: ["이름", "성명", "직원명", "사원명", "name"],
-  },
-  group_label: {
-    canonical: "부서",
-    roleHints: ["group", "filter", "return"],
-    typeHint: "text",
-    aliases: ["부서", "소속", "팀", "department"],
-  },
-  rank_label: {
-    canonical: "직급",
-    roleHints: ["filter", "group", "return"],
-    typeHint: "text",
-    aliases: ["직급", "직책", "직함", "position", "title"],
-  },
+const SYNONYMS = {
+  매출: ["매출", "총매출", "매출액", "revenue", "sales", "판매액", "판매금액"],
+  연봉: ["연봉", "급여", "salary", "annual salary", "pay"],
+  점수: ["점수", "성적", "평점", "score", "grade"],
+  재고: ["재고", "재고수량", "inventory", "stock", "qty", "quantity"],
+  판매량: [
+    "판매량",
+    "판매수량",
+    "출고량",
+    "sold",
+    "sales volume",
+    "units sold",
+  ],
+  카테고리: ["카테고리", "분류", "품목", "category", "type"],
+  후기등급: [
+    "후기등급",
+    "리뷰등급",
+    "평점등급",
+    "review grade",
+    "rating grade",
+  ],
+  안전재고: [
+    "안전재고",
+    "적정재고",
+    "최소재고",
+    "safety stock",
+    "buffer stock",
+  ],
+  입고일: ["입고일", "입고 날짜", "입고날짜", "inbound date", "received date"],
+  상품명: ["상품명", "제품명", "품명", "item", "product", "product name"],
+  직원ID: ["직원id", "사번", "employeeid", "emp id", "id"],
+  이름: ["이름", "성명", "직원명", "사원명", "name"],
+  부서: ["부서", "소속", "팀", "department"],
+  직급: ["직급", "직책", "position", "title"],
+  평가등급: ["평가등급", "평가 등급", "등급", "grade", "rating"],
+  입사일: ["입사일", "입사 날짜", "입사날짜", "hire date", "joining date"],
 };
-
-const SYNONYMS = Object.fromEntries(
-  Object.values(HEADER_CLUSTERS).map((cluster) => [
-    cluster.canonical,
-    cluster.aliases,
-  ]),
-);
 
 function norm(s = "") {
   return String(s)
@@ -550,144 +464,19 @@ function norm(s = "") {
     .trim();
 }
 
-function _normalizeTermSet(termSet) {
-  return new Set(
-    [...(termSet instanceof Set ? termSet : new Set(termSet || []))]
-      .filter(Boolean)
-      .map(norm)
-      .filter(Boolean),
-  );
-}
-
-function _clusterEntries() {
-  return Object.entries(HEADER_CLUSTERS);
-}
-
-function detectClustersFromTerms(termSet) {
-  const terms = _normalizeTermSet(termSet);
-  const hits = new Set();
-
-  for (const [clusterKey, cluster] of _clusterEntries()) {
-    const aliasNorms = cluster.aliases.map(norm);
-    const matched = [...terms].some(
-      (t) =>
-        aliasNorms.includes(t) ||
-        aliasNorms.some((a) => t.includes(a) || a.includes(t)),
-    );
-    if (matched) hits.add(clusterKey);
-  }
-
-  return hits;
-}
-
-function detectHeaderClusters(header = "") {
-  const h = norm(header);
-  const hits = new Set();
-
-  for (const [clusterKey, cluster] of _clusterEntries()) {
-    const aliasNorms = cluster.aliases.map(norm);
-    const matched = aliasNorms.some(
-      (a) => h === a || h.includes(a) || a.includes(h),
-    );
-    if (matched) hits.add(clusterKey);
-  }
-
-  return hits;
-}
-
-function inferRoleFromOperation(operation = "") {
-  const op = String(operation || "").toLowerCase();
-
-  if (["xlookup", "lookup"].includes(op)) return "lookup";
-  if (["average", "sum", "stdev", "min", "max", "median"].includes(op))
-    return "metric";
-  if (["countif", "countifs", "unique", "sort", "filter"].includes(op))
-    return "group";
-  if (["if", "ifs", "filter"].includes(op)) return "filter";
-
-  return "return";
-}
-
-function inferExpectedTypeFromOperation(operation = "") {
-  const op = String(operation || "").toLowerCase();
-
-  if (["average", "sum", "stdev", "min", "max", "median"].includes(op))
-    return "number";
-
-  return null;
-}
-
-function inferMetaType(meta = {}) {
-  if (!meta || typeof meta !== "object") return null;
-
-  if (meta.dominantType) return String(meta.dominantType).toLowerCase();
-  if (typeof meta.numericRatio === "number") {
-    if (meta.numericRatio >= 0.8) return "number";
-    if (meta.numericRatio <= 0.2) return "text";
-  }
-
-  return null;
-}
-
-function clusterScore(header, termSet, operation, meta = {}) {
-  const headerClusters = detectHeaderClusters(header);
-  if (!headerClusters.size) return 0;
-
-  const termClusters = detectClustersFromTerms(termSet);
-  if (!termClusters.size) return 0;
-
-  const expectedRole = inferRoleFromOperation(operation);
-  const expectedType = inferExpectedTypeFromOperation(operation);
-  const metaType = inferMetaType(meta);
-
-  let score = 0;
-
-  for (const clusterKey of headerClusters) {
-    if (!termClusters.has(clusterKey)) continue;
-
-    const cluster = HEADER_CLUSTERS[clusterKey];
-    const h = norm(header);
-    const aliasNorms = cluster.aliases.map(norm);
-
-    if (aliasNorms.includes(h)) {
-      score += SCORING_WEIGHTS.CLUSTER_EXACT_MATCH;
-    } else {
-      score += SCORING_WEIGHTS.CLUSTER_PARTIAL_MATCH;
-    }
-
-    if (cluster.roleHints?.includes(expectedRole)) {
-      score += SCORING_WEIGHTS.ROLE_BONUS_STRONG;
-    } else if (
-      cluster.roleHints?.includes("return") ||
-      cluster.roleHints?.includes("filter")
-    ) {
-      score += SCORING_WEIGHTS.ROLE_BONUS_WEAK;
-    }
-
-    if (expectedType && cluster.typeHint === expectedType) {
-      score += SCORING_WEIGHTS.TYPE_BONUS_STRONG;
-    } else if (metaType && cluster.typeHint === metaType) {
-      score += SCORING_WEIGHTS.TYPE_BONUS_WEAK;
-    }
-  }
-
-  return score;
-}
-
 function expandTermsFromText(text = "") {
   const base = norm(text);
   const terms = new Set([base]);
 
-  for (const cluster of Object.values(HEADER_CLUSTERS)) {
-    const norms = cluster.aliases.map(norm);
+  Object.values(SYNONYMS).forEach((list) => {
+    const norms = list.map(norm);
     if (
       norms.includes(base) ||
       norms.some((v) => base.includes(v) || v.includes(base))
     ) {
-      cluster.aliases.forEach((v) => terms.add(norm(v)));
-      terms.add(norm(cluster.canonical));
+      list.forEach((v) => terms.add(norm(v)));
     }
-  }
+  });
 
   return terms;
 }
@@ -699,31 +488,23 @@ function sheetNameScore(sheetName, termSet) {
   return score;
 }
 
-function scoreColumn(sheetName, header, meta = {}, termSet, operation) {
+function scoreColumn(sheetName, header, meta, termSet, operation) {
   const h = norm(header);
-  const terms = _normalizeTermSet(termSet);
-
-  if (terms.has(h)) return SCORING_WEIGHTS.EXACT_MATCH;
+  if (termSet.has(h)) return SCORING_WEIGHTS.EXACT_MATCH;
 
   let score = 0;
-
-  if ([...terms].some((t) => h.includes(t) || t.includes(h))) {
+  if ([...termSet].some((t) => h.includes(t) || t.includes(h)))
     score += SCORING_WEIGHTS.PARTIAL_MATCH;
-  }
-
-  score += clusterScore(header, terms, operation, meta);
-
-  if (!score) {
+  else {
     for (const list of Object.values(SYNONYMS)) {
       const nlist = list.map(norm);
-      if (nlist.some((a) => h.includes(a) || a.includes(h))) {
+      if (nlist.some((a) => h.includes(a))) {
         score += SCORING_WEIGHTS.SYNONYM_MATCH;
         break;
       }
     }
   }
-
-  score += sheetNameScore(sheetName, terms);
+  score += sheetNameScore(sheetName, termSet);
 
   const needNumeric = [
     "average",
@@ -736,15 +517,12 @@ function scoreColumn(sheetName, header, meta = {}, termSet, operation) {
     "countifs",
     "minifs",
     "maxifs",
-    "median",
   ];
-
-  if (needNumeric.includes(String(operation || "").toLowerCase())) {
+  if (needNumeric.includes(operation)) {
     if (meta.numericRatio >= 0.8) score += SCORING_WEIGHTS.NUMERIC_COLUMN_BONUS;
     else if (meta.numericRatio >= 0.4) score += 1;
     else score += SCORING_WEIGHTS.NUMERIC_COLUMN_PENALTY;
   }
-
   return score;
 }
 
@@ -845,9 +623,4 @@ module.exports = {
   columnLetterToIndex,
   indexToColumnLetter,
   isNumericLike,
-  detectClustersFromTerms,
-  detectHeaderClusters,
-  inferRoleFromOperation,
-  inferExpectedTypeFromOperation,
-  clusterScore,
 };

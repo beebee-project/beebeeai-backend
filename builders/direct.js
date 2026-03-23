@@ -12,6 +12,10 @@ function hasHeaderDrivenIntent(it = {}) {
     it?.return_hint ||
     it?.lookup_hint ||
     it?.group_by ||
+    it?.return?.header ||
+    it?.return_array?.header ||
+    it?.lookup_array?.header ||
+    it?.sort?.header ||
     (Array.isArray(it?.return_fields) && it.return_fields.length) ||
     (Array.isArray(it?.filters) && it.filters.length) ||
     (Array.isArray(it?.conditions) && it.conditions.length) ||
@@ -31,30 +35,11 @@ function shouldRejectDirectForUploadedSheet(ctx) {
   return false;
 }
 
-function isDirectEligible(intent = {}, ctx = {}) {
-  const it = intent || {};
-  const op = String(it?.operation || "").toLowerCase();
-
-  const alwaysSafeNoFileOps = new Set(["today", "now", "rand"]);
-
-  if (alwaysSafeNoFileOps.has(op)) {
-    return true;
-  }
-
-  const hasSheetsMeta =
-    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
-  if (hasSheetsMeta) {
-    return false;
-  }
-
-  if (hasHeaderDrivenIntent(it)) {
-    return false;
-  }
-
-  if (!hasExplicitRangeIntent(it)) {
-    return false;
-  }
-
+function shouldUseDirectBuilder(ctx = {}) {
+  const it = ctx?.intent || {};
+  if (!hasExplicitRangeIntent(it)) return false;
+  if (hasHeaderDrivenIntent(it)) return false;
+  if (shouldRejectDirectForUploadedSheet(ctx)) return false;
   return true;
 }
 
@@ -388,21 +373,15 @@ const handlers = {
   search: searchf,
 };
 
-function canHandleWithoutFile(intent, ctx = {}) {
+function canHandleWithoutFile(intent) {
   const op = String(intent?.operation || "").toLowerCase();
-  if (!handlers[op]) return false;
-  return isDirectEligible(intent, ctx);
+  return !!handlers[op];
 }
 
-function buildFormula(intent, ctx = {}) {
+function buildFormula(intent) {
   const op = String(intent?.operation || "").toLowerCase();
   const h = handlers[op];
   if (!h) return null;
-
-  if (!isDirectEligible(intent, ctx)) {
-    return null;
-  }
-
   return h(intent);
 }
 
@@ -447,6 +426,8 @@ module.exports = {
 
   canHandleWithoutFile,
   buildFormula,
-  isDirectEligible,
-  formula,
+  hasExplicitRangeIntent,
+  hasHeaderDrivenIntent,
+  shouldRejectDirectForUploadedSheet,
+  shouldUseDirectBuilder,
 };
