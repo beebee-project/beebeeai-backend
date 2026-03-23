@@ -301,23 +301,27 @@ const DEFAULT_FORMAT_OPTIONS = {
 // }
 
 function shouldUseDirectBuilder(intent = {}, ctx = {}) {
-  if (typeof direct?.shouldUseDirectBuilder === "function") {
-    return direct.shouldUseDirectBuilder({
-      intent: {
-        ...intent,
-        raw_message: intent?.raw_message || intent?.message || "",
-      },
-      allSheetsData: ctx?.allSheetsData,
-    });
-  }
-
   const raw = String(intent?.raw_message || "");
   const explicit =
     formulaUtils.parseExplicitCellOrRange(raw) ||
     intent?.range ||
     intent?.target_cell;
 
+  const hasSheetMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+  const headerDriven = Boolean(
+    intent?.header_hint ||
+    intent?.return_hint ||
+    intent?.lookup_hint ||
+    intent?.group_by ||
+    (Array.isArray(intent?.return_fields) && intent.return_fields.length) ||
+    (Array.isArray(intent?.filters) && intent.filters.length) ||
+    (Array.isArray(intent?.conditions) && intent.conditions.length) ||
+    intent?.lookup?.key_header,
+  );
+
   if (!explicit) return false;
+  if (hasSheetMeta && headerDriven) return false;
   return true;
 }
 
@@ -428,7 +432,7 @@ function buildLocalIntentFromText(text = "") {
       if (/이름|name/.test(s)) intent.lookup_hint = "이름";
     }
     // 1) lookup key 힌트 보강
-    if (/(직원\s*id|사번|직원번호)/i.test(original) && !intent.lookup_hint) {
+    if (/(직원\s*id|사번|직원번호)/i.test(original)) {
       intent.lookup_hint = "직원 ID";
     }
 
@@ -439,23 +443,17 @@ function buildLocalIntentFromText(text = "") {
     }
 
     // 3) multi-return 보강
-    const hasExplicitReturn =
-      !!intent.return_hint ||
-      (Array.isArray(intent.return_fields) && intent.return_fields.length > 0);
+    const wantedFields = [];
+    if (/(이름|성명)/.test(original)) wantedFields.push("이름");
+    if (/부서/.test(original)) wantedFields.push("부서");
+    if (/직급/.test(original)) wantedFields.push("직급");
+    if (/(연봉|급여)/.test(original)) wantedFields.push("연봉");
 
-    if (!hasExplicitReturn) {
-      const wantedFields = [];
-      if (/(이름|성명)/.test(original)) wantedFields.push("이름");
-      if (/(부서|소속)/.test(original)) wantedFields.push("부서");
-      if (/(직급|직함)/.test(original)) wantedFields.push("직급");
-      if (/(연봉|급여)/.test(original)) wantedFields.push("연봉");
-
-      if (wantedFields.length >= 2) {
-        intent.return_fields = [...new Set(wantedFields)];
-        delete intent.return_hint;
-      } else if (wantedFields.length === 1) {
-        intent.return_hint = wantedFields[0];
-      }
+    if (wantedFields.length >= 2) {
+      intent.return_fields = [...new Set(wantedFields)];
+      delete intent.return_hint;
+    } else if (wantedFields.length === 1) {
+      intent.return_hint = wantedFields[0];
     }
 
     // 4) latest duplicate 보강

@@ -103,20 +103,7 @@ function normalizeReturnFields(intent = {}, rawMessage = "") {
     !!intent.return?.header ||
     !!intent.return_hint;
 
-  const hasExplicitLookupKey =
-    !!intent.lookup_array?.header ||
-    !!intent.lookup?.header ||
-    !!intent.lookup_hint;
-
-  const isExplicitReturnRequest =
-    /가져와|보여줘|출력|반환|리턴/.test(msg) &&
-    !/기준|으로|조건|찾아|조회|검색/.test(msg);
-
-  if (
-    !hasExplicitReturn &&
-    !hasExplicitLookupKey &&
-    (!isLookupOp || isExplicitReturnRequest)
-  ) {
+  if (!(isLookupOp && hasExplicitReturn)) {
     const known = [
       "이름",
       "부서",
@@ -130,7 +117,7 @@ function normalizeReturnFields(intent = {}, rawMessage = "") {
     for (const k of known) {
       if (
         msg.includes(k) &&
-        /가져와|보여줘|출력|반환|리턴/.test(msg) &&
+        /가져와|보여줘|출력/.test(msg) &&
         !out.includes(k)
       ) {
         out.push(k);
@@ -149,6 +136,8 @@ function normalizeReturnFields(intent = {}, rawMessage = "") {
     (x) =>
       !lookupKeyHeader || String(x).trim() !== String(lookupKeyHeader).trim(),
   );
+
+  return [...new Set(out)];
 }
 
 function normalizeLookup(intent = {}) {

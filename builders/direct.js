@@ -12,10 +12,6 @@ function hasHeaderDrivenIntent(it = {}) {
     it?.return_hint ||
     it?.lookup_hint ||
     it?.group_by ||
-    it?.return?.header ||
-    it?.return_array?.header ||
-    it?.lookup_array?.header ||
-    it?.sort?.header ||
     (Array.isArray(it?.return_fields) && it.return_fields.length) ||
     (Array.isArray(it?.filters) && it.filters.length) ||
     (Array.isArray(it?.conditions) && it.conditions.length) ||
@@ -33,14 +29,6 @@ function shouldRejectDirectForUploadedSheet(ctx) {
   if (hasHeaderDrivenIntent(it)) return true;
 
   return false;
-}
-
-function shouldUseDirectBuilder(ctx = {}) {
-  const it = ctx?.intent || {};
-  if (!hasExplicitRangeIntent(it)) return false;
-  if (hasHeaderDrivenIntent(it)) return false;
-  if (shouldRejectDirectForUploadedSheet(ctx)) return false;
-  return true;
 }
 
 // === 유틸 ===
@@ -423,12 +411,4 @@ module.exports = {
   year: (ctx) => year(ctx.intent || {}),
   month: (ctx) => month(ctx.intent || {}),
   day: (ctx) => day(ctx.intent || {}),
-
-  canHandleWithoutFile,
-  buildFormula,
-  formula,
-  hasExplicitRangeIntent,
-  hasHeaderDrivenIntent,
-  shouldRejectDirectForUploadedSheet,
-  shouldUseDirectBuilder,
 };
