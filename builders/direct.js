@@ -426,6 +426,7 @@ module.exports = {
 
   canHandleWithoutFile,
   buildFormula,
+  formula,
   hasExplicitRangeIntent,
   hasHeaderDrivenIntent,
   shouldRejectDirectForUploadedSheet,
