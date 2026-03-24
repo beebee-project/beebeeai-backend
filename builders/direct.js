@@ -437,4 +437,8 @@ module.exports = {
   year: (ctx) => year(ctx.intent || {}),
   month: (ctx) => month(ctx.intent || {}),
   day: (ctx) => day(ctx.intent || {}),
+
+  canHandleWithoutFile,
+  buildFormula,
+  formula,
 };
