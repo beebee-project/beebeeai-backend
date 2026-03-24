@@ -2101,7 +2101,7 @@ exports.handleConversion = async (req, res, next) => {
       direct?.canHandleWithoutFile?.(intent) &&
       shouldUseDirectBuilder(intent, context)
     ) {
-      const f = direct.buildFormula(intent);
+      const f = direct.buildFormula(intent, context);
       if (f) {
         // ✅ 6-1: 출력 검증(Direct도 동일 적용)
         const v = validateFormula(f);

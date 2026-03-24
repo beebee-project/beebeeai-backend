@@ -147,13 +147,25 @@ function parseExplicitCellOrRange(text = "") {
   const rangeMatch = upper.match(/[A-Z]+[0-9]+:[A-Z]+[0-9]+/);
   if (rangeMatch) return rangeMatch[0];
 
-  // 2) "A1부터 A10까지" / "a1부터a10까지" 처럼 셀 두 개만 있는 경우
+  // 2) 전체 열 범위 표기: B:B
+  const fullColumnRangeMatch = upper.match(/\b([A-Z]{1,3}):([A-Z]{1,3})\b/);
+  if (fullColumnRangeMatch) {
+    return `${fullColumnRangeMatch[1]}:${fullColumnRangeMatch[2]}`;
+  }
+
+  // 3) "B열", "AA열" 같은 단일 열 표기
+  const koreanColumnMatch = upper.match(/\b([A-Z]{1,3})\s*열\b/);
+  if (koreanColumnMatch) {
+    return `${koreanColumnMatch[1]}:${koreanColumnMatch[1]}`;
+  }
+
+  // 4) "A1부터 A10까지" / "a1부터a10까지" 처럼 셀 두 개만 있는 경우
   const cells = upper.match(/[A-Z]+[0-9]+/g);
   if (cells && cells.length >= 2) {
     return `${cells[0]}:${cells[1]}`;
   }
 
-  // 3) "A1" 하나만 있는 경우
+  // 5) "A1" 하나만 있는 경우
   if (cells && cells.length === 1) {
     return cells[0];
   }

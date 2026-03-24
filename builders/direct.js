@@ -1,7 +1,18 @@
 const { parseExplicitCellOrRange } = require("../utils/formulaUtils");
 
-function hasExplicitRangeIntent(it = {}) {
-  const raw = String(it?.raw_message || "");
+function getRawForExplicit(it = {}, ctx = {}) {
+  return String(
+    it?.raw_message ||
+      ctx?.prompt ||
+      ctx?.message ||
+      ctx?.nl ||
+      ctx?.text ||
+      "",
+  );
+}
+
+function hasExplicitRangeIntent(it = {}, ctx = {}) {
+  const raw = getRawForExplicit(it, ctx);
   if (it?.range || it?.target_cell) return true;
   return !!parseExplicitCellOrRange(raw);
 }
@@ -25,7 +36,7 @@ function shouldRejectDirectForUploadedSheet(ctx) {
     !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
 
   if (!hasSheetsMeta) return false;
-  if (!hasExplicitRangeIntent(it)) return true;
+  if (!hasExplicitRangeIntent(it, ctx)) return true;
   if (hasHeaderDrivenIntent(it)) return true;
 
   return false;
@@ -36,10 +47,10 @@ function isCellRef(v) {
   return /^[A-Z]{1,3}[0-9]{1,7}$/i.test(String(v || "").trim());
 }
 
-function getRangeOrCell(it) {
+function getRangeOrCell(it, ctx = {}) {
   if (it?.range) return it.range;
   if (it?.target_cell) return it.target_cell;
-  const guessed = parseExplicitCellOrRange(it?.raw_message || "");
+  const guessed = parseExplicitCellOrRange(getRawForExplicit(it, ctx));
   return guessed || null;
 }
 
@@ -65,7 +76,7 @@ function simpleAggregate(it, funcName, ctx) {
     return `=ERROR("${funcName.toUpperCase()}: 업로드 파일 기반 요청은 헤더/조건 엔진으로 처리해야 합니다.")`;
   }
 
-  const r = getRangeOrCell(it);
+  const r = getRangeOrCell(it, ctx);
   if (!r) return needRangeError(funcName);
   return `=${funcName.toUpperCase()}(${r})`;
 }
@@ -366,11 +377,11 @@ function canHandleWithoutFile(intent) {
   return !!handlers[op];
 }
 
-function buildFormula(intent) {
+function buildFormula(intent, ctx = {}) {
   const op = String(intent?.operation || "").toLowerCase();
   const h = handlers[op];
   if (!h) return null;
-  return h(intent);
+  return h(intent, null, null, null, ctx);
 }
 
 function formula(ctx) {
@@ -399,7 +410,7 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
   const hasSheetsMeta =
     !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
 
-  const explicit = hasExplicitRangeIntent(it);
+  const explicit = hasExplicitRangeIntent(it, ctx);
   const headerDriven = hasHeaderDrivenIntent(it);
 
   if (!explicit) return false;
