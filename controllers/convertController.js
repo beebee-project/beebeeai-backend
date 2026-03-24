@@ -28,6 +28,7 @@ const referenceFunctionBuilder = require("../builders/referenceFunctions");
 const textFunctionBuilder = require("../builders/textFunctions");
 const arrayFunctionBuilder = require("../builders/arrayFunctions");
 const direct = require("../builders/direct");
+const { shouldUseDirectBuilder: shouldUseDirectGate } = direct;
 
 const { bumpUsage, assertCanUse } = require("../services/usageService");
 
@@ -301,28 +302,7 @@ const DEFAULT_FORMAT_OPTIONS = {
 // }
 
 function shouldUseDirectBuilder(intent = {}, ctx = {}) {
-  const raw = String(intent?.raw_message || "");
-  const explicit =
-    formulaUtils.parseExplicitCellOrRange(raw) ||
-    intent?.range ||
-    intent?.target_cell;
-
-  const hasSheetMeta =
-    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
-  const headerDriven = Boolean(
-    intent?.header_hint ||
-    intent?.return_hint ||
-    intent?.lookup_hint ||
-    intent?.group_by ||
-    (Array.isArray(intent?.return_fields) && intent.return_fields.length) ||
-    (Array.isArray(intent?.filters) && intent.filters.length) ||
-    (Array.isArray(intent?.conditions) && intent.conditions.length) ||
-    intent?.lookup?.key_header,
-  );
-
-  if (!explicit) return false;
-  if (hasSheetMeta && headerDriven) return false;
-  return true;
+  return shouldUseDirectGate(intent, ctx);
 }
 
 /* ---------------------------------------------

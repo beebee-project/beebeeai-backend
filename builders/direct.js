@@ -394,7 +394,22 @@ function formula(ctx) {
   return eq;
 }
 
+function shouldUseDirectBuilder(intent = {}, ctx = {}) {
+  const it = intent || {};
+  const hasSheetsMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+
+  const explicit = hasExplicitRangeIntent(it);
+  const headerDriven = hasHeaderDrivenIntent(it);
+
+  if (!explicit) return false;
+  if (hasSheetsMeta && headerDriven) return false;
+  return true;
+}
+
 module.exports = {
+  shouldUseDirectBuilder,
+  shouldRejectDirectForUploadedSheet,
   average: (ctx) => average(ctx.intent || {}, null, null, null, ctx),
   sum: (ctx) => sum(ctx.intent || {}, null, null, null, ctx),
   count: (ctx) => count(ctx.intent || {}, null, null, null, ctx),
