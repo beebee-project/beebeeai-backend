@@ -8,6 +8,9 @@ const SCORING_WEIGHTS = {
   SHEET_NAME_BONUS: 1.5,
   NUMERIC_COLUMN_BONUS: 3,
   NUMERIC_COLUMN_PENALTY: -5,
+  CLUSTER_MATCH: 12,
+  ROLE_MATCH: 8,
+  TYPE_MATCH: 5,
 };
 
 function columnLetterToIndex(letter) {
@@ -365,7 +368,29 @@ function bestHeaderInSheet(sheetInfo, sheetName, termSet, operation) {
 
   const meta = sheetInfo.metaData || {};
   for (const [header, metaInfo] of Object.entries(meta)) {
-    const s = scoreColumn(sheetName, header, metaInfo, termSet, operation);
+    const s = scoreColumn(sheetName, header, metaInfo, termSet, operation, {
+      desiredCluster: null,
+      desiredRole:
+        operation === "lookup"
+          ? "lookup"
+          : operation === "group"
+            ? "group"
+            : null,
+      expectedType: [
+        "average",
+        "sum",
+        "stdev",
+        "min",
+        "max",
+        "averageifs",
+        "sumifs",
+        "countifs",
+        "minifs",
+        "maxifs",
+      ].includes(operation)
+        ? "number"
+        : null,
+    });
     if (s > best.score) {
       runnerUp = best;
       best = { header, score: s, col: metaInfo };
@@ -470,10 +495,7 @@ function expandTermsFromText(text = "") {
 
   Object.values(SYNONYMS).forEach((list) => {
     const norms = list.map(norm);
-    if (
-      norms.includes(base) ||
-      norms.some((v) => base.includes(v) || v.includes(base))
-    ) {
+    if (norms.includes(base)) {
       list.forEach((v) => terms.add(norm(v)));
     }
   });
@@ -488,23 +510,64 @@ function sheetNameScore(sheetName, termSet) {
   return score;
 }
 
-function scoreColumn(sheetName, header, meta, termSet, operation) {
+function scoreColumn(
+  sheetName,
+  header,
+  meta,
+  termSet,
+  operation,
+  options = {},
+) {
   const h = norm(header);
   if (termSet.has(h)) return SCORING_WEIGHTS.EXACT_MATCH;
 
   let score = 0;
+  let lexicalScore = 0;
+  let clusterScore = 0;
+  let roleScore = 0;
+  let typeScore = 0;
+
+  const desiredCluster = options.desiredCluster || null;
+  const desiredRole = options.desiredRole || null;
+  const expectedType = options.expectedType || null;
+
+  if (
+    desiredCluster &&
+    meta?.clusterCandidate &&
+    String(meta.clusterCandidate) === String(desiredCluster)
+  ) {
+    clusterScore += SCORING_WEIGHTS.CLUSTER_MATCH;
+  }
+
+  if (
+    desiredRole &&
+    meta?.inferredRole &&
+    String(meta.inferredRole) === String(desiredRole)
+  ) {
+    roleScore += SCORING_WEIGHTS.ROLE_MATCH;
+  }
+
+  const dominantType = meta?.dominantType || meta?.clusterType || null;
+  if (
+    expectedType &&
+    dominantType &&
+    String(dominantType) === String(expectedType)
+  ) {
+    typeScore += SCORING_WEIGHTS.TYPE_MATCH;
+  }
+
   if ([...termSet].some((t) => h.includes(t) || t.includes(h)))
-    score += SCORING_WEIGHTS.PARTIAL_MATCH;
+    lexicalScore += SCORING_WEIGHTS.PARTIAL_MATCH;
   else {
     for (const list of Object.values(SYNONYMS)) {
       const nlist = list.map(norm);
-      if (nlist.some((a) => h.includes(a))) {
-        score += SCORING_WEIGHTS.SYNONYM_MATCH;
+      if (nlist.some((a) => h === a)) {
+        lexicalScore += SCORING_WEIGHTS.SYNONYM_MATCH;
         break;
       }
     }
   }
-  score += sheetNameScore(sheetName, termSet);
+  lexicalScore += sheetNameScore(sheetName, termSet);
 
   const needNumeric = [
     "average",
@@ -519,10 +582,12 @@ function scoreColumn(sheetName, header, meta, termSet, operation) {
     "maxifs",
   ];
   if (needNumeric.includes(operation)) {
-    if (meta.numericRatio >= 0.8) score += SCORING_WEIGHTS.NUMERIC_COLUMN_BONUS;
-    else if (meta.numericRatio >= 0.4) score += 1;
-    else score += SCORING_WEIGHTS.NUMERIC_COLUMN_PENALTY;
+    if (meta.numericRatio >= 0.8)
+      typeScore += SCORING_WEIGHTS.NUMERIC_COLUMN_BONUS;
+    else if (meta.numericRatio >= 0.4) typeScore += 1;
+    else typeScore += SCORING_WEIGHTS.NUMERIC_COLUMN_PENALTY;
   }
+  score = clusterScore + roleScore + typeScore + lexicalScore;
   return score;
 }
 
