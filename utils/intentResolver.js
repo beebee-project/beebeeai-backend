@@ -84,13 +84,13 @@ function resolveBaseSheet(ctx, schema) {
   }
 
   if (schema.group_by) {
-    const c = pickBestColumnAnySheet(ctx, schema.group_by, "lookup");
+    const c = pickBestColumnAnySheet(ctx, schema.group_by, "group");
     if (c) candidates.push(c);
   }
 
   for (const f of schema.filters || []) {
     if (f?.header) {
-      const c = pickBestColumnAnySheet(ctx, f.header, "lookup");
+      const c = pickBestColumnAnySheet(ctx, f.header, "filter");
       if (c) candidates.push(c);
     }
   }
@@ -113,10 +113,20 @@ function resolveBaseSheet(ctx, schema) {
 function resolveReturnColumns(ctx, schema, baseSheet) {
   const out = [];
   const seen = new Set();
+  const op = String(schema?.operation || "").toLowerCase();
+  const hasExplicitReturn =
+    Array.isArray(schema.return_fields) && schema.return_fields.length > 0;
+  const returnRole = ["average", "sum", "stdev", "min", "max"].includes(op)
+    ? op
+    : "return";
+
+  if (op === "count" && !hasExplicitReturn) {
+    return out;
+  }
 
   for (const rf of schema.return_fields || []) {
-    const inBase = pickBestColumnInSheet(ctx, rf, baseSheet, "return");
-    const any = inBase || pickBestColumnAnySheet(ctx, rf, "return");
+    const inBase = pickBestColumnInSheet(ctx, rf, baseSheet, returnRole);
+    const any = inBase || pickBestColumnAnySheet(ctx, rf, returnRole);
     if (!any) continue;
 
     const key = `${any.sheetName}::${any.header}::${any.columnLetter}`;
@@ -125,7 +135,7 @@ function resolveReturnColumns(ctx, schema, baseSheet) {
     out.push(any);
   }
 
-  if (!out.length && ctx.bestReturn) {
+  if (!out.length && ctx.bestReturn && op !== "count") {
     const fallback = {
       ...ctx.bestReturn,
       cell: `'${ctx.bestReturn.sheetName}'!${ctx.bestReturn.columnLetter}${ctx.bestReturn.startRow}`,
@@ -153,16 +163,16 @@ function resolveLookupColumn(ctx, schema, baseSheet) {
 function resolveGroupColumn(ctx, schema, baseSheet) {
   if (!schema.group_by) return null;
   return (
-    pickBestColumnInSheet(ctx, schema.group_by, baseSheet, "lookup") ||
-    pickBestColumnAnySheet(ctx, schema.group_by, "lookup")
+    pickBestColumnInSheet(ctx, schema.group_by, baseSheet, "group") ||
+    pickBestColumnAnySheet(ctx, schema.group_by, "group")
   );
 }
 
 function resolveSortColumn(ctx, schema, baseSheet) {
   if (!schema.sort?.header) return null;
   return (
-    pickBestColumnInSheet(ctx, schema.sort.header, baseSheet, "lookup") ||
-    pickBestColumnAnySheet(ctx, schema.sort.header, "lookup")
+    pickBestColumnInSheet(ctx, schema.sort.header, baseSheet, "sort") ||
+    pickBestColumnAnySheet(ctx, schema.sort.header, "sort")
   );
 }
 
@@ -173,8 +183,8 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
     if (f?.logical_operator && Array.isArray(f.conditions)) {
       const inner = f.conditions.map((x) => {
         const ref =
-          pickBestColumnInSheet(ctx, x.header, baseSheet, "lookup") ||
-          pickBestColumnAnySheet(ctx, x.header, "lookup");
+          pickBestColumnInSheet(ctx, x.header, baseSheet, "filter") ||
+          pickBestColumnAnySheet(ctx, x.header, "filter");
         return { ...x, ref };
       });
       out.push({ logical_operator: f.logical_operator, conditions: inner });
@@ -182,8 +192,8 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
     }
 
     const ref =
-      pickBestColumnInSheet(ctx, f.header, baseSheet, "lookup") ||
-      pickBestColumnAnySheet(ctx, f.header, "lookup");
+      pickBestColumnInSheet(ctx, f.header, baseSheet, "filter") ||
+      pickBestColumnAnySheet(ctx, f.header, "filter");
 
     out.push({ ...f, ref });
   }
