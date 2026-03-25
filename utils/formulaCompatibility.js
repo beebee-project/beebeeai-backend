@@ -5,6 +5,7 @@ function detectFormulaCompatibility(formula = "") {
   const sheetsOnly = [];
 
   const excelOnlyFns = [
+    "SORTBY(",
     "TOCOL(",
     "TAKE(",
     "DROP(",
@@ -49,4 +50,18 @@ function detectFormulaCompatibility(formula = "") {
   };
 }
 
-module.exports = { detectFormulaCompatibility };
+const FALLBACK_BLOCKERS = ["SORTBY", "TAKE", "HSTACK"];
+
+function shouldAttemptCompatibilityFallback(compatibility = null) {
+  const blockers = Array.isArray(compatibility?.blockers)
+    ? compatibility.blockers.map((x) => String(x || "").toUpperCase())
+    : [];
+
+  return blockers.some((b) => FALLBACK_BLOCKERS.includes(b));
+}
+
+module.exports = {
+  detectFormulaCompatibility,
+  shouldAttemptCompatibilityFallback,
+  FALLBACK_BLOCKERS,
+};
