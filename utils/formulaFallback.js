@@ -117,19 +117,60 @@ function fallbackTAKE(argSource = "") {
 
   if (!rowsExpr) return null;
 
-  if (/^-?\d+$/.test(rowsExpr)) {
-    const rowNum = Number(rowsExpr);
-    if (rowNum > 0) {
-      const colSeq =
-        colsExpr && /^\d+$/.test(colsExpr)
-          ? `SEQUENCE(1,${colsExpr})`
-          : `SEQUENCE(1,COLUMNS(${arrayExpr}))`;
-      return `INDEX(${arrayExpr},SEQUENCE(${rowNum}),${colSeq})`;
+  const isInt = (v) => /^-?\d+$/.test(String(v || "").trim());
+  const hasCols = colsExpr.length > 0;
+  const isSingleColumnExpr = /^\s*CHOOSECOLS\s*\(/i.test(arrayExpr);
+
+  if (!isInt(rowsExpr)) return null;
+
+  const rowNum = Number(rowsExpr);
+
+  // TAKE(array, 1) / TAKE(array, n)
+  if (rowNum > 0) {
+    // 단일열 배열은 굳이 2차원 INDEX로 만들지 않아도 된다.
+    if (!hasCols && isSingleColumnExpr && rowNum === 1) {
+      return `INDEX(${arrayExpr},1)`;
     }
 
-    if (rowNum === -1 && !colsExpr) {
+    if (!hasCols && rowNum === 1) {
+      return `INDEX(${arrayExpr},1,SEQUENCE(1,COLUMNS(${arrayExpr})))`;
+    }
+
+    const colSeq =
+      hasCols && isInt(colsExpr)
+        ? Number(colsExpr) === 1
+          ? "1"
+          : `SEQUENCE(1,${colsExpr})`
+        : `SEQUENCE(1,COLUMNS(${arrayExpr}))`;
+
+    return `INDEX(${arrayExpr},SEQUENCE(${rowNum}),${colSeq})`;
+  }
+
+  // TAKE(array, -1) / TAKE(array, -n)
+  if (rowNum < 0) {
+    const absRows = Math.abs(rowNum);
+
+    if (!hasCols && isSingleColumnExpr && absRows === 1) {
+      return `INDEX(${arrayExpr},ROWS(${arrayExpr}))`;
+    }
+
+    if (!hasCols && absRows === 1) {
       return `INDEX(${arrayExpr},ROWS(${arrayExpr}),SEQUENCE(1,COLUMNS(${arrayExpr})))`;
     }
+
+    const rowSeq =
+      absRows === 1
+        ? `ROWS(${arrayExpr})`
+        : `SEQUENCE(${absRows},1,ROWS(${arrayExpr})-${absRows}+1)`;
+
+    const colSeq =
+      hasCols && isInt(colsExpr)
+        ? Number(colsExpr) === 1
+          ? "1"
+          : `SEQUENCE(1,${colsExpr})`
+        : `SEQUENCE(1,COLUMNS(${arrayExpr}))`;
+
+    return `INDEX(${arrayExpr},${rowSeq},${colSeq})`;
   }
 
   return null;
