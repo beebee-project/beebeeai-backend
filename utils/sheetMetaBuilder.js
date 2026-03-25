@@ -2,7 +2,7 @@ const XLSX = require("xlsx");
 const {
   inferClusterCandidate,
   getClusterRole,
-  getClusterType,
+  inferClusterType,
 } = require("./clusterSchema");
 
 function nonEmptyCount(row = []) {
@@ -350,8 +350,12 @@ function buildAllSheetsData(workbook) {
           stats.dominantType,
         );
         const inferredRole = getClusterRole(clusterCandidate);
-        const clusterType =
-          getClusterType(clusterCandidate) || stats.dominantType;
+        const clusterType = inferClusterType(
+          clusterCandidate,
+          name,
+          sampleValues,
+          stats.dominantType,
+        );
 
         metaData[name] = {
           columnLetter: indexToColumnLetter(idx),

@@ -604,6 +604,9 @@ function scoreColumn(
       typeScore += SCORING_WEIGHTS.NUMERIC_COLUMN_BONUS;
     else if (meta.numericRatio >= 0.4) typeScore += 1;
     else typeScore += SCORING_WEIGHTS.NUMERIC_COLUMN_PENALTY;
+
+    if (meta?.clusterType === "ordered_text") typeScore -= 2;
+    if (meta?.clusterType === "date") typeScore -= 1;
   }
   score = clusterScore + roleScore + typeScore + lexicalScore;
   return score;

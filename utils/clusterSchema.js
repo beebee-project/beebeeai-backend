@@ -106,10 +106,50 @@ function getClusterType(clusterKey = "") {
   return CLUSTER_DEFS[clusterKey]?.type || null;
 }
 
+function inferClusterType(
+  clusterKey = "",
+  header = "",
+  sampleValues = [],
+  dominantType = "",
+) {
+  const explicitType = getClusterType(clusterKey);
+  if (explicitType) return explicitType;
+
+  const t = String(dominantType || "").toLowerCase();
+  if (t === "number") return "number";
+  if (t === "date") return "date";
+
+  const headerNorm = norm(header);
+  const samples = Array.isArray(sampleValues)
+    ? sampleValues.map((v) => String(v).trim()).filter(Boolean)
+    : [];
+
+  if (
+    /등급|직급|직위|rank|grade|rating/.test(headerNorm) ||
+    samples.some((v) => /^(a|b|c|d|s)$/i.test(v)) ||
+    samples.some((v) =>
+      /^(인턴|사원|대리|과장|차장|부장|이사|상무|전무|대표)$/i.test(v),
+    )
+  ) {
+    return "ordered_text";
+  }
+
+  if (
+    /일자|날짜|date|입사/.test(headerNorm) ||
+    samples.some((v) => /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(v))
+  ) {
+    return "date";
+  }
+
+  if (t === "text") return "text";
+  return "text";
+}
+
 module.exports = {
   CLUSTER_DEFS,
   inferClusterFromText,
   inferClusterCandidate,
   getClusterRole,
   getClusterType,
+  inferClusterType,
 };
