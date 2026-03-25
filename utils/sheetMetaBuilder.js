@@ -1,4 +1,9 @@
 const XLSX = require("xlsx");
+const {
+  inferClusterCandidate,
+  getClusterRole,
+  getClusterType,
+} = require("./clusterSchema");
 
 function nonEmptyCount(row = []) {
   let n = 0;
@@ -335,13 +340,30 @@ function buildAllSheetsData(workbook) {
 
         const stats = analyzeSamples(values);
 
+        const sampleValues = values
+          .slice(0, 5)
+          .map((v) => String(v).trim())
+          .filter(Boolean);
+        const clusterCandidate = inferClusterCandidate(
+          name,
+          sampleValues,
+          stats.dominantType,
+        );
+        const inferredRole = getClusterRole(clusterCandidate);
+        const clusterType =
+          getClusterType(clusterCandidate) || stats.dominantType;
+
         metaData[name] = {
           columnLetter: indexToColumnLetter(idx),
           startRow: dataStart + 1,
           lastRow: lastNonEmpty + 1,
           headerRow: headerIndex + 1,
           columnIndex: idx + 1,
-          canonicalKey: null,
+          canonicalKey: clusterCandidate || null,
+          sampleValues,
+          clusterCandidate,
+          inferredRole,
+          clusterType,
           ...stats,
         };
       });

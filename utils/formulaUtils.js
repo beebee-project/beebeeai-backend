@@ -1,5 +1,6 @@
 const XLSX = require("xlsx");
 const { buildAllSheetsData } = require("./sheetMetaBuilder");
+const { CLUSTER_DEFS, inferClusterFromText } = require("./clusterSchema");
 
 const SCORING_WEIGHTS = {
   EXACT_MATCH: 100,
@@ -512,6 +513,11 @@ function expandTermsFromText(text = "") {
     }
   });
 
+  const clusterKey = inferClusterFromText(text);
+  if (clusterKey && CLUSTER_DEFS[clusterKey]?.aliases) {
+    CLUSTER_DEFS[clusterKey].aliases.forEach((v) => terms.add(norm(v)));
+  }
+
   return terms;
 }
 
@@ -559,7 +565,7 @@ function scoreColumn(
     roleScore += SCORING_WEIGHTS.ROLE_MATCH;
   }
 
-  const dominantType = meta?.dominantType || meta?.clusterType || null;
+  const dominantType = meta?.clusterType || meta?.dominantType || null;
   if (
     expectedType &&
     dominantType &&
