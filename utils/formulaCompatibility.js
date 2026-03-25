@@ -4,16 +4,9 @@ function detectFormulaCompatibility(formula = "") {
   const excelOnly = [];
   const sheetsOnly = [];
 
-  const excelOnlyFns = [
-    "SORTBY(",
-    "TOCOL(",
-    "TAKE(",
-    "DROP(",
-    "BYROW(",
-    "MAP(",
-    "HSTACK(",
-    "VSTACK(",
-  ];
+  // 이 판정은 "Sheets 미지원 함수 탐지"용이다.
+  // Sheets 공식 지원 함수는 여기 넣지 않는다.
+  const excelOnlyFns = ["SORTBY("];
 
   const sheetsOnlyFns = [
     "IMPORTRANGE(",
@@ -50,7 +43,7 @@ function detectFormulaCompatibility(formula = "") {
   };
 }
 
-const FALLBACK_BLOCKERS = ["SORTBY", "TAKE", "HSTACK"];
+const FALLBACK_BLOCKERS = ["SORTBY"];
 
 function shouldAttemptCompatibilityFallback(compatibility = null) {
   const blockers = Array.isArray(compatibility?.blockers)
