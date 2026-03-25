@@ -402,7 +402,11 @@ function buildLocalIntentFromText(text = "") {
   const hasLookupCue =
     op.includes("lookup") || /찾|조회|검색|lookup/i.test(original);
   const hasGroup = Boolean(groupBy);
-  const hasMetric = Boolean(aggOp && aggOp !== "formula");
+  const hasMetric = Boolean(
+    headerHint &&
+    aggOp &&
+    !["formula", "filter", "xlookup", "lookup"].includes(aggOp),
+  );
 
   let basicCondition = null;
   if (headerHint) {
@@ -426,12 +430,6 @@ function buildLocalIntentFromText(text = "") {
   if (hasLookupCue) {
     intent.operation = "xlookup";
 
-    if (/(직원\s*id|사번|직원번호)/i.test(original)) {
-      intent.lookup_hint = "직원 ID";
-    } else if (/(이름|성명|name)/i.test(original)) {
-      intent.lookup_hint = "이름";
-    }
-
     if (headerHint) {
       intent.return_hint = headerHint;
     }
@@ -440,19 +438,6 @@ function buildLocalIntentFromText(text = "") {
       intent.lookup_value = explicitCellOrRange.ref;
     } else if (explicitCellMatch) {
       intent.lookup_value = explicitCellMatch[1].toUpperCase();
-    }
-
-    const returnFields = [];
-    if (/(이름|성명)/.test(original)) returnFields.push("이름");
-    if (/부서/.test(original)) returnFields.push("부서");
-    if (/직급/.test(original)) returnFields.push("직급");
-    if (/(연봉|급여)/.test(original)) returnFields.push("연봉");
-
-    if (returnFields.length > 1) {
-      intent.return_fields = [...new Set(returnFields)];
-      delete intent.return_hint;
-    } else if (returnFields.length === 1 && !intent.return_hint) {
-      intent.return_hint = returnFields[0];
     }
 
     if (
@@ -465,7 +450,7 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
-  if (hasGroup || hasMetric) {
+  if (hasGroup || hasMetric || basicCondition) {
     intent.operation = aggOp;
 
     if (groupBy) {
@@ -480,6 +465,9 @@ function buildLocalIntentFromText(text = "") {
     if (sortOrder) {
       intent.sorted = true;
       intent.sort_order = sortOrder;
+    }
+    if (!hasGroup && !hasMetric && basicCondition && !hasLookupValue) {
+      intent.operation = "filter";
     }
     return intent;
   }
