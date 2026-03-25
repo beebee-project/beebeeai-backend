@@ -370,6 +370,55 @@ function indexToColumnLetter(idx) {
   return s;
 }
 
+function inferDesiredRole(operation = "") {
+  const op = String(operation || "").toLowerCase();
+
+  if (["lookup", "xlookup"].includes(op)) return "lookup";
+  if (["group", "group_by"].includes(op)) return "group";
+
+  if (
+    [
+      "return",
+      "average",
+      "sum",
+      "stdev",
+      "min",
+      "max",
+      "averageifs",
+      "sumifs",
+      "countifs",
+      "minifs",
+      "maxifs",
+      "count",
+    ].includes(op)
+  ) {
+    return "metric";
+  }
+
+  return null;
+}
+
+function inferExpectedType(operation = "") {
+  const op = String(operation || "").toLowerCase();
+  if (
+    [
+      "average",
+      "sum",
+      "stdev",
+      "min",
+      "max",
+      "averageifs",
+      "sumifs",
+      "countifs",
+      "minifs",
+      "maxifs",
+    ].includes(op)
+  ) {
+    return "number";
+  }
+  return null;
+}
+
 function bestHeaderInSheet(sheetInfo, sheetName, termSet, operation) {
   const MINIMUM_SCORE_THRESHOLD = 10;
   // ambiguity(불확실) 판단을 위한 Top-2 추적
@@ -381,28 +430,11 @@ function bestHeaderInSheet(sheetInfo, sheetName, termSet, operation) {
 
   const meta = sheetInfo.metaData || {};
   for (const [header, metaInfo] of Object.entries(meta)) {
+    const termText = [...termSet].join(" ");
     const s = scoreColumn(sheetName, header, metaInfo, termSet, operation, {
-      desiredCluster: null,
-      desiredRole:
-        operation === "lookup"
-          ? "lookup"
-          : operation === "group"
-            ? "group"
-            : null,
-      expectedType: [
-        "average",
-        "sum",
-        "stdev",
-        "min",
-        "max",
-        "averageifs",
-        "sumifs",
-        "countifs",
-        "minifs",
-        "maxifs",
-      ].includes(operation)
-        ? "number"
-        : null,
+      desiredCluster: inferClusterFromText(termText),
+      desiredRole: inferDesiredRole(operation),
+      expectedType: inferExpectedType(operation),
     });
     if (s > best.score) {
       runnerUp = best;
