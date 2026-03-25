@@ -1363,7 +1363,7 @@ function _extremeRow(ctx, which) {
   const want =
     Array.isArray(it.return_headers) && it.return_headers.length
       ? it.return_headers
-      : ["이름", "부서", "직급", "연봉"];
+      : ["이름"];
   const retIdxs = want
     .map((h) => {
       const key = String(h).trim();
@@ -1407,6 +1407,23 @@ function _extremeRow(ctx, which) {
     if (!meta?.columnLetter) continue;
     const relIdx =
       formulaUtils.columnLetterToIndex(meta.columnLetter) - firstColIdx0 + 1;
+
+    // maxrow/minrow에서는 정렬 기준 열에 대한 "MAX/MIN" 조건을
+    // FILTER 마스크에 다시 넣지 않는다.
+    if (relIdx === criterionIdx) {
+      const rawValText = String(c.value ?? "")
+        .trim()
+        .toUpperCase();
+      if (
+        rawValText === "MAX" ||
+        rawValText === "MIN" ||
+        rawValText === "최대" ||
+        rawValText === "최소"
+      ) {
+        continue;
+      }
+    }
+
     const colExpr = `CHOOSECOLS(t, ${relIdx})`;
     const op = String(c.operator || "=").trim();
     const rawVal = c.value;
