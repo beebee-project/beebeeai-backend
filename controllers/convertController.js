@@ -401,6 +401,7 @@ function buildLocalIntentFromText(text = "") {
 
   const hasLookupCue =
     op.includes("lookup") || /찾|조회|검색|lookup/i.test(original);
+  const hasLookupValue = Boolean(explicitCellOrRange?.ref || explicitCellMatch);
   const hasGroup = Boolean(groupBy);
   const hasMetric = Boolean(
     headerHint &&
@@ -451,7 +452,10 @@ function buildLocalIntentFromText(text = "") {
   }
 
   if (hasGroup || hasMetric || basicCondition) {
-    intent.operation = aggOp;
+    intent.operation =
+      !hasGroup && !hasMetric && basicCondition && !hasLookupValue
+        ? "filter"
+        : aggOp;
 
     if (groupBy) {
       intent.group_by = groupBy;
@@ -465,9 +469,6 @@ function buildLocalIntentFromText(text = "") {
     if (sortOrder) {
       intent.sorted = true;
       intent.sort_order = sortOrder;
-    }
-    if (!hasGroup && !hasMetric && basicCondition && !hasLookupValue) {
-      intent.operation = "filter";
     }
     return intent;
   }
