@@ -538,16 +538,24 @@ function expandTermsFromText(text = "") {
   const base = norm(text);
   const terms = new Set([base]);
 
-  Object.values(SYNONYMS).forEach((list) => {
-    const norms = list.map(norm);
-    if (norms.includes(base)) {
-      list.forEach((v) => terms.add(norm(v)));
-    }
-  });
-
   const clusterKey = inferClusterFromText(text);
   if (clusterKey && CLUSTER_DEFS[clusterKey]?.aliases) {
     CLUSTER_DEFS[clusterKey].aliases.forEach((v) => terms.add(norm(v)));
+  }
+
+  // 최소 fallback: cluster가 안 잡힐 때만 제한적으로 synonym 확장
+  if (!clusterKey) {
+    for (const list of Object.values(SYNONYMS)) {
+      const norms = list.map(norm);
+      if (norms.includes(base)) {
+        // 전체 확장 대신 base 제외 상위 몇 개만 제한 사용
+        for (const v of list.slice(0, 3)) {
+          const nv = norm(v);
+          if (nv && nv !== base) terms.add(nv);
+        }
+        break;
+      }
+    }
   }
 
   return terms;
@@ -576,6 +584,7 @@ function scoreColumn(
   let clusterScore = 0;
   let roleScore = 0;
   let typeScore = 0;
+  let synonymScore = 0;
 
   const desiredCluster = options.desiredCluster || null;
   const desiredRole = options.desiredRole || null;
@@ -611,8 +620,9 @@ function scoreColumn(
   else {
     for (const list of Object.values(SYNONYMS)) {
       const nlist = list.map(norm);
-      if (nlist.some((a) => h === a)) {
-        lexicalScore += SCORING_WEIGHTS.SYNONYM_MATCH;
+      const termHit = [...termSet].some((t) => nlist.includes(t));
+      if (termHit && nlist.some((a) => h === a)) {
+        synonymScore += Math.min(2, SCORING_WEIGHTS.SYNONYM_MATCH);
         break;
       }
     }
@@ -640,7 +650,7 @@ function scoreColumn(
     if (meta?.clusterType === "ordered_text") typeScore -= 2;
     if (meta?.clusterType === "date") typeScore -= 1;
   }
-  score = clusterScore + roleScore + typeScore + lexicalScore;
+  score = clusterScore + roleScore + typeScore + lexicalScore + synonymScore;
   return score;
 }
 
