@@ -26,7 +26,7 @@ function _resolvedDateColumn(ctx) {
   const hdr =
     ctx?.intent?.date_header || ctx?.intent?.window?.date_header || "입사일";
 
-  return _bestColumnByHint(hdr, ctx, "lookup") || null;
+  return _bestColumnByHint(hdr, ctx, "date") || null;
 }
 
 function _lookupValueExpr(it, FV, ctx) {
@@ -652,14 +652,32 @@ const referenceFunctionBuilder = {
     const ifNotFound = _notFoundExpr(it, FV);
 
     // 중복 최신값 규칙
+    const rawMsg = String(it.raw_message || ctx?.message || "").toLowerCase();
     const duplicateRule =
-      it.duplicate_rule || it?.lookup?.duplicate_rule || null;
+      it.duplicate_rule ||
+      it?.lookup?.duplicate_rule ||
+      (/(최신|최근|마지막|latest|most recent|newest)/i.test(rawMsg)
+        ? "latest"
+        : null);
     if (duplicateRule === "latest") {
       let dateCol = _resolvedDateColumn(ctx);
 
       // resolved date가 없으면 날짜 계열 헤더를 한 번 더 느슨하게 탐색
       if (!dateCol?.range && formulaUtils.findBestColumnAcrossSheets) {
-        const dateTerms = new Set(["입사일", "날짜", "일자", "date"]);
+        const dateTerms = new Set([
+          "입사일",
+          "날짜",
+          "일자",
+          "기준일",
+          "등록일",
+          "생성일",
+          "수정일",
+          "업데이트일",
+          "연월일",
+          "date",
+          "created_at",
+          "updated_at",
+        ]);
         const bestDate = formulaUtils.findBestColumnAcrossSheets(
           ctx.allSheetsData,
           dateTerms,
