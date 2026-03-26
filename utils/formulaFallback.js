@@ -120,7 +120,10 @@ function fallbackTAKE(argSource = "") {
   const trimmedArray = String(arrayExpr || "").trim();
   const looksSingleColumn =
     /,\s*,\s*1\)\s*$/.test(trimmedArray) || // INDEX(...,,1)
-    /'[^']+'![A-Z]+\d+:[A-Z]+\d+\s*$/.test(trimmedArray); // 단일열 range
+    /'[^']+'![A-Z]+\d+:[A-Z]+\d+\s*$/.test(trimmedArray) || // 단일열 range
+    /^SORT\(\s*'[^']+'![A-Z]+\d+:[A-Z]+\d+\s*,\s*1\s*,\s*(TRUE|FALSE)\s*\)$/i.test(
+      trimmedArray,
+    ); // SORT(single-column-range,1,TRUE/FALSE)
 
   if (/^-?\d+$/.test(rowsExpr)) {
     const rowNum = Number(rowsExpr);
