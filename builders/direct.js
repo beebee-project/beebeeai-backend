@@ -34,10 +34,11 @@ function shouldRejectDirectForUploadedSheet(ctx) {
   const it = ctx?.intent || {};
   const hasSheetsMeta =
     !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+  const explicit = hasExplicitRangeIntent(it, ctx);
 
   if (!hasSheetsMeta) return false;
-  if (!hasExplicitRangeIntent(it, ctx)) return true;
-  if (hasHeaderDrivenIntent(it)) return true;
+  if (!explicit) return true;
+  if (hasHeaderDrivenIntent(it) && !explicit) return true;
 
   return false;
 }
@@ -414,7 +415,7 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
   const headerDriven = hasHeaderDrivenIntent(it);
 
   if (!explicit) return false;
-  if (hasSheetsMeta && headerDriven) return false;
+  if (hasSheetsMeta && headerDriven && !explicit) return false;
   return true;
 }
 
