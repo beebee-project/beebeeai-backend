@@ -117,9 +117,18 @@ function fallbackTAKE(argSource = "") {
 
   if (!rowsExpr) return null;
 
+  const trimmedArray = String(arrayExpr || "").trim();
+  const looksSingleColumn =
+    /,\s*,\s*1\)\s*$/.test(trimmedArray) || // INDEX(...,,1)
+    /'[^']+'![A-Z]+\d+:[A-Z]+\d+\s*$/.test(trimmedArray); // 단일열 range
+
   if (/^-?\d+$/.test(rowsExpr)) {
     const rowNum = Number(rowsExpr);
     if (rowNum > 0) {
+      if (!colsExpr && looksSingleColumn) {
+        return `INDEX(${arrayExpr},SEQUENCE(${rowNum}))`;
+      }
+
       const colSeq =
         colsExpr && /^\d+$/.test(colsExpr)
           ? `SEQUENCE(1,${colsExpr})`
@@ -128,6 +137,9 @@ function fallbackTAKE(argSource = "") {
     }
 
     if (rowNum === -1 && !colsExpr) {
+      if (looksSingleColumn) {
+        return `INDEX(${arrayExpr},ROWS(${arrayExpr}))`;
+      }
       return `INDEX(${arrayExpr},ROWS(${arrayExpr}),SEQUENCE(1,COLUMNS(${arrayExpr})))`;
     }
   }
@@ -143,6 +155,14 @@ function fallbackSORTBY(argSource = "") {
   const keyExpr = args[1];
   const orderExpr = String(args[2] || "").trim();
   const ascending = !String(orderExpr).startsWith("-");
+
+  const normArray = String(arrayExpr || "").replace(/\s+/g, "");
+  const normKey = String(keyExpr || "").replace(/\s+/g, "");
+
+  // self-sort 단일열은 더 단순한 SORT로 축약
+  if (normArray && normArray === normKey) {
+    return `SORT(${arrayExpr},1,${ascending ? "TRUE" : "FALSE"})`;
+  }
 
   return `INDEX(SORT({${arrayExpr},${keyExpr}},2,${ascending ? "TRUE" : "FALSE"}),,1)`;
 }
