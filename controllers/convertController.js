@@ -2455,11 +2455,19 @@ async function convert(nl, options = {}, meta = {}) {
 
   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
   if (allSheetsData) {
-    const hasHints = !!(
-      intent.return_hint ||
-      intent.header_hint ||
-      intent.lookup_hint
-    );
+    let bestReturn = null;
+    let bestLookup = null;
+    let resolvedBaseSheet = null;
+
+    const explicitRef = formulaUtils.parseExplicitCellOrRange(message);
+    const hasExplicitRef =
+      !!intent.range ||
+      !!intent.target_cell ||
+      !!(explicitRef && (explicitRef.ref || explicitRef));
+
+    const hasHints =
+      !hasExplicitRef &&
+      !!(intent.return_hint || intent.header_hint || intent.lookup_hint);
 
     if (
       hasHints &&
@@ -2483,7 +2491,11 @@ async function convert(nl, options = {}, meta = {}) {
 
       // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
       // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
+      if (
+        !hasExplicitRef &&
+        !bestReturn &&
+        (intent.header_hint || intent.return_hint)
+      ) {
         return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
       }
 
