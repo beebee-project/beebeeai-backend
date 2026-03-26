@@ -1041,12 +1041,19 @@ const arrayFunctionBuilder = {
     }
 
     // 반환열 자체를 기준으로 Top N을 허용
-    const limitN = Math.max(0, Number(it.take_n || it.limit || it.top_n || 0));
+    const rawMsg = String(it.raw_message || ctx?.message || "").toLowerCase();
+    const inlineLimitMatch =
+      rawMsg.match(/(?:상위|하위|top|bottom|높은|낮은|큰|작은)\s*(\d+)/i) ||
+      rawMsg.match(/(\d+)\s*(?:명|개|건)/i);
+    const inferredLimit = inlineLimitMatch ? Number(inlineLimitMatch[1]) : 0;
+    const limitN = Math.max(
+      0,
+      Number(it.take_n || it.limit || it.top_n || inferredLimit || 0),
+    );
 
     if (bestReturn && !bestLookup && limitN > 0) {
       const sheetName = bestReturn.sheetName;
       const returnRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
-      const rawMsg = String(it.raw_message || ctx?.message || "").toLowerCase();
       const sortOrderRaw = String(it.sort_order || "").toLowerCase();
 
       const isAsc =
