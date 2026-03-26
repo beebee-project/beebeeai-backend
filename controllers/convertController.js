@@ -426,33 +426,12 @@ function buildLocalIntentFromText(text = "") {
   if (hasLookupCue) {
     intent.operation = "xlookup";
 
-    if (/(직원\s*id|사번|직원번호)/i.test(original)) {
-      intent.lookup_hint = "직원 ID";
-    } else if (/(이름|성명|name)/i.test(original)) {
-      intent.lookup_hint = "이름";
-    }
-
-    if (headerHint) {
-      intent.return_hint = headerHint;
-    }
+    if (headerHint) intent.return_hint = headerHint;
 
     if (explicitCellOrRange?.ref) {
       intent.lookup_value = explicitCellOrRange.ref;
     } else if (explicitCellMatch) {
       intent.lookup_value = explicitCellMatch[1].toUpperCase();
-    }
-
-    const returnFields = [];
-    if (/(이름|성명)/.test(original)) returnFields.push("이름");
-    if (/부서/.test(original)) returnFields.push("부서");
-    if (/직급/.test(original)) returnFields.push("직급");
-    if (/(연봉|급여)/.test(original)) returnFields.push("연봉");
-
-    if (returnFields.length > 1) {
-      intent.return_fields = [...new Set(returnFields)];
-      delete intent.return_hint;
-    } else if (returnFields.length === 1 && !intent.return_hint) {
-      intent.return_hint = returnFields[0];
     }
 
     if (
@@ -466,7 +445,7 @@ function buildLocalIntentFromText(text = "") {
   }
 
   if (hasGroup || hasMetric) {
-    intent.operation = aggOp;
+    intent.operation = aggOp || intent.operation || "formula";
 
     if (groupBy) {
       intent.group_by = groupBy;
@@ -504,21 +483,6 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
-  // ✅ 5. 날짜/최근 기간 패턴
-  // 예: "최근 7일 매출", "지난달 평균 매출"
-  if (/최근|지난|이번|오늘|yesterday|today|month|week|day/.test(s)) {
-    const numMatch = s.match(
-      /([0-9]+)\s*(일|day|days|주|week|weeks|달|month|months)/,
-    );
-    const size = numMatch ? parseInt(numMatch[1], 10) : 7;
-    intent.window = { type: "days", size, date_header: "날짜" };
-    if (/매출|sales/.test(s)) intent.header_hint = "매출액";
-    if (/평균/.test(s)) intent.operation = "averageifs";
-    else intent.operation = "sumifs";
-    return intent;
-  }
-
-  // ✅ 6. 기본 fallback
   return intent;
 }
 
@@ -549,6 +513,66 @@ function applyStructuralOverrides(intent) {
     delete intent.group_by;
   }
 
+  return intent;
+}
+
+function hasStableIntentStructure(intent = {}) {
+  if (!intent || typeof intent !== "object") return false;
+
+  const hasLookup =
+    intent.lookup_value != null ||
+    !!intent.lookup_hint ||
+    !!intent.lookup?.value ||
+    !!intent.lookup?.header ||
+    !!intent.lookup?.key_header;
+
+  const hasGroup = !!intent.group_by;
+  const hasMetric =
+    !!intent.header_hint ||
+    !!intent.return_hint ||
+    (Array.isArray(intent.return_fields) && intent.return_fields.length > 0);
+  const hasFilters =
+    Array.isArray(intent.conditions) && intent.conditions.length > 0;
+  const hasSort =
+    intent.sorted === true ||
+    !!intent.sort_order ||
+    !!intent.sort_by ||
+    !!intent.sort;
+  const hasLimit = Number(intent.limit || intent.top_n || 0) > 0;
+  const hasWindow = !!intent.window;
+
+  return (
+    hasLookup ||
+    hasGroup ||
+    hasMetric ||
+    hasFilters ||
+    hasSort ||
+    hasLimit ||
+    hasWindow
+  );
+}
+
+function applyPatternOverridesIfNeeded(message, intent) {
+  if (!intent || typeof intent !== "object") return intent;
+
+  // 구조가 이미 충분하면 표현 기반 override는 건너뜀
+  if (hasStableIntentStructure(intent)) {
+    return intent;
+  }
+
+  intent = applyDateBoundaryOverride(message, intent);
+  intent = applyExtremeRowOverride(message, intent);
+  intent = applyRecentTopNOverride(message, intent);
+  intent = applyMonthCountOverride(message, intent);
+  intent = applyYearCountOverride(message, intent);
+  intent = applyUniqueSortOverride(message, intent);
+  intent = applySortListOverride(message, intent);
+  intent = applyFilteredSortOverride(message, intent);
+  intent = applyRankColumnOverride(message, intent);
+  intent = applyDuplicateLatestMetricOverride(message, intent);
+  intent = applyRankThresholdCountOverride(message, intent);
+  intent = applyTrimColumnOverride(message, intent);
+  intent = applyAverageThresholdIfOverride(message, intent);
   return intent;
 }
 
@@ -2016,19 +2040,6 @@ exports.handleConversion = async (req, res, next) => {
     intent = normalizeIntentSchema(intent, message);
     intent = normalizeLookupIntent(intent);
     intent = applyStructuralOverrides(intent);
-    intent = applyDateBoundaryOverride(message, intent);
-    intent = applyExtremeRowOverride(message, intent);
-    intent = applyRecentTopNOverride(message, intent);
-    intent = applyMonthCountOverride(message, intent);
-    intent = applyYearCountOverride(message, intent);
-    intent = applyUniqueSortOverride(message, intent);
-    intent = applySortListOverride(message, intent);
-    intent = applyFilteredSortOverride(message, intent);
-    intent = applyRankColumnOverride(message, intent);
-    intent = applyDuplicateLatestMetricOverride(message, intent);
-    intent = applyRankThresholdCountOverride(message, intent);
-    intent = applyTrimColumnOverride(message, intent);
-    intent = applyAverageThresholdIfOverride(message, intent);
     intent.raw_message = message;
     _dbgIntent = intent;
 
