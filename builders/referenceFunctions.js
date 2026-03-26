@@ -307,6 +307,18 @@ function _bestColumnInSheetByHint(hint, sheetName, ctx) {
 }
 
 function _pairsBySheetLoose(ctx, it) {
+  const hasSheetsMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+  const hasResolved =
+    !!ctx?._resolved?.lookupColumn?.range ||
+    !!ctx?._resolved?.returnColumns?.length ||
+    !!ctx?.resolved?.lookupColumn?.range ||
+    !!ctx?.resolved?.returnColumns?.length;
+
+  if (hasSheetsMeta && !hasResolved) {
+    return [];
+  }
+
   const order = _candidateSheetOrder(ctx);
   const pairs = [];
   for (const s of order) {

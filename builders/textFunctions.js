@@ -85,7 +85,10 @@ function _targetCellOrRange(ctx, kind = "text") {
   }
 
   // 3) legacy fallback
-  if (ctx.bestReturn) {
+  // 업로드 파일 메타가 있을 때는 bestReturn 단독 fallback 금지
+  const hasSheetsMeta =
+    !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
+  if (!hasSheetsMeta && ctx.bestReturn) {
     const br = ctx.bestReturn;
     return {
       isRange: false,

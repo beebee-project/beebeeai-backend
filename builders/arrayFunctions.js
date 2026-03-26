@@ -386,6 +386,12 @@ const arrayFunctionBuilder = {
     }
 
     // ✅ 기존 legacy fallback
+    // 업로드된 시트 메타가 있는 경우에는
+    // resolved/ref 기반으로 못 찾으면 더 이상 느슨한 기본 범위로 내려가지 않음
+    if (allSheetsData && Object.keys(allSheetsData).length > 0) {
+      return `=ERROR("필요한 열을 정확히 찾지 못했습니다. 열 이름을 더 구체적으로 입력해 주세요.")`;
+    }
+
     const { bestReturn } = ctx;
     if (!bestReturn) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
 
