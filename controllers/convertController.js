@@ -2171,6 +2171,8 @@ exports.handleConversion = async (req, res, next) => {
         });
         return res.json({
           result: safeOut,
+          excelFormula: safeOut,
+          sheetsFormula: null,
           compatibility: directCompatibility,
         });
       }
@@ -2216,6 +2218,7 @@ exports.handleConversion = async (req, res, next) => {
     let safeFinal = v.ok
       ? finalFormula
       : `=ERROR("결과 검증에 실패했습니다. 입력을 더 구체적으로 작성해 주세요.")`;
+    const baseFormula = safeFinal;
 
     let compatibility = detectFormulaCompatibility(safeFinal || "");
     let fallbackFunctions = [];
@@ -2282,9 +2285,13 @@ exports.handleConversion = async (req, res, next) => {
     const finalCompatibility = detectFormulaCompatibility(
       safeFinal || finalFormula || "",
     );
+    const excelFormula = baseFormula;
+    const sheetsFormula = fallbackFunctions.length > 0 ? safeFinal : null;
 
     return res.json({
       result: safeFinal,
+      excelFormula,
+      sheetsFormula,
       compatibility: finalCompatibility,
     });
   } catch (err) {
