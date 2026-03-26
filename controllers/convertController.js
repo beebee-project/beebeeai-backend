@@ -2038,6 +2038,39 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     intent = normalizeIntentSchema(intent, message);
+
+    // ✅ explicit cell/range 최우선 보호
+    // 파일이 붙어 있어도 A1:A10, B3 같은 명시적 참조는
+    // 헤더/클러스터 해석보다 우선해야 한다.
+    const explicitRef = formulaUtils.parseExplicitCellOrRange(message);
+    if (explicitRef) {
+      if (typeof explicitRef === "string") {
+        if (/^[A-Z]{1,3}\d{1,7}:[A-Z]{1,3}\d{1,7}$/i.test(explicitRef)) {
+          intent.range = explicitRef.toUpperCase();
+        } else if (/^[A-Z]{1,3}\d{1,7}$/i.test(explicitRef)) {
+          intent.target_cell = explicitRef.toUpperCase();
+        }
+      } else if (explicitRef.ref) {
+        if (String(explicitRef.type).toLowerCase() === "range") {
+          intent.range = String(explicitRef.ref).toUpperCase();
+        } else if (String(explicitRef.type).toLowerCase() === "cell") {
+          intent.target_cell = String(explicitRef.ref).toUpperCase();
+        }
+      }
+
+      // direct gate가 uploaded-file + headerDriven 때문에 막히지 않도록
+      // explicit 참조일 때는 헤더 기반 힌트를 제거
+      delete intent.header_hint;
+      delete intent.return_hint;
+      delete intent.lookup_hint;
+      delete intent.group_by;
+      delete intent.return_fields;
+      delete intent.conditions;
+      delete intent.condition_groups;
+      delete intent.lookup;
+      delete intent.return;
+    }
+
     intent = normalizeLookupIntent(intent);
     intent = applyStructuralOverrides(intent);
     intent.raw_message = message;
