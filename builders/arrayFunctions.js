@@ -1040,6 +1040,18 @@ const arrayFunctionBuilder = {
       return `=LET(t, ${fullA1}, f, FILTER(t, ${maskParts.join(" * ")}), s, SORTBY(f, CHOOSECOLS(f, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
     }
 
+    // 반환열 자체를 기준으로 Top N을 허용
+    const limitN = Math.max(0, Number(it.take_n || it.limit || it.top_n || 0));
+
+    if (bestReturn && !bestLookup && limitN > 0) {
+      const sheetName = bestReturn.sheetName;
+      const returnRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
+      const order =
+        String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+
+      return `=TAKE(SORTBY(${returnRange}, ${returnRange}, ${order}), ${limitN})`;
+    }
+
     if (!bestReturn || !bestLookup)
       return `=ERROR("필요한 열을 모두 찾을 수 없습니다.")`;
     if (bestReturn.sheetName !== bestLookup.sheetName)

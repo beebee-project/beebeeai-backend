@@ -655,7 +655,25 @@ const referenceFunctionBuilder = {
     const duplicateRule =
       it.duplicate_rule || it?.lookup?.duplicate_rule || null;
     if (duplicateRule === "latest") {
-      const dateCol = _resolvedDateColumn(ctx);
+      let dateCol = _resolvedDateColumn(ctx);
+
+      // resolved date가 없으면 날짜 계열 헤더를 한 번 더 느슨하게 탐색
+      if (!dateCol?.range && formulaUtils.findBestColumnAcrossSheets) {
+        const dateTerms = new Set(["입사일", "날짜", "일자", "date"]);
+        const bestDate = formulaUtils.findBestColumnAcrossSheets(
+          ctx.allSheetsData,
+          dateTerms,
+          "date",
+        );
+        if (bestDate?.sheetName && bestDate?.columnLetter) {
+          dateCol = {
+            range: `'${bestDate.sheetName}'!${bestDate.columnLetter}${bestDate.startRow}:${bestDate.columnLetter}${bestDate.lastDataRow}`,
+            sheetName: bestDate.sheetName,
+            header: bestDate.header,
+          };
+        }
+      }
+
       if (!dateCol?.range) {
         return `=ERROR("XLOOKUP: latest 중복 처리용 날짜 열을 찾지 못했습니다.")`;
       }
