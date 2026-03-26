@@ -1046,8 +1046,14 @@ const arrayFunctionBuilder = {
     if (bestReturn && !bestLookup && limitN > 0) {
       const sheetName = bestReturn.sheetName;
       const returnRange = `'${sheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
-      const order =
-        String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+      const rawMsg = String(it.raw_message || ctx?.message || "").toLowerCase();
+      const sortOrderRaw = String(it.sort_order || "").toLowerCase();
+
+      const isAsc =
+        sortOrderRaw === "asc" ||
+        /(하위|낮은|작은|오름차순|bottom|lowest|smallest|asc)/i.test(rawMsg);
+
+      const order = isAsc ? 1 : -1;
 
       return `=TAKE(SORTBY(${returnRange}, ${returnRange}, ${order}), ${limitN})`;
     }
