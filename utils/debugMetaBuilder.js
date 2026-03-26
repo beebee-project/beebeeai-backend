@@ -9,6 +9,9 @@ function buildDebugMeta({
   intentCacheKey,
   validator,
   timing,
+  intentVersion,
+  clusterVersion,
+  resolverMode,
   extra,
 }) {
   return {
@@ -16,6 +19,9 @@ function buildDebugMeta({
     cacheHit: cacheHit ?? undefined,
     intentOp: intentOp || undefined,
     intentCacheKey: intentCacheKey || undefined,
+    intentVersion: intentVersion || undefined,
+    clusterVersion: clusterVersion || undefined,
+    resolverMode: resolverMode || undefined,
 
     validatorOk: validator?.ok ?? undefined,
     validatorKind: validator?.kind ?? undefined,

@@ -305,6 +305,40 @@ const DEFAULT_FORMAT_OPTIONS = {
 //   ].join("||");
 // }
 
+function sendFormulaResponse(res, payload = {}) {
+  const result = payload.result ?? null;
+  const excelFormula = payload.excelFormula ?? result;
+  const sheetsFormula = Object.prototype.hasOwnProperty.call(
+    payload,
+    "sheetsFormula",
+  )
+    ? payload.sheetsFormula
+    : null;
+  const compatibility = payload.compatibility || {
+    level: "common",
+    blockers: [],
+  };
+  const debugMeta = payload.debugMeta || null;
+
+  return res.json({
+    result,
+    excelFormula,
+    sheetsFormula,
+    compatibility,
+    debugMeta,
+  });
+}
+
+const INTENT_VERSION = "v2";
+const CLUSTER_VERSION = "v1";
+
+function getResolverMode(ctx = {}) {
+  if (ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0) {
+    return "sheet+cluster";
+  }
+  return "direct";
+}
+
 function shouldUseDirectBuilder(intent = {}, ctx = {}) {
   return shouldUseDirectGate(intent, ctx);
 }
@@ -2094,8 +2128,40 @@ exports.handleConversion = async (req, res, next) => {
         const bestLookup = joint.lookup;
 
         if (!bestReturn && (intent.header_hint || intent.return_hint)) {
-          return res.json({
-            result: `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`,
+          const out = `=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")`;
+          const debugMeta = buildDebugMeta({
+            rawReason: "MISSING_REQUIRED_COLUMN",
+            cacheHit: _dbgCacheHit,
+            intentOp: intent?.operation,
+            intentCacheKey: _dbgIntentCacheKey,
+            intentVersion: INTENT_VERSION,
+            clusterVersion: CLUSTER_VERSION,
+            resolverMode: getResolverMode(context),
+            validator: null,
+            timing: {
+              preprocess: _ms(_tPreStart, _tPreEnd),
+              intent: _ms(_tIntentStart, _tIntentEnd),
+              build: _ms(_tBuildStart, _tBuildEnd),
+              total: Date.now() - startedAt,
+            },
+            extra: {
+              compatibilityLevel:
+                detectFormulaCompatibility(out)?.level || null,
+              fallbackAttempted: false,
+              fallbackFunctions: [],
+              resolvedBaseSheet: context?.resolved?.baseSheet || null,
+              resolvedReturnHeaders: [],
+              resolvedLookupHeader: null,
+              resolvedGroupHeader: null,
+            },
+          });
+
+          return sendFormulaResponse(res, {
+            result: out,
+            excelFormula: out,
+            sheetsFormula: null,
+            compatibility: detectFormulaCompatibility(out),
+            debugMeta,
           });
         }
 
@@ -2112,7 +2178,6 @@ exports.handleConversion = async (req, res, next) => {
 
     // 5) direct(파일無) 빠른 경로
     if (
-      !isFileAttached &&
       direct?.canHandleWithoutFile?.(intent) &&
       shouldUseDirectBuilder(intent, context)
     ) {
@@ -2134,6 +2199,36 @@ exports.handleConversion = async (req, res, next) => {
           prompt: message,
           result: safeOut,
         });
+        const debugMeta = buildDebugMeta({
+          rawReason,
+          cacheHit: _dbgCacheHit,
+          intentOp: intent?.operation,
+          intentCacheKey: _dbgIntentCacheKey,
+          intentVersion: INTENT_VERSION,
+          clusterVersion: CLUSTER_VERSION,
+          resolverMode: getResolverMode(context),
+          validator: v,
+          timing: {
+            preprocess: _ms(_tPreStart, _tPreEnd),
+            intent: _ms(_tIntentStart, _tIntentEnd),
+            build: _ms(_tBuildStart, _tBuildEnd),
+            total: Date.now() - startedAt,
+          },
+          extra: {
+            compatibility: directCompatibility,
+            compatibilityLevel: directCompatibility?.level || null,
+            fallbackAttempted: false,
+            fallbackFunctions: [],
+            resolvedBaseSheet: context?.resolved?.baseSheet || null,
+            resolvedReturnHeaders: (context?.resolved?.returnColumns || []).map(
+              (x) => x.header,
+            ),
+            resolvedLookupHeader:
+              context?.resolved?.lookupColumn?.header || null,
+            resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+          },
+        });
+
         await writeRequestLog({
           traceId,
           userId: req.user?.id,
@@ -2144,36 +2239,14 @@ exports.handleConversion = async (req, res, next) => {
           isFallback: false,
           prompt: message,
           latencyMs: Date.now() - startedAt,
-          debugMeta: buildDebugMeta({
-            rawReason,
-            cacheHit: _dbgCacheHit,
-            intentOp: intent?.operation,
-            intentCacheKey: _dbgIntentCacheKey,
-            validator: v,
-            timing: {
-              preprocess: _ms(_tPreStart, _tPreEnd),
-              intent: _ms(_tIntentStart, _tIntentEnd),
-              build: _ms(_tBuildStart, _tBuildEnd),
-              total: Date.now() - startedAt,
-            },
-            extra: {
-              compatibility: directCompatibility,
-              resolvedBaseSheet: context?.resolved?.baseSheet || null,
-              resolvedReturnHeaders: (
-                context?.resolved?.returnColumns || []
-              ).map((x) => x.header),
-              resolvedLookupHeader:
-                context?.resolved?.lookupColumn?.header || null,
-              resolvedGroupHeader:
-                context?.resolved?.groupColumn?.header || null,
-            },
-          }),
+          debugMeta,
         });
-        return res.json({
+        return sendFormulaResponse(res, {
           result: safeOut,
           excelFormula: safeOut,
           sheetsFormula: null,
           compatibility: directCompatibility,
+          debugMeta,
         });
       }
     }
@@ -2248,6 +2321,36 @@ exports.handleConversion = async (req, res, next) => {
 
     _dbgCompatibility = compatibility;
 
+    const debugMeta = buildDebugMeta({
+      rawReason,
+      cacheHit: _dbgCacheHit,
+      intentOp: intent?.operation,
+      intentCacheKey: _dbgIntentCacheKey,
+      intentVersion: INTENT_VERSION,
+      clusterVersion: CLUSTER_VERSION,
+      resolverMode: getResolverMode(context),
+      validator: v,
+      timing: {
+        preprocess: _ms(_tPreStart, _tPreEnd),
+        intent: _ms(_tIntentStart, _tIntentEnd),
+        build: _ms(_tBuildStart, _tBuildEnd),
+        total: Date.now() - startedAt,
+      },
+      extra: {
+        compatibility,
+        compatibilityLevel: compatibility?.level || null,
+        fallbackAttempted:
+          v.ok && shouldAttemptCompatibilityFallback(compatibility),
+        fallbackFunctions,
+        resolvedBaseSheet: context?.resolved?.baseSheet || null,
+        resolvedReturnHeaders: (context?.resolved?.returnColumns || []).map(
+          (x) => x.header,
+        ),
+        resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
+        resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+      },
+    });
+
     await writeRequestLog({
       traceId,
       userId: req.user?.id,
@@ -2258,29 +2361,7 @@ exports.handleConversion = async (req, res, next) => {
       isFallback: v.ok ? fallbackFunctions.length > 0 : true,
       prompt: message,
       latencyMs: Date.now() - startedAt,
-      debugMeta: buildDebugMeta({
-        rawReason,
-        cacheHit: _dbgCacheHit,
-        intentOp: intent?.operation,
-        intentCacheKey: _dbgIntentCacheKey,
-        validator: v,
-        timing: {
-          preprocess: _ms(_tPreStart, _tPreEnd),
-          intent: _ms(_tIntentStart, _tIntentEnd),
-          build: _ms(_tBuildStart, _tBuildEnd),
-          total: Date.now() - startedAt,
-        },
-        extra: {
-          compatibility,
-          fallbackFunctions,
-          resolvedBaseSheet: context?.resolved?.baseSheet || null,
-          resolvedReturnHeaders: (context?.resolved?.returnColumns || []).map(
-            (x) => x.header,
-          ),
-          resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
-          resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
-        },
-      }),
+      debugMeta,
     });
     const finalCompatibility = detectFormulaCompatibility(
       safeFinal || finalFormula || "",
@@ -2288,11 +2369,12 @@ exports.handleConversion = async (req, res, next) => {
     const excelFormula = baseFormula;
     const sheetsFormula = fallbackFunctions.length > 0 ? safeFinal : null;
 
-    return res.json({
+    return sendFormulaResponse(res, {
       result: safeFinal,
       excelFormula,
       sheetsFormula,
       compatibility: finalCompatibility,
+      debugMeta,
     });
   } catch (err) {
     const rawReason = "EXCEPTION";
@@ -2455,19 +2537,11 @@ async function convert(nl, options = {}, meta = {}) {
 
   // 3) allSheetsData가 있으면, 자동 열 매핑(bestReturn / bestLookup) 시도
   if (allSheetsData) {
-    let bestReturn = null;
-    let bestLookup = null;
-    let resolvedBaseSheet = null;
-
-    const explicitRef = formulaUtils.parseExplicitCellOrRange(message);
-    const hasExplicitRef =
-      !!intent.range ||
-      !!intent.target_cell ||
-      !!(explicitRef && (explicitRef.ref || explicitRef));
-
-    const hasHints =
-      !hasExplicitRef &&
-      !!(intent.return_hint || intent.header_hint || intent.lookup_hint);
+    const hasHints = !!(
+      intent.return_hint ||
+      intent.header_hint ||
+      intent.lookup_hint
+    );
 
     if (
       hasHints &&
@@ -2491,11 +2565,7 @@ async function convert(nl, options = {}, meta = {}) {
 
       // bestReturn이 없는데도 sum/average 같은 집계 op를 요청하면
       // 테스트에서는 그냥 ERROR 문자열을 받게 해도 됨
-      if (
-        !hasExplicitRef &&
-        !bestReturn &&
-        (intent.header_hint || intent.return_hint)
-      ) {
+      if (!bestReturn && (intent.header_hint || intent.return_hint)) {
         return '=ERROR("필요한 열을 파일에서 찾을 수 없습니다.")';
       }
 
