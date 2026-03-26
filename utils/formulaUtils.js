@@ -596,6 +596,7 @@ function scoreColumn(
     String(meta.clusterCandidate) === String(desiredCluster)
   ) {
     clusterScore += SCORING_WEIGHTS.CLUSTER_MATCH;
+    lexicalScore = Math.max(0, lexicalScore - 1);
   }
 
   if (
