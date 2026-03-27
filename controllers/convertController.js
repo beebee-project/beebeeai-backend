@@ -240,14 +240,13 @@ const DEFAULT_POLICY = {
 };
 
 function sendFormulaResponse(res, payload = {}) {
-  const result = payload.result ?? null;
-  const excelFormula = payload.excelFormula ?? result;
+  const excelFormula = payload.excelFormula ?? null;
   const sheetsFormula = Object.prototype.hasOwnProperty.call(
     payload,
     "sheetsFormula",
   )
     ? payload.sheetsFormula
-    : null;
+    : excelFormula;
   const compatibility = payload.compatibility || {
     level: "common",
     blockers: [],
@@ -255,7 +254,6 @@ function sendFormulaResponse(res, payload = {}) {
   const debugMeta = payload.debugMeta || null;
 
   return res.json({
-    result,
     excelFormula,
     sheetsFormula,
     compatibility,
@@ -1073,7 +1071,13 @@ exports.handleConversion = async (req, res, next) => {
     } = req.body || {};
     _dbgMessage = message || null;
     if (!message || !conversionType) {
-      return res.status(400).json({ result: "요청 정보가 부족합니다." });
+      const out = `=ERROR("요청 정보가 부족합니다.")`;
+      return sendFormulaResponse(res.status(400), {
+        excelFormula: out,
+        sheetsFormula: out,
+        compatibility: detectFormulaCompatibility(out),
+        debugMeta: null,
+      });
     }
 
     // ✅ 변환 한도 체크 (FREE면 10회)
@@ -1271,9 +1275,8 @@ exports.handleConversion = async (req, res, next) => {
           });
 
           return sendFormulaResponse(res, {
-            result: out,
             excelFormula: out,
-            sheetsFormula: null,
+            sheetsFormula: out,
             compatibility: detectFormulaCompatibility(out),
             debugMeta,
           });
@@ -1356,9 +1359,8 @@ exports.handleConversion = async (req, res, next) => {
           debugMeta,
         });
         return sendFormulaResponse(res, {
-          result: safeOut,
           excelFormula: safeOut,
-          sheetsFormula: null,
+          sheetsFormula: safeOut,
           compatibility: directCompatibility,
           debugMeta,
         });
@@ -1481,10 +1483,10 @@ exports.handleConversion = async (req, res, next) => {
       safeFinal || finalFormula || "",
     );
     const excelFormula = baseFormula;
-    const sheetsFormula = fallbackFunctions.length > 0 ? safeFinal : null;
+    const sheetsFormula =
+      fallbackFunctions.length > 0 ? safeFinal : baseFormula;
 
     return sendFormulaResponse(res, {
-      result: safeFinal,
       excelFormula,
       sheetsFormula,
       compatibility: finalCompatibility,
