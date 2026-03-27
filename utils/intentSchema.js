@@ -10,11 +10,6 @@ const DEFAULT_FORMAT_OPTIONS = {
   coerce_number: true,
 };
 
-function asArray(v) {
-  if (v == null) return [];
-  return Array.isArray(v) ? v.filter(Boolean) : [v].filter(Boolean);
-}
-
 function normalizeOperation(op = "") {
   const s = String(op || "")
     .trim()

@@ -1,6 +1,5 @@
 const formulaUtils = require("../utils/formulaUtils");
 const {
-  resolveHeaderInSheet,
   rangeFromSpec,
   evalSubIntentToScalar,
   asArray,
@@ -571,17 +570,6 @@ function buildTwoWayLookupFormula(args) {
   // 안전 검사(가능 시)
   const exists = `AND(ISNUMBER(${rIdx}), ISNUMBER(${cIdx}))`;
   return ifNotFound ? `IF(${exists}, ${core}, ${ifNotFound})` : core;
-}
-
-function _buildLookupTopNFormula({
-  lookupRange,
-  returnRange,
-  metricRange,
-  lookupValue,
-  n = 5,
-  order = -1,
-}) {
-  return `=TAKE(SORTBY(FILTER(HSTACK(${returnRange}, ${metricRange}), ${lookupRange}=${lookupValue}), FILTER(${metricRange}, ${lookupRange}=${lookupValue}), ${order}), ${n})`;
 }
 
 /* =========================

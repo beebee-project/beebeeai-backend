@@ -200,45 +200,6 @@ function analyzeSamples(values) {
   };
 }
 
-function detectHeaderRowIndex(json, maxScanRows = 10) {
-  const limit = Math.min(json.length, maxScanRows);
-  let bestRow = 0;
-  let bestScore = -1;
-
-  for (let i = 0; i < limit; i++) {
-    const row = json[i] || [];
-    let nonEmpty = 0;
-
-    for (const cell of row) {
-      if (cell !== null && cell !== undefined && String(cell).trim() !== "") {
-        nonEmpty++;
-      }
-    }
-
-    if (nonEmpty > bestScore) {
-      bestScore = nonEmpty;
-      bestRow = i;
-    }
-  }
-
-  // 시트 전체에서 "처음으로 값이 있는 행"을 헤더로 사용
-  if (bestScore <= 0) {
-    for (let i = 0; i < json.length; i++) {
-      const row = json[i] || [];
-      if (
-        row.some(
-          (c) => c !== null && c !== undefined && String(c).trim() !== "",
-        )
-      ) {
-        return i; // 첫 non-empty 행
-      }
-    }
-    return 0; // 그래도 없으면 0
-  }
-
-  return bestRow; // 0-based index
-}
-
 // workbook (XLSX.read 결과) → allSheetsData
 function buildAllSheetsData(workbook) {
   const allSheetsData = {};

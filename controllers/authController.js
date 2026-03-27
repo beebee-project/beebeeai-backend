@@ -1,7 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const bcrypt = require("bcryptjs");
 const {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -65,7 +64,7 @@ exports.signup = async (req, res, next) => {
         code: "REJOIN_BLOCKED",
         purgeAt: blocked.purgeAt,
         message: `탈퇴 후 30일 동안 동일 이메일로 재가입이 불가능합니다. (재가입 가능: ${fmtKST(
-          blocked.purgeAt
+          blocked.purgeAt,
         )})`,
       });
     }
@@ -155,13 +154,13 @@ exports.login = async (req, res, next) => {
         code: "REJOIN_BLOCKED",
         purgeAt: blocked.purgeAt,
         message: `탈퇴 후 30일 동안 동일 이메일로 로그인/재가입이 불가능합니다. (가능: ${fmtKST(
-          blocked.purgeAt
+          blocked.purgeAt,
         )})`,
       });
     }
 
     const user = await User.findOne({ email: normalizedEmail }).select(
-      "+password"
+      "+password",
     );
 
     if (!user || !(await user.comparePassword(password))) {
@@ -262,7 +261,7 @@ exports.withdraw = async (req, res, next) => {
     }
 
     const user = await User.findById(req.user.id).select(
-      "email name plan subscription isDeleted authIdentity purgeAt deletedAt"
+      "email name plan subscription isDeleted authIdentity purgeAt deletedAt",
     );
     if (!user) return res.status(404).json({ message: "사용자 없음" });
 
@@ -277,11 +276,11 @@ exports.withdraw = async (req, res, next) => {
     // ✅ 구독/체험 “신호”가 하나라도 있는지 (빈 객체면 false)
     const hasAnySubscriptionSignal = Boolean(
       sub.billingKey ||
-        sub.customerKey ||
-        sub.startedAt ||
-        sub.trialEndsAt ||
-        sub.nextChargeAt ||
-        sub.expiresAt
+      sub.customerKey ||
+      sub.startedAt ||
+      sub.trialEndsAt ||
+      sub.nextChargeAt ||
+      sub.expiresAt,
     );
 
     // ✅ 탈퇴 차단 상태(정책상 유지)
