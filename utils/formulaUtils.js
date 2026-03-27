@@ -3,15 +3,15 @@ const { buildAllSheetsData } = require("./sheetMetaBuilder");
 const { CLUSTER_DEFS, inferClusterFromText } = require("./clusterSchema");
 
 const SCORING_WEIGHTS = {
-  EXACT_MATCH: 100,
-  PARTIAL_MATCH: 3,
-  SYNONYM_MATCH: 1,
+  EXACT_MATCH: 30,
+  PARTIAL_MATCH: 2,
+  SYNONYM_MATCH: 0.2,
   SHEET_NAME_BONUS: 1.5,
   NUMERIC_COLUMN_BONUS: 3,
   NUMERIC_COLUMN_PENALTY: -5,
-  CLUSTER_MATCH: 12,
-  ROLE_MATCH: 8,
-  TYPE_MATCH: 5,
+  CLUSTER_MATCH: 20,
+  ROLE_MATCH: 12,
+  TYPE_MATCH: 8,
 };
 
 function columnLetterToIndex(letter) {
@@ -543,7 +543,6 @@ function expandTermsFromText(text = "") {
     CLUSTER_DEFS[clusterKey].aliases.forEach((v) => terms.add(norm(v)));
   }
 
-  // 최소 fallback: cluster가 안 잡힐 때만 제한적으로 synonym 확장
   if (!clusterKey) {
     for (const list of Object.values(SYNONYMS)) {
       const norms = list.map(norm);
@@ -623,7 +622,7 @@ function scoreColumn(
       const nlist = list.map(norm);
       const termHit = [...termSet].some((t) => nlist.includes(t));
       if (termHit && nlist.some((a) => h === a)) {
-        synonymScore += Math.min(2, SCORING_WEIGHTS.SYNONYM_MATCH);
+        synonymScore += SCORING_WEIGHTS.SYNONYM_MATCH;
         break;
       }
     }
