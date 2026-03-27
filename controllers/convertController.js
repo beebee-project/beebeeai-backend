@@ -587,27 +587,7 @@ function hasStableIntentStructure(intent = {}) {
 }
 
 function applyPatternOverridesIfNeeded(message, intent) {
-  if (!intent || typeof intent !== "object") return intent;
-
-  // 구조가 이미 충분하면 표현 기반 override는 건너뜀
-  if (hasStableIntentStructure(intent)) {
-    return intent;
-  }
-
-  intent = applyDateBoundaryOverride(message, intent);
-  intent = applyExtremeRowOverride(message, intent);
-  intent = applyRecentTopNOverride(message, intent);
-  intent = applyMonthCountOverride(message, intent);
-  intent = applyYearCountOverride(message, intent);
-  intent = applyUniqueSortOverride(message, intent);
-  intent = applySortListOverride(message, intent);
-  intent = applyFilteredSortOverride(message, intent);
-  intent = applyRankColumnOverride(message, intent);
-  intent = applyDuplicateLatestMetricOverride(message, intent);
-  intent = applyRankThresholdCountOverride(message, intent);
-  intent = applyTrimColumnOverride(message, intent);
-  intent = applyAverageThresholdIfOverride(message, intent);
-  return intent;
+  return applyStructuralOverrides(intent);
 }
 
 /* ---------------------------------------------
@@ -2505,21 +2485,10 @@ exports.handleFeedback = async (req, res, next) => {
 async function convert(nl, options = {}, meta = {}) {
   // 1) Intent 생성 (로컬 룰 or meta.intent 오버라이드)
   const baseIntent = meta.intent ? meta.intent : buildLocalIntentFromText(nl);
-  let intent = normalizeLookupIntent(baseIntent);
+  let intent = normalizeIntentSchema(baseIntent, nl);
+  intent = normalizeLookupIntent(intent);
   intent = applyStructuralOverrides(intent);
-  intent = applyExtremeRowOverride(nl, intent);
-  intent = applyDateBoundaryOverride(nl, intent);
-  intent = applyRecentTopNOverride(nl, intent);
-  intent = applyMonthCountOverride(nl, intent);
-  intent = applyYearCountOverride(nl, intent);
-  intent = applyUniqueSortOverride(nl, intent);
-  intent = applySortListOverride(nl, intent);
-  intent = applyFilteredSortOverride(nl, intent);
-  intent = applyRankColumnOverride(nl, intent);
-  intent = applyDuplicateLatestMetricOverride(nl, intent);
-  intent = applyRankThresholdCountOverride(nl, intent);
-  intent = applyTrimColumnOverride(nl, intent);
-  intent = applyAverageThresholdIfOverride(nl, intent);
+  intent.raw_message = nl;
 
   // 2) 기본 컨텍스트 재료
   const engine = options.engine || DEFAULT_ENGINE;
