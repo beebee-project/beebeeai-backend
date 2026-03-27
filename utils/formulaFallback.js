@@ -1,3 +1,93 @@
+function fallbackVSTACK(argSource = "") {
+  const args = splitTopLevelArgs(argSource);
+  if (args.length < 2) return null;
+  return `{${args.join(";")}}`;
+}
+
+function fallbackTOCOL(argSource = "") {
+  const args = splitTopLevelArgs(argSource);
+  if (!args.length) return null;
+
+  const arrayExpr = String(args[0] || "").trim();
+  if (!arrayExpr) return null;
+
+  // 단일열이면 그대로 사용
+  if (/^'[^']+'![A-Z]+\d+:[A-Z]+\d+$/i.test(arrayExpr)) return arrayExpr;
+  if (/^INDEX\(.+,\s*,\s*1\)$/i.test(arrayExpr)) return arrayExpr;
+
+  // 보수적 fallback: 첫 번째 열만 반환
+  return `INDEX(${arrayExpr},,1)`;
+}
+
+function escapeRegExp(s = "") {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function fallbackLET(argSource = "") {
+  const args = splitTopLevelArgs(argSource);
+  if (args.length < 3) return null;
+
+  const body = String(args[args.length - 1] || "").trim();
+  const bindings = args.slice(0, -1);
+  if (bindings.length % 2 !== 0) return null;
+
+  let out = body;
+
+  for (let i = bindings.length - 2; i >= 0; i -= 2) {
+    const name = String(bindings[i] || "").trim();
+    const expr = String(bindings[i + 1] || "").trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return null;
+
+    const re = new RegExp(`\\b${escapeRegExp(name)}\\b`, "g");
+    out = out.replace(re, `(${expr})`);
+  }
+
+  return out;
+}
+
+function fallbackMAP(argSource = "") {
+  const args = splitTopLevelArgs(argSource);
+  if (args.length !== 2) return null;
+
+  const arrayExpr = String(args[0] || "").trim();
+  const lambdaExpr = String(args[1] || "").trim();
+
+  const m = lambdaExpr.match(
+    /^LAMBDA\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*(.+)\)$/i,
+  );
+  if (!m) return null;
+
+  const param = m[1];
+  const body = m[2];
+  const re = new RegExp(`\\b${escapeRegExp(param)}\\b`, "g");
+  const mapped = body.replace(re, "x");
+
+  return `ARRAYFORMULA(BYROW(${arrayExpr}, LAMBDA(x, ${mapped})))`;
+}
+
+function fallbackBYROW(argSource = "") {
+  const args = splitTopLevelArgs(argSource);
+  if (args.length !== 2) return null;
+
+  const rangeExpr = String(args[0] || "").trim();
+  const lambdaExpr = String(args[1] || "").trim();
+
+  const m = lambdaExpr.match(
+    /^LAMBDA\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*(.+)\)$/i,
+  );
+  if (!m) return null;
+
+  const param = m[1];
+  const body = m[2];
+
+  // 최소 지원: BYROW(range, LAMBDA(r, SUM(r)))
+  if (new RegExp(`\\bSUM\\(${escapeRegExp(param)}\\)`, "i").test(body)) {
+    return `MMULT(N(${rangeExpr}), TRANSPOSE(COLUMN(${rangeExpr})^0))`;
+  }
+
+  return null;
+}
+
 function splitTopLevelArgs(src = "") {
   const out = [];
   let cur = "";
@@ -199,6 +289,46 @@ function tryGenerateFallbackFormula(formula = "", compatibility = null) {
     if (replaced !== next) {
       next = replaced;
       appliedFunctions.push("HSTACK");
+    }
+  }
+
+  if (blockers.includes("VSTACK")) {
+    const replaced = replaceFunctionCalls(next, "VSTACK", fallbackVSTACK);
+    if (replaced !== next) {
+      next = replaced;
+      appliedFunctions.push("VSTACK");
+    }
+  }
+
+  if (blockers.includes("TOCOL")) {
+    const replaced = replaceFunctionCalls(next, "TOCOL", fallbackTOCOL);
+    if (replaced !== next) {
+      next = replaced;
+      appliedFunctions.push("TOCOL");
+    }
+  }
+
+  if (blockers.includes("LET")) {
+    const replaced = replaceFunctionCalls(next, "LET", fallbackLET);
+    if (replaced !== next) {
+      next = replaced;
+      appliedFunctions.push("LET");
+    }
+  }
+
+  if (blockers.includes("MAP")) {
+    const replaced = replaceFunctionCalls(next, "MAP", fallbackMAP);
+    if (replaced !== next) {
+      next = replaced;
+      appliedFunctions.push("MAP");
+    }
+  }
+
+  if (blockers.includes("BYROW")) {
+    const replaced = replaceFunctionCalls(next, "BYROW", fallbackBYROW);
+    if (replaced !== next) {
+      next = replaced;
+      appliedFunctions.push("BYROW");
     }
   }
 

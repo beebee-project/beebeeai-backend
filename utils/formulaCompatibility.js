@@ -6,7 +6,16 @@ function detectFormulaCompatibility(formula = "") {
 
   // 이 판정은 "Sheets 미지원 함수 탐지"용이다.
   // Sheets 공식 지원 함수는 여기 넣지 않는다.
-  const excelOnlyFns = ["SORTBY(", "TAKE(", "HSTACK("];
+  const excelOnlyFns = [
+    "SORTBY(",
+    "TAKE(",
+    "HSTACK(",
+    "VSTACK(",
+    "TOCOL(",
+    "LET(",
+    "BYROW(",
+    "MAP(",
+  ];
 
   const sheetsOnlyFns = [
     "IMPORTRANGE(",
@@ -43,7 +52,16 @@ function detectFormulaCompatibility(formula = "") {
   };
 }
 
-const FALLBACK_BLOCKERS = ["SORTBY", "TAKE", "HSTACK"];
+const FALLBACK_BLOCKERS = [
+  "SORTBY",
+  "TAKE",
+  "HSTACK",
+  "VSTACK",
+  "TOCOL",
+  "LET",
+  "BYROW",
+  "MAP",
+];
 
 function shouldAttemptCompatibilityFallback(compatibility = null) {
   const blockers = Array.isArray(compatibility?.blockers)
