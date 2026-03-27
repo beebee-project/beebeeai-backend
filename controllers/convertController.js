@@ -538,6 +538,7 @@ function applyStructuralOverrides(intent) {
   const hasGroup = !!intent.group_by;
   const hasMetric = !!intent.header_hint || !!intent.return_hint;
   const op = String(intent.operation || "").toLowerCase();
+  const raw = String(intent.raw_message || "").trim();
 
   if (op === "xlookup" && hasGroup && !hasLookup) {
     intent.operation = hasMetric ? "sum" : "count";
@@ -545,6 +546,33 @@ function applyStructuralOverrides(intent) {
 
   if (op === "xlookup" && hasLookup && hasGroup && !hasMetric) {
     delete intent.group_by;
+  }
+
+  if (op === "xlookup" && !hasLookup && raw) {
+    const hasDateCue = /(입사|입사일|날짜|근무)/i.test(raw);
+    const hasRecentCue = /(가장\s*최근|최근|최신|latest|most\s*recent)/i.test(
+      raw,
+    );
+    const hasOldestCue =
+      /(가장\s*오래|오래\s*근무|최장\s*근무|earliest|oldest)/i.test(raw);
+    const wantsRowEntity = /(직원|이름|성명|사람|정보)/i.test(raw);
+
+    if (hasDateCue && wantsRowEntity && (hasRecentCue || hasOldestCue)) {
+      intent.operation = hasRecentCue ? "maxrow" : "minrow";
+      intent.header_hint = intent.header_hint || intent.return_hint || "입사일";
+
+      if (
+        !Array.isArray(intent.return_fields) ||
+        intent.return_fields.length === 0
+      ) {
+        intent.return_fields = ["이름"];
+      }
+
+      delete intent.lookup_hint;
+      delete intent.lookup_value;
+      if (intent.lookup) delete intent.lookup;
+      if (intent.lookup_array) delete intent.lookup_array;
+    }
   }
 
   return intent;
