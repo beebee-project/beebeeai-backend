@@ -850,7 +850,8 @@ Core fields (always consider):
       The main action. Examples:
         "sum", "sumifs", "average", "averageifs", "countifs",
         "lookup", "xlookup", "filter", "if", "sortby",
-        "textjoin", "textsplit", "regexmatch", "regexreplace".
+        "textjoin", "textsplit", "regexmatch", "regexreplace",
+        "vstack", "tocol", "byrow".
       Choose the most appropriate single operation.
 
   - engine (optional): "excel" | "sheets"
@@ -921,14 +922,18 @@ General rules:
     instead of hard-coded cell references or ranges.
   - Use Korean header names if the user uses Korean column names.
   - If you are unsure about a field, OMIT it rather than guessing.
+  - If the user explicitly specifies A1-style ranges such as "A1:C3", prefer
+    range-based operations instead of header-based hints.
+  - Use "vstack" when the user asks to vertically combine multiple explicit ranges.
+  - Use "tocol" when the user asks to flatten a range into a single column.
+  - Use "byrow" when the user asks for row-wise calculations on an explicit range.
+  - For "byrow", only use it when an explicit range is present. If no explicit
+    range is given, omit range-specific fields rather than inventing a range.
   - The output MUST be valid JSON. No comments, no trailing commas, no extra text.
   - Prefer header-based hints (lookup_hint, return_hint, header_hint, group_by)
     instead of hard-coded cell references or ranges.
   - Do NOT invent sheet names, column letters, or A1-style ranges.
     Never output things like "Sheet1!B2:B100" or column letters like "A", "B", "C".
-  - Use Korean header names if the user uses Korean column names.
-  - If you are unsure about a field, OMIT it rather than guessing.
-  - The output MUST be valid JSON. No comments, no trailing commas, no extra text.
 
   Examples (important):
 
@@ -969,6 +974,33 @@ Intent:
       "size": 7,
       "date_header": "날짜"
     }
+  }
+}
+
+4) Vertical stack of explicit ranges
+User: "A1:A3와 B1:B3를 세로로 합쳐줘"
+Intent:
+{
+  "intent": {
+    "operation": "vstack"
+  }
+}
+
+5) Flatten range into one column
+User: "A1:C3를 한 열로 펴줘"
+Intent:
+{
+  "intent": {
+    "operation": "tocol"
+  }
+}
+
+6) Row-wise calculation on explicit range
+User: "A1:C3의 각 행의 합계를 구해줘"
+Intent:
+{
+  "intent": {
+    "operation": "byrow"
   }
 }
 
