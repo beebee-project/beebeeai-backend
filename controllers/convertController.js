@@ -1220,9 +1220,9 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     intent = normalizeIntentSchema(intent, message);
+    intent.raw_message = message;
     intent = normalizeLookupIntent(intent);
     intent = applyStructuralOverrides(intent);
-    intent.raw_message = message;
     _dbgIntent = intent;
 
     _tIntentEnd = process.hrtime.bigint();
