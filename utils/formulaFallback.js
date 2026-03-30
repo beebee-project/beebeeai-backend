@@ -255,12 +255,49 @@ function fallbackSORTBY(argSource = "") {
   return `INDEX(SORT({${arrayExpr},${keyExpr}},2,${ascending ? "TRUE" : "FALSE"}),,1)`;
 }
 
+function fallbackGroupAverageTable(input = "") {
+  const src = String(input || "").replace(/\s+/g, " ");
+
+  // 패턴:
+  // LET(keys, UNIQUE(<keyRange>), HSTACK(keys, MAP(keys, LAMBDA(k, LET(arr, IFERROR(FILTER(<valRange>, (<keyRange>=k)), ""), IF(COUNTA(arr)=0, "", AVERAGE(arr)))))))
+  const m = src.match(
+    /LET\(\s*keys\s*,\s*UNIQUE\(([^)]+)\)\s*,\s*HSTACK\(\s*keys\s*,\s*MAP\(\s*keys\s*,\s*LAMBDA\(\s*k\s*,[\s\S]*?AVERAGE\(\s*arr\s*\)[\s\S]*?\)\s*\)\s*\)\s*\)/i,
+  );
+  if (!m) return null;
+
+  const keyRange = String(m[1] || "").trim();
+
+  // FILTER(valRange, (keyRange=k)) 안의 valRange를 추출
+  const fm = src.match(/FILTER\(\s*([^,]+)\s*,\s*\(([^=]+)=\s*k\)\s*\)/i);
+  if (!fm) return null;
+
+  const valRange = String(fm[1] || "").trim();
+  const filterKeyRange = String(fm[2] || "").trim();
+
+  // keyRange 일치 확인이 안 되면 보수적으로 중단
+  const norm = (s) => String(s || "").replace(/\s+/g, "");
+  if (norm(keyRange) !== norm(filterKeyRange)) return null;
+
+  const keysExpr = `UNIQUE(${keyRange})`;
+  return `={${keysExpr}, ARRAYFORMULA(IF(${keysExpr}="",,AVERAGEIF(${keyRange}, ${keysExpr}, ${valRange})))}`;
+}
+
 function tryGenerateFallbackFormula(formula = "", compatibility = null) {
   const blockers = Array.isArray(compatibility?.blockers)
     ? compatibility.blockers.map((x) => String(x || "").toUpperCase())
     : [];
 
   let next = String(formula || "");
+  // 그룹 평균 표 전용 fallback
+  const groupAvgFallback = fallbackGroupAverageTable(next);
+  if (groupAvgFallback) {
+    next = groupAvgFallback;
+    appliedFunctions.push("GROUP_AVERAGE_TABLE");
+    return {
+      formula: next,
+      appliedFunctions,
+    };
+  }
   const appliedFunctions = [];
 
   if (blockers.includes("SORTBY")) {
