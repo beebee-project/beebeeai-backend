@@ -288,8 +288,8 @@ function tryGenerateFallbackFormula(formula = "", compatibility = null) {
     : [];
 
   let next = String(formula || "");
-  // 그룹 평균 표 전용 fallback
   const groupAvgFallback = fallbackGroupAverageTable(next);
+  const appliedFunctions = [];
   if (groupAvgFallback) {
     next = groupAvgFallback;
     appliedFunctions.push("GROUP_AVERAGE_TABLE");
@@ -298,7 +298,6 @@ function tryGenerateFallbackFormula(formula = "", compatibility = null) {
       appliedFunctions,
     };
   }
-  const appliedFunctions = [];
 
   if (blockers.includes("SORTBY")) {
     const replaced = replaceFunctionCalls(next, "SORTBY", fallbackSORTBY);
