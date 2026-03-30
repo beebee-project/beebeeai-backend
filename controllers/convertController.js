@@ -291,6 +291,11 @@ function _deduceOp(text = "") {
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
   if (/(sortby|정렬)/.test(s)) return "sortby";
+  if (/(세로로\s*합치|세로로\s*붙이|vstack)/.test(s)) return "vstack";
+  if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/.test(s))
+    return "tocol";
+  if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
+    return "byrow";
   return "formula";
 }
 

@@ -331,6 +331,44 @@ function searchf(it) {
   return `=SEARCH(${find},${within},${start})`;
 }
 
+function vstack(it, ctx) {
+  const ranges =
+    Array.isArray(it?.ranges) && it.ranges.length
+      ? it.ranges
+      : (() => {
+          const raw = getRawForExplicit(it, ctx).toUpperCase();
+          const tokens =
+            raw.match(/[A-Z]+[0-9]+:[A-Z]+[0-9]+|[A-Z]+:[A-Z]+/g) || [];
+          return tokens;
+        })();
+
+  if (!ranges || ranges.length < 2) {
+    return `=ERROR("VSTACK: 두 개 이상의 범위가 필요합니다.")`;
+  }
+  return `=VSTACK(${ranges.join(", ")})`;
+}
+
+function tocol(it, ctx) {
+  const r = getRangeOrCell(it, ctx);
+  if (!r) return `=ERROR("TOCOL: 범위를 지정해 주세요 (예: A1:C3)")`;
+  return `=TOCOL(${r}, 0, 0)`;
+}
+
+function byrow(it, ctx) {
+  const r = getRangeOrCell(it, ctx);
+  if (!r) return `=ERROR("BYROW: 범위를 지정해 주세요 (예: A1:C3)")`;
+  const agg = String(it?.aggregate || "sum").toLowerCase();
+  const body =
+    agg === "average"
+      ? "AVERAGE(r)"
+      : agg === "max"
+        ? "MAX(r)"
+        : agg === "min"
+          ? "MIN(r)"
+          : "SUM(r)";
+  return `=BYROW(${r}, LAMBDA(r, ${body}))`;
+}
+
 // === 디스패처 ===
 const handlers = {
   average,
@@ -437,6 +475,9 @@ module.exports = {
   year: (ctx) => year(ctx.intent || {}),
   month: (ctx) => month(ctx.intent || {}),
   day: (ctx) => day(ctx.intent || {}),
+  vstack: (ctx) => vstack(ctx.intent || {}, ctx),
+  tocol: (ctx) => tocol(ctx.intent || {}, ctx),
+  byrow: (ctx) => byrow(ctx.intent || {}, ctx),
 
   canHandleWithoutFile,
   buildFormula,
