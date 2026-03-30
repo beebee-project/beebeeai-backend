@@ -355,6 +355,9 @@ function tocol(it, ctx) {
 }
 
 function byrow(it, ctx) {
+  if (it?.require_explicit_range) {
+    return `=ERROR("BYROW: 범위를 지정해 주세요 (예: A1:C3)")`;
+  }
   const r = getRangeOrCell(it, ctx);
   if (!r) return `=ERROR("BYROW: 범위를 지정해 주세요 (예: A1:C3)")`;
   const agg = String(it?.aggregate || "sum").toLowerCase();

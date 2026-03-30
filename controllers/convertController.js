@@ -459,7 +459,11 @@ function applyStructuralOverrides(intent) {
   if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/i.test(raw)) {
     intent.operation = "byrow";
     intent.aggregate = intent.aggregate || "sum";
-    if (explicitSingle) intent.range = explicitSingle;
+    if (explicitSingle) {
+      intent.range = explicitSingle;
+    } else {
+      intent.require_explicit_range = true;
+    }
     return intent;
   }
 
