@@ -280,7 +280,7 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
-  if (/(세로로\s*합치|세로로\s*붙이|vstack)/.test(s)) return "vstack";
+  if (/(세로로\s*(합치|합쳐|붙이|붙여)|vstack)/.test(s)) return "vstack";
   if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/.test(s))
     return "tocol";
   if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
@@ -444,7 +444,7 @@ function applyStructuralOverrides(intent) {
   const explicitSingle =
     raw.match(/[A-Z]+[0-9]+:[A-Z]+[0-9]+|[A-Z]+:[A-Z]+/i)?.[0] || null;
 
-  if (/(세로로\s*합치|세로로\s*붙이|vstack)/i.test(raw)) {
+  if (/(세로로\s*(합치|합쳐|붙이|붙여)|vstack)/i.test(raw)) {
     intent.operation = "vstack";
     if (explicitRanges.length >= 2) intent.ranges = explicitRanges;
     return intent;
