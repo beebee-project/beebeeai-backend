@@ -280,6 +280,11 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
+  if (/(세로로\s*합치|세로로\s*붙이|vstack)/.test(s)) return "vstack";
+  if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/.test(s))
+    return "tocol";
+  if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
+    return "byrow";
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
@@ -291,11 +296,6 @@ function _deduceOp(text = "") {
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
   if (/(sortby|정렬)/.test(s)) return "sortby";
-  if (/(세로로\s*합치|세로로\s*붙이|vstack)/.test(s)) return "vstack";
-  if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/.test(s))
-    return "tocol";
-  if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
-    return "byrow";
   return "formula";
 }
 
@@ -437,6 +437,31 @@ function applyStructuralOverrides(intent) {
   const hasMetric = !!intent.header_hint || !!intent.return_hint;
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
+
+  // explicit-range 구조 연산은 LLM 결과보다 우선.
+  const explicitRanges =
+    raw.match(/[A-Z]+[0-9]+:[A-Z]+[0-9]+|[A-Z]+:[A-Z]+/gi) || [];
+  const explicitSingle =
+    raw.match(/[A-Z]+[0-9]+:[A-Z]+[0-9]+|[A-Z]+:[A-Z]+/i)?.[0] || null;
+
+  if (/(세로로\s*합치|세로로\s*붙이|vstack)/i.test(raw)) {
+    intent.operation = "vstack";
+    if (explicitRanges.length >= 2) intent.ranges = explicitRanges;
+    return intent;
+  }
+
+  if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/i.test(raw)) {
+    intent.operation = "tocol";
+    if (explicitSingle) intent.range = explicitSingle;
+    return intent;
+  }
+
+  if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/i.test(raw)) {
+    intent.operation = "byrow";
+    intent.aggregate = intent.aggregate || "sum";
+    if (explicitSingle) intent.range = explicitSingle;
+    return intent;
+  }
 
   if (op === "xlookup" && hasGroup && !hasLookup) {
     intent.operation = hasMetric ? "sum" : "count";

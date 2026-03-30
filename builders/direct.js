@@ -408,6 +408,9 @@ const handlers = {
 
   find: findf,
   search: searchf,
+  vstack,
+  tocol,
+  byrow,
 };
 
 function canHandleWithoutFile(intent) {

@@ -57,12 +57,7 @@ function fallbackMAP(argSource = "") {
   );
   if (!m) return null;
 
-  const param = m[1];
-  const body = m[2];
-  const re = new RegExp(`\\b${escapeRegExp(param)}\\b`, "g");
-  const mapped = body.replace(re, "x");
-
-  return `ARRAYFORMULA(BYROW(${arrayExpr}, LAMBDA(x, ${mapped})))`;
+  return null;
 }
 
 function fallbackBYROW(argSource = "") {
