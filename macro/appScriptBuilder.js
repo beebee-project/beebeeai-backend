@@ -1,3 +1,25 @@
+function toAppsScriptFunctionName(intent = {}) {
+  const map = {
+    formatRange: "formatRangeMacro",
+    setValue: "setValueMacro",
+    copyRange: "copyRangeMacro",
+    clearRange: "clearRangeMacro",
+    moveRange: "moveRangeMacro",
+    sortRange: "sortRangeMacro",
+    filterRange: "filterRangeMacro",
+    insertRow: "insertRowMacro",
+    deleteRow: "deleteRowMacro",
+    insertColumn: "insertColumnMacro",
+    deleteColumn: "deleteColumnMacro",
+    createSheet: "createSheetMacro",
+    duplicateSheet: "duplicateSheetMacro",
+    renameSheet: "renameSheetMacro",
+    deleteSheet: "deleteSheetMacro",
+    activateSheet: "activateSheetMacro",
+  };
+  return map[intent?.type] || "runMacro";
+}
+
 function colLetterToPosition(letter) {
   if (!letter) return 1;
   let result = 0;
@@ -91,7 +113,7 @@ function buildFormatRangeScript(intent) {
   if (s.border) {
     // 얇은 실선 테두리
     lines.push(
-      `  range.setBorder(true, true, true, true, true, true, null, SpreadsheetApp.BorderStyle.SOLID);`
+      `  range.setBorder(true, true, true, true, true, true, null, SpreadsheetApp.BorderStyle.SOLID);`,
     );
   }
 
@@ -187,8 +209,9 @@ function buildInsertRowScript(intent) {
 
 function buildDeleteRowScript(intent) {
   const rowIndex = intent.rowIndex || 1;
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   sheet.deleteRow(${rowIndex});
 }`;
@@ -240,8 +263,9 @@ function buildDeleteColumnScript(intent) {
 // ─────────────────────────────
 function buildCreateSheetScript(intent) {
   const name = intent.name || "NewSheet";
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.insertSheet("${name}");
 }`;
@@ -374,7 +398,7 @@ function buildFilterRangeScript(intent) {
 // ─────────────────────────────
 function fallbackScript(originalText) {
   const safe = (originalText || "").replace(/[\r\n]/g, " ");
-  return `function main() {
+  return `function runMacro() {
   // 지원하지 않는 작업입니다.
   // 입력: ${safe}
 }`;
