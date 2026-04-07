@@ -1,16 +1,24 @@
 const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587, // 465 쓰면 secure: true
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const EMAIL_ENABLED = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+
+const transporter = EMAIL_ENABLED
+  ? nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    })
+  : null;
 
 const sendVerificationEmail = async (to, token) => {
+  if (!EMAIL_ENABLED || !transporter) {
+    console.log("[email disabled] sendVerificationEmail", { to, token });
+    return { skipped: true };
+  }
   const verificationLink = `${process.env.FRONTEND_URL}/verify.html?token=${token}`;
 
   const mailOptions = {
@@ -56,6 +64,10 @@ const sendVerificationEmail = async (to, token) => {
 };
 
 const sendPasswordResetEmail = async (to, token) => {
+  if (!EMAIL_ENABLED || !transporter) {
+    console.log("[email disabled] sendPasswordResetEmail", { to, token });
+    return { skipped: true };
+  }
   const resetLink = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
 
   const mailOptions = {

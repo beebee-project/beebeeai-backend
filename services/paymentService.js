@@ -2,6 +2,7 @@ const free = require("./paymentGateway/freeBeta");
 const gateway = require("./paymentGateway/toss");
 
 function getProvider() {
+  if (process.env.LOCAL_DEV === "1") return "freebeta";
   return String(process.env.PG_PROVIDER || "toss").toLowerCase();
 }
 

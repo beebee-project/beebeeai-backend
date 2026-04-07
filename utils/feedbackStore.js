@@ -2,11 +2,14 @@
 const { Storage } = require("@google-cloud/storage");
 const crypto = require("crypto");
 
-const storage = new Storage();
+const GCS_ENABLED = Boolean(process.env.GCS_BUCKET_NAME);
+const storage = GCS_ENABLED ? new Storage() : null;
 
 // 업로드용으로 쓰는 버킷을 그대로 사용해도 OK (prefix로 분리)
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
-if (!BUCKET_NAME) throw new Error("Missing env: GCS_BUCKET_NAME");
+if (!BUCKET_NAME) {
+  console.warn("[feedbackStore] disabled - GCS_BUCKET_NAME missing");
+}
 
 // 선택: prefix를 바꾸고 싶으면 env로 조절 가능
 const FEEDBACK_PREFIX = process.env.GCS_FEEDBACK_PREFIX || "feedback/events";
@@ -19,6 +22,11 @@ function ymd(date = new Date()) {
 }
 
 async function appendFeedback(event) {
+  if (!GCS_ENABLED || !BUCKET_NAME || !storage) {
+    console.log("[feedbackStore] skip appendFeedback");
+    return { skipped: true };
+  }
+
   const now = new Date();
   const day = ymd(now);
   const ts = now.getTime();

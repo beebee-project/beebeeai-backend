@@ -1,5 +1,9 @@
 const RequestLog = require("../models/RequestLog");
 
+function isLocalBypassMode() {
+  return process.env.LOCAL_DEV === "1";
+}
+
 function safeStr(s, max = 2000) {
   const v = String(s ?? "");
   return v.length > max ? v.slice(0, max) : v;
@@ -17,6 +21,9 @@ async function writeRequestLog({
   latencyMs,
   debugMeta,
 }) {
+  if (process.env.DISABLE_DB === "1") {
+    return { skipped: true };
+  }
   try {
     await RequestLog.create({
       traceId,

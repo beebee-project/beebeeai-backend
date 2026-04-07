@@ -15,7 +15,15 @@ async function connectDB() {
   }
 
   const uri = process.env.MONGO_URI;
+  const isLocalDev =
+    process.env.LOCAL_DEV === "1" || process.env.NODE_ENV !== "production";
   if (!uri) {
+    if (isLocalDev) {
+      console.warn(
+        "⚠️ MONGO_URI is not set - skipping DB connection in local dev",
+      );
+      return null;
+    }
     console.error("❌ MONGO_URI is not set");
     throw new Error("MONGO_URI is not set");
   }
@@ -24,7 +32,7 @@ async function connectDB() {
     console.log(
       "🔗 Connecting MongoDB:",
       uri.replace(/\/\/([^:]+):([^@]+)@/, "//<user>:<pass>@").slice(0, 80) +
-        "..."
+        "...",
     );
 
     const conn = await mongoose.connect(uri, {

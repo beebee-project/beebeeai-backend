@@ -2,6 +2,20 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const protect = async (req, res, next) => {
+  if (process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1") {
+    req.user = {
+      id: "000000000000000000000001",
+      email: "dev@local.test",
+      plan: "PRO",
+      usage: {
+        formulaConversions: 0,
+        fileUploads: 0,
+      },
+      uploadedFiles: [],
+    };
+    return next();
+  }
+
   let token;
 
   if (

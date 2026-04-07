@@ -4,19 +4,11 @@ const fs = require("fs");
 const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
 
-// ==== ENV 체크 ====
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-  console.error("ENV MISSING: GOOGLE_APPLICATION_CREDENTIALS_JSON");
-  throw new Error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set");
-}
-if (!process.env.GCLOUD_PROJECT) {
-  console.error("ENV MISSING: GCLOUD_PROJECT");
-  throw new Error("GCLOUD_PROJECT is not set");
-}
-if (!process.env.GCS_BUCKET_NAME) {
-  console.error("ENV MISSING: GCS_BUCKET_NAME");
-  throw new Error("GCS_BUCKET_NAME is not set");
-}
+const GCS_ENABLED = Boolean(
+  process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON &&
+  process.env.GCLOUD_PROJECT &&
+  process.env.GCS_BUCKET_NAME,
+);
 
 // ==== 서비스 계정 JSON을 임시 파일로 저장하고,
 //      GOOGLE_APPLICATION_CREDENTIALS 를 그 파일로 지정 ====
@@ -24,25 +16,28 @@ if (!process.env.GCS_BUCKET_NAME) {
 // 키 파일을 저장할 경로 (컨테이너 로컬 디스크, 재시작되면 사라져도 상관 없음)
 const KEY_FILE_PATH = path.join(__dirname, "..", "gcs-key.json");
 
-// 이미 파일이 없으면 생성
-if (!fs.existsSync(KEY_FILE_PATH)) {
-  fs.writeFileSync(
-    KEY_FILE_PATH,
-    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
-    "utf8",
-  );
+let storage = null;
+let bucket = null;
+
+if (GCS_ENABLED) {
+  if (!fs.existsSync(KEY_FILE_PATH)) {
+    fs.writeFileSync(
+      KEY_FILE_PATH,
+      process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
+      "utf8",
+    );
+  }
+
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = KEY_FILE_PATH;
+
+  storage = new Storage({
+    projectId: process.env.GCLOUD_PROJECT,
+  });
+
+  bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+} else {
+  console.warn("[storage] GCS disabled - missing required env");
 }
-
-// 표준 ADC 환경 변수 설정
-process.env.GOOGLE_APPLICATION_CREDENTIALS = KEY_FILE_PATH;
-
-// 이제 Storage는 기본 자격증명을 사용하게 됨
-const storage = new Storage({
-  projectId: process.env.GCLOUD_PROJECT,
-});
-
-// 버킷 핸들
-const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 
 // ==== 이하 기존 코드 동일 ====
 
@@ -73,6 +68,9 @@ function gcsKey({ userId, originalName, hash }) {
 }
 
 async function uploadBufferToGCS({ userId, buffer, originalName }) {
+  if (!GCS_ENABLED || !bucket) {
+    throw new Error("GCS storage is disabled");
+  }
   const { mime } = await sniffMime(buffer, originalName);
   const hash = sha256(buffer);
   const key = gcsKey({ userId, originalName, hash });
@@ -142,6 +140,7 @@ function _gcMetaMem() {
 }
 
 async function readMetaCache(key) {
+  if (!GCS_ENABLED || !bucket) return null;
   try {
     const e = _metaMem.get(key);
     if (!e) return null;
@@ -161,6 +160,7 @@ async function readMetaCache(key) {
 }
 
 async function writeMetaCache(key, value) {
+  if (!GCS_ENABLED || !bucket) return null;
   try {
     const now = _now();
     _metaMem.set(key, {
@@ -183,4 +183,5 @@ module.exports = {
   sniffMime,
   readMetaCache,
   writeMetaCache,
+  isStorageEnabled: () => GCS_ENABLED,
 };

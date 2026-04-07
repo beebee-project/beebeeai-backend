@@ -19,6 +19,10 @@ const { startDailySummaryCron } = require("./cron/dailySummaryCron");
 const app = express();
 app.set("trust proxy", 1);
 
+const IS_LOCAL_DEV =
+  process.env.LOCAL_DEV === "1" || process.env.NODE_ENV !== "production";
+const DB_DISABLED = process.env.DISABLE_DB === "1";
+
 // CORS (프론트/백엔드 도메인 허용)
 const ALLOWED_ORIGINS = new Set([
   "https://beebeeai.kr",
@@ -49,6 +53,7 @@ app.use((req, res, next) => {
 
 const corsMiddleware = cors({
   origin: (origin, cb) => {
+    if (IS_LOCAL_DEV) return cb(null, true);
     if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS"));
   },
@@ -58,7 +63,8 @@ const corsMiddleware = cors({
 });
 app.use(corsMiddleware);
 // ✅ 웹 서버에서는 내부 cron을 기본 OFF
-if (process.env.RUN_INTERNAL_CRON === "1") {
+// ✅ DB 비활성 상태에서는 cron 시작 금지
+if (process.env.RUN_INTERNAL_CRON === "1" && !DB_DISABLED) {
   startDailySummaryCron();
 }
 
@@ -73,11 +79,23 @@ try {
 } catch (_) {}
 
 // DB 연결
-connectDB();
+if (!DB_DISABLED) {
+  connectDB().catch((err) => {
+    console.error("[app] DB connect failed:", err?.message || err);
+    if (!IS_LOCAL_DEV) {
+      process.exit(1);
+    }
+  });
+} else {
+  console.log("[app] DB disabled by DISABLE_DB=1");
+}
 
 // 헬스 체크
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, t: Date.now() });
+});
+app.get("/", (req, res) => {
+  res.status(200).send("BeeBeeAI API server is running");
 });
 
 // 라우트

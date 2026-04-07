@@ -1,13 +1,17 @@
 const User = require("../models/User");
 const paymentService = require("./paymentService");
 
+function isLocalBypassMode() {
+  return process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1";
+}
+
 function hasSubscriptionSignal(sub = {}) {
   return Boolean(
     sub?.billingKey ||
-      sub?.customerKey ||
-      sub?.startedAt ||
-      sub?.trialEndsAt ||
-      sub?.nextChargeAt
+    sub?.customerKey ||
+    sub?.startedAt ||
+    sub?.trialEndsAt ||
+    sub?.nextChargeAt,
   );
 }
 
@@ -47,6 +51,17 @@ function needMonthlyReset(lastReset, now = new Date()) {
 }
 
 async function getUsageSummary(userId) {
+  if (isLocalBypassMode()) {
+    return {
+      plan: "PRO",
+      usage: {
+        formulaConversions: 0,
+        fileUploads: 0,
+      },
+      limits: getLimits("PRO"),
+    };
+  }
+
   const user = await User.findById(userId).select("plan usage subscription");
   if (!user) throw new Error("User not found");
 
@@ -79,8 +94,20 @@ async function getUsageSummary(userId) {
 }
 
 async function bumpUsage(userId, field, delta) {
+  if (isLocalBypassMode()) {
+    return {
+      skipped: true,
+      usage: {
+        formulaConversions: 0,
+        fileUploads: 0,
+      },
+      limits: getLimits("PRO"),
+      plan: "PRO",
+    };
+  }
+
   const user = await User.findById(userId).select(
-    "plan usage subscription isDeleted"
+    "plan usage subscription isDeleted",
   );
   if (!user) throw new Error("User not found");
 
@@ -103,8 +130,16 @@ async function bumpUsage(userId, field, delta) {
 }
 
 async function assertCanUse(userId, field, amount = 1) {
+  if (isLocalBypassMode()) {
+    return {
+      plan: "PRO",
+      used: 0,
+      limit: null,
+    };
+  }
+
   const user = await User.findById(userId).select(
-    "plan subscription usage isDeleted purgeAt"
+    "plan subscription usage isDeleted purgeAt",
   );
   if (!user) throw new Error("User not found");
 

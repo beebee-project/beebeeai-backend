@@ -1,7 +1,8 @@
 const { Storage } = require("@google-cloud/storage");
 const { v4: uuidv4 } = require("uuid");
-const storage = new Storage();
-const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+const GCS_ENABLED = Boolean(process.env.GCS_BUCKET_NAME);
+const storage = GCS_ENABLED ? new Storage() : null;
+const bucket = GCS_ENABLED ? storage.bucket(process.env.GCS_BUCKET_NAME) : null;
 const { bumpUsage, assertCanUse } = require("../services/usageService");
 
 exports.upload = async (req, res) => {
@@ -33,6 +34,13 @@ exports.getFiles = async (req, res, next) => {
 // 2. 파일 업로드 API
 exports.uploadFile = async (req, res, next) => {
   try {
+    if (!GCS_ENABLED || !bucket) {
+      return res.status(503).json({
+        error: "File storage is disabled in local dev",
+        code: "STORAGE_DISABLED",
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ message: "파일이 업로드되지 않았습니다." });
     }
@@ -100,6 +108,12 @@ exports.uploadFile = async (req, res, next) => {
 // 3. 파일 다운로드 API
 exports.downloadFile = async (req, res, next) => {
   try {
+    if (!GCS_ENABLED || !bucket) {
+      return res.status(503).json({
+        error: "File storage is disabled in local dev",
+        code: "STORAGE_DISABLED",
+      });
+    }
     const user = req.user;
     const { originalName } = req.params;
 
@@ -128,6 +142,12 @@ exports.downloadFile = async (req, res, next) => {
 // 4. 파일 삭제 API
 exports.deleteFile = async (req, res, next) => {
   try {
+    if (!GCS_ENABLED || !bucket) {
+      return res.status(503).json({
+        error: "File storage is disabled in local dev",
+        code: "STORAGE_DISABLED",
+      });
+    }
     const user = req.user;
     const { originalName } = req.params;
 
