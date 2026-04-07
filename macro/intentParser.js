@@ -8,7 +8,7 @@ function detectRange(text) {
 
   // A1~C10, A1부터 C10까지
   const blockMatch = upper.match(
-    /([A-Z][0-9]+)\s*(?:부터|~|-)\s*([A-Z][0-9]+)/
+    /([A-Z][0-9]+)\s*(?:부터|~|-)\s*([A-Z][0-9]+)/,
   );
   if (blockMatch) {
     return `${blockMatch[1]}:${blockMatch[2]}`;
@@ -344,7 +344,8 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   // 5) 행/열 삭제 (deleteRow / deleteColumn)
   // ─────────────────────────────
-  const hasDeleteKeyword = tNorm.includes("삭제") || tNorm.includes("지워");
+  const hasDeleteKeyword =
+    tNorm.includes("삭제") || tNorm.includes("지워") || tNorm.includes("제거");
 
   if (hasDeleteKeyword && tNorm.includes("행")) {
     const rowMatch = tNorm.match(/([0-9]+)\s*행/);
