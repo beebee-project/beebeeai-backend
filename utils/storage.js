@@ -4,11 +4,21 @@ const fs = require("fs");
 const { Storage } = require("@google-cloud/storage");
 const { fileTypeFromBuffer } = require("file-type");
 
-const GCS_ENABLED = Boolean(
+const HAS_GCS_ENV = Boolean(
   process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON &&
   process.env.GCLOUD_PROJECT &&
   process.env.GCS_BUCKET_NAME,
 );
+
+const STORAGE_MODE =
+  process.env.STORAGE_MODE || (HAS_GCS_ENV ? "gcs" : "local");
+const IS_LOCAL_STORAGE = STORAGE_MODE === "local";
+const GCS_ENABLED = !IS_LOCAL_STORAGE && HAS_GCS_ENV;
+const LOCAL_UPLOAD_ROOT = path.join(__dirname, "..", ".local_uploads");
+
+if (IS_LOCAL_STORAGE && !fs.existsSync(LOCAL_UPLOAD_ROOT)) {
+  fs.mkdirSync(LOCAL_UPLOAD_ROOT, { recursive: true });
+}
 
 // ==== 서비스 계정 JSON을 임시 파일로 저장하고,
 //      GOOGLE_APPLICATION_CREDENTIALS 를 그 파일로 지정 ====
@@ -36,7 +46,11 @@ if (GCS_ENABLED) {
 
   bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
 } else {
-  console.warn("[storage] GCS disabled - missing required env");
+  console.warn(
+    IS_LOCAL_STORAGE
+      ? "[storage] local storage enabled"
+      : "[storage] GCS disabled - missing required env",
+  );
 }
 
 // ==== 이하 기존 코드 동일 ====
@@ -67,12 +81,32 @@ function gcsKey({ userId, originalName, hash }) {
   return `users/${userId}/${yyyy}/${mm}/${hash}-${base}`;
 }
 
+function localKey({ userId, originalName, hash }) {
+  const ts = new Date();
+  const yyyy = ts.getUTCFullYear();
+  const mm = String(ts.getUTCMonth() + 1).padStart(2, "0");
+  const base = path.basename(originalName);
+  return path.join(String(userId), String(yyyy), String(mm), `${hash}-${base}`);
+}
+
+function localAbsPath(name) {
+  return path.join(LOCAL_UPLOAD_ROOT, name);
+}
+
 async function uploadBufferToGCS({ userId, buffer, originalName }) {
+  const { mime } = await sniffMime(buffer, originalName);
+  const hash = sha256(buffer);
+  if (IS_LOCAL_STORAGE) {
+    const localName = localKey({ userId, originalName, hash });
+    const abs = localAbsPath(localName);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, buffer);
+    return { gcsName: null, localName, mime, hash };
+  }
+
   if (!GCS_ENABLED || !bucket) {
     throw new Error("GCS storage is disabled");
   }
-  const { mime } = await sniffMime(buffer, originalName);
-  const hash = sha256(buffer);
   const key = gcsKey({ userId, originalName, hash });
   const file = bucket.file(key);
 
@@ -85,16 +119,24 @@ async function uploadBufferToGCS({ userId, buffer, originalName }) {
     },
   });
 
-  return { gcsName: key, mime, hash };
+  return { gcsName: key, localName: null, mime, hash };
 }
 
-async function downloadToBuffer(gcsName) {
-  const [buffer] = await bucket.file(gcsName).download();
+async function downloadToBuffer(name) {
+  if (IS_LOCAL_STORAGE) {
+    return fs.readFileSync(localAbsPath(name));
+  }
+  const [buffer] = await bucket.file(name).download();
   return buffer;
 }
 
-async function deleteObject(gcsName) {
-  await bucket.file(gcsName).delete({ ignoreNotFound: true });
+async function deleteObject(name) {
+  if (IS_LOCAL_STORAGE) {
+    const abs = localAbsPath(name);
+    if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    return;
+  }
+  await bucket.file(name).delete({ ignoreNotFound: true });
 }
 
 async function getSignedUrl(gcsName, { minutes = 5, dispositionName } = {}) {
@@ -140,7 +182,6 @@ function _gcMetaMem() {
 }
 
 async function readMetaCache(key) {
-  if (!GCS_ENABLED || !bucket) return null;
   try {
     const e = _metaMem.get(key);
     if (!e) return null;
@@ -160,7 +201,6 @@ async function readMetaCache(key) {
 }
 
 async function writeMetaCache(key, value) {
-  if (!GCS_ENABLED || !bucket) return null;
   try {
     const now = _now();
     _metaMem.set(key, {
@@ -183,5 +223,8 @@ module.exports = {
   sniffMime,
   readMetaCache,
   writeMetaCache,
-  isStorageEnabled: () => GCS_ENABLED,
+  isStorageEnabled: () => IS_LOCAL_STORAGE || GCS_ENABLED,
+  isLocalStorage: () => IS_LOCAL_STORAGE,
+  getBucket: () => bucket,
+  localAbsPath,
 };

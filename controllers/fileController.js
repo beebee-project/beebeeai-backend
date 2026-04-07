@@ -1,9 +1,10 @@
-const { Storage } = require("@google-cloud/storage");
-const { v4: uuidv4 } = require("uuid");
-const GCS_ENABLED = Boolean(process.env.GCS_BUCKET_NAME);
-const storage = GCS_ENABLED ? new Storage() : null;
-const bucket = GCS_ENABLED ? storage.bucket(process.env.GCS_BUCKET_NAME) : null;
 const { bumpUsage, assertCanUse } = require("../services/usageService");
+const {
+  uploadBufferToGCS,
+  downloadToBuffer,
+  deleteObject,
+  isStorageEnabled,
+} = require("../utils/storage");
 
 exports.upload = async (req, res) => {
   const saved = await saveToStorage(req);
@@ -34,7 +35,7 @@ exports.getFiles = async (req, res, next) => {
 // 2. 파일 업로드 API
 exports.uploadFile = async (req, res, next) => {
   try {
-    if (!GCS_ENABLED || !bucket) {
+    if (!isStorageEnabled()) {
       return res.status(503).json({
         error: "File storage is disabled in local dev",
         code: "STORAGE_DISABLED",
@@ -64,42 +65,30 @@ exports.uploadFile = async (req, res, next) => {
       (f) => f.originalName === originalName,
     );
     if (existingFile) {
-      await bucket.file(existingFile.gcsName).delete();
+      await deleteObject(existingFile.localName || existingFile.gcsName);
 
       user.uploadedFiles = user.uploadedFiles.filter(
         (f) => f.originalName !== originalName,
       );
     }
 
-    const gcsName = `${user._id}-${uuidv4()}-${originalName}`;
-    const file = bucket.file(gcsName);
-
-    const stream = file.createWriteStream({
-      metadata: {
-        contentType: req.file.mimetype,
-      },
+    const saved = await uploadBufferToGCS({
+      userId: user._id,
+      buffer: req.file.buffer,
+      originalName,
     });
 
-    stream.on("error", (err) => {
-      next(err);
-    });
+    const newFile = {
+      originalName,
+      gcsName: saved.gcsName || null,
+      localName: saved.localName || null,
+      size: req.file.size,
+    };
+    user.uploadedFiles.push(newFile);
+    await user.save();
 
-    stream.on("finish", async () => {
-      const newFile = {
-        originalName,
-        gcsName,
-        size: req.file.size,
-      };
-      user.uploadedFiles.push(newFile);
-      await user.save();
-
-      // ✅ '횟수' 기준이므로 업로드 성공 1회 카운트
-      await bumpUsage(req.user.id, "fileUploads", 1);
-
-      res.status(201).json(user.uploadedFiles);
-    });
-
-    stream.end(req.file.buffer);
+    await bumpUsage(req.user.id, "fileUploads", 1);
+    res.status(201).json(user.uploadedFiles);
   } catch (error) {
     next(error);
   }
@@ -108,7 +97,7 @@ exports.uploadFile = async (req, res, next) => {
 // 3. 파일 다운로드 API
 exports.downloadFile = async (req, res, next) => {
   try {
-    if (!GCS_ENABLED || !bucket) {
+    if (!isStorageEnabled()) {
       return res.status(503).json({
         error: "File storage is disabled in local dev",
         code: "STORAGE_DISABLED",
@@ -133,7 +122,10 @@ exports.downloadFile = async (req, res, next) => {
       `attachment; filename*=UTF-8''${encodedFilename}`,
     );
 
-    bucket.file(fileInfo.gcsName).createReadStream().pipe(res);
+    const buffer = await downloadToBuffer(
+      fileInfo.localName || fileInfo.gcsName,
+    );
+    res.end(buffer);
   } catch (error) {
     next(error);
   }
@@ -142,7 +134,7 @@ exports.downloadFile = async (req, res, next) => {
 // 4. 파일 삭제 API
 exports.deleteFile = async (req, res, next) => {
   try {
-    if (!GCS_ENABLED || !bucket) {
+    if (!isStorageEnabled()) {
       return res.status(503).json({
         error: "File storage is disabled in local dev",
         code: "STORAGE_DISABLED",
@@ -161,7 +153,7 @@ exports.deleteFile = async (req, res, next) => {
         .json({ message: "파일을 찾을 수 없거나 접근 권한이 없습니다." });
     }
 
-    await bucket.file(fileInfo.gcsName).delete();
+    await deleteObject(fileInfo.localName || fileInfo.gcsName);
 
     user.uploadedFiles = user.uploadedFiles.filter(
       (f) => f.originalName !== originalName,

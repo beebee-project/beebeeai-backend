@@ -1,6 +1,9 @@
+const fs = require("fs");
+const path = require("path");
 const { cleanAIResponse } = require("../utils/responseHelper");
 const formulaUtils = require("../utils/formulaUtils");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
+const { downloadToBuffer } = require("../utils/storage");
 const { buildIntentCacheKey } = require("../utils/intentCacheKeyBuilder");
 const { makeSheetStateSig } = require("../utils/sheetStateSig");
 const intentCache = require("../services/intentCache");
@@ -51,21 +54,6 @@ function getOpenAI() {
     const OpenAI = require("openai");
     _openai = new OpenAI({ apiKey });
     return _openai;
-  } catch {
-    return null;
-  }
-}
-
-let _bucket = null;
-function getBucket() {
-  try {
-    if (_bucket) return _bucket;
-    const name = process.env.GCS_BUCKET_NAME;
-    if (!name) return null;
-    const { Storage } = require("@google-cloud/storage");
-    const storage = new Storage();
-    _bucket = storage.bucket(name);
-    return _bucket;
   } catch {
     return null;
   }
@@ -787,33 +775,57 @@ function resolveOp(op) {
 /* ---------------------------------------------
  * 파일 전처리 유틸
  * -------------------------------------------*/
-async function loadAndPreprocessFromBucketIfPossible(user, fileName) {
+const LOCAL_TEST_FILE_DIR = path.join(__dirname, "..", ".local_test_files");
+async function loadAndPreprocessFromStorageIfPossible(user, fileName) {
   const logLP = shouldLogCache();
   if (logLP) console.log("[loadAndPreprocess] user?.id:", user?.id);
   if (logLP) console.log("[loadAndPreprocess] fileName:", fileName);
 
-  const bucket = getBucket();
-  if (logLP) console.log("[loadAndPreprocess] bucket exists?:", !!bucket);
-
-  if (!bucket || !user || !fileName) {
-    if (logLP)
-      console.log("[loadAndPreprocess] early return (no bucket/user/fileName)");
+  if (!user || !fileName) {
+    if (logLP) {
+      console.log("[loadAndPreprocess] early return (no user/fileName)");
+    }
     return { isFileAttached: false, preprocessed: null };
   }
 
   if (logLP)
     console.log("[loadAndPreprocess] user.uploadedFiles:", user?.uploadedFiles);
-  const fileInfo = user.uploadedFiles?.find((f) => f.originalName === fileName);
+  let fileInfo = user.uploadedFiles?.find((f) => f.originalName === fileName);
   if (logLP) console.log("[loadAndPreprocess] fileInfo:", fileInfo);
 
   if (!fileInfo) {
+    const isLocalDev = process.env.LOCAL_DEV === "1";
+    const fallbackPath = path.join(LOCAL_TEST_FILE_DIR, fileName || "");
+
+    if (isLocalDev && fileName && fs.existsSync(fallbackPath)) {
+      if (logLP) {
+        console.log(
+          "[loadAndPreprocess] fallback local test file found:",
+          fallbackPath,
+        );
+      }
+
+      const buffer = fs.readFileSync(fallbackPath);
+      const { fileHash, allSheetsData } = await getOrBuildAllSheetsData(buffer);
+
+      return {
+        isFileAttached: true,
+        preprocessed: { fileHash, allSheetsData },
+      };
+    }
+
     if (logLP)
       console.log("[loadAndPreprocess] early return (fileInfo not found)");
     return { isFileAttached: false, preprocessed: null };
   }
 
-  const file = bucket.file(fileInfo.gcsName);
-  const [buffer] = await file.download();
+  const storageName = fileInfo.localName || fileInfo.gcsName;
+  if (!storageName) {
+    if (logLP) console.log("[loadAndPreprocess] early return (no storageName)");
+    return { isFileAttached: false, preprocessed: null };
+  }
+
+  const buffer = await downloadToBuffer(storageName);
   if (logLP)
     console.log("[loadAndPreprocess] downloaded buffer length:", buffer.length);
 
@@ -1162,7 +1174,7 @@ exports.handleConversion = async (req, res, next) => {
     // 1) 파일 전처리(옵션)
     _tPreStart = process.hrtime.bigint();
     const { isFileAttached, preprocessed } =
-      await loadAndPreprocessFromBucketIfPossible(req.user, fileName);
+      await loadAndPreprocessFromStorageIfPossible(req.user, fileName);
     _tPreEnd = process.hrtime.bigint();
 
     const fileHash = preprocessed?.fileHash || null;
