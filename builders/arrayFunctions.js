@@ -292,6 +292,13 @@ function _endsWithExpr(colA1, needle, cs) {
     : `RIGHT(${colN}, LEN(${q}))=${q}`;
 }
 
+function _regexMatchExpr(colA1, pattern, cs, strict) {
+  let pat = String(pattern ?? "");
+  if (cs && strict) pat = _stripCaseInsensInlineFlag(pat);
+  if (!cs && !_hasCaseInsensInlineFlag(pat)) pat = `(?i)${pat}`;
+  return `REGEXMATCH(${colA1}, ${_q(pat)})`;
+}
+
 function _normRange(rg) {
   return `UPPER(TRIM(${rg}&""))`;
 }
@@ -408,17 +415,13 @@ const arrayFunctionBuilder = {
     const fullRange = `'${legacySheetName}'!${firstCol}${legacySheetInfo.startRow}:${lastCol}${legacySheetInfo.lastDataRow}`;
     const returnRangeSingle = `'${legacySheetName}'!${bestReturn.columnLetter}${bestReturn.startRow}:${bestReturn.columnLetter}${bestReturn.lastDataRow}`;
 
-    // 1) 공통 condition engine 우선
-    const commonMask = _buildMask(ctx, buildConditionMask);
-    if (commonMask) {
-      const filtered = `FILTER(${stackedReturn}, ${commonMask})`;
-      return pipeSortIfRequested(ctx, intent, filtered, null);
-    }
-
-    // 2) 공통 엔진으로 표현이 안 되는 legacy 특수 케이스만 아래에서 처리
+    // 1) 조건 마스크 (AND/*, OR/+)
+    // Step2: regex가 Excel에서 불가하므로, 필요 시 조기에 ERROR 반환
     let earlyError = null;
-    const rawConds = Array.isArray(intent.conditions) ? intent.conditions : [];
+    const isSheets = _isSheetsContext(ctx);
 
+    // ✅ intent.conditions가 ConditionNode( target/header ) 형태여도 지원
+    const rawConds = Array.isArray(intent.conditions) ? intent.conditions : [];
     const inlineGroups = rawConds.filter(
       (c) =>
         c &&
@@ -426,7 +429,6 @@ const arrayFunctionBuilder = {
         c.logical_operator &&
         Array.isArray(c.conditions),
     );
-
     const condNodes = rawConds.filter(
       (c) =>
         !(
@@ -451,17 +453,20 @@ const arrayFunctionBuilder = {
         );
         if (!bestCol?.col) return null;
 
+        // Step1 연계: 열 후보가 모호하면 오답 대신 중단
         if (bestCol.isAmbiguous) {
           earlyError = `=ERROR("조건 열이 모호합니다: '${bestCol.header}' 또는 '${bestCol.runnerUp?.header || "다른 후보"}' 중 선택이 필요합니다.")`;
           return null;
         }
 
         const colA1 = `'${legacySheetName}'!${bestCol.col.columnLetter}${legacySheetInfo.startRow}:${bestCol.col.columnLetter}${legacySheetInfo.lastDataRow}`;
+
         const rawOp = String(cond.operator || "=").toLowerCase();
         const textOp = _normalizeTextOp(rawOp);
         const op = _normalizeOp(rawOp);
         const rawVal = cond.value;
 
+        // Step2: 날짜/숫자 비교는 열 값을 안전 coercion
         if (_isISODate(rawVal))
           return `${_coerceDate(colA1)}${op}${_dateVal(rawVal)}`;
         if (_isNumericLiteral(rawVal))
@@ -470,9 +475,68 @@ const arrayFunctionBuilder = {
         const cs = (cond.case_sensitive ?? intent.case_sensitive) === true;
 
         if (textOp === "contains") return _containsExpr(colA1, rawVal, cs);
+
         if (textOp === "starts_with") return _startsWithExpr(colA1, rawVal, cs);
+
         if (textOp === "ends_with") return _endsWithExpr(colA1, rawVal, cs);
 
+        if (
+          ["in", "any_of"].includes(rawOp) &&
+          Array.isArray(cond.values) &&
+          cond.values.length
+        ) {
+          // Step2: IN은 MATCH 기반(텍스트는 TRIM/LOWER 정규화)
+          const colN = _normText(colA1, cs);
+          const values = cond.values.map((v) => {
+            if (_isNumericLiteral(v)) return String(v).replace(/,/g, "");
+            const s = cs
+              ? String(v ?? "").trim()
+              : String(v ?? "")
+                  .trim()
+                  .toLowerCase();
+            return _q(s);
+          });
+          return `ISNUMBER(MATCH(${colN}, {${values.join(",")}}, 0))`;
+        }
+
+        if (rawOp === "between" && cond.min != null && cond.max != null) {
+          const isNum =
+            _isNumericLiteral(cond.min) && _isNumericLiteral(cond.max);
+          const isDate = _isISODate(cond.min) && _isISODate(cond.max);
+
+          if (isNum) {
+            const L = String(cond.min).replace(/,/g, "");
+            const R = String(cond.max).replace(/,/g, "");
+            const left = _coerceNumber(colA1);
+            return `(${left}>=${L})*(${left}<=${R})`;
+          }
+
+          if (isDate) {
+            const L = _dateVal(String(cond.min));
+            const R = _dateVal(String(cond.max));
+            const left = _coerceDate(colA1);
+            return `(${left}>=${L})*(${left}<=${R})`;
+          }
+
+          // fallback
+          const L = _q(cond.min);
+          const R = _q(cond.max);
+          const left = _trimText(colA1);
+          return `(${left}>=${L})*(${left}<=${R})`;
+        }
+
+        if (["matches", "regex"].includes(rawOp)) {
+          // Step2: REGEXMATCH는 Sheets 전용으로 운영(Excel이면 안전하게 중단)
+          if (!isSheets) {
+            earlyError = `=ERROR("정규식 조건은 Google Sheets에서만 지원됩니다.")`;
+            return null;
+          }
+          const strict =
+            (cond.strip_inline_flags ?? intent.strip_inline_flags) === true;
+          return _regexMatchExpr(colA1, rawVal, cs, strict);
+        }
+
+        // ✅ 문자열/셀참조 비교: J3 같은 셀은 따옴표 금지
         return `${_trimText(colA1)}${op}${_valExpr(rawVal)}`;
       })
       .filter(Boolean);

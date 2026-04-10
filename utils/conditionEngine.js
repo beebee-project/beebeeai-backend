@@ -27,65 +27,6 @@ function _coerceDate(expr) {
   return `IFERROR(DATEVALUE(TRIM(${expr}&"")), ${expr})`;
 }
 
-function _normalizeCmpOp(op = "") {
-  const s = String(op || "")
-    .trim()
-    .toLowerCase();
-  if (s === "==") return "=";
-  if (s === "!=") return "<>";
-  if (s === "≤") return "<=";
-  if (s === "≥") return ">=";
-  return s || "=";
-}
-
-function _resolveCondRef(cond, ctx) {
-  const header =
-    cond?.ref?.header ||
-    (typeof cond?.header === "string" ? cond.header : null) ||
-    (typeof cond?.target === "string" ? cond.target : null) ||
-    cond?.target?.header ||
-    cond?.hint ||
-    null;
-
-  return (
-    cond?.ref ||
-    (header
-      ? refFromHeaderSpec(ctx, {
-          header,
-          sheet: ctx?.resolved?.baseSheet || undefined,
-        })
-      : null) ||
-    (header ? refFromHeaderSpec(ctx, header) : null)
-  );
-}
-
-function _windowExprs(ctx) {
-  const exprs = [];
-  const pairs = [];
-
-  const win = ctx?.intent?.window;
-  if (
-    win &&
-    String(win.type || "").toLowerCase() === "days" &&
-    Number(win.size || 0) > 0
-  ) {
-    const hdr = win.date_header || "날짜";
-    const rr =
-      refFromHeaderSpec(ctx, {
-        header: hdr,
-        sheet: ctx?.resolved?.baseSheet || undefined,
-      }) || refFromHeaderSpec(ctx, hdr);
-
-    if (rr?.range) {
-      const n = Number(win.size || 0);
-      exprs.push(`(${_coerceDate(rr.range)}>=TODAY()-${n})`);
-      pairs.push(rr.range, `">="&TODAY()-${n}`);
-    }
-  }
-
-  return { exprs, pairs };
-}
-
 function _formatScalar(
   v,
   formatValue,
@@ -123,12 +64,31 @@ function _formatScalar(
 
 function _buildLeafExpr(cond, ctx, formatValue) {
   const caseSensitive = !!ctx?.formatOptions?.case_sensitive;
-  const ref = _resolveCondRef(cond, ctx);
+
+  const header =
+    cond?.ref?.header ||
+    (typeof cond?.header === "string" ? cond.header : null) ||
+    (typeof cond?.target === "string" ? cond.target : null) ||
+    cond?.target?.header ||
+    cond?.hint ||
+    null;
+
+  const ref =
+    cond?.ref ||
+    (header
+      ? refFromHeaderSpec(ctx, {
+          header,
+          sheet: ctx?.resolved?.baseSheet || undefined,
+        })
+      : null) ||
+    (header ? refFromHeaderSpec(ctx, header) : null);
 
   if (!ref?.range) return null;
 
   const range = ref.range;
-  const op = _normalizeCmpOp(cond?.operator || "=");
+  const op = String(cond?.operator || "=")
+    .trim()
+    .toLowerCase();
   const rawVal = cond?.value;
   const valueType = cond?.value_type || null;
 
@@ -216,98 +176,30 @@ function buildConditionMask(ctx, formatValue) {
     .map((c) => buildSingleConditionExpr(c, ctx, formatValue))
     .filter(Boolean);
 
-  const win = _windowExprs(ctx);
-  if (win.exprs.length) exprs.push(...win.exprs);
+  // window 조건 추가
+  const win = ctx?.intent?.window;
+  if (
+    win &&
+    String(win.type || "").toLowerCase() === "days" &&
+    Number(win.size || 0) > 0
+  ) {
+    const hdr = win.date_header || "날짜";
+    const rr =
+      refFromHeaderSpec(ctx, {
+        header: hdr,
+        sheet: ctx?.resolved?.baseSheet || undefined,
+      }) || refFromHeaderSpec(ctx, hdr);
+
+    if (rr?.range) {
+      exprs.push(`(${_coerceDate(rr.range)}>=TODAY()-${Number(win.size)})`);
+    }
+  }
 
   if (!exprs.length) return null;
   return exprs.length === 1 ? exprs[0] : `(${exprs.join("*")})`;
 }
 
-function _isLeafIfsSafe(cond = {}) {
-  const op = _normalizeCmpOp(cond?.operator || "=");
-  if (cond?.logical_operator && Array.isArray(cond?.conditions)) return false;
-  if (
-    ["contains", "starts_with", "startswith", "ends_with", "endswith"].includes(
-      op,
-    )
-  ) {
-    return false;
-  }
-  if (cond?.value == null) return false;
-  return ["=", "<>", ">", ">=", "<", "<="].includes(op);
-}
-
-function _leafToIfsPair(cond, ctx, formatValue) {
-  if (!_isLeafIfsSafe(cond)) return null;
-  const ref = _resolveCondRef(cond, ctx);
-  if (!ref?.range) return null;
-
-  const op = _normalizeCmpOp(cond?.operator || "=");
-  const rawVal = cond?.value;
-  const valueType = cond?.value_type || null;
-
-  let crit;
-  if (valueType === "number" || _isNumericLiteral(rawVal)) {
-    crit = ["=", "<>"].includes(op)
-      ? String(Number(String(rawVal).replace(/,/g, "").trim()))
-      : `"${op}${String(Number(String(rawVal).replace(/,/g, "").trim()))}"`;
-    return [ref.range, crit];
-  }
-
-  if (valueType === "date" || _isIsoDateLiteral(rawVal)) {
-    const rhs = _formatScalar(rawVal, formatValue, "date", false);
-    crit = ["=", "<>"].includes(op) ? rhs : `"${op}"&${rhs}`;
-    return [ref.range, crit];
-  }
-
-  const rhs =
-    typeof formatValue === "function" ? formatValue(rawVal) : _q(rawVal);
-  crit = ["=", "<>"].includes(op) ? rhs : `"${op}"&${rhs}`;
-  return [ref.range, crit];
-}
-
-function canUseIfsPairs(ctx) {
-  const raw = ctx?.resolved?.filterColumns?.length
-    ? ctx.resolved.filterColumns
-    : Array.isArray(ctx?.intent?.filters)
-      ? ctx.intent.filters
-      : Array.isArray(ctx?.intent?.conditions)
-        ? ctx.intent.conditions
-        : [];
-
-  const ok = raw.every((c) => _isLeafIfsSafe(c));
-  if (!ok) return false;
-
-  // window(days)는 AND 단일 범위 비교이므로 허용
-  return true;
-}
-
-function buildConditionPairs(ctx, formatValue) {
-  if (!canUseIfsPairs(ctx)) return [];
-
-  const raw = ctx?.resolved?.filterColumns?.length
-    ? ctx.resolved.filterColumns
-    : Array.isArray(ctx?.intent?.filters)
-      ? ctx.intent.filters
-      : Array.isArray(ctx?.intent?.conditions)
-        ? ctx.intent.conditions
-        : [];
-
-  const out = [];
-  for (const c of raw) {
-    const pair = _leafToIfsPair(c, ctx, formatValue);
-    if (!pair) return [];
-    out.push(...pair);
-  }
-
-  const win = _windowExprs(ctx);
-  if (win.pairs.length) out.push(...win.pairs);
-  return out;
-}
-
 module.exports = {
   buildConditionMask,
   buildSingleConditionExpr,
-  buildConditionPairs,
-  canUseIfsPairs,
 };

@@ -453,14 +453,10 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
   const it = intent || {};
   const hasSheetsMeta =
     !!ctx?.allSheetsData && Object.keys(ctx.allSheetsData).length > 0;
-  const hasAmbiguity =
-    Array.isArray(ctx?.resolved?.ambiguities) &&
-    ctx.resolved.ambiguities.length > 0;
 
   const explicit = hasExplicitRangeIntent(it, ctx);
   const headerDriven = hasHeaderDrivenIntent(it);
 
-  if (hasAmbiguity) return false;
   if (!explicit) return false;
   if (hasSheetsMeta && headerDriven) return false;
   return true;

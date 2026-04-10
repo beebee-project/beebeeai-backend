@@ -132,12 +132,25 @@ function _evalSubExprToRange(ctx, formatValue, node) {
 }
 
 function _collectPairs(ctx, it, buildConditionPairs, formatValue) {
-  return _ensureConditionPairs(ctx, buildConditionPairs);
+  let pairs = _ensureConditionPairs(ctx, buildConditionPairs);
+  const winPairs = _injectWindowToConditionPairs(it?.window, ctx, formatValue);
+  if (winPairs.length) pairs = pairs.concat(winPairs);
+  return pairs;
 }
 
 function _collectMask(ctx, buildConditionMask) {
   if (!buildConditionMask) return null;
   return buildConditionMask(ctx) || null;
+}
+
+function _injectWindowToConditionPairs(windowObj, ctx, _formatValue) {
+  if (!windowObj || windowObj.type !== "days") return [];
+  const size = Number(windowObj.size || 0);
+  if (!size) return [];
+  const hdr = windowObj.date_header || "날짜";
+  const rr = refFromHeaderSpec(ctx, { header: hdr, sheet: windowObj.sheet });
+  if (!rr) return [];
+  return [rr.range, `">="&TODAY()-${size}`];
 }
 
 function _scalarFrom(spec, ctx, formatValue) {
@@ -254,11 +267,7 @@ const mathStatsFunctionBuilder = {
       )}`;
     }
 
-    if (
-      !Array.isArray(intent.conditions) &&
-      !Array.isArray(intent.filters) &&
-      !intent.window
-    ) {
+    if (!intent.conditions || intent.conditions.length === 0) {
       return this._buildSimpleAggregate("average", ctx);
     }
 
