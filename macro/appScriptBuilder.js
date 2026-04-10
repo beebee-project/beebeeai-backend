@@ -254,12 +254,13 @@ function buildInsertColumnScript(intent) {
 
 function buildDeleteColumnScript(intent) {
   const col = intent.column || { letter: null, index: 1 };
+  const fnName = toAppsScriptFunctionName(intent);
 
   let colPos = 1;
   if (col.letter) colPos = colLetterToPosition(col.letter);
   else if (col.index) colPos = col.index;
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   sheet.deleteColumn(${colPos});
 }`;
@@ -271,7 +272,7 @@ function buildDeleteColumnScript(intent) {
 // duplicateSheet: { type: "duplicateSheet", name }
 // ─────────────────────────────
 function buildCreateSheetScript(intent) {
-  const name = intent.name || "NewSheet";
+  const name = escapeJsString(intent.name || "NewSheet");
   const fnName = toAppsScriptFunctionName(intent);
 
   return `function ${fnName}() {
@@ -281,9 +282,10 @@ function buildCreateSheetScript(intent) {
 }
 
 function buildDuplicateSheetScript(intent) {
-  const name = intent.name || "Backup";
+  const name = escapeJsString(intent.name || "Backup");
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const active = ss.getActiveSheet();
   const copied = active.copyTo(ss);
@@ -298,12 +300,13 @@ function buildDuplicateSheetScript(intent) {
 // activateSheet: { type: "activateSheet", name }
 // ─────────────────────────────
 function buildRenameSheetScript(intent) {
-  const fromName = intent.fromName || null;
-  const toName = intent.toName || "RenamedSheet";
+  const fromName = intent.fromName ? escapeJsString(intent.fromName) : null;
+  const toName = escapeJsString(intent.toName || "RenamedSheet");
+  const fnName = toAppsScriptFunctionName(intent);
 
   if (fromName) {
     // 특정 시트 이름 변경
-    return `function main() {
+    return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("${fromName}");
   if (sheet) {
@@ -312,7 +315,7 @@ function buildRenameSheetScript(intent) {
 }`;
   } else {
     // 현재 시트 이름 변경
-    return `function main() {
+    return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   sheet.setName("${toName}");
@@ -321,10 +324,11 @@ function buildRenameSheetScript(intent) {
 }
 
 function buildDeleteSheetScript(intent) {
-  const name = intent.name || null;
+  const name = intent.name ? escapeJsString(intent.name) : null;
+  const fnName = toAppsScriptFunctionName(intent);
 
   if (name) {
-    return `function main() {
+    return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("${name}");
   if (sheet) {
@@ -332,7 +336,7 @@ function buildDeleteSheetScript(intent) {
   }
 }`;
   } else {
-    return `function main() {
+    return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getActiveSheet();
   ss.deleteSheet(sheet);
@@ -341,9 +345,10 @@ function buildDeleteSheetScript(intent) {
 }
 
 function buildActivateSheetScript(intent) {
-  const name = intent.name || "Sheet1";
+  const name = escapeJsString(intent.name || "Sheet1");
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("${name}");
   if (sheet) {
@@ -358,6 +363,7 @@ function buildActivateSheetScript(intent) {
 // ─────────────────────────────
 function buildSortRangeScript(intent) {
   const col = intent.column || { letter: null, index: 1 };
+  const fnName = toAppsScriptFunctionName(intent);
   let colPos = 1;
 
   if (col.letter) colPos = colLetterToPosition(col.letter);
@@ -365,7 +371,7 @@ function buildSortRangeScript(intent) {
 
   const ascending = intent.direction !== "descending";
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const range = sheet.getDataRange();
   range.sort({ column: ${colPos}, ascending: ${ascending ? "true" : "false"} });
@@ -378,6 +384,7 @@ function buildSortRangeScript(intent) {
 // ─────────────────────────────
 function buildFilterRangeScript(intent) {
   const col = intent.column || { letter: null, index: 1 };
+  const fnName = toAppsScriptFunctionName(intent);
   let colPos = 1;
 
   if (col.letter) colPos = colLetterToPosition(col.letter);
@@ -385,7 +392,7 @@ function buildFilterRangeScript(intent) {
 
   const criteria = intent.criteria || "";
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const range = sheet.getDataRange();
 
