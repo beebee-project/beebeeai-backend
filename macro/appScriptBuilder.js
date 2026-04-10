@@ -20,6 +20,10 @@ function toAppsScriptFunctionName(intent = {}) {
   return map[intent?.type] || "runMacro";
 }
 
+function escapeJsString(value = "") {
+  return JSON.stringify(String(value ?? "")).slice(1, -1);
+}
+
 function colLetterToPosition(letter) {
   if (!letter) return 1;
   let result = 0;
@@ -82,6 +86,7 @@ function buildFormatRangeScript(intent) {
   const rangeRef = (intent.target && intent.target.range) || "B:B";
   const s = intent.style || {};
   const lines = [];
+  const fnName = toAppsScriptFunctionName(intent);
 
   // 배경색
   if (s.fillColor) {
@@ -101,8 +106,7 @@ function buildFormatRangeScript(intent) {
   }
   // 밑줄
   if (s.underline) {
-    // 필요 시 TextStyle 기반으로 확장
-    lines.push(`  // underline은 현재 버전에서 미지원(추후 보강)`);
+    lines.push(`  range.setFontLine("underline");`);
   }
   // 정렬
   if (s.horizontalAlign) {
@@ -121,7 +125,7 @@ function buildFormatRangeScript(intent) {
     lines.push(`  // 적용할 서식이 감지되지 않았습니다.`);
   }
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const range = sheet.getRange("${rangeRef}");
 ${lines.join("\n")}
@@ -135,8 +139,9 @@ ${lines.join("\n")}
 function buildSetValueScript(intent) {
   const rangeRef = (intent.target && intent.target.range) || "A1";
   const value = intent.value ?? "";
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const range = sheet.getRange("${rangeRef}");
   range.setValue(${JSON.stringify(value)});
@@ -149,9 +154,9 @@ function buildSetValueScript(intent) {
 // ─────────────────────────────
 function buildCopyRangeScript(intent) {
   const from = intent.from || "A1:A1";
-  const to = intent.to || "B1:B1";
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const source = sheet.getRange("${from}");
   const target = sheet.getRange("${to}");
@@ -166,8 +171,9 @@ function buildCopyRangeScript(intent) {
 // ─────────────────────────────
 function buildClearRangeScript(intent) {
   const rangeRef = (intent.target && intent.target.range) || "A1:A10";
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const range = sheet.getRange("${rangeRef}");
   // 값 + 서식 전체 삭제
@@ -182,8 +188,9 @@ function buildClearRangeScript(intent) {
 function buildMoveRangeScript(intent) {
   const from = intent.from || "A1:A1";
   const to = intent.to || "B1:B1";
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const source = sheet.getRange("${from}");
   const dest = sheet.getRange("${to}");
@@ -200,8 +207,9 @@ function buildMoveRangeScript(intent) {
 // ─────────────────────────────
 function buildInsertRowScript(intent) {
   const rowIndex = intent.rowIndex || 1;
+  const fnName = toAppsScriptFunctionName(intent);
 
-  return `function main() {
+  return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   sheet.insertRows(${rowIndex}, 1);
 }`;
@@ -225,18 +233,19 @@ function buildDeleteRowScript(intent) {
 function buildInsertColumnScript(intent) {
   const col = intent.column || { letter: null, index: 1 };
   const position = intent.position === "left" ? "left" : "right";
+  const fnName = toAppsScriptFunctionName(intent);
 
   let colPos = 1;
   if (col.letter) colPos = colLetterToPosition(col.letter);
   else if (col.index) colPos = col.index;
 
   if (position === "left") {
-    return `function main() {
+    return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   sheet.insertColumnBefore(${colPos});
 }`;
   } else {
-    return `function main() {
+    return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   sheet.insertColumnAfter(${colPos});
 }`;
