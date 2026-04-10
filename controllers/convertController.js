@@ -19,13 +19,18 @@ const {
 const {
   resolveIntent,
   buildResolvedContext,
+  hasResolvedAmbiguity,
 } = require("../utils/intentResolver");
 const {
   detectFormulaCompatibility,
   shouldAttemptCompatibilityFallback,
 } = require("../utils/formulaCompatibility");
 const { tryGenerateFallbackFormula } = require("../utils/formulaFallback");
-const { buildConditionMask } = require("../utils/conditionEngine");
+const {
+  buildConditionMask,
+  buildConditionPairs,
+  canUseIfsPairs,
+} = require("../utils/conditionEngine");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -261,6 +266,23 @@ function getResolverMode(ctx = {}) {
 
 function shouldUseDirectBuilder(intent = {}, ctx = {}) {
   return shouldUseDirectGate(intent, ctx);
+}
+
+function buildAmbiguityError(resolved) {
+  const first = Array.isArray(resolved?.ambiguities)
+    ? resolved.ambiguities[0]
+    : null;
+
+  if (!first) {
+    return `=ERROR("열 이름이 모호합니다. 더 구체적으로 입력해 주세요.")`;
+  }
+
+  const asked = first.header || "요청한 열";
+  const runner = first.runnerUpHeader
+    ? ` (예: '${asked}' vs '${first.runnerUpHeader}')`
+    : "";
+
+  return `=ERROR("열 이름이 모호합니다: ${asked}${runner}. 열 이름을 더 구체적으로 입력해 주세요.")`;
 }
 
 /* ---------------------------------------------
@@ -591,77 +613,12 @@ const formulaBuilder = {
   _formatValue: (val, opts = {}) => formulaUtils.formatValue(val, { ...opts }), // 정책은 상위에서 주입
 
   _buildConditionPairs: function (ctx) {
-    const { intent, allSheetsData } = ctx;
-    if (!allSheetsData) return [];
-    if (!intent?.conditions?.length) return [];
-
-    return intent.conditions
-      .map((c) => {
-        // 1) 어떤 문자열을 헤더 후보로 쓸지 정리
-        let headerText = "";
-
-        if (typeof c?.target === "string") {
-          headerText = c.target;
-        } else if (c?.target && typeof c.target === "object") {
-          // HeaderSpec 형태 { header, sheet, ... } 지원
-          headerText = c.target.header || "";
-        } else if (c?.hint) {
-          // 혹시 과거 포맷과의 호환을 위해 hint도 fallback으로 사용
-          headerText = c.hint;
-        }
-
-        if (!headerText) return null;
-
-        const term = formulaUtils.expandTermsFromText(headerText);
-        const best = formulaUtils.findBestColumnAcrossSheets(
-          allSheetsData,
-          term,
-          "lookup",
-        );
-        if (!best) return null;
-
-        // ✅ 불확실(Top2 gap 좁음)하면 "그럴듯하게 틀림" 방지를 위해 즉시 중단
-        if (best.isAmbiguous) {
-          const candA = best.header || "후보1";
-          const candB = best.runnerUpHeader || "후보2";
-          ctx.__errorFormula = `=ERROR("조건 열이 모호합니다: '${candA}' 또는 '${candB}' 중 선택이 필요합니다.")`;
-          return null;
-        }
-
-        const range = `'${best.sheetName}'!${best.columnLetter}${best.startRow}:${best.columnLetter}${best.lastDataRow}`;
-
-        const op = String(c.operator || "=").trim();
-        const rawVal = c.value;
-
-        // ✅ 값이 비어있으면 조건으로 만들지 않는다 ("" 조건 생성 방지)
-        if (
-          rawVal == null ||
-          (typeof rawVal === "string" && rawVal.trim() === "")
-        ) {
-          return null;
-        }
-
-        // 값도 반드시 포매터를 통과시켜 따옴표/숫자 처리
-        const val = formulaBuilder._formatValue(rawVal);
-
-        // COUNTIFS/SUMIFS/AVERAGEIFS 기준:
-        // - 숫자 비교:  "<=100" 형태
-        // - 날짜/텍스트 비교(>=,<= 등): "<="&DATEVALUE("2023-01-01") 처럼 연결
-        // - contains/starts_with/ends_with: 와일드카드
-        const cmpOps = new Set([">", ">=", "<", "<=", "<>"]);
-        if (cmpOps.has(op)) {
-          if (rawVal != null && !isNaN(rawVal))
-            return `${range}, "${op}${rawVal}"`;
-          return `${range}, "${op}"&${val}`;
-        }
-        if (/^contains$/i.test(op)) return `${range}, "*"&${val}&"*"`;
-        if (/^starts?_with$/i.test(op)) return `${range}, ${val}&"*"`;
-        if (/^ends?_with$/i.test(op)) return `${range}, "*"&${val}`;
-
-        // 기본(=)
-        return `${range}, ${val}`;
-      })
-      .filter(Boolean);
+    return buildConditionPairs(ctx, (v, o) =>
+      formulaUtils.formatValue(v, {
+        ...(ctx?.formatOptions || {}),
+        ...(o || {}),
+      }),
+    );
   },
 
   _buildConditionMask: function (ctx) {
@@ -671,6 +628,10 @@ const formulaBuilder = {
         ...(o || {}),
       }),
     );
+  },
+
+  _canUseIfsPairs: function (ctx) {
+    return canUseIfsPairs(ctx);
   },
 };
 Object.assign(formulaBuilder, logicalFunctionBuilder);
@@ -1371,7 +1332,49 @@ exports.handleConversion = async (req, res, next) => {
       }
     }
 
-    // 5) direct(파일無) 빠른 경로
+    // 5) resolver ambiguity 차단
+    if (hasResolvedAmbiguity?.(context?.resolved)) {
+      const out = buildAmbiguityError(context.resolved);
+      const compatibility = detectFormulaCompatibility(out);
+      const debugMeta = buildDebugMeta({
+        rawReason: "AMBIGUOUS_COLUMN_MATCH",
+        cacheHit: _dbgCacheHit,
+        intentOp: intent?.operation,
+        intentCacheKey: _dbgIntentCacheKey,
+        intentVersion: INTENT_VERSION,
+        clusterVersion: CLUSTER_VERSION,
+        resolverMode: getResolverMode(context),
+        validator: null,
+        timing: {
+          preprocess: _ms(_tPreStart, _tPreEnd),
+          intent: _ms(_tIntentStart, _tIntentEnd),
+          build: _ms(_tBuildStart, _tBuildEnd),
+          total: Date.now() - startedAt,
+        },
+        extra: {
+          compatibilityLevel: compatibility?.level || null,
+          fallbackAttempted: false,
+          fallbackFunctions: [],
+          resolvedBaseSheet: context?.resolved?.baseSheet || null,
+          resolvedReturnHeaders:
+            context?.resolved?.returnColumns
+              ?.map((x) => x?.header)
+              .filter(Boolean) || [],
+          resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
+          resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+          ambiguities: context?.resolved?.ambiguities || [],
+        },
+      });
+
+      return sendFormulaResponse(res, {
+        excelFormula: out,
+        sheetsFormula: out,
+        compatibility,
+        debugMeta,
+      });
+    }
+
+    // 6) direct(파일無) 빠른 경로
     if (
       direct?.canHandleWithoutFile?.(intent) &&
       shouldUseDirectBuilder(intent, context)
@@ -1421,6 +1424,7 @@ exports.handleConversion = async (req, res, next) => {
             resolvedLookupHeader:
               context?.resolved?.lookupColumn?.header || null,
             resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+            ambiguities: context?.resolved?.ambiguities || [],
           },
         });
 

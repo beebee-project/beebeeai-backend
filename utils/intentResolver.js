@@ -1,5 +1,11 @@
 const formulaUtils = require("./formulaUtils");
 
+function hasResolvedAmbiguity(resolved) {
+  return (
+    Array.isArray(resolved?.ambiguities) && resolved.ambiguities.length > 0
+  );
+}
+
 function toRef(sheetName, header, meta, sheetInfo) {
   if (!meta || !sheetInfo) return null;
   const columnLetter = meta.columnLetter;
@@ -228,8 +234,36 @@ function resolveIntent(ctx) {
       resolved.ambiguities.push({
         header: c.header,
         sheetName: c.sheetName,
+        source: "resolved-column",
         gap: c.ambiguityGap ?? null,
         runnerUpHeader: c.runnerUpHeader ?? null,
+      });
+    }
+  }
+
+  for (const f of resolved.filterColumns || []) {
+    if (f?.logical_operator && Array.isArray(f.conditions)) {
+      for (const inner of f.conditions) {
+        if (inner?.ref?.isAmbiguous) {
+          resolved.ambiguities.push({
+            header: inner.ref.header,
+            sheetName: inner.ref.sheetName,
+            source: "filter",
+            gap: inner.ref.ambiguityGap ?? null,
+            runnerUpHeader: inner.ref.runnerUpHeader ?? null,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (f?.ref?.isAmbiguous) {
+      resolved.ambiguities.push({
+        header: f.ref.header,
+        sheetName: f.ref.sheetName,
+        source: "filter",
+        gap: f.ref.ambiguityGap ?? null,
+        runnerUpHeader: f.ref.runnerUpHeader ?? null,
       });
     }
   }
@@ -238,15 +272,22 @@ function resolveIntent(ctx) {
 }
 
 function buildResolvedContext(ctx, resolved) {
+  const ambiguous = hasResolvedAmbiguity(resolved);
   return {
     ...ctx,
     resolved,
-    bestReturn: resolved?.returnColumns?.[0] || ctx.bestReturn || null,
-    bestLookup: resolved?.lookupColumn || ctx.bestLookup || null,
+    // ambiguity가 있으면 느슨한 best fallback 금지
+    bestReturn: ambiguous
+      ? null
+      : resolved?.returnColumns?.[0] || ctx.bestReturn || null,
+    bestLookup: ambiguous
+      ? null
+      : resolved?.lookupColumn || ctx.bestLookup || null,
   };
 }
 
 module.exports = {
+  hasResolvedAmbiguity,
   resolveIntent,
   buildResolvedContext,
 };
