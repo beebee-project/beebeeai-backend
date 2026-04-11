@@ -26,7 +26,7 @@ function ensureAbsoluteUrl(url, fallbackOrigin) {
 exports.getUsage = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select(
-      "plan usage subscription"
+      "plan usage subscription",
     );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
@@ -49,8 +49,8 @@ exports.getUsage = async (req, res) => {
     const plan = paymentService.isBetaMode()
       ? paymentService.getEffectivePlan(user.plan)
       : isSubscribed
-      ? "PRO"
-      : "FREE";
+        ? "PRO"
+        : "FREE";
 
     const limits =
       plan === "PRO"
@@ -90,7 +90,7 @@ exports.getPlans = (req, res) => {
       },
       {
         code: "PRO",
-        price: 4900,
+        price: 100,
         interval: "month",
         features: ["우선지원", "고급기능"],
         available: !paymentService.isBetaMode(),
@@ -185,7 +185,7 @@ exports.startSubscription = async (req, res) => {
             "subscription.cancelAtPeriodEnd": false,
           },
           // billingKey/customerKey는 유지 (A 정책)
-        }
+        },
       );
     }
 
@@ -201,11 +201,11 @@ exports.startSubscription = async (req, res) => {
     // env에서 받은 URL을 '절대 URL'로 강제 보정
     const successUrl = ensureAbsoluteUrl(
       process.env.SUBSCRIPTION_SUCCESS_URL || `${origin}/success.html`,
-      origin
+      origin,
     );
     const failUrl = ensureAbsoluteUrl(
       process.env.SUBSCRIPTION_FAIL_URL || `${origin}/fail.html`,
-      origin
+      origin,
     );
 
     // 최종 형식 검증: 여기서 걸리면 Toss로 보내기 전에 서버가 막아줌
@@ -259,7 +259,29 @@ exports.completeSubscription = async (req, res) => {
       return res.status(500).json({ error: "billingKey 발급 실패" });
     }
 
-    // 구독 등록 완료: 즉시 ACTIVE, 다음 청구일은 1개월 후
+    // 👉 추가: 첫 결제 실행
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 100);
+    const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
+    const orderId = `init-${customerKey}-${Date.now()}`;
+
+    try {
+      await paymentService.chargeBillingKey({
+        billingKey: issued.billingKey,
+        customerKey,
+        amount,
+        orderId,
+        orderName,
+        idempotencyKey: orderId,
+      });
+    } catch (e) {
+      console.error("초기 결제 실패:", e);
+      return res.status(402).json({
+        error: "첫 결제 승인 실패",
+        detail: e?.response?.data || e.message,
+      });
+    }
+
+    // 👉 결제 성공한 경우만 ACTIVE
     const now = new Date();
     const nextChargeAt = paymentService.addMonths(now, 1);
 
@@ -275,7 +297,7 @@ exports.completeSubscription = async (req, res) => {
       startedAt: user.subscription?.startedAt || now,
       trialEndsAt: null,
       nextChargeAt,
-      lastChargedAt: null,
+      lastChargedAt: now,
     };
 
     await user.save();
@@ -349,11 +371,11 @@ exports.cronCharge = async (req, res) => {
           // 정책적으로 nextChargeAt은 "더 이상 청구 없음"이므로 null로 정리 추천
           "subscription.nextChargeAt": null,
         },
-      }
+      },
     );
 
     // 2) 구독 청구 금액/상품명
-    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 100);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
     // 3) 청구 대상 조회: ACTIVE/PAST_DUE + nextChargeAt 도래 + billingKey 존재
@@ -364,7 +386,7 @@ exports.cronCharge = async (req, res) => {
         "subscription.nextChargeAt": { $ne: null, $lte: now },
         "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
       },
-      "_id subscription"
+      "_id subscription",
     ).lean();
 
     console.log("[cronCharge] targets", targets.length);
@@ -409,7 +431,7 @@ exports.cronCharge = async (req, res) => {
             "subscription.lastOrderId": orderId,
             "subscription.lastChargeAttemptAt": now,
           },
-        }
+        },
       );
 
       if (!lock?.modifiedCount) continue;
@@ -441,7 +463,7 @@ exports.cronCharge = async (req, res) => {
               "subscription.lastChargeError": "",
               "subscription.chargeLockKey": "",
             },
-          }
+          },
         );
 
         successCount += 1;
@@ -454,13 +476,13 @@ exports.cronCharge = async (req, res) => {
             $set: {
               "subscription.status": "PAST_DUE",
               "subscription.lastChargeError": String(
-                e?.response?.data?.message || e?.message || e
+                e?.response?.data?.message || e?.message || e,
               ).slice(0, 500),
             },
             $unset: {
               "subscription.chargeLockKey": "",
             },
-          }
+          },
         );
       }
     }
