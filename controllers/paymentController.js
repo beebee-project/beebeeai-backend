@@ -90,7 +90,7 @@ exports.getPlans = (req, res) => {
       },
       {
         code: "PRO",
-        price: 100,
+        price: 4900,
         interval: "month",
         features: ["우선지원", "고급기능"],
         available: !paymentService.isBetaMode(),
@@ -259,29 +259,7 @@ exports.completeSubscription = async (req, res) => {
       return res.status(500).json({ error: "billingKey 발급 실패" });
     }
 
-    // 👉 추가: 첫 결제 실행
-    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 100);
-    const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
-    const orderId = `init-${customerKey}-${Date.now()}`;
-
-    try {
-      await paymentService.chargeBillingKey({
-        billingKey: issued.billingKey,
-        customerKey,
-        amount,
-        orderId,
-        orderName,
-        idempotencyKey: orderId,
-      });
-    } catch (e) {
-      console.error("초기 결제 실패:", e);
-      return res.status(402).json({
-        error: "첫 결제 승인 실패",
-        detail: e?.response?.data || e.message,
-      });
-    }
-
-    // 👉 결제 성공한 경우만 ACTIVE
+    // 구독 등록 완료: 즉시 ACTIVE, 다음 청구일은 1개월 후
     const now = new Date();
     const nextChargeAt = paymentService.addMonths(now, 1);
 
@@ -297,7 +275,7 @@ exports.completeSubscription = async (req, res) => {
       startedAt: user.subscription?.startedAt || now,
       trialEndsAt: null,
       nextChargeAt,
-      lastChargedAt: now,
+      lastChargedAt: null,
     };
 
     await user.save();
@@ -375,7 +353,7 @@ exports.cronCharge = async (req, res) => {
     );
 
     // 2) 구독 청구 금액/상품명
-    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 100);
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
     // 3) 청구 대상 조회: ACTIVE/PAST_DUE + nextChargeAt 도래 + billingKey 존재
