@@ -36,6 +36,14 @@ function colLetterToPosition(letter) {
   return result; // 1-based
 }
 
+function getAppsScriptRangeExpr(intent) {
+  const rangeRef = intent?.target?.range || null;
+  if (!rangeRef || rangeRef === "__USED_RANGE__") {
+    return "sheet.getDataRange()";
+  }
+  return `sheet.getRange("${rangeRef}")`;
+}
+
 function buildAppsScript(intent) {
   if (!intent || !intent.type) {
     return fallbackScript("잘못된 intent");
@@ -209,16 +217,13 @@ function buildMoveRangeScript(intent) {
 // ─────────────────────────────
 function buildRemoveDuplicatesScript(intent) {
   const fnName = toAppsScriptFunctionName(intent);
-  const rangeRef = (intent.target && intent.target.range) || null;
   const col = intent.column || { letter: null, index: 1 };
 
   let colPos = 1;
   if (col.letter) colPos = colLetterToPosition(col.letter);
   else if (col.index) colPos = col.index;
 
-  const rangeExpr = rangeRef
-    ? `sheet.getRange("${rangeRef}")`
-    : `sheet.getDataRange()`;
+  const rangeExpr = getAppsScriptRangeExpr(intent);
 
   return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -400,7 +405,7 @@ function buildSortRangeScript(intent) {
 
   return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  const range = sheet.getDataRange();
+  const range = ${getAppsScriptRangeExpr(intent)};
   range.sort({ column: ${colPos}, ascending: ${ascending ? "true" : "false"} });
 }`;
 }
@@ -421,7 +426,7 @@ function buildFilterRangeScript(intent) {
 
   return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  const range = sheet.getDataRange();
+  const range = ${getAppsScriptRangeExpr(intent)};
 
   let filter = range.getFilter();
   if (!filter) {

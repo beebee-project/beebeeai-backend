@@ -110,6 +110,18 @@ function getRemoveDuplicatesRangeRef(intent) {
   return (intent?.target && intent.target.range) || "ActiveSheet.UsedRange";
 }
 
+function getVbaRangeExpr(intent, fallback = "ActiveSheet.UsedRange") {
+  const rangeRef = intent?.target?.range || null;
+  if (!rangeRef || rangeRef === "__USED_RANGE__") return fallback;
+  return `Range("${rangeRef}")`;
+}
+
+function getVbaHeaderConst(intent) {
+  if (intent?.hasHeader === true) return "xlYes";
+  if (intent?.hasHeader === false) return "xlNo";
+  return "xlGuess";
+}
+
 /* =========================
  * 1) 서식
  * =======================*/
@@ -221,6 +233,7 @@ function buildRemoveDuplicatesVba(intent) {
   const procName = toMacroProcedureName(intent);
   const rangeRef = getRemoveDuplicatesRangeRef(intent);
   const col = getColumnLetterOrIndex(intent.column);
+  const headerConst = getVbaHeaderConst(intent);
 
   let columnsExpr = "Array(1)";
   if (col.index) {
@@ -230,12 +243,12 @@ function buildRemoveDuplicatesVba(intent) {
   }
 
   const targetExpr =
-    rangeRef === "ActiveSheet.UsedRange"
+    rangeRef === "ActiveSheet.UsedRange" || rangeRef === "__USED_RANGE__"
       ? "ActiveSheet.UsedRange"
       : `Range("${rangeRef}")`;
 
   return `Sub ${procName}()
-    ${targetExpr}.RemoveDuplicates Columns:=${columnsExpr}, Header:=xlGuess
+    ${targetExpr}.RemoveDuplicates Columns:=${columnsExpr}, Header:=${headerConst}
 End Sub`;
 }
 
@@ -246,6 +259,8 @@ function buildSortRangeVba(intent) {
   const col = getColumnLetterOrIndex(intent.column);
   const order = sortOrderToVba(intent.direction || "ascending");
   const procName = toMacroProcedureName(intent);
+  const rangeExpr = getVbaRangeExpr(intent);
+  const headerConst = getVbaHeaderConst(intent);
 
   let keyRef = 'Range("A:A")';
   if (col.letter) {
@@ -258,8 +273,8 @@ function buildSortRangeVba(intent) {
     With ActiveSheet.Sort
         .SortFields.Clear
         .SortFields.Add Key:=${keyRef}, SortOn:=xlSortOnValues, Order:=${order}, DataOption:=xlSortNormal
-        .SetRange ActiveSheet.UsedRange
-        .Header = xlGuess
+        .SetRange ${rangeExpr}
+        .Header = ${headerConst}
         .MatchCase = False
         .Orientation = xlTopToBottom
         .Apply
@@ -274,12 +289,13 @@ function buildFilterRangeVba(intent) {
   const col = getColumnLetterOrIndex(intent.column);
   const criteria = escapeVbaString(intent.criteria || "");
   const procName = toMacroProcedureName(intent);
+  const rangeExpr = getVbaRangeExpr(intent);
 
   const fieldExpr =
     col.index || (col.letter ? `Range("${col.letter}1").Column` : 1);
 
   return `Sub ${procName}()
-    ActiveSheet.UsedRange.AutoFilter Field:=${fieldExpr}, Criteria1:="${criteria}"
+    ${rangeExpr}.AutoFilter Field:=${fieldExpr}, Criteria1:="${criteria}"
 End Sub`;
 }
 
