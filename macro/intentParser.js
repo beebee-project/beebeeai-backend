@@ -199,6 +199,45 @@ function detectSheetNameLoose(text) {
   return m ? m[1].trim() : null;
 }
 
+function detectTargetRange(text) {
+  const range = detectRange(text);
+  if (range) return range;
+
+  const t = String(text || "").toLowerCase();
+  if (
+    t.includes("전체 데이터") ||
+    t.includes("전체 범위") ||
+    t.includes("현재 시트 전체") ||
+    t.includes("사용중인 범위") ||
+    t.includes("usedrange")
+  ) {
+    return "__USED_RANGE__";
+  }
+
+  return null;
+}
+
+function detectHeaderFlag(text) {
+  const t = String(text || "").toLowerCase();
+  if (
+    t.includes("헤더 포함") ||
+    t.includes("제목 포함") ||
+    t.includes("첫 행은 제목") ||
+    t.includes("첫줄은 제목")
+  ) {
+    return true;
+  }
+  if (
+    t.includes("헤더 제외") ||
+    t.includes("제목 제외") ||
+    t.includes("헤더 없음") ||
+    t.includes("제목 없음")
+  ) {
+    return false;
+  }
+  return null;
+}
+
 function parseMacroIntent(text) {
   if (!text || typeof text !== "string") {
     return { type: "unknown", text: "" };
@@ -236,12 +275,14 @@ function parseMacroIntent(text) {
 
   if (hasDuplicateKeyword && hasRemoveKeyword) {
     const colInfo = detectColumnInfo(originalText); // { letter, index }
-    const range = detectRange(originalText); // 없으면 null
+    const range = detectTargetRange(originalText);
+    const hasHeader = detectHeaderFlag(originalText);
 
     return {
       type: "removeDuplicates",
       target: { range: range || null },
       column: colInfo,
+      hasHeader,
       text: originalText,
     };
   }
@@ -362,6 +403,8 @@ function parseMacroIntent(text) {
 
   if (hasSortKeyword) {
     const colInfo = detectColumnInfo(originalText); // { letter, index }
+    const range = detectTargetRange(originalText);
+    const hasHeader = detectHeaderFlag(originalText);
 
     let direction = "ascending";
     if (
@@ -376,8 +419,10 @@ function parseMacroIntent(text) {
 
     return {
       type: "sortRange",
+      target: { range: range || null },
       column: colInfo, // { letter, index }
       direction,
+      hasHeader,
       text: originalText,
     };
   }
@@ -394,11 +439,15 @@ function parseMacroIntent(text) {
   if (hasFilterKeyword) {
     const colInfo = detectColumnInfo(originalText); // { letter, index }
     const criteria = detectFilterCriteria(originalText) || "";
+    const range = detectTargetRange(originalText);
+    const hasHeader = detectHeaderFlag(originalText);
 
     return {
       type: "filterRange",
+      target: { range: range || null },
       column: colInfo,
       criteria,
+      hasHeader,
       text: originalText,
     };
   }
