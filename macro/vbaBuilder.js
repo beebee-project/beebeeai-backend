@@ -5,6 +5,7 @@ function toMacroProcedureName(intent = {}) {
     copyRange: "CopyRangeMacro",
     clearRange: "ClearRangeMacro",
     moveRange: "MoveRangeMacro",
+    removeDuplicates: "RemoveDuplicatesMacro",
     sortRange: "SortRangeMacro",
     filterRange: "FilterRangeMacro",
     insertRow: "InsertRowMacro",
@@ -57,6 +58,8 @@ function buildVbaScript(intent) {
       return buildClearRangeVba(intent);
     case "moveRange":
       return buildMoveRangeVba(intent);
+    case "removeDuplicates":
+      return buildRemoveDuplicatesVba(intent);
     case "sortRange":
       return buildSortRangeVba(intent);
     case "filterRange":
@@ -101,6 +104,10 @@ function getColumnLetterOrIndex(col) {
 
 function sortOrderToVba(direction = "ascending") {
   return direction === "descending" ? "xlDescending" : "xlAscending";
+}
+
+function getRemoveDuplicatesRangeRef(intent) {
+  return (intent?.target && intent.target.range) || "ActiveSheet.UsedRange";
 }
 
 /* =========================
@@ -204,6 +211,31 @@ function buildMoveRangeVba(intent) {
 
   return `Sub ${procName}()
     Range("${from}").Cut Destination:=Range("${to}")
+End Sub`;
+}
+
+/* =========================
++ * 5-1) 중복 제거
++ * =======================*/
+function buildRemoveDuplicatesVba(intent) {
+  const procName = toMacroProcedureName(intent);
+  const rangeRef = getRemoveDuplicatesRangeRef(intent);
+  const col = getColumnLetterOrIndex(intent.column);
+
+  let columnsExpr = "Array(1)";
+  if (col.index) {
+    columnsExpr = `Array(${col.index})`;
+  } else if (col.letter) {
+    columnsExpr = `Array(Range("${col.letter}1").Column)`;
+  }
+
+  const targetExpr =
+    rangeRef === "ActiveSheet.UsedRange"
+      ? "ActiveSheet.UsedRange"
+      : `Range("${rangeRef}")`;
+
+  return `Sub ${procName}()
+    ${targetExpr}.RemoveDuplicates Columns:=${columnsExpr}, Header:=xlGuess
 End Sub`;
 }
 

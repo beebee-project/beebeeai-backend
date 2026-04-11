@@ -206,6 +206,68 @@ function parseMacroIntent(text) {
 
   const originalText = text;
   const tNorm = normalize(text.toLowerCase());
+  const hasDeleteKeyword =
+    tNorm.includes("삭제") || tNorm.includes("지워") || tNorm.includes("제거");
+  const hasClearKeyword =
+    tNorm.includes("비워") ||
+    tNorm.includes("초기화") ||
+    tNorm.includes("clear") ||
+    (hasDeleteKeyword &&
+      (tNorm.includes("셀") ||
+        tNorm.includes("범위") ||
+        /[a-z]+\d+/i.test(originalText) ||
+        /[a-z]\s*열/i.test(originalText) ||
+        /[0-9]+\s*행/i.test(originalText)));
+
+  // ─────────────────────────────
+  // 0-1) 중복 제거 (removeDuplicates)
+  // 예: "A열 기준으로 중복 제거", "중복된 행 삭제", "중복값 제거"
+  // ─────────────────────────────
+  const hasDuplicateKeyword =
+    tNorm.includes("중복") ||
+    tNorm.includes("duplicate") ||
+    tNorm.includes("중복값");
+
+  const hasRemoveKeyword =
+    tNorm.includes("제거") ||
+    tNorm.includes("삭제") ||
+    tNorm.includes("없애") ||
+    tNorm.includes("지워");
+
+  if (hasDuplicateKeyword && hasRemoveKeyword) {
+    const colInfo = detectColumnInfo(originalText); // { letter, index }
+    const range = detectRange(originalText); // 없으면 null
+
+    return {
+      type: "removeDuplicates",
+      target: { range: range || null },
+      column: colInfo,
+      text: originalText,
+    };
+  }
+
+  // ─────────────────────────────
+  // 0) 범위 지우기 (clearRange)
+  // deleteRow/deleteColumn보다 먼저 처리해서
+  // "A1 지워줘", "C열 비워줘" 같은 요청을 범위 삭제로 인식
+  // ─────────────────────────────
+  if (
+    hasClearKeyword &&
+    !tNorm.includes("시트") &&
+    !(
+      tNorm.includes("행") &&
+      !/[a-z]+\d+/i.test(originalText) &&
+      !/[a-z]\s*열/i.test(originalText)
+    ) &&
+    !(tNorm.includes("열") && !/[a-z]+\d+/i.test(originalText))
+  ) {
+    const range = detectRange(originalText) || "A1";
+    return {
+      type: "clearRange",
+      target: { range },
+      text: originalText,
+    };
+  }
 
   // ─────────────────────────────
   // 1) 형식(서식) 관련 (1단계)
@@ -344,9 +406,6 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   // 5) 행/열 삭제 (deleteRow / deleteColumn)
   // ─────────────────────────────
-  const hasDeleteKeyword =
-    tNorm.includes("삭제") || tNorm.includes("지워") || tNorm.includes("제거");
-
   if (hasDeleteKeyword && tNorm.includes("행")) {
     const rowMatch = tNorm.match(/([0-9]+)\s*행/);
     const rowIndex = rowMatch ? parseInt(rowMatch[1], 10) : 1;
@@ -371,7 +430,10 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   if (
     tNorm.includes("행") &&
-    (tNorm.includes("추가") || tNorm.includes("삽입"))
+    (tNorm.includes("추가") ||
+      tNorm.includes("삽입") ||
+      tNorm.includes("넣어") ||
+      tNorm.includes("만들어"))
   ) {
     const rowMatch = tNorm.match(/([0-9]+)\s*행/);
     const rowIndex = rowMatch ? parseInt(rowMatch[1], 10) : 1;
@@ -388,7 +450,10 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   if (
     tNorm.includes("열") &&
-    (tNorm.includes("추가") || tNorm.includes("삽입"))
+    (tNorm.includes("추가") ||
+      tNorm.includes("삽입") ||
+      tNorm.includes("넣어") ||
+      tNorm.includes("만들어"))
   ) {
     const colInfo = detectColumnInfo(originalText);
     let position = "right";
@@ -426,7 +491,11 @@ function parseMacroIntent(text) {
     const anyName = quotedName || looseName;
 
     // 9-1) 시트 생성
-    if (tNorm.includes("생성") || tNorm.includes("만들")) {
+    if (
+      tNorm.includes("생성") ||
+      tNorm.includes("만들") ||
+      tNorm.includes("추가")
+    ) {
       const name = quotedName || "NewSheet";
       return {
         type: "createSheet",

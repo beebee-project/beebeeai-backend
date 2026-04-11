@@ -5,6 +5,7 @@ function toAppsScriptFunctionName(intent = {}) {
     copyRange: "copyRangeMacro",
     clearRange: "clearRangeMacro",
     moveRange: "moveRangeMacro",
+    removeDuplicates: "removeDuplicatesMacro",
     sortRange: "sortRangeMacro",
     filterRange: "filterRangeMacro",
     insertRow: "insertRowMacro",
@@ -51,6 +52,8 @@ function buildAppsScript(intent) {
       return buildClearRangeScript(intent);
     case "moveRange":
       return buildMoveRangeScript(intent);
+    case "removeDuplicates":
+      return buildRemoveDuplicatesScript(intent);
     case "insertRow":
       return buildInsertRowScript(intent);
     case "deleteRow":
@@ -197,6 +200,30 @@ function buildMoveRangeScript(intent) {
   // 값+서식 복사 후 원본 지우기 = 이동
   source.copyTo(dest, { contentsOnly: false });
   source.clear();
+}`;
+}
+
+// ─────────────────────────────
+// 5-1) 중복 제거 (removeDuplicates)
+// intent: { type: "removeDuplicates", target?: { range }, column?: { letter, index } }
+// ─────────────────────────────
+function buildRemoveDuplicatesScript(intent) {
+  const fnName = toAppsScriptFunctionName(intent);
+  const rangeRef = (intent.target && intent.target.range) || null;
+  const col = intent.column || { letter: null, index: 1 };
+
+  let colPos = 1;
+  if (col.letter) colPos = colLetterToPosition(col.letter);
+  else if (col.index) colPos = col.index;
+
+  const rangeExpr = rangeRef
+    ? `sheet.getRange("${rangeRef}")`
+    : `sheet.getDataRange()`;
+
+  return `function ${fnName}() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const range = ${rangeExpr};
+  range.removeDuplicates([${colPos}]);
 }`;
 }
 
