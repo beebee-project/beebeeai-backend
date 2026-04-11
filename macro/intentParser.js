@@ -6,9 +6,9 @@ function normalize(text) {
 function detectRange(text) {
   const upper = text.toUpperCase();
 
-  // A1~C10, A1부터 C10까지
+  // A1:C10, A1~C10, A1부터 C10까지
   const blockMatch = upper.match(
-    /([A-Z][0-9]+)\s*(?:부터|~|-)\s*([A-Z][0-9]+)/,
+    /([A-Z][0-9]+)\s*(?::|부터|~|-)\s*([A-Z][0-9]+)/,
   );
   if (blockMatch) {
     return `${blockMatch[1]}:${blockMatch[2]}`;
@@ -200,9 +200,6 @@ function detectSheetNameLoose(text) {
 }
 
 function detectTargetRange(text) {
-  const range = detectRange(text);
-  if (range) return range;
-
   const t = String(text || "").toLowerCase();
   if (
     t.includes("전체 데이터") ||
@@ -213,6 +210,9 @@ function detectTargetRange(text) {
   ) {
     return "__USED_RANGE__";
   }
+
+  const range = detectRange(text);
+  if (range) return range;
 
   return null;
 }
@@ -299,8 +299,7 @@ function parseMacroIntent(text) {
       tNorm.includes("행") &&
       !/[a-z]+\d+/i.test(originalText) &&
       !/[a-z]\s*열/i.test(originalText)
-    ) &&
-    !(tNorm.includes("열") && !/[a-z]+\d+/i.test(originalText))
+    )
   ) {
     const range = detectRange(originalText) || "A1";
     return {
@@ -323,7 +322,13 @@ function parseMacroIntent(text) {
     tNorm.includes("글씨") ||
     tNorm.includes("폰트") ||
     tNorm.includes("글자") ||
-    tNorm.includes("정렬") ||
+    tNorm.includes("가운데 정렬") ||
+    tNorm.includes("중앙 정렬") ||
+    tNorm.includes("센터") ||
+    tNorm.includes("오른쪽 정렬") ||
+    tNorm.includes("우측 정렬") ||
+    tNorm.includes("왼쪽 정렬") ||
+    tNorm.includes("좌측 정렬") ||
     tNorm.includes("테두리");
 
   if (hasFormatKeyword) {
