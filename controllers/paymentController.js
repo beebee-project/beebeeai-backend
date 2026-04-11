@@ -90,7 +90,7 @@ exports.getPlans = (req, res) => {
       },
       {
         code: "PRO",
-        price: 4900,
+        price: 5900,
         interval: "month",
         features: ["우선지원", "고급기능"],
         available: !paymentService.isBetaMode(),
@@ -353,7 +353,7 @@ exports.cronCharge = async (req, res) => {
     );
 
     // 2) 구독 청구 금액/상품명
-    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 4900);
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 5900);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
     // 3) 청구 대상 조회: ACTIVE/PAST_DUE + nextChargeAt 도래 + billingKey 존재
