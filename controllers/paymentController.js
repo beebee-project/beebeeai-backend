@@ -314,6 +314,49 @@ exports.completeSubscription = async (req, res) => {
   }
 };
 
+// 테스트용: 현재 로그인한 유저만 nextChargeAt을 과거로 변경
+exports.forceChargeForUser = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const past = new Date(Date.now() - 60 * 1000); // 1분 전
+
+    const result = await User.updateOne(
+      {
+        _id: userId,
+        plan: "PRO",
+        "subscription.billingKey": { $exists: true, $ne: null },
+        "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
+      },
+      {
+        $set: {
+          "subscription.nextChargeAt": past,
+        },
+        $unset: {
+          "subscription.lastChargeKey": "",
+          "subscription.chargeLockKey": "",
+          "subscription.lastChargeError": "",
+        },
+      },
+    );
+
+    if (!result.modifiedCount) {
+      return res.status(400).json({
+        ok: false,
+        error: "테스트 대상이 아닙니다. PRO/billingKey/status를 확인해주세요.",
+      });
+    }
+
+    return res.json({
+      ok: true,
+      message: "테스트용 nextChargeAt 변경 완료",
+      nextChargeAt: past,
+    });
+  } catch (e) {
+    console.error("forceChargeForUser error:", e);
+    return res.status(500).json({ error: "forceChargeForUser 실패" });
+  }
+};
+
 exports.cronCharge = async (req, res) => {
   const now = new Date();
 
