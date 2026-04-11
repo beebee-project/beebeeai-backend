@@ -5,8 +5,7 @@
   "main": "app.js",
   "license": "ISC",
   "scripts": {
-    "start": "node app.js",
-    "cron:charge": "node cron/cronCharge.js"
+    "start": "node app.js"
   },
   "engines": {
     "node": "20.x"

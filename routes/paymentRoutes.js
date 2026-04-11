@@ -11,11 +11,6 @@ router.post("/confirm", protect, ctrl.confirmPayment);
 router.post("/subscription/start", protect, ctrl.startSubscription);
 router.post("/subscription/complete", protect, ctrl.completeSubscription);
 router.post("/subscription/cancel", protect, ctrl.cancelSubscription);
-router.post(
-  "/subscription/force-charge-test",
-  protect,
-  ctrl.forceChargeForUser,
-);
 
 router.post("/cron/charge", requireCronSecret, ctrl.cronCharge);
 
