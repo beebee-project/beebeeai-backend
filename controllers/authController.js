@@ -49,14 +49,14 @@ exports.signup = async (req, res, next) => {
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
-    const emailHash = sha256(normalizedEmail);
+    const blockedEmailHash = emailHash(normalizedEmail);
     const now = new Date();
 
     // ✅ 30일 재가입 차단(탈퇴 계정이 purgeAt 이전이면 차단)
     const blocked = await User.findOne({
       isDeleted: true,
       purgeAt: { $ne: null, $gt: now },
-      "authIdentity.emailHash": emailHash,
+      "authIdentity.emailHash": blockedEmailHash,
     }).select("purgeAt");
 
     if (blocked?.purgeAt) {
@@ -139,14 +139,14 @@ exports.login = async (req, res, next) => {
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
-    const emailHash = sha256(normalizedEmail);
+    const blockedEmailHash = emailHash(normalizedEmail);
     const now = new Date();
 
     // ✅ 30일 재가입 차단: 탈퇴한 이메일이면 로그인 시도도 안내 UX로 막기
     const blocked = await User.findOne({
       isDeleted: true,
       purgeAt: { $ne: null, $gt: now },
-      "authIdentity.emailHash": emailHash,
+      "authIdentity.emailHash": blockedEmailHash,
     }).select("purgeAt");
 
     if (blocked?.purgeAt) {
