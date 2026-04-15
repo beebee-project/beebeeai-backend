@@ -76,6 +76,28 @@ function detectColumnInfo(text) {
   return { letter: null, index: null };
 }
 
+function detectAllColumnInfos(text) {
+  const upper = text.toUpperCase();
+  const matches = [...upper.matchAll(/([A-Z])\s*열/g)];
+  return matches.map((m) => ({ letter: m[1], index: null }));
+}
+
+function detectAggregateType(text) {
+  const t = String(text || "").toLowerCase();
+  if (t.includes("평균") || t.includes("average")) return "average";
+  if (t.includes("합계") || t.includes("합산") || t.includes("sum"))
+    return "sum";
+  if (
+    t.includes("개수") ||
+    t.includes("갯수") ||
+    t.includes("개수를") ||
+    t.includes("수를") ||
+    t.includes("count")
+  )
+    return "count";
+  return null;
+}
+
 function detectColors(text) {
   const t = text.toLowerCase();
   const colorMap = [
@@ -257,6 +279,31 @@ function parseMacroIntent(text) {
         /[a-z]+\d+/i.test(originalText) ||
         /[a-z]\s*열/i.test(originalText) ||
         /[0-9]+\s*행/i.test(originalText)));
+
+  // ─────────────────────────────
+  // 0-2) 그룹 집계 (groupByAggregate)
+  // 예: "A열 기준 개수", "A열 기준 B열 평균", "부서별 평균 연봉"
+  // ─────────────────────────────
+  const hasGroupByKeyword = tNorm.includes("기준") || tNorm.includes("별");
+  const aggregateType = detectAggregateType(originalText);
+
+  if (hasGroupByKeyword && aggregateType) {
+    const allCols = detectAllColumnInfos(originalText);
+    const groupByColumn = allCols[0] || detectColumnInfo(originalText);
+    const valueColumn = aggregateType === "count" ? null : allCols[1] || null;
+    const range = detectTargetRange(originalText);
+
+    if (groupByColumn?.letter || groupByColumn?.index) {
+      return {
+        type: "groupByAggregate",
+        target: { range: range || "__USED_RANGE__" },
+        groupByColumn,
+        valueColumn,
+        aggregateType,
+        text: originalText,
+      };
+    }
+  }
 
   // ─────────────────────────────
   // 0-1) 중복 제거 (removeDuplicates)

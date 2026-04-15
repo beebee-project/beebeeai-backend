@@ -1,5 +1,6 @@
 function toAppsScriptFunctionName(intent = {}) {
   const map = {
+    groupByAggregate: "groupByAggregateMacro",
     formatRange: "formatRangeMacro",
     setValue: "setValueMacro",
     copyRange: "copyRangeMacro",
@@ -44,12 +45,21 @@ function getAppsScriptRangeExpr(intent) {
   return `sheet.getRange("${rangeRef}")`;
 }
 
+function getColumnPosition(col) {
+  if (!col) return 1;
+  if (col.letter) return colLetterToPosition(col.letter);
+  if (col.index) return col.index;
+  return 1;
+}
+
 function buildAppsScript(intent) {
   if (!intent || !intent.type) {
     return fallbackScript("잘못된 intent");
   }
 
   switch (intent.type) {
+    case "groupByAggregate":
+      return buildGroupByAggregateScript(intent);
     case "formatRange":
       return buildFormatRangeScript(intent);
     case "setValue":
@@ -87,6 +97,63 @@ function buildAppsScript(intent) {
     default:
       return fallbackScript(intent.text || "");
   }
+}
+
+// ─────────────────────────────
+// 0) 그룹 집계 (groupByAggregate)
+// ─────────────────────────────
+function buildGroupByAggregateScript(intent) {
+  const fnName = toAppsScriptFunctionName(intent);
+  const rangeExpr = getAppsScriptRangeExpr(intent);
+  const groupColPos = getColumnPosition(intent.groupByColumn);
+  const valueColPos =
+    intent.aggregateType === "count"
+      ? null
+      : getColumnPosition(intent.valueColumn || { index: 2 });
+  const aggregateType = intent.aggregateType || "count";
+
+  return `function ${fnName}() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  const range = ${rangeExpr};
+  const values = range.getValues();
+  const summary = {};
+
+  values.forEach((row) => {
+    const key = row[${groupColPos - 1}];
+    if (key === "" || key == null) return;
+
+    if (!summary[key]) {
+      summary[key] = { count: 0, sum: 0 };
+    }
+
+    summary[key].count += 1;
+
+    ${
+      aggregateType === "count"
+        ? ""
+        : `const num = Number(row[${valueColPos - 1}]);
+    if (!Number.isNaN(num)) {
+      summary[key].sum += num;
+    }`
+    }
+  });
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const target = ss.insertSheet("요약표");
+  const output = [["기준값", "${aggregateType}"]];
+
+  Object.keys(summary).forEach((key) => {
+    let result = summary[key].count;
+    if ("${aggregateType}" === "sum") {
+      result = summary[key].sum;
+    } else if ("${aggregateType}" === "average") {
+      result = summary[key].count ? summary[key].sum / summary[key].count : 0;
+    }
+    output.push([key, result]);
+  });
+
+  target.getRange(1, 1, output.length, output[0].length).setValues(output);
+}`;
 }
 
 // ─────────────────────────────

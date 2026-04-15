@@ -1,5 +1,6 @@
 function toMacroProcedureName(intent = {}) {
   const map = {
+    groupByAggregate: "GroupByAggregateMacro",
     formatRange: "FormatRangeMacro",
     setValue: "SetValueMacro",
     copyRange: "CopyRangeMacro",
@@ -48,6 +49,8 @@ function buildVbaScript(intent) {
   }
 
   switch (intent.type) {
+    case "groupByAggregate":
+      return buildGroupByAggregateVba(intent);
     case "formatRange":
       return buildFormatRangeVba(intent);
     case "setValue":
@@ -120,6 +123,67 @@ function getVbaHeaderConst(intent) {
   if (intent?.hasHeader === true) return "xlYes";
   if (intent?.hasHeader === false) return "xlNo";
   return "xlGuess";
+}
+
+function getColumnNumberExpr(col) {
+  const c = getColumnLetterOrIndex(col);
+  if (c.index) return String(c.index);
+  if (c.letter) return `Range("${c.letter}1").Column`;
+  return "1";
+}
+
+/* =========================
+ * 0) 그룹 집계
+ * =======================*/
+function buildGroupByAggregateVba(intent) {
+  const procName = toMacroProcedureName(intent);
+  const groupColExpr = getColumnNumberExpr(intent.groupByColumn);
+  const valueColExpr =
+    intent.aggregateType === "count"
+      ? null
+      : getColumnNumberExpr(intent.valueColumn || { index: 2 });
+
+  const rangeExpr = getVbaRangeExpr(intent);
+  const aggType = intent.aggregateType || "count";
+
+  let formulaLine = `        ws.Cells(outRow, 2).Value = Application.WorksheetFunction.CountIf(${rangeExpr}.Columns(${groupColExpr}), key)`;
+  if (aggType === "sum") {
+    formulaLine = `        ws.Cells(outRow, 2).Value = Application.WorksheetFunction.SumIf(${rangeExpr}.Columns(${groupColExpr}), key, ${rangeExpr}.Columns(${valueColExpr}))`;
+  } else if (aggType === "average") {
+    formulaLine = `        ws.Cells(outRow, 2).Value = Application.WorksheetFunction.AverageIf(${rangeExpr}.Columns(${groupColExpr}), key, ${rangeExpr}.Columns(${valueColExpr}))`;
+  }
+
+  return `Sub ${procName}()
+    Dim src As Range
+    Dim ws As Worksheet
+    Dim dict As Object
+    Dim cell As Range
+    Dim key As Variant
+    Dim outRow As Long
+
+    Set src = ${rangeExpr}
+    Set ws = Worksheets.Add(After:=Worksheets(Worksheets.Count))
+    ws.Name = "요약표"
+    Set dict = CreateObject("Scripting.Dictionary")
+
+    For Each cell In src.Columns(${groupColExpr}).Cells
+        If Trim(CStr(cell.Value)) <> "" Then
+            If Not dict.Exists(CStr(cell.Value)) Then
+                dict.Add CStr(cell.Value), True
+            End If
+        End If
+    Next cell
+
+    ws.Cells(1, 1).Value = "기준값"
+    ws.Cells(1, 2).Value = "${aggType}"
+    outRow = 2
+
+    For Each key In dict.Keys
+        ws.Cells(outRow, 1).Value = key
+${formulaLine}
+        outRow = outRow + 1
+    Next key
+End Sub`;
 }
 
 /* =========================
