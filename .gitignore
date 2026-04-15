@@ -9,7 +9,9 @@
 package-lock.json
 config/*.json
 meta-cache/
-.local_test-files
+.local_uploads/
+tests/
+script/
 
 # ==================================
 # Node.js

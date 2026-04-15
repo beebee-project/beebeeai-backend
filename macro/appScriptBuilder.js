@@ -104,7 +104,10 @@ function buildAppsScript(intent) {
 // ─────────────────────────────
 function buildGroupByAggregateScript(intent) {
   const fnName = toAppsScriptFunctionName(intent);
-  const rangeExpr = getAppsScriptRangeExpr(intent);
+  const rangeExpr =
+    intent.aggregateType === "count"
+      ? getAppsScriptRangeExpr(intent)
+      : "sheet.getDataRange()";
   const groupColPos = getColumnPosition(intent.groupByColumn);
   const valueColPos =
     intent.aggregateType === "count"

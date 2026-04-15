@@ -143,7 +143,10 @@ function buildGroupByAggregateVba(intent) {
       ? null
       : getColumnNumberExpr(intent.valueColumn || { index: 2 });
 
-  const rangeExpr = getVbaRangeExpr(intent);
+  const rangeExpr =
+    intent.aggregateType === "count"
+      ? getVbaRangeExpr(intent)
+      : "ActiveSheet.UsedRange";
   const aggType = intent.aggregateType || "count";
 
   let formulaLine = `        ws.Cells(outRow, 2).Value = Application.WorksheetFunction.CountIf(${rangeExpr}.Columns(${groupColExpr}), key)`;

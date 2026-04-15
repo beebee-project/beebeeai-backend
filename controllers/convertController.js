@@ -775,7 +775,10 @@ function resolveOp(op) {
 /* ---------------------------------------------
  * 파일 전처리 유틸
  * -------------------------------------------*/
-const LOCAL_TEST_FILE_DIR = path.join(__dirname, "..", ".local_test_files");
+const LOCAL_TEST_DIRS = [
+  path.join(__dirname, "..", ".local_test_files"),
+  path.join(__dirname, "..", ".local_uploads"),
+];
 async function loadAndPreprocessFromStorageIfPossible(user, fileName) {
   const logLP = shouldLogCache();
   if (logLP) console.log("[loadAndPreprocess] user?.id:", user?.id);
@@ -795,23 +798,28 @@ async function loadAndPreprocessFromStorageIfPossible(user, fileName) {
 
   if (!fileInfo) {
     const isLocalDev = process.env.LOCAL_DEV === "1";
-    const fallbackPath = path.join(LOCAL_TEST_FILE_DIR, fileName || "");
+    if (isLocalDev && fileName) {
+      for (const dir of LOCAL_TEST_DIRS) {
+        const fallbackPath = path.join(dir, fileName);
 
-    if (isLocalDev && fileName && fs.existsSync(fallbackPath)) {
-      if (logLP) {
-        console.log(
-          "[loadAndPreprocess] fallback local test file found:",
-          fallbackPath,
-        );
+        if (fs.existsSync(fallbackPath)) {
+          if (logLP) {
+            console.log(
+              "[loadAndPreprocess] fallback local test file found:",
+              fallbackPath,
+            );
+          }
+
+          const buffer = fs.readFileSync(fallbackPath);
+          const { fileHash, allSheetsData } =
+            await getOrBuildAllSheetsData(buffer);
+
+          return {
+            isFileAttached: true,
+            preprocessed: { fileHash, allSheetsData },
+          };
+        }
       }
-
-      const buffer = fs.readFileSync(fallbackPath);
-      const { fileHash, allSheetsData } = await getOrBuildAllSheetsData(buffer);
-
-      return {
-        isFileAttached: true,
-        preprocessed: { fileHash, allSheetsData },
-      };
     }
 
     if (logLP)
