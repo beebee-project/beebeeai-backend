@@ -21,9 +21,10 @@ async function writeRequestLog({
   latencyMs,
   debugMeta,
 }) {
-  if (process.env.DISABLE_DB === "1") {
+  if (process.env.DISABLE_DB === "1" || isLocalBypassMode()) {
     return { skipped: true };
   }
+
   try {
     await RequestLog.create({
       traceId,

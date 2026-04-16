@@ -779,6 +779,81 @@ const LOCAL_TEST_DIRS = [
   path.join(__dirname, "..", ".local_test_files"),
   path.join(__dirname, "..", ".local_uploads"),
 ];
+for (const dir of LOCAL_TEST_DIRS) {
+  if (fs.existsSync(dir)) {
+    console.log("[convertController] files in dir:", dir, fs.readdirSync(dir));
+  }
+}
+
+function normalizeNameForLocalMatch(name) {
+  return String(name || "")
+    .trim()
+    .normalize("NFC")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function walkFilesRecursive(rootDir) {
+  const out = [];
+  if (!fs.existsSync(rootDir)) return out;
+
+  const stack = [rootDir];
+  while (stack.length) {
+    const current = stack.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+      } else if (entry.isFile()) {
+        out.push(fullPath);
+      }
+    }
+  }
+
+  return out;
+}
+
+function findLocalTestFilePath(fileName) {
+  if (!fileName) return null;
+
+  const wanted = normalizeNameForLocalMatch(fileName);
+
+  for (const dir of LOCAL_TEST_DIRS) {
+    if (!fs.existsSync(dir)) continue;
+
+    // 1) exact path
+    const directPath = path.join(dir, fileName);
+    if (fs.existsSync(directPath)) {
+      return directPath;
+    }
+
+    // 2) recursive basename match
+    const allFiles = walkFilesRecursive(dir);
+
+    const exact = allFiles.find((fullPath) => {
+      const base = path.basename(fullPath);
+      return normalizeNameForLocalMatch(base) === wanted;
+    });
+    if (exact) return exact;
+
+    // 3) loose basename match
+    const loose = allFiles.find((fullPath) => {
+      const base = normalizeNameForLocalMatch(path.basename(fullPath));
+      return base.includes(wanted) || wanted.includes(base);
+    });
+    if (loose) return loose;
+  }
+
+  return null;
+}
+
 async function loadAndPreprocessFromStorageIfPossible(user, fileName) {
   const logLP = shouldLogCache();
   if (logLP) console.log("[loadAndPreprocess] user?.id:", user?.id);
@@ -791,37 +866,51 @@ async function loadAndPreprocessFromStorageIfPossible(user, fileName) {
     return { isFileAttached: false, preprocessed: null };
   }
 
+  const isLocalDev = process.env.LOCAL_DEV === "1";
+  if (isLocalDev && fileName) {
+    const fallbackPath = findLocalTestFilePath(fileName);
+    if (logLP) {
+      console.log(
+        "[loadAndPreprocess] local fallback resolved path:",
+        fallbackPath,
+      );
+    }
+
+    if (fallbackPath) {
+      if (logLP) {
+        console.log(
+          "[loadAndPreprocess] using LOCAL_DEV fallback first:",
+          fallbackPath,
+        );
+        console.log(
+          "[loadAndPreprocess] fallback exists?:",
+          fs.existsSync(fallbackPath),
+        );
+      }
+
+      const buffer = fs.readFileSync(fallbackPath);
+      const { fileHash, allSheetsData } = await getOrBuildAllSheetsData(buffer);
+
+      if (logLP) {
+        console.log(
+          "[loadAndPreprocess] got allSheetsData keys:",
+          Object.keys(allSheetsData || {}),
+        );
+      }
+
+      return {
+        isFileAttached: true,
+        preprocessed: { fileHash, allSheetsData },
+      };
+    }
+  }
+
   if (logLP)
     console.log("[loadAndPreprocess] user.uploadedFiles:", user?.uploadedFiles);
   let fileInfo = user.uploadedFiles?.find((f) => f.originalName === fileName);
   if (logLP) console.log("[loadAndPreprocess] fileInfo:", fileInfo);
 
   if (!fileInfo) {
-    const isLocalDev = process.env.LOCAL_DEV === "1";
-    if (isLocalDev && fileName) {
-      for (const dir of LOCAL_TEST_DIRS) {
-        const fallbackPath = path.join(dir, fileName);
-
-        if (fs.existsSync(fallbackPath)) {
-          if (logLP) {
-            console.log(
-              "[loadAndPreprocess] fallback local test file found:",
-              fallbackPath,
-            );
-          }
-
-          const buffer = fs.readFileSync(fallbackPath);
-          const { fileHash, allSheetsData } =
-            await getOrBuildAllSheetsData(buffer);
-
-          return {
-            isFileAttached: true,
-            preprocessed: { fileHash, allSheetsData },
-          };
-        }
-      }
-    }
-
     if (logLP)
       console.log("[loadAndPreprocess] early return (fileInfo not found)");
     return { isFileAttached: false, preprocessed: null };
