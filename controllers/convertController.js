@@ -779,11 +779,6 @@ const LOCAL_TEST_DIRS = [
   path.join(__dirname, "..", ".local_test_files"),
   path.join(__dirname, "..", ".local_uploads"),
 ];
-for (const dir of LOCAL_TEST_DIRS) {
-  if (fs.existsSync(dir)) {
-    console.log("[convertController] files in dir:", dir, fs.readdirSync(dir));
-  }
-}
 
 function normalizeNameForLocalMatch(name) {
   return String(name || "")
@@ -881,10 +876,6 @@ async function loadAndPreprocessFromStorageIfPossible(user, fileName) {
         console.log(
           "[loadAndPreprocess] using LOCAL_DEV fallback first:",
           fallbackPath,
-        );
-        console.log(
-          "[loadAndPreprocess] fallback exists?:",
-          fs.existsSync(fallbackPath),
         );
       }
 
