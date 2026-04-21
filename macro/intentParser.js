@@ -342,6 +342,7 @@ function parseMacroIntent(text) {
   if (
     hasClearKeyword &&
     !tNorm.includes("시트") &&
+    !(hasDeleteKeyword && tNorm.includes("열")) &&
     !(
       tNorm.includes("행") &&
       !/[a-z]+\d+/i.test(originalText) &&
@@ -420,7 +421,11 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   // 3) 복사 (copyRange)
   // ─────────────────────────────
-  if (tNorm.includes("복사")) {
+  if (
+    tNorm.includes("복사") &&
+    !tNorm.includes("시트") &&
+    !tNorm.includes("sheet")
+  ) {
     const { from, to } = detectTwoRanges(originalText);
     return {
       type: "copyRange",
@@ -433,7 +438,10 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   // 4) 이동 (moveRange)
   // ─────────────────────────────
-  if (tNorm.includes("이동") || tNorm.includes("옮겨")) {
+  if (
+    (tNorm.includes("이동") || tNorm.includes("옮겨")) &&
+    !tNorm.includes("시트")
+  ) {
     const { from, to } = detectTwoRanges(originalText);
     return {
       type: "moveRange",
@@ -572,7 +580,7 @@ function parseMacroIntent(text) {
   // ─────────────────────────────
   // 8) 범위 전체 삭제(내용 지우기) – 위 케이스 아닌 삭제/지우기
   // ─────────────────────────────
-  if (hasDeleteKeyword) {
+  if (hasDeleteKeyword && !tNorm.includes("시트")) {
     const range = detectRange(originalText) || "A1:A10";
     return {
       type: "clearRange",
@@ -606,7 +614,10 @@ function parseMacroIntent(text) {
     }
 
     // 9-2) 시트 복사
-    if (tNorm.includes("복사")) {
+    if (
+      tNorm.includes("복사") &&
+      (tNorm.includes("시트") || tNorm.includes("sheet"))
+    ) {
       const name = quotedName || "Backup";
       return {
         type: "duplicateSheet",

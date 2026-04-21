@@ -235,6 +235,7 @@ function buildSetValueScript(intent) {
 // ─────────────────────────────
 function buildCopyRangeScript(intent) {
   const from = intent.from || "A1:A1";
+  const to = intent.to || "B1:B1";
   const fnName = toAppsScriptFunctionName(intent);
 
   return `function ${fnName}() {

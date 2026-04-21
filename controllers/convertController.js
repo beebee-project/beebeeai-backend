@@ -273,6 +273,11 @@ function _deduceOp(text = "") {
     return "tocol";
   if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
     return "byrow";
+  if (/(이름\s*목록|목록을\s*보여줘|목록을\s*뽑아줘|직원들의\s*이름)/.test(s))
+    return "filter";
+  if (/(상위\s*\d+명|top\s*\d+)/i.test(s)) return "topnrows";
+  if (/(가장\s*높은\s*직원|최고\s*연봉.*직원)/.test(s)) return "maxrow";
+  if (/(가장\s*낮은\s*직원|최저\s*연봉.*직원)/.test(s)) return "minrow";
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
@@ -319,6 +324,18 @@ function buildLocalIntentFromText(text = "") {
   const explicitCellOrRange = formulaUtils.parseExplicitCellOrRange(original);
   const explicitCellMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
 
+  const quotedTextMatch = original.match(/["']([^"']+)["']/);
+  const quotedText = quotedTextMatch ? quotedTextMatch[1] : null;
+  const wantsNameList = /(이름\s*목록|직원들의\s*이름|직원\s*이름\s*목록)/.test(
+    original,
+  );
+  const hasContains =
+    /포함/.test(original) || /contains|include/i.test(original);
+  const hasStartsWith =
+    /시작/.test(original) || /starts?\s*with/i.test(original);
+  const hasEndsWith =
+    /끝/.test(original) || /ends?\s*with|끝나는/i.test(original);
+
   const hasLookupCue =
     op.includes("lookup") || /찾|조회|검색|lookup/i.test(original);
   const hasGroup = Boolean(groupBy);
@@ -343,15 +360,45 @@ function buildLocalIntentFromText(text = "") {
     }
   }
 
+  if (/정렬|높은 순|낮은 순|오름차순|내림차순/.test(original)) {
+    intent.operation = "sortby";
+    if (!intent.return_fields && /이름/.test(original)) {
+      intent.return_fields = ["이름"];
+    }
+    if (!intent.header_hint && /연봉/.test(original)) {
+      intent.header_hint = "연봉";
+    }
+    if (sortOrder) {
+      intent.sorted = true;
+      intent.sort_order = sortOrder;
+    }
+    return intent;
+  }
+
   if (hasLookupCue) {
     intent.operation = "xlookup";
 
     if (headerHint) intent.return_hint = headerHint;
+    if (/직원\s*id|사번|아이디/i.test(original)) {
+      intent.lookup_hint = "직원 ID";
+    }
+    if (/이름으로/.test(original)) {
+      intent.lookup_hint = "이름";
+    }
 
     if (explicitCellOrRange?.ref) {
       intent.lookup_value = explicitCellOrRange.ref;
+      intent.lookup = {
+        ...(intent.lookup || {}),
+        value_ref: explicitCellOrRange.ref,
+      };
     } else if (explicitCellMatch) {
-      intent.lookup_value = explicitCellMatch[1].toUpperCase();
+      const ref = explicitCellMatch[1].toUpperCase();
+      intent.lookup_value = ref;
+      intent.lookup = {
+        ...(intent.lookup || {}),
+        value_ref: ref,
+      };
     }
 
     if (
@@ -380,6 +427,39 @@ function buildLocalIntentFromText(text = "") {
       intent.sorted = true;
       intent.sort_order = sortOrder;
     }
+    return intent;
+  }
+
+  if (wantsNameList) {
+    intent.operation = "filter";
+    intent.return_fields = ["이름"];
+
+    const filters = [];
+
+    if (hasContains && quotedText) {
+      filters.push({
+        target: "이름",
+        operator: "contains",
+        value: quotedText,
+      });
+    } else if (hasStartsWith && quotedText) {
+      filters.push({
+        target: "이름",
+        operator: "starts_with",
+        value: quotedText,
+      });
+    } else if (hasEndsWith && quotedText) {
+      filters.push({
+        target: "이름",
+        operator: "ends_with",
+        value: quotedText,
+      });
+    }
+
+    if (filters.length) {
+      intent.conditions = filters;
+    }
+
     return intent;
   }
 

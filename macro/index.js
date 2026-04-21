@@ -8,6 +8,7 @@ if (process.env.OPENAI_API_KEY) {
 }
 
 const ALLOWED_TYPES = new Set([
+  "groupByAggregate",
   "formatRange",
   "setValue",
   "copyRange",
@@ -222,6 +223,7 @@ async function llmMacroParser(prompt) {
 
 반드시 JSON 객체만 출력하세요. 설명 문장, 코드블록, 주석은 금지합니다.
 type 은 아래 중 하나만 허용됩니다:
+groupByAggregate,
 formatRange, setValue, copyRange, clearRange, moveRange, removeDuplicates,
 sortRange, filterRange, insertRow, deleteRow, insertColumn, deleteColumn,
 createSheet, duplicateSheet, renameSheet, deleteSheet, activateSheet, unknown
