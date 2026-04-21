@@ -267,6 +267,34 @@ function parseMacroIntent(text) {
 
   const originalText = text;
   const tNorm = normalize(text.toLowerCase());
+
+  const actionHits = [
+    tNorm.includes("정렬") ||
+      tNorm.includes("오름차순") ||
+      tNorm.includes("내림차순"),
+    tNorm.includes("필터") ||
+      tNorm.includes("걸러") ||
+      tNorm.includes("만 남기"),
+    tNorm.includes("복사"),
+    tNorm.includes("이동") || tNorm.includes("옮겨"),
+    tNorm.includes("삭제") || tNorm.includes("지워") || tNorm.includes("제거"),
+    tNorm.includes("삽입") ||
+      tNorm.includes("추가") ||
+      tNorm.includes("만들어"),
+    tNorm.includes("입력") ||
+      tNorm.includes("적어") ||
+      tNorm.includes("써줘") ||
+      tNorm.includes("써 줘"),
+    tNorm.includes("초기화") || tNorm.includes("비워"),
+  ].filter(Boolean).length;
+
+  if (
+    actionHits >= 2 &&
+    (tNorm.includes("하고") || tNorm.includes("후") || tNorm.includes("다음"))
+  ) {
+    return { type: "unknown", text: originalText };
+  }
+
   const hasDeleteKeyword =
     tNorm.includes("삭제") || tNorm.includes("지워") || tNorm.includes("제거");
   const hasClearKeyword =
