@@ -326,6 +326,7 @@ function buildLocalIntentFromText(text = "") {
 
   const quotedTextMatch = original.match(/["']([^"']+)["']/);
   const quotedText = quotedTextMatch ? quotedTextMatch[1] : null;
+  const requestedReturnFields = _extractRequestedReturnFields(original);
   const wantsNameList =
     /(이름\s*목록|직원들의\s*이름|직원\s*이름\s*목록)/.test(original) ||
     ((/이름/.test(original) || /성명/.test(original)) &&
@@ -430,6 +431,30 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
+  // row-return 계열은 aggregate(max/min)로 덮어쓰지 않음
+  if (_isRowEntityOp(op)) {
+    intent.operation = op;
+
+    if (requestedReturnFields.length) {
+      intent.return_fields = requestedReturnFields;
+    }
+
+    if (headerHint) {
+      intent.header_hint = headerHint;
+    }
+
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
+    }
+
+    if (sortOrder) {
+      intent.sorted = true;
+      intent.sort_order = sortOrder;
+    }
+
+    return intent;
+  }
+
   if (
     hasGroup ||
     hasMetric ||
@@ -507,6 +532,22 @@ function applyStructuralOverrides(intent) {
   const hasMetric = !!intent.header_hint || !!intent.return_hint;
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
+  const wantsRowReturnVerb =
+    /(가져와줘|보여줘|출력해줘|알려줘|get|show|return)/i.test(raw);
+  const requestedReturnFields =
+    Array.isArray(intent.return_fields) && intent.return_fields.length
+      ? intent.return_fields
+      : _extractRequestedReturnFields(raw);
+  const hasMultiReturnFields = requestedReturnFields.length >= 2;
+
+  if (
+    (op === "max" || op === "min") &&
+    wantsRowReturnVerb &&
+    hasMultiReturnFields
+  ) {
+    intent.operation = op === "max" ? "maxrow" : "minrow";
+    intent.return_fields = requestedReturnFields;
+  }
 
   // explicit-range 구조 연산은 LLM 결과보다 우선.
   const explicitRanges =
@@ -845,6 +886,51 @@ function _detectSortOrderFromMessage(msg = "") {
   if (/(적은\s*순|낮은\s*순|오름차순|asc|작은\s*순)/i.test(s)) return "asc";
   if (/(많은\s*순|높은\s*순|내림차순|desc|큰\s*순)/i.test(s)) return "desc";
   return null;
+}
+
+function _isRowEntityOp(op = "") {
+  const k = String(op || "").toLowerCase();
+  return ["maxrow", "minrow", "topnrows"].includes(k);
+}
+
+function _cleanReturnFieldToken(token = "") {
+  let s = String(token || "").trim();
+  if (!s) return "";
+
+  // 일반적인 군더더기 제거 (도메인 특정 아님)
+  s = s.replace(/^(?:직원|행|레코드|항목)\s*의\s*/u, "");
+  s = s.replace(/\s*(?:을|를|은|는|이|가)$/u, "");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+function _extractRequestedReturnFields(msg = "") {
+  const raw = String(msg || "");
+  if (!raw) return [];
+
+  // “... 이름, 부서, 직급, 연봉을 가져와줘/보여줘 ...” 같은 열거형 요청을 일반적으로 추출
+  const capture =
+    raw.match(
+      /(?:의|에 해당하는)\s+([^.?]+?)\s*(?:을|를)?\s*(?:가져와줘|보여줘|출력해줘|알려줘|get|show|return)/i,
+    ) ||
+    raw.match(
+      /([^.?]+?)\s*(?:을|를)?\s*(?:가져와줘|보여줘|출력해줘|알려줘|get|show|return)/i,
+    );
+
+  const zone = capture?.[1] || "";
+  if (!zone) return [];
+
+  const normalized = zone.replace(/\s*(?:,|및|그리고|와|과)\s*/g, ",");
+  const fields = normalized
+    .split(",")
+    .map(_cleanReturnFieldToken)
+    .filter(Boolean)
+    .filter(
+      (x) =>
+        !/^(?:가장\s*높은|가장\s*낮은|최고|최저|상위|하위|직원|목록)$/u.test(x),
+    );
+
+  return [...new Set(fields)];
 }
 
 function _pushUniqueFilterSpec(out, spec) {
