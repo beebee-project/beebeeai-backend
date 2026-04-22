@@ -120,6 +120,21 @@ function resolveReturnColumns(ctx, schema, baseSheet) {
     ? op
     : "return";
 
+  // 이름 목록 요청은 "이름" 열을 최우선으로 resolved
+  if (String(schema?.return_role || "") === "entity_name") {
+    const nameCol =
+      pickBestColumnInSheet(ctx, "이름", baseSheet, "return") ||
+      pickBestColumnAnySheet(ctx, "이름", "return");
+
+    if (nameCol) {
+      const key = `${nameCol.sheetName}::${nameCol.header}::${nameCol.columnLetter}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(nameCol);
+      }
+      return out;
+    }
+  }
   if (op === "count" && !hasExplicitReturn) {
     return out;
   }
@@ -135,7 +150,13 @@ function resolveReturnColumns(ctx, schema, baseSheet) {
     out.push(any);
   }
 
-  if (!out.length && ctx.bestReturn && op !== "count") {
+  if (
+    !out.length &&
+    ctx.bestReturn &&
+    op !== "count" &&
+    op !== "filter" &&
+    String(schema?.return_role || "") !== "entity_name"
+  ) {
     const fallback = {
       ...ctx.bestReturn,
       cell: `'${ctx.bestReturn.sheetName}'!${ctx.bestReturn.columnLetter}${ctx.bestReturn.startRow}`,
@@ -178,16 +199,51 @@ function resolveSortColumn(ctx, schema, baseSheet) {
 
 function resolveFilterColumns(ctx, schema, baseSheet) {
   const out = [];
+  const seen = new Set();
+
+  const pushUnique = (item) => {
+    if (!item) return;
+    const key = JSON.stringify([
+      item.logical_operator || "",
+      item.header || "",
+      item.operator || "",
+      item.value ?? "",
+      item.min ?? "",
+      item.max ?? "",
+      item.value_type || "",
+      item.ref?.sheetName || "",
+      item.ref?.columnLetter || "",
+    ]);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(item);
+  };
 
   for (const f of schema.filters || []) {
     if (f?.logical_operator && Array.isArray(f.conditions)) {
-      const inner = f.conditions.map((x) => {
-        const ref =
-          pickBestColumnInSheet(ctx, x.header, baseSheet, "filter") ||
-          pickBestColumnAnySheet(ctx, x.header, "filter");
-        return { ...x, ref };
-      });
-      out.push({ logical_operator: f.logical_operator, conditions: inner });
+      const innerSeen = new Set();
+      const inner = f.conditions
+        .map((x) => {
+          const ref =
+            pickBestColumnInSheet(ctx, x.header, baseSheet, "filter") ||
+            pickBestColumnAnySheet(ctx, x.header, "filter");
+          const item = { ...x, ref };
+          const innerKey = JSON.stringify([
+            item.header || "",
+            item.operator || "",
+            item.value ?? "",
+            item.min ?? "",
+            item.max ?? "",
+            item.value_type || "",
+            item.ref?.sheetName || "",
+            item.ref?.columnLetter || "",
+          ]);
+          if (innerSeen.has(innerKey)) return null;
+          innerSeen.add(innerKey);
+          return item;
+        })
+        .filter(Boolean);
+      pushUnique({ logical_operator: f.logical_operator, conditions: inner });
       continue;
     }
 
@@ -195,7 +251,7 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
       pickBestColumnInSheet(ctx, f.header, baseSheet, "filter") ||
       pickBestColumnAnySheet(ctx, f.header, "filter");
 
-    out.push({ ...f, ref });
+    pushUnique({ ...f, ref });
   }
 
   return out;

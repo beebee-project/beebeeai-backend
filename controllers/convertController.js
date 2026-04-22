@@ -318,7 +318,7 @@ function buildLocalIntentFromText(text = "") {
 
   const headerHint = _detectHeaderHintFromMessage(original);
   const groupBy = _detectGroupByFromMessage(original);
-  const aggOp = _detectAggregateOpFromMessage(original, intent.operation);
+  let aggOp = _detectAggregateOpFromMessage(original, intent.operation);
   const sortOrder = _detectSortOrderFromMessage(original);
 
   const explicitCellOrRange = formulaUtils.parseExplicitCellOrRange(original);
@@ -326,9 +326,10 @@ function buildLocalIntentFromText(text = "") {
 
   const quotedTextMatch = original.match(/["']([^"']+)["']/);
   const quotedText = quotedTextMatch ? quotedTextMatch[1] : null;
-  const wantsNameList = /(이름\s*목록|직원들의\s*이름|직원\s*이름\s*목록)/.test(
-    original,
-  );
+  const wantsNameList =
+    /(이름\s*목록|직원들의\s*이름|직원\s*이름\s*목록)/.test(original) ||
+    ((/이름/.test(original) || /성명/.test(original)) &&
+      /(목록|리스트|보여줘|뽑아줘|가져와줘)/.test(original));
   const hasContains =
     /포함/.test(original) || /contains|include/i.test(original);
   const hasStartsWith =
@@ -344,9 +345,22 @@ function buildLocalIntentFromText(text = "") {
   const filterSpecs = _extractRoleFilterSpecsFromMessage(original, headerHint);
   const legacyConditions = _filterSpecsToLegacyConditions(filterSpecs);
   const hasFilterSpecs = filterSpecs.length > 0;
+  const hasDateFilter = filterSpecs.some((x) => x.role === "date_filter");
 
+  if (wantsNameList) {
+    intent.return_role = "entity_name";
+    intent.return_fields = ["이름"];
+  }
   if (hasMetric) intent.metric_role = "measure";
   if (groupBy) intent.group_role = "dimension";
+  // 날짜 조건 + count 문구인데 aggregate op가 비어 있으면 count로 승격
+  if (
+    (!aggOp || aggOp === "formula") &&
+    hasDateFilter &&
+    _looksLikeCountRequest(original)
+  ) {
+    aggOp = "count";
+  }
   if (hasLookupCue) {
     intent.lookup_role = "key";
     intent.return_role = "value";
@@ -416,7 +430,11 @@ function buildLocalIntentFromText(text = "") {
     return intent;
   }
 
-  if (hasGroup || hasMetric) {
+  if (
+    hasGroup ||
+    hasMetric ||
+    (hasDateFilter && _looksLikeCountRequest(original))
+  ) {
     intent.operation = aggOp || intent.operation || "formula";
 
     if (groupBy) {
@@ -851,6 +869,25 @@ function _finalizeFilterSpecs(out) {
   return Array.isArray(out) ? out : [];
 }
 
+function _cleanCategoryValue(v) {
+  let s = String(v || "").trim();
+  if (!s) return s;
+
+  // 조사/연결어 제거
+  s = s.replace(/(이면서|이고|이며|이고도)$/u, "");
+  s = s.replace(/(인|인데|인 직원|인 사원)$/u, "");
+  s = s.replace(/(이|가|은|는|을|를|의)$/u, "");
+
+  return s.trim();
+}
+
+function _looksLikeCountRequest(msg = "") {
+  const s = String(msg || "");
+  return /(직원\s*수|인원수|입사자\s*수|개수|갯수|건수|수량|카운트|몇\s*명)/.test(
+    s,
+  );
+}
+
 function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
   const original = String(msg || "");
   const out = [];
@@ -1000,7 +1037,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
       role: "category_filter",
       header_hint: "부서",
       operator: "=",
-      value: dept[1].trim(),
+      value: _cleanCategoryValue(dept[1]),
       value_type: "text",
     });
   }
@@ -1013,7 +1050,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
       role: "category_filter",
       header_hint: "평가 등급",
       operator: "=",
-      value: grade[1].trim().toUpperCase(),
+      value: _cleanCategoryValue(grade[1]).toUpperCase(),
       value_type: "text",
     });
   }
@@ -1024,7 +1061,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
       role: "category_filter",
       header_hint: "직급",
       operator: "=",
-      value: job[1].trim(),
+      value: _cleanCategoryValue(job[1]),
       value_type: "text",
     });
   }

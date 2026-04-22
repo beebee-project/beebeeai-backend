@@ -176,6 +176,15 @@ function buildConditionMask(ctx, formatValue) {
     .map((c) => buildSingleConditionExpr(c, ctx, formatValue))
     .filter(Boolean);
 
+  const uniqExprs = [];
+  const seen = new Set();
+  for (const e of exprs) {
+    const key = String(e).replace(/\s+/g, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniqExprs.push(e);
+  }
+
   // window 조건 추가
   const win = ctx?.intent?.window;
   if (
@@ -191,12 +200,12 @@ function buildConditionMask(ctx, formatValue) {
       }) || refFromHeaderSpec(ctx, hdr);
 
     if (rr?.range) {
-      exprs.push(`(${_coerceDate(rr.range)}>=TODAY()-${Number(win.size)})`);
+      uniqExprs.push(`(${_coerceDate(rr.range)}>=TODAY()-${Number(win.size)})`);
     }
   }
 
-  if (!exprs.length) return null;
-  return exprs.length === 1 ? exprs[0] : `(${exprs.join("*")})`;
+  if (!uniqExprs.length) return null;
+  return uniqExprs.length === 1 ? uniqExprs[0] : `(${uniqExprs.join("*")})`;
 }
 
 module.exports = {

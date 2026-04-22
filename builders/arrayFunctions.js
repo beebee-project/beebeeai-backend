@@ -340,8 +340,28 @@ const arrayFunctionBuilder = {
   ) {
     // ✅ 새 resolved + mask 우선 경로
     const { intent, allSheetsData } = ctx;
-    const returnCols = _resolvedReturnColumns(ctx);
-    const primary = returnCols[0];
+    let returnCols = _resolvedReturnColumns(ctx);
+    let primary = returnCols[0];
+
+    const wantsEntityName =
+      String(intent?.return_role || "").toLowerCase() === "entity_name" ||
+      (Array.isArray(intent?.return_fields) &&
+        intent.return_fields.some((x) => String(x).trim() === "이름"));
+
+    // 이름 목록 요청이면 resolver 결과가 잘못 잡혀도 "이름" 열을 우선 복구
+    if (wantsEntityName) {
+      const baseSheet = primary?.sheetName || ctx?.resolved?.baseSheet || null;
+      const preferredNameRef =
+        refFromHeaderSpec(
+          ctx,
+          baseSheet ? { header: "이름", sheet: baseSheet } : { header: "이름" },
+        ) || refFromHeaderSpec(ctx, "이름");
+
+      if (preferredNameRef?.range) {
+        primary = preferredNameRef;
+        returnCols = [preferredNameRef];
+      }
+    }
 
     if (!primary) return `=ERROR("반환할 열을 찾을 수 없습니다.")`;
 
@@ -351,10 +371,13 @@ const arrayFunctionBuilder = {
 
     const maskExpr = _buildMask(ctx, buildConditionMask);
 
+    const effectiveReturnCols =
+      Array.isArray(returnCols) && returnCols.length ? returnCols : [primary];
+
     const stackedReturn =
-      returnCols.length === 1
-        ? returnCols[0].range
-        : `HSTACK(${returnCols.map((c) => c.range).join(", ")})`;
+      effectiveReturnCols.length === 1
+        ? effectiveReturnCols[0].range
+        : `HSTACK(${effectiveReturnCols.map((c) => c.range).join(", ")})`;
 
     if (maskExpr) {
       let baseExpr = `FILTER(${stackedReturn}, ${maskExpr})`;
