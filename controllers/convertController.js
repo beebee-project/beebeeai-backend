@@ -322,7 +322,11 @@ function buildLocalIntentFromText(text = "") {
   /** @type {Intent} */
   const intent = { operation: op };
 
-  const headerHint = _detectHeaderHintFromMessage(original);
+  const metricHint = _extractMetricHintFromMessage(original);
+  const lookupPhrases = _extractLookupPhrasesFromMessage(original);
+  const explicitHeaderHint = _detectHeaderHintFromMessage(original);
+  const headerHint =
+    explicitHeaderHint || metricHint || lookupPhrases.returnHint || null;
   const groupBy = _detectGroupByFromMessage(original);
   let aggOp = _detectAggregateOpFromMessage(original, intent.operation);
   const sortOrder = _detectSortOrderFromMessage(original);
@@ -332,7 +336,11 @@ function buildLocalIntentFromText(text = "") {
   const wantsRankColumn = _looksLikeRankColumnRequest(original);
   const wantsGroupedAggregate = _looksLikeGroupedAggregateRequest(original);
   const wantsGroupedSort = _looksLikeGroupedSortRequest(original);
-  const inferredSortHeader = _inferSortHeaderHint(original, headerHint);
+  const sortPhraseHint = _extractSortHintFromMessage(original);
+  const inferredSortHeader = _inferSortHeaderHint(
+    original,
+    sortPhraseHint || headerHint,
+  );
   const inferredSortOrder = _inferSortOrderFromMessage(original);
 
   const explicitCellOrRange = formulaUtils.parseExplicitCellOrRange(original);
@@ -394,9 +402,14 @@ function buildLocalIntentFromText(text = "") {
     intent.filter_specs = filterSpecs;
   }
 
-  if (isUniqueListRequest && headerHint) {
+  const uniqueTarget =
+    headerHint ||
+    requestedReturnFields[0] ||
+    _extractSortHintFromMessage(original);
+
+  if (isUniqueListRequest && uniqueTarget) {
     intent.operation = "unique";
-    intent.return_fields = [headerHint];
+    intent.return_fields = [uniqueTarget];
     intent.return_role = "list_item";
     intent.sorted = true;
     intent.sort = true;
@@ -487,8 +500,8 @@ function buildLocalIntentFromText(text = "") {
     if (!intent.return_fields && /이름/.test(original)) {
       intent.return_fields = ["이름"];
     }
-    if (!intent.header_hint && /연봉/.test(original)) {
-      intent.header_hint = "연봉";
+    if (!intent.header_hint && inferredSortHeader) {
+      intent.header_hint = inferredSortHeader;
     }
     if (sortOrder) {
       intent.sorted = true;
@@ -500,12 +513,11 @@ function buildLocalIntentFromText(text = "") {
   if (hasLookupCue) {
     intent.operation = "xlookup";
 
-    if (headerHint) intent.return_hint = headerHint;
-    if (/직원\s*id|사번|아이디/i.test(original)) {
-      intent.lookup_hint = "직원 ID";
+    if (lookupPhrases.returnHint || headerHint) {
+      intent.return_hint = lookupPhrases.returnHint || headerHint;
     }
-    if (/이름으로/.test(original)) {
-      intent.lookup_hint = "이름";
+    if (lookupPhrases.lookupHint) {
+      intent.lookup_hint = lookupPhrases.lookupHint;
     }
 
     if (explicitCellOrRange?.ref) {
@@ -635,6 +647,14 @@ function applyStructuralOverrides(intent) {
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
   const wantsUniqueList = _looksLikeUniqueListRequest(raw);
+  const requestedReturnFields =
+    Array.isArray(intent.return_fields) && intent.return_fields.length
+      ? intent.return_fields
+      : _extractRequestedReturnFields(raw);
+  const uniqueTarget =
+    intent.header_hint ||
+    requestedReturnFields[0] ||
+    _extractSortHintFromMessage(raw);
   const topNLimit = _extractTopNLimit(raw);
   const wantsSortedList = _looksLikeSortedListRequest(raw);
   const wantsRankColumn = _looksLikeRankColumnRequest(raw);
@@ -646,17 +666,10 @@ function applyStructuralOverrides(intent) {
   if (
     wantsUniqueList &&
     (op === "sortby" || op === "filter" || op === "formula") &&
-    (intent.header_hint ||
-      (Array.isArray(intent.return_fields) &&
-        intent.return_fields.length === 1))
+    uniqueTarget
   ) {
     intent.operation = "unique";
-    if (
-      !Array.isArray(intent.return_fields) ||
-      intent.return_fields.length === 0
-    ) {
-      intent.return_fields = [intent.header_hint];
-    }
+    intent.return_fields = [uniqueTarget];
     intent.sorted = true;
     intent.sort = true;
     intent.sort_order = intent.sort_order || "asc";
@@ -713,10 +726,6 @@ function applyStructuralOverrides(intent) {
 
   const wantsRowReturnVerb =
     /(가져와줘|보여줘|출력해줘|알려줘|get|show|return)/i.test(raw);
-  const requestedReturnFields =
-    Array.isArray(intent.return_fields) && intent.return_fields.length
-      ? intent.return_fields
-      : _extractRequestedReturnFields(raw);
   const hasMultiReturnFields = requestedReturnFields.length >= 2;
 
   if (
@@ -1172,6 +1181,75 @@ function _extractRequestedReturnFields(msg = "") {
     );
 
   return [...new Set(fields)];
+}
+
+function _cleanHintPhrase(s = "") {
+  return String(s || "")
+    .replace(/[\"']/g, "")
+    .replace(/\b(을|를|은|는|이|가|의|로|으로)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function _extractMetricHintFromMessage(msg = "") {
+  const raw = String(msg || "").trim();
+  if (!raw) return null;
+
+  const patterns = [
+    /(.+?)\s*(?:평균|합계|총합|최고값|최저값|최고|최저|중앙값|중간값)\b/,
+    /(.+?)\s*(?:average|sum|total|max|min|median)\b/i,
+  ];
+
+  for (const p of patterns) {
+    const m = raw.match(p);
+    const phrase = _cleanHintPhrase(m?.[1] || "");
+    if (phrase && phrase.length <= 40) return phrase;
+  }
+  return null;
+}
+
+function _extractLookupPhrasesFromMessage(msg = "") {
+  const raw = String(msg || "").trim();
+  if (!raw) return { lookupHint: null, returnHint: null };
+
+  // "... X로 Y를 찾아줘"
+  let m = raw.match(
+    /(.+?)로\s+(.+?)\s*(?:을|를)?\s*(?:찾아줘|조회해줘|검색해줘|lookup)/i,
+  );
+  if (m) {
+    return {
+      lookupHint: _cleanHintPhrase(m[1]),
+      returnHint: _cleanHintPhrase(m[2]),
+    };
+  }
+
+  // "... X의 Y를 보여줘"
+  m = raw.match(/(.+?)의\s+(.+?)\s*(?:을|를)?\s*(?:보여줘|가져와줘|알려줘)/i);
+  if (m) {
+    return {
+      lookupHint: _cleanHintPhrase(m[1]),
+      returnHint: _cleanHintPhrase(m[2]),
+    };
+  }
+
+  return { lookupHint: null, returnHint: null };
+}
+
+function _extractSortHintFromMessage(msg = "") {
+  const raw = String(msg || "").trim();
+  if (!raw) return null;
+
+  const patterns = [
+    /(.+?)\s*(?:높은\s*순|낮은\s*순|많은\s*순|적은\s*순|오름차순|내림차순)/,
+    /(.+?)\s*(?:recent|latest|oldest|asc|desc)/i,
+  ];
+
+  for (const p of patterns) {
+    const m = raw.match(p);
+    const phrase = _cleanHintPhrase(m?.[1] || "");
+    if (phrase && phrase.length <= 40) return phrase;
+  }
+  return null;
 }
 
 function _pushUniqueFilterSpec(out, spec) {

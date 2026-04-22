@@ -23,7 +23,9 @@ function _resolvedDateColumn(ctx) {
   if (fromResolved?.range) return fromResolved;
 
   const hdr =
-    ctx?.intent?.date_header || ctx?.intent?.window?.date_header || "입사일";
+    ctx?.intent?.date_header || ctx?.intent?.window?.date_header || null;
+
+  if (!hdr) return null;
 
   return _bestColumnByHint(hdr, ctx, "date") || null;
 }

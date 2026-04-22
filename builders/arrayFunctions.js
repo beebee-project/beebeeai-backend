@@ -1382,30 +1382,21 @@ function _extremeRow(ctx, which) {
     return formulaUtils.formatValue(s);
   };
 
-  const msg = String(
-    it.original_text || it.query || it.message || it.user_text || "",
-  );
-
-  const forceSalarySort =
-    /연봉/.test(msg) && /(최고|최저|가장\s*높|가장\s*낮)/.test(msg);
-
-  const forceHireDateSort =
-    /입사일/.test(msg) && /(최고|최저|가장\s*빠|가장\s*늦)/.test(msg);
-
   const sortHint =
-    (forceSalarySort && "연봉") ||
-    (forceHireDateSort && "입사일") ||
     resolvedSort?.header ||
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
     it.header_hint ||
     it.lookup_hint ||
-    best?.header ||
-    "연봉";
-  const criterionMeta =
-    byName.get(String(sortHint).trim()) ||
-    findMetaByContains(String(sortHint).trim()) ||
     null;
+  const criterionMeta =
+    (resolvedSort?.columnLetter
+      ? { columnLetter: resolvedSort.columnLetter }
+      : null) ||
+    (sortHint
+      ? byName.get(String(sortHint).trim()) ||
+        findMetaByContains(String(sortHint).trim())
+      : null);
   if (!criterionMeta?.columnLetter) {
     return `=ERROR("기준 열의 위치를 찾을 수 없습니다.")`;
   }
@@ -1554,33 +1545,22 @@ function _topNRows(ctx) {
     return formulaUtils.formatValue(s);
   };
 
-  const msg = String(
-    it.original_text || it.query || it.message || it.user_text || "",
-  );
-
-  const forceSalarySort =
-    /연봉/.test(msg) &&
-    /(상위|하위|top|순위|높은\s*순|낮은\s*순|가장\s*높|가장\s*낮)/i.test(msg);
-
-  const forceHireDateSort =
-    /입사일/.test(msg) &&
-    /(상위|하위|top|순위|빠른\s*순|늦은\s*순|가장\s*빠|가장\s*늦)/i.test(msg);
-
   const sortHint =
-    (forceSalarySort && "연봉") ||
-    (forceHireDateSort && "입사일") ||
     resolvedSort?.header ||
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
     it.header_hint ||
     it.lookup_hint ||
-    best?.header ||
-    "입사일";
+    null;
 
   const criterionMeta =
-    byName.get(String(sortHint).trim()) ||
-    findMetaByContains(String(sortHint).trim()) ||
-    null;
+    (resolvedSort?.columnLetter
+      ? { columnLetter: resolvedSort.columnLetter }
+      : null) ||
+    (sortHint
+      ? byName.get(String(sortHint).trim()) ||
+        findMetaByContains(String(sortHint).trim())
+      : null);
   if (!criterionMeta?.columnLetter) {
     return `=ERROR("정렬 기준 열의 위치를 찾을 수 없습니다.")`;
   }

@@ -3,8 +3,8 @@ const formulaUtils = require("./formulaUtils");
 function toRef(sheetName, header, meta, sheetInfo) {
   if (!meta || !sheetInfo) return null;
   const columnLetter = meta.columnLetter;
-  const startRow = meta.startRow || sheetInfo.startRow;
-  const lastDataRow = meta.lastRow || sheetInfo.lastDataRow;
+  const startRow = sheetInfo.startRow || meta.startRow;
+  const lastDataRow = sheetInfo.lastDataRow || meta.lastRow;
 
   return {
     sheetName,
@@ -70,6 +70,134 @@ function pickBestColumnInSheet(ctx, headerLike, sheetName, role = "lookup") {
   return winner;
 }
 
+function listColumnsInSheet(ctx, sheetName) {
+  const info = ctx?.allSheetsData?.[sheetName];
+  if (!info?.metaData) return [];
+  return Object.entries(info.metaData).map(([header, meta]) =>
+    toRef(sheetName, header, meta, info),
+  );
+}
+
+function listColumnsAnySheet(ctx) {
+  const out = [];
+  for (const sheetName of Object.keys(ctx?.allSheetsData || {})) {
+    out.push(...listColumnsInSheet(ctx, sheetName));
+  }
+  return out;
+}
+
+function isDerivedSheetName(sheetName = "") {
+  const s = String(sheetName || "");
+  return /(요약|summary|result|결과|pivot|집계)/i.test(s);
+}
+
+function getPreferredSheetNames(ctx, preferredBaseSheet = null) {
+  const names = Object.keys(ctx?.allSheetsData || {});
+  const ordered = [];
+
+  if (preferredBaseSheet && names.includes(preferredBaseSheet)) {
+    ordered.push(preferredBaseSheet);
+  }
+
+  for (const n of names) {
+    if (ordered.includes(n)) continue;
+    if (!isDerivedSheetName(n)) ordered.push(n);
+  }
+
+  for (const n of names) {
+    if (ordered.includes(n)) continue;
+    ordered.push(n);
+  }
+
+  return ordered;
+}
+
+function pickNumericColumnInSheet(ctx, sheetName, preferredHint = null) {
+  const cols = listColumnsInSheet(ctx, sheetName);
+  if (!cols.length) return null;
+
+  let best = null;
+  for (const c of cols) {
+    const info = ctx.allSheetsData?.[c.sheetName];
+    const meta = info?.metaData?.[c.header];
+    const numericRatio = Number(meta?.numericRatio || 0);
+    let score = numericRatio;
+
+    if (preferredHint) {
+      const normH = formulaUtils.norm(c.header);
+      const normP = formulaUtils.norm(preferredHint);
+      if (normH === normP) score += 1000;
+      else if (normH.includes(normP) || normP.includes(normH)) score += 100;
+    }
+
+    if (!best || score > best.score) {
+      best = { ...c, score };
+    }
+  }
+  return best;
+}
+
+function pickNumericColumnAnySheet(
+  ctx,
+  preferredHint = null,
+  preferredBaseSheet = null,
+) {
+  const sheets = getPreferredSheetNames(ctx, preferredBaseSheet);
+  let best = null;
+  for (const s of sheets) {
+    const hit = pickNumericColumnInSheet(ctx, s, preferredHint);
+    if (!hit) continue;
+    if (isDerivedSheetName(hit.sheetName)) {
+      hit.score -= 500;
+    }
+    if (!best || hit.score > best.score) best = hit;
+  }
+  return best;
+}
+
+function looksLikeDateHeader(header = "") {
+  const h = String(header || "");
+  return /(일자|날짜|date|time|월|년|입사|시작|종료)/i.test(h);
+}
+
+function pickDateColumnInSheet(ctx, sheetName, preferredHint = null) {
+  const cols = listColumnsInSheet(ctx, sheetName);
+  let best = null;
+  for (const c of cols) {
+    let score = 0;
+    if (looksLikeDateHeader(c.header)) score += 100;
+
+    if (preferredHint) {
+      const normH = formulaUtils.norm(c.header);
+      const normP = formulaUtils.norm(preferredHint);
+      if (normH === normP) score += 1000;
+      else if (normH.includes(normP) || normP.includes(normH)) score += 100;
+    }
+
+    if (!score) continue;
+    if (!best || score > best.score) best = { ...c, score };
+  }
+  return best;
+}
+
+function pickDateColumnAnySheet(
+  ctx,
+  preferredHint = null,
+  preferredBaseSheet = null,
+) {
+  const sheets = getPreferredSheetNames(ctx, preferredBaseSheet);
+  let best = null;
+  for (const s of sheets) {
+    const hit = pickDateColumnInSheet(ctx, s, preferredHint);
+    if (!hit) continue;
+    if (isDerivedSheetName(hit.sheetName)) {
+      hit.score -= 500;
+    }
+    if (!best || hit.score > best.score) best = hit;
+  }
+  return best;
+}
+
 function resolveBaseSheet(ctx, schema) {
   const candidates = [];
 
@@ -83,6 +211,19 @@ function resolveBaseSheet(ctx, schema) {
     if (c) candidates.push(c);
   }
 
+  if (schema.header_hint) {
+    const c =
+      pickBestColumnAnySheet(ctx, schema.header_hint, "return") ||
+      pickNumericColumnAnySheet(ctx, schema.header_hint) ||
+      pickDateColumnAnySheet(ctx, schema.header_hint);
+    if (c) candidates.push(c);
+  }
+
+  if (schema.return_hint) {
+    const c = pickBestColumnAnySheet(ctx, schema.return_hint, "return");
+    if (c) candidates.push(c);
+  }
+
   if (schema.group_by) {
     const c = pickBestColumnAnySheet(ctx, schema.group_by, "group");
     if (c) candidates.push(c);
@@ -91,6 +232,20 @@ function resolveBaseSheet(ctx, schema) {
   for (const f of schema.filters || []) {
     if (f?.header) {
       const c = pickBestColumnAnySheet(ctx, f.header, "filter");
+      if (c) candidates.push(c);
+    } else if (f?.role === "date_filter") {
+      const c = pickDateColumnAnySheet(
+        ctx,
+        schema.header_hint || null,
+        ctx.bestReturn?.sheetName || null,
+      );
+      if (c) candidates.push(c);
+    } else if (f?.role === "metric_filter") {
+      const c = pickNumericColumnAnySheet(
+        ctx,
+        schema.header_hint || null,
+        ctx.bestReturn?.sheetName || null,
+      );
       if (c) candidates.push(c);
     }
   }
@@ -150,6 +305,45 @@ function resolveReturnColumns(ctx, schema, baseSheet) {
     out.push(any);
   }
 
+  if (!out.length && schema.header_hint && op !== "count") {
+    const hinted =
+      pickBestColumnInSheet(ctx, schema.header_hint, baseSheet, returnRole) ||
+      pickBestColumnAnySheet(ctx, schema.header_hint, returnRole) ||
+      (["average", "sum", "min", "max", "median", "stdev", "var_s"].includes(op)
+        ? pickNumericColumnInSheet(ctx, baseSheet, schema.header_hint) ||
+          pickNumericColumnAnySheet(ctx, schema.header_hint)
+        : null);
+
+    if (hinted) {
+      const key = `${hinted.sheetName}::${hinted.header}::${hinted.columnLetter}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(hinted);
+      }
+    }
+  }
+
+  if (
+    !out.length &&
+    !hasExplicitReturn &&
+    ["average", "sum", "min", "max", "median", "stdev", "var_s"].includes(op)
+  ) {
+    const numeric =
+      pickNumericColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
+      pickNumericColumnAnySheet(
+        ctx,
+        schema.header_hint || null,
+        baseSheet || ctx.bestReturn?.sheetName || null,
+      );
+    if (numeric) {
+      const key = `${numeric.sheetName}::${numeric.header}::${numeric.columnLetter}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(numeric);
+      }
+    }
+  }
+
   if (
     !out.length &&
     ctx.bestReturn &&
@@ -190,10 +384,23 @@ function resolveGroupColumn(ctx, schema, baseSheet) {
 }
 
 function resolveSortColumn(ctx, schema, baseSheet) {
-  if (!schema.sort?.header) return null;
+  const explicitSortHeader = schema.sort?.header || null;
+  const op = String(schema?.operation || "").toLowerCase();
+  const sortHint =
+    explicitSortHeader ||
+    (op === "maxrow" || op === "minrow" || op === "topnrows" || op === "sortby"
+      ? schema.header_hint || null
+      : null);
+
+  if (!sortHint) return null;
+
   return (
-    pickBestColumnInSheet(ctx, schema.sort.header, baseSheet, "sort") ||
-    pickBestColumnAnySheet(ctx, schema.sort.header, "sort")
+    pickBestColumnInSheet(ctx, sortHint, baseSheet, "sort") ||
+    pickBestColumnAnySheet(ctx, sortHint, "sort") ||
+    pickNumericColumnInSheet(ctx, baseSheet, sortHint) ||
+    pickNumericColumnAnySheet(ctx, sortHint, baseSheet) ||
+    pickDateColumnInSheet(ctx, baseSheet, sortHint) ||
+    pickDateColumnAnySheet(ctx, sortHint, baseSheet)
   );
 }
 
@@ -247,9 +454,29 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
       continue;
     }
 
-    const ref =
-      pickBestColumnInSheet(ctx, f.header, baseSheet, "filter") ||
-      pickBestColumnAnySheet(ctx, f.header, "filter");
+    let ref = null;
+
+    if (f?.header) {
+      ref =
+        pickBestColumnInSheet(ctx, f.header, baseSheet, "filter") ||
+        pickBestColumnAnySheet(ctx, f.header, "filter");
+    } else if (f?.role === "date_filter") {
+      ref =
+        pickDateColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
+        pickDateColumnAnySheet(ctx, schema.header_hint || null);
+    } else if (f?.role === "metric_filter") {
+      ref =
+        pickNumericColumnInSheet(
+          ctx,
+          baseSheet,
+          f.header || schema.header_hint || null,
+        ) ||
+        pickNumericColumnAnySheet(
+          ctx,
+          f.header || schema.header_hint || null,
+          baseSheet || ctx.bestReturn?.sheetName || null,
+        );
+    }
 
     pushUnique({ ...f, ref });
   }
