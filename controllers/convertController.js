@@ -321,6 +321,10 @@ function buildLocalIntentFromText(text = "") {
   let aggOp = _detectAggregateOpFromMessage(original, intent.operation);
   const sortOrder = _detectSortOrderFromMessage(original);
   const isUniqueListRequest = _looksLikeUniqueListRequest(original);
+  const topNLimit = _extractTopNLimit(original);
+  const wantsSortedList = _looksLikeSortedListRequest(original);
+  const inferredSortHeader = _inferSortHeaderHint(original, headerHint);
+  const inferredSortOrder = _inferSortOrderFromMessage(original);
 
   const explicitCellOrRange = formulaUtils.parseExplicitCellOrRange(original);
   const explicitCellMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
@@ -388,6 +392,46 @@ function buildLocalIntentFromText(text = "") {
     intent.sorted = true;
     intent.sort = true;
     intent.sort_order = sortOrder || "asc";
+    return intent;
+  }
+
+  if (topNLimit > 0 && inferredSortHeader) {
+    intent.operation = "topnrows";
+    intent.limit = topNLimit;
+    intent.take_n = topNLimit;
+    intent.header_hint = inferredSortHeader;
+    intent.sort_order = inferredSortOrder;
+    intent.sorted = true;
+
+    if (requestedReturnFields.length) {
+      intent.return_fields = requestedReturnFields;
+    } else if (wantsNameList) {
+      intent.return_fields = ["이름"];
+      intent.return_role = "entity_name";
+    }
+
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
+    }
+    return intent;
+  }
+
+  if (wantsSortedList && inferredSortHeader) {
+    intent.operation = "sortby";
+    intent.header_hint = inferredSortHeader;
+    intent.sort_order = inferredSortOrder;
+    intent.sorted = true;
+
+    if (requestedReturnFields.length) {
+      intent.return_fields = requestedReturnFields;
+    } else if (wantsNameList) {
+      intent.return_fields = ["이름"];
+      intent.return_role = "entity_name";
+    }
+
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
+    }
     return intent;
   }
 
@@ -544,6 +588,10 @@ function applyStructuralOverrides(intent) {
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
   const wantsUniqueList = _looksLikeUniqueListRequest(raw);
+  const topNLimit = _extractTopNLimit(raw);
+  const wantsSortedList = _looksLikeSortedListRequest(raw);
+  const inferredSortHeader = _inferSortHeaderHint(raw, intent.header_hint);
+  const inferredSortOrder = _inferSortOrderFromMessage(raw);
 
   if (
     wantsUniqueList &&
@@ -563,6 +611,24 @@ function applyStructuralOverrides(intent) {
     intent.sort = true;
     intent.sort_order = intent.sort_order || "asc";
     delete intent.return_hint;
+  }
+
+  if (topNLimit > 0 && inferredSortHeader) {
+    intent.operation = "topnrows";
+    intent.limit = intent.limit || topNLimit;
+    intent.take_n = intent.take_n || topNLimit;
+    intent.header_hint = intent.header_hint || inferredSortHeader;
+    intent.sort_order = intent.sort_order || inferredSortOrder;
+    intent.sorted = true;
+  } else if (
+    wantsSortedList &&
+    inferredSortHeader &&
+    (op === "formula" || op === "filter")
+  ) {
+    intent.operation = "sortby";
+    intent.header_hint = intent.header_hint || inferredSortHeader;
+    intent.sort_order = intent.sort_order || inferredSortOrder;
+    intent.sorted = true;
   }
 
   const wantsRowReturnVerb =
@@ -927,6 +993,40 @@ function _looksLikeUniqueListRequest(msg = "") {
     /(중복\s*없이|중복\s*제거|unique|uniq)/i.test(s) &&
     /(목록|리스트|뽑|보여|정렬|가나다순|sort)/i.test(s)
   );
+}
+
+function _extractTopNLimit(msg = "") {
+  const s = String(msg || "");
+  const m =
+    s.match(/(?:상위|하위|top|bottom)\s*(\d+)/i) ||
+    s.match(/(\d+)\s*(?:명|개|건)\b/i);
+  return m ? Number(m[1]) : 0;
+}
+
+function _looksLikeSortedListRequest(msg = "") {
+  const s = String(msg || "");
+  return (
+    /(순으로|정렬|오름차순|내림차순|상위|하위|top|bottom|최근|최신)/i.test(s) &&
+    /(목록|리스트|보여줘|뽑아줘|가져와줘)/i.test(s)
+  );
+}
+
+function _inferSortHeaderHint(msg = "", fallback = null) {
+  const s = String(msg || "");
+  if (/(연봉|급여|salary)/i.test(s)) return "연봉";
+  if (/(입사일|입사\s*날짜|날짜|일자)/i.test(s)) return "입사일";
+  if (/(평가\s*등급|등급)/i.test(s)) return "평가 등급";
+  if (/직급/.test(s)) return "직급";
+  if (/부서/.test(s)) return "부서";
+  return fallback || null;
+}
+
+function _inferSortOrderFromMessage(msg = "") {
+  const s = String(msg || "");
+  if (/(하위|낮은\s*순|작은\s*순|오름차순|asc)/i.test(s)) return "asc";
+  if (/(상위|높은\s*순|큰\s*순|내림차순|desc|최근|최신)/i.test(s))
+    return "desc";
+  return _detectSortOrderFromMessage(s) || "desc";
 }
 
 function _isRowEntityOp(op = "") {
