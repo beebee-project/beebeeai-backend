@@ -320,6 +320,7 @@ function buildLocalIntentFromText(text = "") {
   const groupBy = _detectGroupByFromMessage(original);
   let aggOp = _detectAggregateOpFromMessage(original, intent.operation);
   const sortOrder = _detectSortOrderFromMessage(original);
+  const isUniqueListRequest = _looksLikeUniqueListRequest(original);
 
   const explicitCellOrRange = formulaUtils.parseExplicitCellOrRange(original);
   const explicitCellMatch = original.match(/\b([A-Z]{1,3}\d{1,7})\b/);
@@ -378,6 +379,16 @@ function buildLocalIntentFromText(text = "") {
   }
   if (hasFilterSpecs) {
     intent.filter_specs = filterSpecs;
+  }
+
+  if (isUniqueListRequest && headerHint) {
+    intent.operation = "unique";
+    intent.return_fields = [headerHint];
+    intent.return_role = "list_item";
+    intent.sorted = true;
+    intent.sort = true;
+    intent.sort_order = sortOrder || "asc";
+    return intent;
   }
 
   if (/정렬|높은 순|낮은 순|오름차순|내림차순/.test(original)) {
@@ -532,6 +543,28 @@ function applyStructuralOverrides(intent) {
   const hasMetric = !!intent.header_hint || !!intent.return_hint;
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
+  const wantsUniqueList = _looksLikeUniqueListRequest(raw);
+
+  if (
+    wantsUniqueList &&
+    (op === "sortby" || op === "filter" || op === "formula") &&
+    (intent.header_hint ||
+      (Array.isArray(intent.return_fields) &&
+        intent.return_fields.length === 1))
+  ) {
+    intent.operation = "unique";
+    if (
+      !Array.isArray(intent.return_fields) ||
+      intent.return_fields.length === 0
+    ) {
+      intent.return_fields = [intent.header_hint];
+    }
+    intent.sorted = true;
+    intent.sort = true;
+    intent.sort_order = intent.sort_order || "asc";
+    delete intent.return_hint;
+  }
+
   const wantsRowReturnVerb =
     /(가져와줘|보여줘|출력해줘|알려줘|get|show|return)/i.test(raw);
   const requestedReturnFields =
@@ -886,6 +919,14 @@ function _detectSortOrderFromMessage(msg = "") {
   if (/(적은\s*순|낮은\s*순|오름차순|asc|작은\s*순)/i.test(s)) return "asc";
   if (/(많은\s*순|높은\s*순|내림차순|desc|큰\s*순)/i.test(s)) return "desc";
   return null;
+}
+
+function _looksLikeUniqueListRequest(msg = "") {
+  const s = String(msg || "");
+  return (
+    /(중복\s*없이|중복\s*제거|unique|uniq)/i.test(s) &&
+    /(목록|리스트|뽑|보여|정렬|가나다순|sort)/i.test(s)
+  );
 }
 
 function _isRowEntityOp(op = "") {
