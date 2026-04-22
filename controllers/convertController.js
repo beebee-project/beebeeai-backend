@@ -776,7 +776,6 @@ function applyStructuralOverrides(intent) {
 
     if (hasDateCue && wantsRowEntity && (hasRecentCue || hasOldestCue)) {
       intent.operation = hasRecentCue ? "maxrow" : "minrow";
-      intent.header_hint = intent.header_hint || intent.return_hint || "입사일";
 
       if (
         !Array.isArray(intent.return_fields) ||
@@ -1032,19 +1031,13 @@ const OP_ALIASES = {
 
 function _detectGroupByFromMessage(msg = "") {
   const s = String(msg || "");
-  if (/부서별|부서\s*기준|각\s*부서/.test(s)) return "부서";
-  if (/직급별|직급\s*기준|각\s*직급/.test(s)) return "직급";
-  if (/평가\s*등급별|등급별|평가별/.test(s)) return "평가 등급";
+  const m = s.match(/([가-힣A-Za-z0-9_]+)\s*별/);
+  if (m) return m[1];
   return null;
 }
 
 function _detectHeaderHintFromMessage(msg = "") {
   const s = String(msg || "");
-  if (/(연봉|salary)/i.test(s)) return "연봉";
-  if (/(입사일|입사\s*날짜)/.test(s)) return "입사일";
-  if (/(평가\s*등급|등급)/.test(s)) return "평가 등급";
-  if (/직급/.test(s)) return "직급";
-  if (/부서/.test(s)) return "부서";
   return null;
 }
 
@@ -1116,16 +1109,6 @@ function _looksLikeGroupedSortRequest(msg = "") {
 
 function _inferSortHeaderHint(msg = "", fallback = null) {
   const s = String(msg || "");
-  if (/(연봉|급여|salary)/i.test(s)) return "연봉";
-  if (
-    /(입사일|입사\s*날짜|날짜|일자|최근\s*입사|오래\s*근무|최신\s*입사)/i.test(
-      s,
-    )
-  )
-    return "입사일";
-  if (/(평가\s*등급|등급)/i.test(s)) return "평가 등급";
-  if (/직급/.test(s)) return "직급";
-  if (/부서/.test(s)) return "부서";
   return fallback || null;
 }
 
@@ -1267,7 +1250,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
   if (isoRange) {
     _pushUniqueFilterSpec(out, {
       role: "date_filter",
-      header_hint: "날짜",
+      header_hint: null,
       operator: "between",
       min: isoRange[1].replace(/[./]/g, "-"),
       max: isoRange[2].replace(/[./]/g, "-"),
@@ -1280,7 +1263,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
     if (isoAfter) {
       _pushUniqueFilterSpec(out, {
         role: "date_filter",
-        header_hint: "날짜",
+        header_hint: null,
         operator: ">=",
         value: isoAfter[1].replace(/[./]/g, "-"),
         value_type: "date",
@@ -1293,7 +1276,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
     if (isoBefore) {
       _pushUniqueFilterSpec(out, {
         role: "date_filter",
-        header_hint: "날짜",
+        header_hint: null,
         operator: "<=",
         value: isoBefore[1].replace(/[./]/g, "-"),
         value_type: "date",
@@ -1306,7 +1289,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
     if (yearRange) {
       _pushUniqueFilterSpec(out, {
         role: "date_filter",
-        header_hint: "날짜",
+        header_hint: null,
         operator: "between",
         min: `${yearRange[1]}-01-01`,
         max: `${yearRange[2]}-12-31`,
@@ -1317,7 +1300,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
       if (yearAfter) {
         _pushUniqueFilterSpec(out, {
           role: "date_filter",
-          header_hint: "날짜",
+          header_hint: null,
           operator: ">=",
           value: `${yearAfter[1]}-01-01`,
           value_type: "date",
@@ -1328,7 +1311,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
       if (yearBefore) {
         _pushUniqueFilterSpec(out, {
           role: "date_filter",
-          header_hint: "날짜",
+          header_hint: null,
           operator: "<",
           value: `${yearBefore[1]}-01-01`,
           value_type: "date",
