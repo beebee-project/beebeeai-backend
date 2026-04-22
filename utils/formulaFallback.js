@@ -255,6 +255,34 @@ function fallbackSORTBY(argSource = "") {
   return `INDEX(SORT({${arrayExpr},${keyExpr}},2,${ascending ? "TRUE" : "FALSE"}),,1)`;
 }
 
+function fallbackSortedGroupAverageTable(input = "") {
+  const src = String(input || "").replace(/\s+/g, " ");
+
+  // 패턴:
+  // SORTBY(<groupAvgExpr>, CHOOSECOLS(<sameGroupAvgExpr>, 2), -1 or 1)
+  const m = src.match(
+    /^=?(?:IFERROR\()?SORTBY\(\s*(LET\(\s*keys\s*,\s*UNIQUE\([^)]+\)\s*,\s*HSTACK\([\s\S]*?AVERAGE\(\s*arr\s*\)[\s\S]*?\)\s*\)\s*)\s*,\s*CHOOSECOLS\(\s*\1\s*,\s*2\s*\)\s*,\s*(-?1)\s*\)(?:,\s*([\s\S]+?)\s*)?\)?$/i,
+  );
+  if (!m) return null;
+
+  const groupExpr = String(m[1] || "").trim();
+  const orderExpr = String(m[2] || "-1").trim();
+  const avgTable = fallbackGroupAverageTable(groupExpr);
+  if (!avgTable) return null;
+
+  const avgTableExpr = String(avgTable).replace(/^=/, "").trim();
+
+  const ascending = orderExpr === "1";
+  const sorted = `SORT(${avgTableExpr}, 2, ${ascending ? "TRUE" : "FALSE"})`;
+
+  // 원본이 IFERROR로 감싸져 있었으면 유지
+  if (/^=?(?:IFERROR\()/i.test(src)) {
+    const fallbackArg = m[3] != null ? String(m[3]).trim() : `""`;
+    return `=IFERROR(${sorted}, ${fallbackArg})`;
+  }
+  return `=${sorted}`;
+}
+
 function fallbackGroupAverageTable(input = "") {
   const src = String(input || "").replace(/\s+/g, " ");
 
@@ -288,15 +316,18 @@ function tryGenerateFallbackFormula(formula = "", compatibility = null) {
     : [];
 
   let next = String(formula || "");
-  const groupAvgFallback = fallbackGroupAverageTable(next);
   const appliedFunctions = [];
-  if (groupAvgFallback) {
-    next = groupAvgFallback;
+  const sortedGroupAvgFallback = fallbackSortedGroupAverageTable(next);
+  if (sortedGroupAvgFallback && sortedGroupAvgFallback !== next) {
+    next = sortedGroupAvgFallback;
     appliedFunctions.push("GROUP_AVERAGE_TABLE");
-    return {
-      formula: next,
-      appliedFunctions,
-    };
+    appliedFunctions.push("SORTBY");
+  } else {
+    const groupAvgFallback = fallbackGroupAverageTable(next);
+    if (groupAvgFallback && groupAvgFallback !== next) {
+      next = groupAvgFallback;
+      appliedFunctions.push("GROUP_AVERAGE_TABLE");
+    }
   }
 
   if (blockers.includes("SORTBY")) {

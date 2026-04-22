@@ -330,6 +330,8 @@ function buildLocalIntentFromText(text = "") {
   const topNLimit = _extractTopNLimit(original);
   const wantsSortedList = _looksLikeSortedListRequest(original);
   const wantsRankColumn = _looksLikeRankColumnRequest(original);
+  const wantsGroupedAggregate = _looksLikeGroupedAggregateRequest(original);
+  const wantsGroupedSort = _looksLikeGroupedSortRequest(original);
   const inferredSortHeader = _inferSortHeaderHint(original, headerHint);
   const inferredSortOrder = _inferSortOrderFromMessage(original);
 
@@ -399,6 +401,36 @@ function buildLocalIntentFromText(text = "") {
     intent.sorted = true;
     intent.sort = true;
     intent.sort_order = sortOrder || "asc";
+    return intent;
+  }
+
+  if ((wantsGroupedAggregate || wantsGroupedSort) && groupBy) {
+    intent.group_by = groupBy;
+    intent.group_role = "dimension";
+
+    // 집계 연산이 있으면 그걸 우선, 없고 직원 수/인원수 계열이면 count
+    if (aggOp && aggOp !== "formula") {
+      intent.operation = aggOp;
+    } else if (/(직원\s*수|인원수|개수|건수|수량)/.test(original)) {
+      intent.operation = "count";
+    } else {
+      intent.operation = "count";
+    }
+
+    if (headerHint && intent.operation !== "count") {
+      intent.header_hint = headerHint;
+    }
+
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
+    }
+
+    if (wantsGroupedSort || sortOrder) {
+      intent.sorted = true;
+      intent.sort = true;
+      intent.sort_order = inferredSortOrder || sortOrder || "desc";
+    }
+
     return intent;
   }
 
@@ -606,6 +638,8 @@ function applyStructuralOverrides(intent) {
   const topNLimit = _extractTopNLimit(raw);
   const wantsSortedList = _looksLikeSortedListRequest(raw);
   const wantsRankColumn = _looksLikeRankColumnRequest(raw);
+  const wantsGroupedAggregate = _looksLikeGroupedAggregateRequest(raw);
+  const wantsGroupedSort = _looksLikeGroupedSortRequest(raw);
   const inferredSortHeader = _inferSortHeaderHint(raw, intent.header_hint);
   const inferredSortOrder = _inferSortOrderFromMessage(raw);
 
@@ -656,6 +690,25 @@ function applyStructuralOverrides(intent) {
     intent.header_hint = intent.header_hint || inferredSortHeader;
     intent.sort_order = intent.sort_order || inferredSortOrder;
     intent.sorted = true;
+  }
+
+  if ((wantsGroupedAggregate || wantsGroupedSort) && intent.group_by) {
+    if (op === "sortby" || op === "formula" || op === "filter") {
+      if (/(직원\s*수|인원수|개수|건수|수량)/.test(raw)) {
+        intent.operation = "count";
+      } else if (
+        !intent.operation ||
+        intent.operation === "formula" ||
+        intent.operation === "sortby"
+      ) {
+        intent.operation = intent.header_hint ? "average" : "count";
+      }
+    }
+    if (wantsGroupedSort) {
+      intent.sorted = true;
+      intent.sort = true;
+      intent.sort_order = intent.sort_order || inferredSortOrder || "desc";
+    }
   }
 
   const wantsRowReturnVerb =
@@ -1043,6 +1096,22 @@ function _looksLikeSortedListRequest(msg = "") {
 function _looksLikeRankColumnRequest(msg = "") {
   const s = String(msg || "");
   return /(순위|랭크|등수|rank)/i.test(s);
+}
+
+function _looksLikeGroupedAggregateRequest(msg = "") {
+  const s = String(msg || "");
+  return (
+    /(별|별로)/.test(s) &&
+    /(표로|계산|구해|인원|수|합계|평균|최고|최저|중앙)/.test(s)
+  );
+}
+
+function _looksLikeGroupedSortRequest(msg = "") {
+  const s = String(msg || "");
+  return (
+    /(별|별로)/.test(s) &&
+    /(정렬|순으로|높은\s*순|낮은\s*순|많은\s*순|적은\s*순)/.test(s)
+  );
 }
 
 function _inferSortHeaderHint(msg = "", fallback = null) {
