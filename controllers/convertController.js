@@ -273,6 +273,12 @@ function _deduceOp(text = "") {
     return "tocol";
   if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
     return "byrow";
+  if (
+    /(최근\s*순.*\d+\s*명|오래된\s*순.*\d+\s*명|최신.*\d+\s*명|입사일.*\d+\s*명)/.test(
+      s,
+    )
+  )
+    return "topnrows";
   if (/(이름\s*목록|목록을\s*보여줘|목록을\s*뽑아줘|직원들의\s*이름)/.test(s))
     return "filter";
   if (/(상위\s*\d+명|top\s*\d+)/i.test(s)) return "topnrows";
@@ -323,6 +329,7 @@ function buildLocalIntentFromText(text = "") {
   const isUniqueListRequest = _looksLikeUniqueListRequest(original);
   const topNLimit = _extractTopNLimit(original);
   const wantsSortedList = _looksLikeSortedListRequest(original);
+  const wantsRankColumn = _looksLikeRankColumnRequest(original);
   const inferredSortHeader = _inferSortHeaderHint(original, headerHint);
   const inferredSortOrder = _inferSortOrderFromMessage(original);
 
@@ -392,6 +399,14 @@ function buildLocalIntentFromText(text = "") {
     intent.sorted = true;
     intent.sort = true;
     intent.sort_order = sortOrder || "asc";
+    return intent;
+  }
+
+  if (wantsRankColumn && inferredSortHeader) {
+    intent.operation = "rankcolumn";
+    intent.header_hint = inferredSortHeader;
+    intent.sort_order = inferredSortOrder;
+    intent.sorted = true;
     return intent;
   }
 
@@ -590,6 +605,7 @@ function applyStructuralOverrides(intent) {
   const wantsUniqueList = _looksLikeUniqueListRequest(raw);
   const topNLimit = _extractTopNLimit(raw);
   const wantsSortedList = _looksLikeSortedListRequest(raw);
+  const wantsRankColumn = _looksLikeRankColumnRequest(raw);
   const inferredSortHeader = _inferSortHeaderHint(raw, intent.header_hint);
   const inferredSortOrder = _inferSortOrderFromMessage(raw);
 
@@ -626,6 +642,17 @@ function applyStructuralOverrides(intent) {
     (op === "formula" || op === "filter")
   ) {
     intent.operation = "sortby";
+    intent.header_hint = intent.header_hint || inferredSortHeader;
+    intent.sort_order = intent.sort_order || inferredSortOrder;
+    intent.sorted = true;
+  }
+
+  if (
+    wantsRankColumn &&
+    inferredSortHeader &&
+    (op === "formula" || op === "sortby" || op === "filter")
+  ) {
+    intent.operation = "rankcolumn";
     intent.header_hint = intent.header_hint || inferredSortHeader;
     intent.sort_order = intent.sort_order || inferredSortOrder;
     intent.sorted = true;
@@ -999,22 +1026,34 @@ function _extractTopNLimit(msg = "") {
   const s = String(msg || "");
   const m =
     s.match(/(?:상위|하위|top|bottom)\s*(\d+)/i) ||
-    s.match(/(\d+)\s*(?:명|개|건)\b/i);
+    s.match(/(\d+)\s*(?:명|개|건)\b/i) ||
+    s.match(/(?:최근|최신|오래된|높은|낮은)\s*순(?:으로)?\s*(\d+)/i);
   return m ? Number(m[1]) : 0;
 }
 
 function _looksLikeSortedListRequest(msg = "") {
   const s = String(msg || "");
   return (
-    /(순으로|정렬|오름차순|내림차순|상위|하위|top|bottom|최근|최신)/i.test(s) &&
-    /(목록|리스트|보여줘|뽑아줘|가져와줘)/i.test(s)
+    /(순으로|정렬|오름차순|내림차순|상위|하위|top|bottom|최근|최신|오래된)/i.test(
+      s,
+    ) && /(목록|리스트|보여줘|뽑아줘|가져와줘|출력해줘)/i.test(s)
   );
+}
+
+function _looksLikeRankColumnRequest(msg = "") {
+  const s = String(msg || "");
+  return /(순위|랭크|등수|rank)/i.test(s);
 }
 
 function _inferSortHeaderHint(msg = "", fallback = null) {
   const s = String(msg || "");
   if (/(연봉|급여|salary)/i.test(s)) return "연봉";
-  if (/(입사일|입사\s*날짜|날짜|일자)/i.test(s)) return "입사일";
+  if (
+    /(입사일|입사\s*날짜|날짜|일자|최근\s*입사|오래\s*근무|최신\s*입사)/i.test(
+      s,
+    )
+  )
+    return "입사일";
   if (/(평가\s*등급|등급)/i.test(s)) return "평가 등급";
   if (/직급/.test(s)) return "직급";
   if (/부서/.test(s)) return "부서";
@@ -1023,8 +1062,17 @@ function _inferSortHeaderHint(msg = "", fallback = null) {
 
 function _inferSortOrderFromMessage(msg = "") {
   const s = String(msg || "");
-  if (/(하위|낮은\s*순|작은\s*순|오름차순|asc)/i.test(s)) return "asc";
-  if (/(상위|높은\s*순|큰\s*순|내림차순|desc|최근|최신)/i.test(s))
+  if (
+    /(하위|낮은\s*순|작은\s*순|오름차순|asc|오래된|예전|earliest|oldest)/i.test(
+      s,
+    )
+  )
+    return "asc";
+  if (
+    /(상위|높은\s*순|큰\s*순|내림차순|desc|최근|최신|latest|most\s*recent)/i.test(
+      s,
+    )
+  )
     return "desc";
   return _detectSortOrderFromMessage(s) || "desc";
 }

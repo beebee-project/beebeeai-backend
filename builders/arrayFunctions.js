@@ -1593,7 +1593,9 @@ function _topNRows(ctx) {
   const want =
     Array.isArray(it.return_headers) && it.return_headers.length
       ? it.return_headers
-      : ["이름"];
+      : Array.isArray(it.return_fields) && it.return_fields.length
+        ? it.return_fields
+        : ["이름"];
 
   const retIdxs = want
     .map((h) => {
