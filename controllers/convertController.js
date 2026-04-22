@@ -341,23 +341,28 @@ function buildLocalIntentFromText(text = "") {
   const hasGroup = Boolean(groupBy);
   const hasMetric = Boolean(aggOp && aggOp !== "formula");
 
-  let basicCondition = null;
-  if (headerHint) {
-    let operator = null;
-    if (/(이상|greater|over|>=|>)/i.test(original)) operator = ">=";
-    else if (/(이하|under|<=|<|작은)/i.test(original)) operator = "<=";
-    else if (/(초과)/i.test(original)) operator = ">";
-    else if (/(미만)/i.test(original)) operator = "<";
-    else if (/(같|=|equal)/i.test(original)) operator = "=";
+  const filterSpecs = _extractRoleFilterSpecsFromMessage(original, headerHint);
+  const legacyConditions = _filterSpecsToLegacyConditions(filterSpecs);
+  const hasFilterSpecs = filterSpecs.length > 0;
 
-    const numMatch = original.match(/([0-9][0-9,]*(?:\.[0-9]+)?)/);
-    if (operator && numMatch) {
-      basicCondition = {
-        target: headerHint,
-        operator,
-        value: numMatch[1].replace(/,/g, ""),
-      };
-    }
+  if (hasMetric) intent.metric_role = "measure";
+  if (groupBy) intent.group_role = "dimension";
+  if (hasLookupCue) {
+    intent.lookup_role = "key";
+    intent.return_role = "value";
+  }
+  if (filterSpecs.some((x) => x.role === "date_filter")) {
+    intent.date_role = "date";
+  }
+  if (sortOrder) {
+    intent.sort_spec = {
+      order: sortOrder,
+      role: hasMetric ? "measure_sort" : "generic_sort",
+      header_hint: headerHint || null,
+    };
+  }
+  if (hasFilterSpecs) {
+    intent.filter_specs = filterSpecs;
   }
 
   if (/정렬|높은 순|낮은 순|오름차순|내림차순/.test(original)) {
@@ -420,8 +425,8 @@ function buildLocalIntentFromText(text = "") {
     if (headerHint && aggOp !== "count") {
       intent.header_hint = headerHint;
     }
-    if (basicCondition) {
-      intent.conditions = [basicCondition];
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
     }
     if (sortOrder) {
       intent.sorted = true;
@@ -434,46 +439,25 @@ function buildLocalIntentFromText(text = "") {
     intent.operation = "filter";
     intent.return_fields = ["이름"];
 
-    const filters = [];
-
-    if (hasContains && quotedText) {
-      filters.push({
-        target: "이름",
-        operator: "contains",
-        value: quotedText,
-      });
-    } else if (hasStartsWith && quotedText) {
-      filters.push({
-        target: "이름",
-        operator: "starts_with",
-        value: quotedText,
-      });
-    } else if (hasEndsWith && quotedText) {
-      filters.push({
-        target: "이름",
-        operator: "ends_with",
-        value: quotedText,
-      });
-    }
-
-    if (filters.length) {
-      intent.conditions = filters;
+    intent.return_role = "entity_name";
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
     }
 
     return intent;
   }
 
-  if (/(filter|필터|조건|만족|해당)/.test(s) || basicCondition) {
+  if (/(filter|필터|조건|만족|해당)/.test(s) || hasFilterSpecs) {
     intent.operation = "filter";
-    if (basicCondition) {
-      intent.conditions = [basicCondition];
+    if (legacyConditions.length) {
+      intent.conditions = legacyConditions;
     }
     return intent;
   }
 
-  if (/\bif\b|조건|이면|아니면|참|거짓/.test(s) && basicCondition) {
+  if (/\bif\b|조건|이면|아니면|참|거짓/.test(s) && legacyConditions.length) {
     intent.operation = "if";
-    intent.condition = basicCondition;
+    intent.condition = legacyConditions[0];
 
     const labelMatches = s.match(/['"](.*?)['"]/g);
     if (labelMatches && labelMatches.length >= 2) {
@@ -843,6 +827,232 @@ function _detectSortOrderFromMessage(msg = "") {
   if (/(적은\s*순|낮은\s*순|오름차순|asc|작은\s*순)/i.test(s)) return "asc";
   if (/(많은\s*순|높은\s*순|내림차순|desc|큰\s*순)/i.test(s)) return "desc";
   return null;
+}
+
+function _pushUniqueFilterSpec(out, spec) {
+  if (!spec || typeof spec !== "object") return;
+  const key = JSON.stringify([
+    spec.role || "",
+    spec.header_hint || "",
+    spec.operator || "",
+    spec.value ?? "",
+    spec.value_type || "",
+    spec.min ?? "",
+    spec.max ?? "",
+  ]);
+  if (!out.__seen) out.__seen = new Set();
+  if (out.__seen.has(key)) return;
+  out.__seen.add(key);
+  out.push(spec);
+}
+
+function _finalizeFilterSpecs(out) {
+  if (out && out.__seen) delete out.__seen;
+  return Array.isArray(out) ? out : [];
+}
+
+function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
+  const original = String(msg || "");
+  const out = [];
+
+  const quotedTextMatch = original.match(/["']([^"']+)["']/);
+  const quotedText = quotedTextMatch ? quotedTextMatch[1].trim() : null;
+
+  // 1) 숫자 조건
+  if (headerHint) {
+    let operator = null;
+    if (/(이상|greater|over|>=|>)/i.test(original)) operator = ">=";
+    else if (/(이하|under|<=|<|작은)/i.test(original)) operator = "<=";
+    else if (/(초과)/i.test(original)) operator = ">";
+    else if (/(미만)/i.test(original)) operator = "<";
+    else if (/(같|=|equal)/i.test(original)) operator = "=";
+
+    const numMatch = original.match(/([0-9][0-9,]*(?:\.[0-9]+)?)/);
+    if (operator && numMatch) {
+      _pushUniqueFilterSpec(out, {
+        role: "metric_filter",
+        header_hint: headerHint,
+        operator,
+        value: numMatch[1].replace(/,/g, ""),
+        value_type: "number",
+      });
+    }
+  }
+
+  // 2) 날짜 조건
+  const isoRange = original.match(
+    /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:부터|~|-)\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})/,
+  );
+  if (isoRange) {
+    _pushUniqueFilterSpec(out, {
+      role: "date_filter",
+      header_hint: "날짜",
+      operator: "between",
+      min: isoRange[1].replace(/[./]/g, "-"),
+      max: isoRange[2].replace(/[./]/g, "-"),
+      value_type: "date",
+    });
+  } else {
+    const isoAfter = original.match(
+      /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(이후|후|부터)/,
+    );
+    if (isoAfter) {
+      _pushUniqueFilterSpec(out, {
+        role: "date_filter",
+        header_hint: "날짜",
+        operator: ">=",
+        value: isoAfter[1].replace(/[./]/g, "-"),
+        value_type: "date",
+      });
+    }
+
+    const isoBefore = original.match(
+      /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(이전|전|까지)/,
+    );
+    if (isoBefore) {
+      _pushUniqueFilterSpec(out, {
+        role: "date_filter",
+        header_hint: "날짜",
+        operator: "<=",
+        value: isoBefore[1].replace(/[./]/g, "-"),
+        value_type: "date",
+      });
+    }
+
+    const yearRange = original.match(
+      /(20\d{2})\s*년?\s*[~\-부터]\s*(20\d{2})\s*년?/,
+    );
+    if (yearRange) {
+      _pushUniqueFilterSpec(out, {
+        role: "date_filter",
+        header_hint: "날짜",
+        operator: "between",
+        min: `${yearRange[1]}-01-01`,
+        max: `${yearRange[2]}-12-31`,
+        value_type: "date",
+      });
+    } else {
+      const yearAfter = original.match(/(20\d{2})\s*년?\s*(이후|후)/);
+      if (yearAfter) {
+        _pushUniqueFilterSpec(out, {
+          role: "date_filter",
+          header_hint: "날짜",
+          operator: ">=",
+          value: `${yearAfter[1]}-01-01`,
+          value_type: "date",
+        });
+      }
+
+      const yearBefore = original.match(/(20\d{2})\s*년?\s*(이전|전)/);
+      if (yearBefore) {
+        _pushUniqueFilterSpec(out, {
+          role: "date_filter",
+          header_hint: "날짜",
+          operator: "<",
+          value: `${yearBefore[1]}-01-01`,
+          value_type: "date",
+        });
+      }
+    }
+  }
+
+  // 3) 텍스트 매칭 조건
+  if (quotedText) {
+    const textHeaderHint = /직원\s*id|사번|아이디/i.test(original)
+      ? "직원 ID"
+      : /이름|성명/.test(original)
+        ? "이름"
+        : null;
+
+    if (textHeaderHint) {
+      if (/포함/.test(original) || /contains|include/i.test(original)) {
+        _pushUniqueFilterSpec(out, {
+          role: "text_filter",
+          header_hint: textHeaderHint,
+          operator: "contains",
+          value: quotedText,
+          value_type: "text",
+        });
+      } else if (/시작/.test(original) || /starts?\s*with/i.test(original)) {
+        _pushUniqueFilterSpec(out, {
+          role: "text_filter",
+          header_hint: textHeaderHint,
+          operator: "starts_with",
+          value: quotedText,
+          value_type: "text",
+        });
+      } else if (/끝/.test(original) || /ends?\s*with|끝나는/i.test(original)) {
+        _pushUniqueFilterSpec(out, {
+          role: "text_filter",
+          header_hint: textHeaderHint,
+          operator: "ends_with",
+          value: quotedText,
+          value_type: "text",
+        });
+      }
+    }
+  }
+
+  // 4) 범주형 조건 (기존 헤더 lexicon은 "최종 헤더"가 아니라 semantic hint로만 사용)
+  const dept = original.match(/([가-힣A-Za-z0-9_]+)\s*부서/);
+  if (dept && dept[1] && !/부서별/.test(original)) {
+    _pushUniqueFilterSpec(out, {
+      role: "category_filter",
+      header_hint: "부서",
+      operator: "=",
+      value: dept[1].trim(),
+      value_type: "text",
+    });
+  }
+
+  const grade = original.match(
+    /평가\s*등급(?:이|은|는)?\s*([A-Za-z0-9가-힣]+)/,
+  );
+  if (grade && grade[1] && !/등급별/.test(original)) {
+    _pushUniqueFilterSpec(out, {
+      role: "category_filter",
+      header_hint: "평가 등급",
+      operator: "=",
+      value: grade[1].trim().toUpperCase(),
+      value_type: "text",
+    });
+  }
+
+  const job = original.match(/직급(?:이|은|는)?\s*([가-힣A-Za-z0-9_]+)/);
+  if (job && job[1] && !/직급별/.test(original)) {
+    _pushUniqueFilterSpec(out, {
+      role: "category_filter",
+      header_hint: "직급",
+      operator: "=",
+      value: job[1].trim(),
+      value_type: "text",
+    });
+  }
+
+  return _finalizeFilterSpecs(out);
+}
+
+function _filterSpecsToLegacyConditions(filterSpecs = []) {
+  return (Array.isArray(filterSpecs) ? filterSpecs : [])
+    .map((spec) => {
+      if (!spec) return null;
+      if (spec.operator === "between" && spec.min != null && spec.max != null) {
+        return {
+          target: spec.header_hint || spec.header || null,
+          operator: "between",
+          min: spec.min,
+          max: spec.max,
+          value_type: spec.value_type || null,
+        };
+      }
+      return {
+        target: spec.header_hint || spec.header || null,
+        operator: spec.operator || "=",
+        value: spec.value,
+        value_type: spec.value_type || null,
+      };
+    })
+    .filter(Boolean);
 }
 
 function resolveOp(op) {

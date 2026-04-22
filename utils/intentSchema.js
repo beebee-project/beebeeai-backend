@@ -173,11 +173,15 @@ function normalizeFilters(intent = {}) {
       ? intent.conditions
       : [];
 
+  const roleFilters = Array.isArray(intent.filter_specs)
+    ? intent.filter_specs
+    : [];
+
   const groupedFilters = Array.isArray(intent.condition_groups)
     ? intent.condition_groups
     : [];
 
-  const src = [...flatFilters, ...groupedFilters];
+  const src = [...flatFilters, ...roleFilters, ...groupedFilters];
 
   const out = [];
 
@@ -204,10 +208,13 @@ function normalizeFilters(intent = {}) {
       header:
         typeof c.target === "string"
           ? c.target
-          : c?.target?.header || c?.header || c?.hint || null,
+          : c?.target?.header || c?.header || c?.header_hint || c?.hint || null,
       operator: c.operator || "=",
       value: c.value,
+      min: c.min,
+      max: c.max,
       value_type: c.value_type || null,
+      role: c.role || null,
     });
   }
 
@@ -255,6 +262,11 @@ function normalizeIntentSchema(rawIntent = {}, rawMessage = "") {
     ...intent,
     operation: intent.operation,
     engine: normalizeEngine(intent),
+    metric_role: intent.metric_role || null,
+    group_role: intent.group_role || null,
+    lookup_role: intent.lookup_role || null,
+    return_role: intent.return_role || null,
+    date_role: intent.date_role || null,
     return_fields: normalizeReturnFields(intent),
     has_explicit_return:
       (Array.isArray(intent.return_fields) &&
@@ -264,7 +276,9 @@ function normalizeIntentSchema(rawIntent = {}, rawMessage = "") {
       !!intent.return_hint,
     lookup: normalizeLookup(intent),
     filters: normalizeFilters(intent),
+    filter_specs: Array.isArray(intent.filter_specs) ? intent.filter_specs : [],
     sort: normalizeSort(intent),
+    sort_spec: intent.sort_spec || null,
     limit: normalizeLimit(intent, rawMessage),
     duplicate_rule: normalizeDuplicateRule(intent, rawMessage),
     group_by: intent.group_by || null,
