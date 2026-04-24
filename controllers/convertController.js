@@ -395,7 +395,7 @@ function buildLocalIntentFromText(text = "") {
     intent.sort_spec = {
       order: sortOrder,
       role: hasMetric ? "measure_sort" : "generic_sort",
-      header_hint: headerHint || null,
+      header_hint: inferredSortHeader || headerHint || null,
     };
   }
   if (hasFilterSpecs) {
@@ -405,11 +405,13 @@ function buildLocalIntentFromText(text = "") {
   const uniqueTarget =
     headerHint ||
     requestedReturnFields[0] ||
+    _extractListTargetFromMessage(original) ||
     _extractSortHintFromMessage(original);
 
   if (isUniqueListRequest && uniqueTarget) {
     intent.operation = "unique";
     intent.return_fields = [uniqueTarget];
+    intent.header_hint = uniqueTarget;
     intent.return_role = "list_item";
     intent.sorted = true;
     intent.sort = true;
@@ -450,8 +452,10 @@ function buildLocalIntentFromText(text = "") {
   if (wantsRankColumn && inferredSortHeader) {
     intent.operation = "rankcolumn";
     intent.header_hint = inferredSortHeader;
+    intent.sort_by = inferredSortHeader;
     intent.sort_order = inferredSortOrder;
     intent.sorted = true;
+    intent.sort = { header: inferredSortHeader, order: inferredSortOrder };
     return intent;
   }
 
@@ -460,8 +464,10 @@ function buildLocalIntentFromText(text = "") {
     intent.limit = topNLimit;
     intent.take_n = topNLimit;
     intent.header_hint = inferredSortHeader;
+    intent.sort_by = inferredSortHeader;
     intent.sort_order = inferredSortOrder;
     intent.sorted = true;
+    intent.sort = { header: inferredSortHeader, order: inferredSortOrder };
 
     if (requestedReturnFields.length) {
       intent.return_fields = requestedReturnFields;
@@ -479,8 +485,10 @@ function buildLocalIntentFromText(text = "") {
   if (wantsSortedList && inferredSortHeader) {
     intent.operation = "sortby";
     intent.header_hint = inferredSortHeader;
+    intent.sort_by = inferredSortHeader;
     intent.sort_order = inferredSortOrder;
     intent.sorted = true;
+    intent.sort = { header: inferredSortHeader, order: inferredSortOrder };
 
     if (requestedReturnFields.length) {
       intent.return_fields = requestedReturnFields;
@@ -500,12 +508,29 @@ function buildLocalIntentFromText(text = "") {
     if (!intent.return_fields && /이름/.test(original)) {
       intent.return_fields = ["이름"];
     }
+    if (!intent.return_fields) {
+      const listTarget = _extractListTargetFromMessage(original);
+      if (listTarget) {
+        intent.return_fields = [listTarget];
+        intent.return_role = "list_item";
+      }
+    }
     if (!intent.header_hint && inferredSortHeader) {
       intent.header_hint = inferredSortHeader;
+    }
+    if (!intent.sort_by && inferredSortHeader) {
+      intent.sort_by = inferredSortHeader;
+    }
+    if (!intent.header_hint && intent.return_fields?.[0]) {
+      intent.header_hint = intent.return_fields[0];
     }
     if (sortOrder) {
       intent.sorted = true;
       intent.sort_order = sortOrder;
+      intent.sort = {
+        header: inferredSortHeader || intent.header_hint,
+        order: sortOrder,
+      };
     }
     return intent;
   }
@@ -1047,6 +1072,43 @@ function _detectGroupByFromMessage(msg = "") {
 
 function _detectHeaderHintFromMessage(msg = "") {
   const s = String(msg || "");
+  if (!s) return null;
+
+  const clean = (v = "") =>
+    String(v || "")
+      .replace(/[\"']/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      // 조사/어미를 "단어 끝" 기준으로만 정리
+      .replace(/(?:이|가|은|는|을|를|의|로|으로)$/u, "")
+      // 일반적인 요청 꼬리 제거
+      .replace(
+        /\s*(?:목록|리스트|값|정보|데이터|직원\s*수|인원수|개수|갯수|건수|수량)$/u,
+        "",
+      )
+      .trim();
+
+  const patterns = [
+    // "연봉이 5000 이상", "입사일이 2023년 이후"
+    /(.+?)\s*(?:이|가|은|는)?\s*[0-9][0-9,]*(?:\.[0-9]+)?\s*(?:만원|원|명|개|건|점|%|퍼센트)?\s*(?:이상|이하|초과|미만|>=|<=|>|<)/u,
+    /(.+?)\s*(?:이|가|은|는)\s*(?:20\d{2}년|\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:이후|이전|후|전|부터|까지)/u,
+
+    // "연봉이 높은 순", "입사일 오름차순"
+    /(.+?)\s*(?:이|가|은|는)?\s*(?:높은\s*순|낮은\s*순|많은\s*순|적은\s*순|오름차순|내림차순)/u,
+
+    // "직급 목록", "부서 리스트"
+    /(.+?)\s*(?:목록|리스트)\b/u,
+
+    // "연봉 평균/합계/최고값"
+    /(.+?)\s*(?:평균|합계|총합|최고값|최저값|최고|최저|중앙값|중간값)\b/u,
+  ];
+
+  for (const p of patterns) {
+    const m = s.match(p);
+    const hint = clean(m?.[1] || "");
+    if (hint && hint.length <= 40) return hint;
+  }
+
   return null;
 }
 
@@ -1118,6 +1180,14 @@ function _looksLikeGroupedSortRequest(msg = "") {
 
 function _inferSortHeaderHint(msg = "", fallback = null) {
   const s = String(msg || "");
+  if (!s) return fallback || null;
+
+  const direct = _extractSortHintFromMessage(s);
+  if (direct) return direct;
+
+  const generic = _detectHeaderHintFromMessage(s);
+  if (generic) return generic;
+
   return fallback || null;
 }
 
@@ -1188,6 +1258,7 @@ function _cleanHintPhrase(s = "") {
     .replace(/[\"']/g, "")
     .replace(/\b(을|를|은|는|이|가|의|로|으로)\b/g, " ")
     .replace(/\s+/g, " ")
+    .replace(/(?:이|가|은|는|을|를|의|로|으로)$/u, "")
     .trim();
 }
 
@@ -1249,6 +1320,24 @@ function _extractSortHintFromMessage(msg = "") {
     const phrase = _cleanHintPhrase(m?.[1] || "");
     if (phrase && phrase.length <= 40) return phrase;
   }
+  return _detectHeaderHintFromMessage(raw);
+}
+
+function _extractListTargetFromMessage(msg = "") {
+  const raw = String(msg || "").trim();
+  if (!raw) return null;
+
+  const patterns = [
+    /(.+?)\s*(?:목록|리스트)\s*(?:을|를)?\s*(?:중복\s*없이|고유|유니크|unique)/u,
+    /(.+?)\s*(?:목록|리스트)\s*(?:을|를)?/u,
+  ];
+
+  for (const p of patterns) {
+    const m = raw.match(p);
+    const v = _cleanHintPhrase(m?.[1] || "");
+    if (v && v.length <= 40) return v;
+  }
+
   return null;
 }
 
@@ -1286,6 +1375,43 @@ function _cleanCategoryValue(v) {
   return s.trim();
 }
 
+function _normalizeNumberLiteral(v) {
+  const s = String(v ?? "")
+    .replace(/,/g, "")
+    .replace(/\s+/g, "")
+    .replace(/(?:만원|원|명|개|건|점|%|퍼센트)$/u, "");
+
+  const m = s.match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+
+function _cleanNumericHeaderHint(v = "") {
+  let s = _cleanHintPhrase(v);
+
+  // "개발 부서에서 연봉" → "연봉"
+  // "평가 등급 A이면서 연봉" → "연봉"
+  const splitters = [
+    /(?:에서|중에서)\s*/u,
+    /(?:이면서|면서|이고|이며|그리고|및|,\s*)/u,
+  ];
+
+  for (const re of splitters) {
+    const parts = String(s || "")
+      .split(re)
+      .map((x) => _cleanHintPhrase(x))
+      .filter(Boolean);
+    if (parts.length > 1) s = parts[parts.length - 1];
+  }
+
+  // 앞 조건 흔적 제거: "평가 등급 A 연봉" 같은 경우 마지막 측정 후보만 사용
+  const metricTail = s.match(
+    /(연봉|급여|매출|금액|점수|수량|개수|건수|나이|가격|단가|합계|평균)$/u,
+  );
+  if (metricTail) return metricTail[1];
+
+  return s;
+}
+
 function _looksLikeCountRequest(msg = "") {
   const s = String(msg || "");
   return /(직원\s*수|인원수|입사자\s*수|개수|갯수|건수|수량|카운트|몇\s*명)/.test(
@@ -1300,8 +1426,45 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
   const quotedTextMatch = original.match(/["']([^"']+)["']/);
   const quotedText = quotedTextMatch ? quotedTextMatch[1].trim() : null;
 
+  const pushNumericComparisons = () => {
+    const re =
+      /([가-힣A-Za-z0-9_ ()/%.-]+?)\s*(?:이|가|은|는)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(만원|원|명|개|건|점|%|퍼센트)?\s*(이상|이하|초과|미만|>=|<=|>|<)/gu;
+
+    let pushed = 0;
+    let m;
+    while ((m = re.exec(original))) {
+      const rawHeader = _cleanNumericHeaderHint(m[1] || "");
+      const value = _normalizeNumberLiteral(`${m[2] || ""}${m[3] || ""}`);
+      const wordOp = String(m[4] || "").trim();
+      if (!rawHeader || value == null) continue;
+
+      const operator =
+        wordOp === "이상" || wordOp === ">="
+          ? ">="
+          : wordOp === "이하" || wordOp === "<="
+            ? "<="
+            : wordOp === "초과" || wordOp === ">"
+              ? ">"
+              : wordOp === "미만" || wordOp === "<"
+                ? "<"
+                : "=";
+
+      _pushUniqueFilterSpec(out, {
+        role: "numeric_filter",
+        header_hint: rawHeader,
+        operator,
+        value,
+        value_type: "number",
+      });
+      pushed++;
+    }
+    return pushed;
+  };
+
+  const numericComparisonCount = pushNumericComparisons();
+
   // 1) 숫자 조건
-  if (headerHint) {
+  if (headerHint && numericComparisonCount === 0) {
     let operator = null;
     if (/(이상|greater|over|>=|>)/i.test(original)) operator = ">=";
     else if (/(이하|under|<=|<|작은)/i.test(original)) operator = "<=";
@@ -1315,7 +1478,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
         role: "metric_filter",
         header_hint: headerHint,
         operator,
-        value: numMatch[1].replace(/,/g, ""),
+        value: _normalizeNumberLiteral(numMatch[1]),
         value_type: "number",
       });
     }
