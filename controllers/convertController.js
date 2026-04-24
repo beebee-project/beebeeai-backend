@@ -273,25 +273,20 @@ function _deduceOp(text = "") {
     return "tocol";
   if (/(각\s*행의\s*합계|행별\s*합계|각\s*행\s*합계|byrow)/.test(s))
     return "byrow";
-  if (
-    /(최근\s*순.*\d+\s*명|오래된\s*순.*\d+\s*명|최신.*\d+\s*명|입사일.*\d+\s*명)/.test(
-      s,
-    )
-  )
-    return "topnrows";
-  if (/(이름\s*목록|목록을\s*보여줘|목록을\s*뽑아줘|직원들의\s*이름)/.test(s))
-    return "filter";
+  if (/(최근\s*순.*\d+|오래된\s*순.*\d+|최신.*\d+)/.test(s)) return "topnrows";
+  if (/(목록을\s*보여줘|목록을\s*뽑아줘|리스트)/.test(s)) return "filter";
   if (/(상위\s*\d+명|top\s*\d+)/i.test(s)) return "topnrows";
-  if (/(가장\s*높은\s*직원|최고\s*연봉.*직원)/.test(s)) return "maxrow";
-  if (/(가장\s*낮은\s*직원|최저\s*연봉.*직원)/.test(s)) return "minrow";
+  if (/(가장\s*높은|최고).*(가져와|보여|출력|알려|get|show|return)/i.test(s))
+    return "maxrow";
+  if (/(가장\s*낮은|최저).*(가져와|보여|출력|알려|get|show|return)/i.test(s))
+    return "minrow";
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
   if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
   if (/(xlookup|lookup|찾아|조회|검색|참조)/.test(s)) return "xlookup";
   if (/(filter|필터)/.test(s)) return "filter";
   if (/\b(if|조건|만약)\b/.test(s)) return "if";
-  if (/(median|중앙값|중간값|가운데\s*값|중앙\s*(연봉|급여|값|금액)?)/.test(s))
-    return "median";
+  if (/(median|중앙값|중간값|가운데\s*값)/.test(s)) return "median";
   if (/(stdev|표준편차)/.test(s)) return "stdev_s";
   if (/(var|분산)/.test(s)) return "var_s";
   if (/(sortby|정렬)/.test(s)) return "sortby";
@@ -372,7 +367,7 @@ function buildLocalIntentFromText(text = "") {
 
   if (wantsNameList) {
     intent.return_role = "entity_name";
-    intent.return_fields = ["이름"];
+    intent.return_fields = [];
   }
   if (hasMetric) intent.metric_role = "measure";
   if (groupBy) intent.group_role = "dimension";
@@ -424,7 +419,7 @@ function buildLocalIntentFromText(text = "") {
     // 집계 연산이 있으면 그걸 우선, 없고 직원 수/인원수 계열이면 count
     if (aggOp && aggOp !== "formula") {
       intent.operation = aggOp;
-    } else if (/(직원\s*수|인원수|개수|건수|수량)/.test(original)) {
+    } else if (/(인원수|개수|건수|수량)/.test(original)) {
       intent.operation = "count";
     } else {
       intent.operation = "count";
@@ -466,7 +461,7 @@ function buildLocalIntentFromText(text = "") {
     if (requestedReturnFields.length) {
       intent.return_fields = requestedReturnFields;
     } else if (wantsNameList) {
-      intent.return_fields = ["이름"];
+      intent.return_fields = [];
       intent.return_role = "entity_name";
     }
 
@@ -485,7 +480,7 @@ function buildLocalIntentFromText(text = "") {
     if (requestedReturnFields.length) {
       intent.return_fields = requestedReturnFields;
     } else if (wantsNameList) {
-      intent.return_fields = ["이름"];
+      intent.return_fields = [];
       intent.return_role = "entity_name";
     }
 
@@ -498,7 +493,7 @@ function buildLocalIntentFromText(text = "") {
   if (/정렬|높은 순|낮은 순|오름차순|내림차순/.test(original)) {
     intent.operation = "sortby";
     if (!intent.return_fields && /이름/.test(original)) {
-      intent.return_fields = ["이름"];
+      intent.return_fields = [];
     }
     if (!intent.header_hint && inferredSortHeader) {
       intent.header_hint = inferredSortHeader;
@@ -594,7 +589,7 @@ function buildLocalIntentFromText(text = "") {
 
   if (wantsNameList) {
     intent.operation = "filter";
-    intent.return_fields = ["이름"];
+    intent.return_fields = [];
 
     intent.return_role = "entity_name";
     if (legacyConditions.length) {
@@ -707,7 +702,7 @@ function applyStructuralOverrides(intent) {
 
   if ((wantsGroupedAggregate || wantsGroupedSort) && intent.group_by) {
     if (op === "sortby" || op === "formula" || op === "filter") {
-      if (/(직원\s*수|인원수|개수|건수|수량)/.test(raw)) {
+      if (/(인원수|개수|건수|수량)/.test(raw)) {
         intent.operation = "count";
       } else if (
         !intent.operation ||
@@ -775,13 +770,13 @@ function applyStructuralOverrides(intent) {
   }
 
   if (op === "xlookup" && !hasLookup && raw) {
-    const hasDateCue = /(입사|입사일|날짜|근무)/i.test(raw);
+    const hasDateCue = /(날짜|일자|date|time)/i.test(raw);
     const hasRecentCue = /(가장\s*최근|최근|최신|latest|most\s*recent)/i.test(
       raw,
     );
     const hasOldestCue =
       /(가장\s*오래|오래\s*근무|최장\s*근무|earliest|oldest)/i.test(raw);
-    const wantsRowEntity = /(직원|이름|성명|사람|정보)/i.test(raw);
+    const wantsRowEntity = /(정보|행|레코드|row|record)/i.test(raw);
 
     if (hasDateCue && wantsRowEntity && (hasRecentCue || hasOldestCue)) {
       intent.operation = hasRecentCue ? "maxrow" : "minrow";
@@ -790,7 +785,7 @@ function applyStructuralOverrides(intent) {
         !Array.isArray(intent.return_fields) ||
         intent.return_fields.length === 0
       ) {
-        intent.return_fields = ["이름"];
+        intent.return_fields = [];
       }
 
       delete intent.lookup_hint;
@@ -1054,11 +1049,10 @@ function _detectAggregateOpFromMessage(msg = "", fallbackOp = "") {
   const s = String(msg || "");
   if (/(평균|average|avg|mean)/i.test(s)) return "average";
   if (/(합계|총합|sum|total)/i.test(s)) return "sum";
-  if (/(개수|갯수|건수|인원수|직원\s*수|count)/i.test(s)) return "count";
+  if (/(개수|갯수|건수|인원수|수량|count)/i.test(s)) return "count";
   if (/(최고|최대|가장\s*높|max|highest)/i.test(s)) return "max";
   if (/(최저|최소|가장\s*낮|min|lowest)/i.test(s)) return "min";
-  if (/(중앙값|중간값|가운데\s*값|median|중앙\s*(연봉|급여|값|금액)?)/i.test(s))
-    return "median";
+  if (/(중앙값|중간값|가운데\s*값|median)/i.test(s)) return "median";
   return fallbackOp || "formula";
 }
 
@@ -1148,7 +1142,7 @@ function _cleanReturnFieldToken(token = "") {
   if (!s) return "";
 
   // 일반적인 군더더기 제거 (도메인 특정 아님)
-  s = s.replace(/^(?:직원|행|레코드|항목)\s*의\s*/u, "");
+  s = s.replace(/^(?:행|레코드|항목)\s*의\s*/u, "");
   s = s.replace(/\s*(?:을|를|은|는|이|가)$/u, "");
   s = s.replace(/\s+/g, " ").trim();
   return s;
@@ -1288,9 +1282,7 @@ function _cleanCategoryValue(v) {
 
 function _looksLikeCountRequest(msg = "") {
   const s = String(msg || "");
-  return /(직원\s*수|인원수|입사자\s*수|개수|갯수|건수|수량|카운트|몇\s*명)/.test(
-    s,
-  );
+  return /(인원수|개수|갯수|건수|수량|카운트|몇\s*명)/.test(s);
 }
 
 function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
@@ -1400,11 +1392,7 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
 
   // 3) 텍스트 매칭 조건
   if (quotedText) {
-    const textHeaderHint = /직원\s*id|사번|아이디/i.test(original)
-      ? "직원 ID"
-      : /이름|성명/.test(original)
-        ? "이름"
-        : null;
+    const textHeaderHint = headerHint || null;
 
     if (textHeaderHint) {
       if (/포함/.test(original) || /contains|include/i.test(original)) {
@@ -1433,42 +1421,6 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
         });
       }
     }
-  }
-
-  // 4) 범주형 조건 (기존 헤더 lexicon은 "최종 헤더"가 아니라 semantic hint로만 사용)
-  const dept = original.match(/([가-힣A-Za-z0-9_]+)\s*부서/);
-  if (dept && dept[1] && !/부서별/.test(original)) {
-    _pushUniqueFilterSpec(out, {
-      role: "category_filter",
-      header_hint: "부서",
-      operator: "=",
-      value: _cleanCategoryValue(dept[1]),
-      value_type: "text",
-    });
-  }
-
-  const grade = original.match(
-    /평가\s*등급(?:이|은|는)?\s*([A-Za-z0-9가-힣]+)/,
-  );
-  if (grade && grade[1] && !/등급별/.test(original)) {
-    _pushUniqueFilterSpec(out, {
-      role: "category_filter",
-      header_hint: "평가 등급",
-      operator: "=",
-      value: _cleanCategoryValue(grade[1]).toUpperCase(),
-      value_type: "text",
-    });
-  }
-
-  const job = original.match(/직급(?:이|은|는)?\s*([가-힣A-Za-z0-9_]+)/);
-  if (job && job[1] && !/직급별/.test(original)) {
-    _pushUniqueFilterSpec(out, {
-      role: "category_filter",
-      header_hint: "직급",
-      operator: "=",
-      value: _cleanCategoryValue(job[1]),
-      value_type: "text",
-    });
   }
 
   return _finalizeFilterSpecs(out);
