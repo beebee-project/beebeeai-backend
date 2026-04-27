@@ -727,6 +727,49 @@ function applyStructuralOverrides(intent) {
     delete intent.return_hint;
     delete intent.group_by;
   }
+
+  const hasAggregateBoundCondition =
+    /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:이|가)?\s*(평균|average|avg|mean)\s*(이상|이하|초과|미만)/i.test(
+      raw,
+    );
+
+  if (
+    hasAggregateBoundCondition &&
+    /(?:직원|행|레코드|항목).*(?:수|개수|건수|몇\s*명)|(?:수|개수|건수)$/i.test(
+      raw,
+    )
+  ) {
+    intent.operation = "count";
+  }
+
+  const aggregateBoundMatch = raw.match(
+    /([가-힣A-Za-z0-9_]+)\s*(?:이|가)?\s*(평균|average|avg|mean)\s*(이상|이하|초과|미만)/i,
+  );
+
+  if (aggregateBoundMatch) {
+    const header = aggregateBoundMatch[1];
+    const agg = aggregateBoundMatch[2];
+    const dir = aggregateBoundMatch[3];
+
+    intent.filters = intent.filters || [];
+
+    intent.filters.push({
+      header,
+      operator:
+        dir === "이상"
+          ? ">="
+          : dir === "초과"
+            ? ">"
+            : dir === "이하"
+              ? "<="
+              : "<",
+      value: agg,
+      value_type: "aggregate",
+      aggregate: agg,
+      role: "aggregate_filter",
+    });
+  }
+
   const wantsUniqueList = _looksLikeUniqueListRequest(raw);
   const requestedReturnFields =
     Array.isArray(intent.return_fields) && intent.return_fields.length
@@ -1605,6 +1648,62 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
 
   const quotedTextMatch = original.match(/["']([^"']+)["']/);
   const quotedText = quotedTextMatch ? quotedTextMatch[1].trim() : null;
+
+  // 순서형 텍스트 조건: "직급이 대리 이상", "직급이 과장 이하"
+  const ordinalTextMatch = original.match(
+    /([가-힣A-Za-z0-9_]+)\s*(?:이|가)?\s*([가-힣A-Za-z0-9_]+)\s*(이상|이하|초과|미만)/u,
+  );
+  if (ordinalTextMatch) {
+    const header = ordinalTextMatch[1].trim();
+    const value = ordinalTextMatch[2].trim();
+    const bound = ordinalTextMatch[3].trim();
+
+    if (/(직급|등급|단계|레벨|level|grade)/i.test(header)) {
+      const op =
+        bound === "이상"
+          ? ">="
+          : bound === "이하"
+            ? "<="
+            : bound === "초과"
+              ? ">"
+              : "<";
+
+      _pushUniqueFilterSpec(out, {
+        role: "ordinal_filter",
+        header_hint: header,
+        operator: op,
+        value,
+        value_type: "ordinal_text",
+      });
+    }
+  }
+
+  // 집계 기준 조건: "연봉이 평균 이상", "점수가 평균 이하"
+  const aggregateBoundMatch = original.match(
+    /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:이|가)?\s*(평균|average|avg|mean)\s*(이상|이하|초과|미만)/i,
+  );
+  if (aggregateBoundMatch) {
+    const header = _cleanHintPhrase(aggregateBoundMatch[1]);
+    const agg = String(aggregateBoundMatch[2]).toLowerCase();
+    const bound = aggregateBoundMatch[3];
+
+    const op =
+      bound === "이상"
+        ? ">="
+        : bound === "이하"
+          ? "<="
+          : bound === "초과"
+            ? ">"
+            : "<";
+
+    _pushUniqueFilterSpec(out, {
+      role: "aggregate_filter",
+      header_hint: header,
+      operator: op,
+      value_type: "aggregate",
+      aggregate: /avg|mean|average|평균/i.test(agg) ? "average" : agg,
+    });
+  }
 
   // 1) 숫자 조건
   if (headerHint) {

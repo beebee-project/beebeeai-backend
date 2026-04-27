@@ -1138,7 +1138,11 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
       ref =
         pickDateColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
         pickDateColumnAnySheet(ctx, schema.header_hint || null);
-    } else if (f?.role === "metric_filter") {
+    } else if (
+      f?.role === "metric_filter" ||
+      f?.role === "aggregate_filter" ||
+      f?.value_type === "aggregate"
+    ) {
       ref =
         pickNumericColumnInSheet(
           ctx,
@@ -1219,11 +1223,124 @@ function _dedupeDateRangeFilters(filters = []) {
   });
 }
 
+function _dedupeOrdinalEqualityFilters(filters = []) {
+  const ordinalKeys = new Set();
+
+  const collect = (items = []) => {
+    for (const f of items) {
+      if (!f) continue;
+      if (f.logical_operator && Array.isArray(f.conditions)) {
+        collect(f.conditions);
+        continue;
+      }
+
+      if (f.role === "ordinal_filter" || f.value_type === "ordinal_text") {
+        ordinalKeys.add(
+          [
+            String(f.header || f.header_hint || f.ref?.header || "").trim(),
+            String(f.value ?? "").trim(),
+          ].join("::"),
+        );
+      }
+    }
+  };
+
+  collect(filters);
+  if (!ordinalKeys.size) return filters;
+
+  const shouldDrop = (f) => {
+    if (!f) return false;
+
+    const key = [
+      String(f.header || f.header_hint || f.ref?.header || "").trim(),
+      String(f.value ?? "").trim(),
+    ].join("::");
+
+    const isPlainEquality =
+      String(f.operator || "").trim() === "=" &&
+      f.role !== "ordinal_filter" &&
+      f.value_type !== "ordinal_text";
+
+    return isPlainEquality && ordinalKeys.has(key);
+  };
+
+  return filters
+    .map((f) => {
+      if (!f) return null;
+
+      if (f.logical_operator && Array.isArray(f.conditions)) {
+        const inner = f.conditions.filter((x) => !shouldDrop(x));
+        if (!inner.length) return null;
+        return { ...f, conditions: inner };
+      }
+
+      return shouldDrop(f) ? null : f;
+    })
+    .filter(Boolean);
+}
+
+function _dedupeAggregateTextFilters(filters = []) {
+  const aggregateHeaders = new Set();
+
+  const collect = (items = []) => {
+    for (const f of items) {
+      if (!f) continue;
+
+      if (f.logical_operator && Array.isArray(f.conditions)) {
+        collect(f.conditions);
+        continue;
+      }
+
+      if (f.role === "aggregate_filter" || f.value_type === "aggregate") {
+        const header = String(
+          f.header || f.header_hint || f.ref?.header || "",
+        ).trim();
+        if (header) aggregateHeaders.add(header);
+      }
+    }
+  };
+
+  collect(filters);
+  if (!aggregateHeaders.size) return filters;
+
+  const shouldDrop = (f) => {
+    if (!f) return false;
+
+    // aggregate 자체는 유지
+    if (f.role === "aggregate_filter" || f.value_type === "aggregate") {
+      return false;
+    }
+
+    const header = String(
+      f.header || f.header_hint || f.ref?.header || "",
+    ).trim();
+
+    // 같은 header에 대한 일반 비교는 제거
+    return aggregateHeaders.has(header);
+  };
+
+  return filters
+    .map((f) => {
+      if (!f) return null;
+
+      if (f.logical_operator && Array.isArray(f.conditions)) {
+        const inner = f.conditions.filter((x) => !shouldDrop(x));
+        if (!inner.length) return null;
+        return { ...f, conditions: inner };
+      }
+
+      return shouldDrop(f) ? null : f;
+    })
+    .filter(Boolean);
+}
+
 function resolveIntent(ctx) {
   const schema = ctx.intent || {};
   const baseSheet = resolveBaseSheet(ctx, schema);
-  const filterColumns = _dedupeDateRangeFilters(
-    resolveFilterColumns(ctx, schema, baseSheet),
+  const filterColumns = _dedupeOrdinalEqualityFilters(
+    _dedupeAggregateTextFilters(
+      _dedupeDateRangeFilters(resolveFilterColumns(ctx, schema, baseSheet)),
+    ),
   );
 
   const resolved = {

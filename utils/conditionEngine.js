@@ -27,6 +27,10 @@ function _coerceDate(expr) {
   return `IFERROR(DATEVALUE(TRIM(${expr}&"")), ${expr})`;
 }
 
+const ORDINAL_MAPS = {
+  position: ["사원", "대리", "과장", "차장", "부장"],
+};
+
 function _formatScalar(
   v,
   formatValue,
@@ -136,6 +140,41 @@ function _buildLeafExpr(cond, ctx, formatValue) {
     return op === "not_between" ? `(${expr}=0)` : expr;
   }
 
+  if (valueType === "ordinal_text" || cond?.role === "ordinal_filter") {
+    const headerText = String(header || "").trim();
+    const order = /(직급|position|rank|title)/i.test(headerText)
+      ? ORDINAL_MAPS.position
+      : null;
+
+    if (order) {
+      const idx = order.indexOf(String(rawVal || "").trim());
+      if (idx >= 0) {
+        const rankExpr = `MATCH(TRIM(${range}&""), {"${order.join('","')}"}, 0)`;
+        return `(${rankExpr}${op}${idx + 1})`;
+      }
+    }
+  }
+
+  if (valueType === "aggregate" || cond?.role === "aggregate_filter") {
+    const agg = String(cond?.aggregate || "").toLowerCase();
+    if (
+      agg === "average" ||
+      agg === "avg" ||
+      agg === "mean" ||
+      agg === "평균"
+    ) {
+      const left = _coerceNumber(range);
+      const avgExpr = `AVERAGE(${left})`;
+
+      if (op === ">=") return `(NOT(${left}<${avgExpr}))`;
+      if (op === "<=") return `(NOT(${left}>${avgExpr}))`;
+      if (op === ">") return `(${left}>${avgExpr})`;
+      if (op === "<") return `(${left}<${avgExpr})`;
+
+      return `(NOT(${left}<${avgExpr}))`;
+    }
+  }
+
   if (rawVal == null || (typeof rawVal === "string" && rawVal.trim() === "")) {
     return null;
   }
@@ -227,9 +266,35 @@ function buildConditionMask(ctx, formatValue) {
     .map((c) => buildSingleConditionExpr(c, ctx, formatValue))
     .filter(Boolean);
 
+  const hasOrdinalExpr = exprs.some((e) =>
+    /MATCH\(TRIM\(.+?\&""\),\s*\{/.test(String(e)),
+  );
+
+  const hasAggregateExpr = exprs.some((e) => /AVERAGE\(/i.test(String(e)));
+
+  const filteredExprs = exprs.filter((e) => {
+    const s = String(e);
+
+    if (hasOrdinalExpr) {
+      if (/MATCH\(TRIM\(.+?\&""\),\s*\{/.test(s)) return true;
+      if (/LOWER\(TRIM\(.+?\&""\)\)\s*=\s*LOWER\(TRIM\("/.test(s)) {
+        return false;
+      }
+    }
+
+    if (
+      hasAggregateExpr &&
+      /LOWER\(TRIM\(.+?\&""\)\)\s*(?:>=|<=|>|<|=)\s*LOWER\(TRIM\("평균"/.test(s)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
   const uniqExprs = [];
   const seen = new Set();
-  for (const e of exprs) {
+  for (const e of filteredExprs) {
     const key = String(e).replace(/\s+/g, "");
     if (seen.has(key)) continue;
     seen.add(key);
