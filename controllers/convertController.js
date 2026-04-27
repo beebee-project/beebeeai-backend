@@ -502,6 +502,14 @@ function buildLocalIntentFromText(text = "") {
     } else if (wantsNameList) {
       intent.return_fields = [];
       intent.return_role = "entity_name";
+    } else if (
+      /(직원|사람|행|레코드|항목)/.test(original) ||
+      (!requestedReturnFields.length &&
+        !intent.return_role &&
+        intent.operation === "sortby")
+    ) {
+      intent.return_role = "row";
+      intent.return_fields = [];
     }
 
     if (legacyConditions.length) {
@@ -707,6 +715,9 @@ function applyStructuralOverrides(intent) {
     intent.header_hint = intent.header_hint || inferredSortHeader;
     intent.sort_order = intent.sort_order || inferredSortOrder;
     intent.sorted = true;
+    if (requestedReturnFields.length) {
+      intent.return_fields = requestedReturnFields;
+    }
   } else if (
     wantsSortedList &&
     inferredSortHeader &&
@@ -715,6 +726,31 @@ function applyStructuralOverrides(intent) {
     intent.operation = "sortby";
     intent.header_hint = intent.header_hint || inferredSortHeader;
     intent.sort_order = intent.sort_order || inferredSortOrder;
+    intent.sorted = true;
+  }
+
+  const rawRequestedReturnFields = _extractRequestedReturnFields(raw);
+  const hasOnlySortHintAsReturn =
+    Array.isArray(intent.return_fields) &&
+    intent.return_fields.length === 1 &&
+    inferredSortHeader &&
+    String(intent.return_fields[0]).trim() ===
+      String(inferredSortHeader).trim();
+
+  // sortby인데 명시 반환열이 없고 "행/대상 목록" 요청이면 전체 행 반환으로 보정
+  if (
+    String(intent.operation || "").toLowerCase() === "sortby" &&
+    wantsSortedList &&
+    inferredSortHeader &&
+    (!rawRequestedReturnFields.length || hasOnlySortHintAsReturn) &&
+    String(intent.return_role || "").toLowerCase() !== "entity_name"
+  ) {
+    intent.return_role = "row";
+    intent.return_fields = [];
+    intent.return_all_columns = true;
+    delete intent.return_hint;
+    intent.header_hint = intent.header_hint || inferredSortHeader;
+    intent.sort_order = intent.sort_order || inferredSortOrder || "desc";
     intent.sorted = true;
   }
 
@@ -1155,6 +1191,13 @@ function _extractRankMetricHint(msg = "") {
     const phrase = _cleanHintPhrase(m?.[1] || "")
       .split(/에서|중에서|among|within/i)
       .pop()
+      .replace(/^[가-힣A-Za-z0-9_]+\s*부서\s*/u, "")
+      .replace(/^[가-힣A-Za-z0-9_]+\s*팀\s*/u, "")
+      .replace(
+        /\d+(?:,\d{3})*(?:\.\d+)?\s*(?:이상|이하|초과|미만|부터|까지|>=|<=|>|<).*$/u,
+        "",
+      )
+      .replace(/\s*(?:직원|사람|행|레코드|항목)\s*$/u, "")
       .replace(/\s*(?:이|가|은|는|을|를|의)$/u, "")
       .trim();
 
@@ -1204,6 +1247,19 @@ function _cleanReturnFieldToken(token = "") {
 function _extractRequestedReturnFields(msg = "") {
   const raw = String(msg || "");
   if (!raw) return [];
+
+  // 정렬/필터 후 "직원/행/항목을 보여줘"는 특정 반환열 요청이 아니라 row-return 요청이다.
+  if (
+    /(순으로|정렬|오름차순|내림차순|높은\s*순|낮은\s*순|상위|하위|top|bottom)/i.test(
+      raw,
+    ) &&
+    /(행|레코드|항목|목록|리스트|직원|사람)/i.test(raw) &&
+    !/(?:^|[,，및그리고와과\s])(이름|성명|직급|부서|ID|아이디|연봉|급여|나이|입사일)(?:\s*(?:,|및|그리고|와|과)|\s*(?:을|를)?\s*(?:보여줘|출력해줘|가져와줘|알려줘))/i.test(
+      raw,
+    )
+  ) {
+    return [];
+  }
 
   // “... 이름, 부서, 직급, 연봉을 가져와줘/보여줘 ...” 같은 열거형 요청을 일반적으로 추출
   const capture =
@@ -1352,6 +1408,23 @@ function _looksLikeCountRequest(msg = "") {
 function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
   const original = String(msg || "");
   const out = [];
+
+  // 범용 카테고리 조건: "개발 부서", "영업 부서에서", "마케팅 팀"
+  for (const m of original.matchAll(
+    /([가-힣A-Za-z0-9_]+)\s*(부서|팀)(?:에서|의|이면서|이고|이며|인)?/gu,
+  )) {
+    const value = _cleanCategoryValue(m[1]);
+    const header = String(m[2] || "").trim();
+    if (!value || !header) continue;
+
+    _pushUniqueFilterSpec(out, {
+      role: "category_filter",
+      header_hint: header,
+      operator: "=",
+      value,
+      value_type: "text",
+    });
+  }
 
   const quotedTextMatch = original.match(/["']([^"']+)["']/);
   const quotedText = quotedTextMatch ? quotedTextMatch[1].trim() : null;

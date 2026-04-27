@@ -462,6 +462,8 @@ function _expandRawTokens(raw = "") {
 function _isStopToken(token = "") {
   const t = _normToken(token);
   if (!t) return true;
+  if (/^top\d+$/i.test(String(token).trim())) return true;
+  if (/^(상위|하위)\d+$/u.test(String(token).trim())) return true;
   if (/^\d+$/.test(t)) return false;
   return [
     "계산",
@@ -1036,16 +1038,17 @@ function augmentFiltersFromRaw(ctx, schema, baseSheet) {
   const hasQuotedTextOperator = !!(
     _extractQuotedLiteral(raw) && _inferTextOperator(raw)
   );
-  const existing = (Array.isArray(schema.filters) ? schema.filters : []).filter(
-    (f) => {
-      if (!hasQuotedTextOperator) return true;
-      const op = String(f?.operator || "=").toLowerCase();
-      const vt = String(f?.value_type || "").toLowerCase();
-      // quoted literal + starts/ends/contains 요청에서는
-      // 기존 equality text filter가 중복 조건으로 들어오는 것을 차단
-      return !(vt === "text" && (op === "=" || op === "=="));
-    },
-  );
+  const existing = [
+    ...(Array.isArray(schema.filters) ? schema.filters : []),
+    ...(Array.isArray(schema.filter_specs) ? schema.filter_specs : []),
+  ].filter((f) => {
+    if (!hasQuotedTextOperator) return true;
+    const op = String(f?.operator || "=").toLowerCase();
+    const vt = String(f?.value_type || "").toLowerCase();
+    // quoted literal + starts/ends/contains 요청에서는
+    // 기존 equality text filter가 중복 조건으로 들어오는 것을 차단
+    return !(vt === "text" && (op === "=" || op === "=="));
+  });
   return _dedupeFilters([
     ...existing,
     ..._inferCellRefEqualityFilters(ctx, schema, baseSheet),
@@ -1167,9 +1170,57 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
   return out;
 }
 
+function _dedupeDateRangeFilters(filters = []) {
+  const ranges = filters.filter(
+    (f) =>
+      f &&
+      String(f.operator || "").toLowerCase() === "between" &&
+      f.value_type === "date" &&
+      f.min != null &&
+      f.max != null,
+  );
+
+  if (!ranges.length) return filters;
+
+  const sameHeader = (a, b) =>
+    String(a?.header || a?.ref?.header || "").trim() ===
+    String(b?.header || b?.ref?.header || "").trim();
+
+  return filters.filter((f) => {
+    if (!f || String(f.operator || "").toLowerCase() === "between") {
+      return true;
+    }
+
+    const op = String(f.operator || "").toLowerCase();
+    const val = String(f.value || "")
+      .trim()
+      .replace(/[./]/g, "-");
+
+    return !ranges.some((r) => {
+      if (!sameHeader(f, r)) return false;
+      const min = String(r.min || "")
+        .trim()
+        .replace(/[./]/g, "-");
+      const max = String(r.max || "")
+        .trim()
+        .replace(/[./]/g, "-");
+
+      return (
+        (f.value_type === "date" &&
+          (op === ">=" || op === "gte") &&
+          val === min) ||
+        ((op === "<=" || op === "lte") && val === max)
+      );
+    });
+  });
+}
+
 function resolveIntent(ctx) {
   const schema = ctx.intent || {};
   const baseSheet = resolveBaseSheet(ctx, schema);
+  const filterColumns = _dedupeDateRangeFilters(
+    resolveFilterColumns(ctx, schema, baseSheet),
+  );
 
   const resolved = {
     platform: ctx.engine || "excel",
@@ -1178,7 +1229,7 @@ function resolveIntent(ctx) {
     lookupColumn: resolveLookupColumn(ctx, schema, baseSheet),
     groupColumn: resolveGroupColumn(ctx, schema, baseSheet),
     sortColumn: resolveSortColumn(ctx, schema, baseSheet),
-    filterColumns: resolveFilterColumns(ctx, schema, baseSheet),
+    filterColumns,
     ambiguities: [],
   };
 

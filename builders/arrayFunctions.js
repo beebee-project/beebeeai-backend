@@ -851,9 +851,12 @@ const arrayFunctionBuilder = {
   },
 
   // ✅ 최고/최저 직원 정보(행 반환)
-  maxrow: (ctx) => _extremeRow(ctx, "max"),
-  minrow: (ctx) => _extremeRow(ctx, "min"),
-  topnrows: (ctx) => _topNRows(ctx),
+  maxrow: (ctx, _formatValue, _buildConditionPairs, buildConditionMask) =>
+    _extremeRow(ctx, "max", buildConditionMask),
+  minrow: (ctx, _formatValue, _buildConditionPairs, buildConditionMask) =>
+    _extremeRow(ctx, "min", buildConditionMask),
+  topnrows: (ctx, _formatValue, _buildConditionPairs, buildConditionMask) =>
+    _topNRows(ctx, buildConditionMask),
   rankcolumn: (ctx) => _rankColumn(ctx),
   monthcount: (ctx) => _monthCountTable(ctx),
   yearcount: (ctx) => _yearCountTable(ctx),
@@ -893,16 +896,32 @@ const arrayFunctionBuilder = {
   },
 
   // ---------------------- SORTBY ----------------------
-  sortby: function (ctx) {
+  sortby: function (
+    ctx,
+    _formatValue,
+    _buildConditionPairs,
+    buildConditionMask,
+  ) {
     const { bestReturn, bestLookup } = ctx;
     const it = ctx.intent || {};
 
+    const wantsRowReturn =
+      String(it.return_role || "").toLowerCase() === "row" ||
+      it.return_all_columns === true;
+
+    const resolvedSort = _resolvedSortColumn(ctx);
+    const rowBaseSheet =
+      bestReturn?.sheetName ||
+      resolvedSort?.sheetName ||
+      ctx?.resolved?.baseSheet ||
+      null;
+
     if (
-      Array.isArray(it.return_headers) &&
-      it.return_headers.length &&
-      bestReturn
+      ((Array.isArray(it.return_headers) && it.return_headers.length) ||
+        wantsRowReturn) &&
+      (bestReturn || (wantsRowReturn && rowBaseSheet))
     ) {
-      const sheetName = bestReturn.sheetName;
+      const sheetName = bestReturn?.sheetName || rowBaseSheet;
       const sheetInfo = ctx.allSheetsData?.[sheetName];
       if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
 
@@ -957,7 +976,6 @@ const arrayFunctionBuilder = {
         return formulaUtils.formatValue(s);
       };
 
-      const resolvedSort = _resolvedSortColumn(ctx);
       const resolvedPrimary = _resolvedPrimaryReturn(ctx);
 
       const sortHint =
@@ -981,17 +999,33 @@ const arrayFunctionBuilder = {
         formulaUtils.columnLetterToIndex(criterionMeta.columnLetter) -
         firstColIdx0 +
         1;
-      const retIdxs = it.return_headers
-        .map((h) => {
-          const key = String(h).trim();
-          const m = byName.get(key) || findMetaByContains(key);
-          if (!m?.columnLetter) return null;
-          return (
-            formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
-          );
-        })
-        .filter((v) => Number.isFinite(v));
-      if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+      const retIdxs = wantsRowReturn
+        ? metaEntries.map(
+            ([_h, m]) =>
+              formulaUtils.columnLetterToIndex(m.columnLetter) -
+              firstColIdx0 +
+              1,
+          )
+        : it.return_headers
+            .map((h) => {
+              const key = String(h).trim();
+              const m = byName.get(key) || findMetaByContains(key);
+              if (!m?.columnLetter) return null;
+              return (
+                formulaUtils.columnLetterToIndex(m.columnLetter) -
+                firstColIdx0 +
+                1
+              );
+            })
+            .filter((v) => Number.isFinite(v));
+
+      const uniqueRetIdxs = [...new Set(retIdxs)].filter((v) =>
+        Number.isFinite(v),
+      );
+
+      if (!uniqueRetIdxs.length && !wantsRowReturn) {
+        return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+      }
 
       const order =
         String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
@@ -1015,6 +1049,9 @@ const arrayFunctionBuilder = {
       }
 
       if (!uniqueConds.length) {
+        if (wantsRowReturn) {
+          return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), s)`;
+        }
         return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
       }
 
@@ -1057,8 +1094,22 @@ const arrayFunctionBuilder = {
         else if (op === "<" || op === "lt")
           maskParts.push(`(${left}<${right})`);
       }
+
+      const externalMask =
+        typeof buildConditionMask === "function"
+          ? buildConditionMask(ctx)
+          : null;
+
+      if (externalMask) {
+        maskParts.length = 0;
+        maskParts.push(externalMask);
+      }
+
       if (!maskParts.length) {
         return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
+      }
+      if (wantsRowReturn) {
+        return `=LET(t, ${fullA1}, f, FILTER(t, ${maskParts.join(" * ")}), s, SORTBY(f, CHOOSECOLS(f, ${criterionIdx}), ${order}), s)`;
       }
       return `=LET(t, ${fullA1}, f, FILTER(t, ${maskParts.join(" * ")}), s, SORTBY(f, CHOOSECOLS(f, ${criterionIdx}), ${order}), CHOOSECOLS(s, ${retIdxs.join(", ")}))`;
     }
@@ -1324,7 +1375,7 @@ const arrayFunctionBuilder = {
   },
 };
 
-function _extremeRow(ctx, which) {
+function _extremeRow(ctx, which, buildConditionMask) {
   const it = ctx.intent || {};
   const best = _resolvedPrimaryReturn(ctx);
   const resolvedSort = _resolvedSortColumn(ctx);
@@ -1474,13 +1525,22 @@ function _extremeRow(ctx, which) {
     else if (op === ">" || op === "gt") maskParts.push(`(${left}>${right})`);
     else if (op === "<" || op === "lt") maskParts.push(`(${left}<${right})`);
   }
+
+  const externalMask =
+    typeof buildConditionMask === "function" ? buildConditionMask(ctx) : null;
+
+  if (externalMask) {
+    maskParts.length = 0;
+    maskParts.push(externalMask);
+  }
+
   if (!maskParts.length) {
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
   }
   return `=LET(t, ${fullA1}, f, FILTER(t, ${maskParts.join(" * ")}), s, SORTBY(f, CHOOSECOLS(f, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), 1))`;
 }
 
-function _topNRows(ctx) {
+function _topNRows(ctx, buildConditionMask) {
   const it = ctx.intent || {};
   const best = _resolvedPrimaryReturn(ctx);
   const resolvedSort = _resolvedSortColumn(ctx);
@@ -1648,6 +1708,14 @@ function _topNRows(ctx) {
     else if (op === "<=" || op === "lte") maskParts.push(`(${left}<=${right})`);
     else if (op === ">" || op === "gt") maskParts.push(`(${left}>${right})`);
     else if (op === "<" || op === "lt") maskParts.push(`(${left}<${right})`);
+  }
+
+  const externalMask =
+    typeof buildConditionMask === "function" ? buildConditionMask(ctx) : null;
+
+  if (externalMask) {
+    maskParts.length = 0;
+    maskParts.push(externalMask);
   }
 
   if (!maskParts.length) {
