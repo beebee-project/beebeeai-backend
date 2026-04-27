@@ -830,6 +830,10 @@ function _inferNumericFiltersByTypedColumns(ctx, schema, baseSheet) {
     while ((m = re.exec(raw))) {
       const value = String(m[1]).replace(/,/g, "");
 
+      // 날짜/연도 범위에 사용된 숫자는 metric filter로 오탐하지 않는다.
+      // 예: "2022년부터 2023년 사이", "2022-01-01부터 ..."
+      if (_isNumericTokenConsumedByDate(raw, value)) continue;
+
       const hinted =
         numericCols.find((c) => raw.includes(c.header)) ||
         numericCols.find((c) => {
@@ -862,11 +866,130 @@ function _inferNumericFiltersByTypedColumns(ctx, schema, baseSheet) {
   return out;
 }
 
+function _escapeRegExp(s = "") {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function _normalizeIsoDateToken(s = "") {
+  return String(s || "")
+    .trim()
+    .replace(/[./]/g, "-");
+}
+
+function _dateRangeConsumedTokens(raw = "") {
+  const s = String(raw || "");
+  const out = [];
+
+  const push = (...xs) => {
+    for (const x of xs) {
+      const v = String(x || "").trim();
+      if (v && !out.includes(v)) out.push(v);
+    }
+  };
+
+  // 2022-01-01부터 2023-12-31 사이
+  for (const m of s.matchAll(
+    /((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:부터|~|-)\s*((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:까지|사이)?/g,
+  )) {
+    push(m[1], m[2]);
+  }
+
+  // 2022년부터 2023년 사이 / 2022~2023
+  for (const m of s.matchAll(
+    /((?:19|20)\d{2})\s*년?\s*(?:부터|~|-)\s*((?:19|20)\d{2})\s*년?\s*(?:까지|사이)?/g,
+  )) {
+    push(m[1], m[2]);
+  }
+
+  // 2023년에 / 2023년 입사
+  for (const m of s.matchAll(/((?:19|20)\d{2})\s*년(?:에)?/g)) {
+    push(m[1]);
+  }
+
+  return out;
+}
+
+function _isNumericTokenConsumedByDate(raw = "", value = "") {
+  const v = String(value || "").trim();
+  if (!v) return false;
+  return _dateRangeConsumedTokens(raw).some((x) => String(x).includes(v));
+}
+
+function _pickDateFilterRef(ctx, schema, baseSheet) {
+  return (
+    pickDateColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
+    pickDateColumnAnySheet(
+      ctx,
+      schema.header_hint || null,
+      baseSheet || ctx.bestReturn?.sheetName || null,
+    )
+  );
+}
+
 function _inferDateFiltersByTypedColumns(ctx, schema, baseSheet) {
   const raw = _rawText(schema);
   if (!raw || !ctx?.allSheetsData) return [];
 
   const out = [];
+  const dateCols = _collectAllMetaColumns(ctx, baseSheet).filter((c) =>
+    _isDateColumn(c.meta, c.header),
+  );
+
+  const pushDateRange = (min, max, source = "typed_date_range_match") => {
+    const ref =
+      dateCols.find((c) => raw.includes(c.header)) ||
+      _pickDateFilterRef(ctx, schema, baseSheet);
+    const normalized = _normalizeRefRange(ref, ctx);
+    if (!normalized?.header) return;
+
+    out.push({
+      ...normalized,
+      header: normalized.header,
+      operator: "between",
+      min,
+      max,
+      value_type: "date",
+      source,
+    });
+  };
+
+  // YYYY-MM-DD부터 YYYY-MM-DD 사이/까지
+  const explicitRange = raw.match(
+    /((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:부터|~|-)\s*((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:까지|사이)?/,
+  );
+  if (explicitRange) {
+    pushDateRange(
+      _normalizeIsoDateToken(explicitRange[1]),
+      _normalizeIsoDateToken(explicitRange[2]),
+      "typed_date_explicit_range_match",
+    );
+  }
+
+  // YYYY년부터 YYYY년 사이 / YYYY~YYYY
+  const yearRange = raw.match(
+    /((?:19|20)\d{2})\s*년?\s*(?:부터|~|-)\s*((?:19|20)\d{2})\s*년?\s*(?:까지|사이)?/,
+  );
+  if (yearRange) {
+    pushDateRange(
+      `${yearRange[1]}-01-01`,
+      `${yearRange[2]}-12-31`,
+      "typed_date_year_range_match",
+    );
+  }
+
+  // 2023년에 입사한 / 2022년에 입사한
+  // 단, 위 range 문장과 중복되면 추가하지 않음
+  if (!explicitRange && !yearRange) {
+    const yearOnly = raw.match(/((?:19|20)\d{2})\s*년(?:에)?/);
+    if (yearOnly && /(입사|날짜|일자|date)/i.test(raw)) {
+      pushDateRange(
+        `${yearOnly[1]}-01-01`,
+        `${yearOnly[1]}-12-31`,
+        "typed_date_year_only_match",
+      );
+    }
+  }
+
   const rules = [
     {
       re: /((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:이후|부터|>=|≥)/g,
@@ -879,10 +1002,6 @@ function _inferDateFiltersByTypedColumns(ctx, schema, baseSheet) {
     { re: /((?:19|20)\d{2})\s*년\s*(?:이후|부터|>=|≥)/g, op: ">=", year: true },
     { re: /((?:19|20)\d{2})\s*년\s*(?:이전|전|<)/g, op: "<", year: true },
   ];
-
-  const dateCols = _collectAllMetaColumns(ctx, baseSheet).filter((c) =>
-    _isDateColumn(c.meta, c.header),
-  );
 
   for (const { re, op, year } of rules) {
     re.lastIndex = 0;

@@ -101,6 +101,41 @@ function _buildLeafExpr(cond, ctx, formatValue) {
   const rawVal = cond?.value;
   const valueType = cond?.value_type || null;
 
+  if (
+    (op === "between" || op === "not_between") &&
+    cond?.min != null &&
+    cond?.max != null
+  ) {
+    const isDate =
+      valueType === "date" ||
+      _isIsoDateLiteral(cond.min) ||
+      _isIsoDateLiteral(cond.max);
+    const isNumber =
+      valueType === "number" ||
+      (_isNumericLiteral(cond.min) && _isNumericLiteral(cond.max));
+
+    let left;
+    let minExpr;
+    let maxExpr;
+
+    if (isDate) {
+      left = _coerceDate(range);
+      minExpr = _formatScalar(cond.min, formatValue, "date", caseSensitive);
+      maxExpr = _formatScalar(cond.max, formatValue, "date", caseSensitive);
+    } else if (isNumber) {
+      left = _coerceNumber(range);
+      minExpr = _formatScalar(cond.min, formatValue, "number", caseSensitive);
+      maxExpr = _formatScalar(cond.max, formatValue, "number", caseSensitive);
+    } else {
+      left = _normText(range, caseSensitive);
+      minExpr = _formatScalar(cond.min, formatValue, "text", caseSensitive);
+      maxExpr = _formatScalar(cond.max, formatValue, "text", caseSensitive);
+    }
+
+    const expr = `((${left}>=${minExpr})*(${left}<=${maxExpr}))`;
+    return op === "not_between" ? `(${expr}=0)` : expr;
+  }
+
   if (rawVal == null || (typeof rawVal === "string" && rawVal.trim() === "")) {
     return null;
   }
