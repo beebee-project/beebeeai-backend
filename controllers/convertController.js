@@ -564,11 +564,16 @@ function buildLocalIntentFromText(text = "") {
   if (_isRowEntityOp(op)) {
     intent.operation = op;
 
+    const rankMetricHint = _extractRankMetricHint(original);
+    if (rankMetricHint) {
+      intent.header_hint = rankMetricHint;
+    }
+
     if (requestedReturnFields.length) {
       intent.return_fields = requestedReturnFields;
     }
 
-    if (headerHint) {
+    if (!intent.header_hint && headerHint) {
       intent.header_hint = headerHint;
     }
 
@@ -1135,9 +1140,32 @@ function _looksLikeGroupedSortRequest(msg = "") {
   );
 }
 
+function _extractRankMetricHint(msg = "") {
+  const raw = String(msg || "").trim();
+  if (!raw) return null;
+
+  const patterns = [
+    /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:이|가)?\s*가장\s*(?:높은|낮은)/,
+    /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:상위|하위|top|bottom)\s*\d*/i,
+    /(.+?)\s*(?:높은\s*순|낮은\s*순|많은\s*순|적은\s*순|오름차순|내림차순)/,
+  ];
+
+  for (const p of patterns) {
+    const m = raw.match(p);
+    const phrase = _cleanHintPhrase(m?.[1] || "")
+      .split(/에서|중에서|among|within/i)
+      .pop()
+      .replace(/\s*(?:이|가|은|는|을|를|의)$/u, "")
+      .trim();
+
+    if (phrase && phrase.length <= 40) return phrase;
+  }
+
+  return null;
+}
+
 function _inferSortHeaderHint(msg = "", fallback = null) {
-  const s = String(msg || "");
-  return fallback || null;
+  return _extractRankMetricHint(msg) || fallback || null;
 }
 
 function _inferSortOrderFromMessage(msg = "") {
