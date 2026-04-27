@@ -983,7 +983,11 @@ function _inferDateFiltersByTypedColumns(ctx, schema, baseSheet) {
   // 단, 위 range 문장과 중복되면 추가하지 않음
   if (!explicitRange && !yearRange) {
     const yearOnly = raw.match(/((?:19|20)\d{2})\s*년(?:에)?/);
-    if (yearOnly && /(입사|날짜|일자|date)/i.test(raw)) {
+    if (
+      yearOnly &&
+      /(입사|날짜|일자|date)/i.test(raw) &&
+      !/(이후|부터|이전|전|후|까지|>=|<=|>|<)/i.test(raw)
+    ) {
       pushDateRange(
         `${yearOnly[1]}-01-01`,
         `${yearOnly[1]}-12-31`,
