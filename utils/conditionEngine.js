@@ -52,6 +52,10 @@ function _formatScalar(
     return String(Number(String(v).replace(/,/g, "").trim()));
   }
 
+  if (valueType === "cell") {
+    return String(v).trim();
+  }
+
   if (valueType === "date" || _isIsoDateLiteral(v)) {
     const iso = String(v).trim().replace(/[./]/g, "-");
     return `DATEVALUE(${_q(iso)})`;
@@ -135,7 +139,14 @@ function _buildLeafExpr(cond, ctx, formatValue) {
 
   // default text compare
   const left = _normText(range, caseSensitive);
-  const right = _formatScalar(rawVal, formatValue, "text", caseSensitive);
+  const rightScalar = _formatScalar(
+    rawVal,
+    formatValue,
+    valueType === "cell" ? "cell" : "text",
+    caseSensitive,
+  );
+  const right =
+    valueType === "cell" ? _normText(rightScalar, caseSensitive) : rightScalar;
 
   if (op === "=" || op === "==") return `(${left}=${right})`;
   if (op === "<>" || op === "!=") return `(${left}<>${right})`;

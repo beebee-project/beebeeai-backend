@@ -708,6 +708,75 @@ function _inferTextOperatorFilters(ctx, schema, baseSheet) {
   return best ? [best] : [];
 }
 
+function _extractCellRefLiteral(raw = "") {
+  const m = String(raw || "").match(/\b(\$?[A-Z]{1,3}\$?\d{1,7})\b/i);
+  return m?.[1] ? m[1].toUpperCase() : null;
+}
+
+function _inferCellRefEqualityFilters(ctx, schema, baseSheet) {
+  const raw = _rawText(schema);
+  if (!raw || !ctx?.allSheetsData) return [];
+
+  const cellRef = _extractCellRefLiteral(raw);
+  if (!cellRef) return [];
+
+  const returnHeaders = new Set(
+    (schema.return_fields || []).map((x) => _normToken(x)),
+  );
+
+  const columns = _collectAllMetaColumns(ctx, baseSheet).filter(
+    (c) =>
+      !_isNumericColumn(c.meta) &&
+      !_isDateColumn(c.meta, c.header) &&
+      !returnHeaders.has(_normToken(c.header)),
+  );
+
+  let best = null;
+  const rawNorm = _normToken(raw);
+  const cellNorm = _normToken(cellRef);
+
+  for (const col of columns) {
+    let score = 0;
+    const headerNorm = _normToken(col.header);
+
+    if (headerNorm && rawNorm.includes(headerNorm)) score += 40;
+
+    // 셀 참조 바로 주변의 헤더를 조건열로 우선 판단
+    // 예: "J3 부서에 해당하는 ..." => 부서 컬럼에 강한 보너스
+    const cellIdx = rawNorm.indexOf(cellNorm);
+    const headerIdx = headerNorm ? rawNorm.indexOf(headerNorm) : -1;
+    if (cellIdx >= 0 && headerIdx >= 0 && Math.abs(headerIdx - cellIdx) <= 12) {
+      score += 80;
+    }
+
+    const terms =
+      typeof formulaUtils.expandTermsFromText === "function"
+        ? [...formulaUtils.expandTermsFromText(col.header)]
+        : [headerNorm];
+
+    if (terms.some((t) => t && rawNorm.includes(_normToken(t)))) {
+      score += 20;
+    }
+
+    if (score <= 0) continue;
+
+    const ref = _normalizeRefRange(col.ref, ctx);
+    const candidate = {
+      ...ref,
+      header: col.header,
+      operator: "=",
+      value: cellRef,
+      value_type: "cell",
+      source: "cell_ref_equality_match",
+      score,
+    };
+
+    if (!best || candidate.score > best.score) best = candidate;
+  }
+
+  return best ? [best] : [];
+}
+
 function _inferNumericFiltersByTypedColumns(ctx, schema, baseSheet) {
   const raw = _rawText(schema);
   if (!raw || !ctx?.allSheetsData) return [];
@@ -828,6 +897,7 @@ function augmentFiltersFromRaw(ctx, schema, baseSheet) {
   const existing = Array.isArray(schema.filters) ? schema.filters : [];
   return _dedupeFilters([
     ...existing,
+    ..._inferCellRefEqualityFilters(ctx, schema, baseSheet),
     ..._inferTextOperatorFilters(ctx, schema, baseSheet),
     ..._inferFiltersBySampleValues(ctx, schema, baseSheet),
     ..._inferNumericFiltersByTypedColumns(ctx, schema, baseSheet),
