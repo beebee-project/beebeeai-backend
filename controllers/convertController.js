@@ -277,6 +277,21 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
+
+  if (
+    /(가장\s*(최근|오래|빠른|늦은|높은|낮은)|최근\s*순|오래된\s*순|높은\s*순|낮은\s*순|상위\s*\d+|하위\s*\d+|top\s*\d+|bottom\s*\d+)/i.test(
+      s,
+    ) &&
+    /(직원|사람|행|레코드|항목|이름|목록|보여|가져와|출력)/i.test(s)
+  ) {
+    if (/(가장\s*(최근|늦은|높은)|최신|highest|latest)/i.test(s)) {
+      return "maxrow";
+    }
+    if (/(가장\s*(오래|빠른|낮은)|oldest|earliest|lowest)/i.test(s)) {
+      return "minrow";
+    }
+    return "topnrows";
+  }
   if (/(중복\s*없이|중복\s*제거|unique|uniq)/i.test(s)) return "unique";
   if (/(세로로\s*(합치|합쳐|붙이|붙여)|vstack)/.test(s)) return "vstack";
   if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/.test(s))
@@ -708,6 +723,38 @@ function applyStructuralOverrides(intent) {
     delete intent.return_hint;
   }
 
+  const wantsRowExtreme =
+    /(가장\s*(최근|오래|빠른|늦은|높은|낮은)|최신|oldest|earliest|latest|highest|lowest)/i.test(
+      raw,
+    ) &&
+    /(직원|사람|행|레코드|항목|이름|목록|보여줘|가져와줘|출력해줘|알려줘)/i.test(
+      raw,
+    );
+
+  if (wantsRowExtreme && inferredSortHeader) {
+    const asc = /가장\s*(오래|빠른|낮은)|oldest|earliest|lowest/i.test(raw);
+    intent.operation = asc ? "minrow" : "maxrow";
+    intent.header_hint = inferredSortHeader;
+    intent.sort_order = asc ? "asc" : "desc";
+    intent.sorted = true;
+
+    const rawRequested = _extractRequestedReturnFields(raw);
+    if (rawRequested.length) {
+      intent.return_fields = rawRequested;
+    } else if (/(이름|성명)/.test(raw)) {
+      intent.return_role = "entity_name";
+      intent.return_fields = [];
+    } else if (/(\d+)\s*(?:명|개|건)/.test(raw)) {
+      intent.operation = "topnrows";
+      const n = _extractTopNLimit(raw);
+      intent.limit = n || intent.limit || 1;
+      intent.take_n = n || intent.take_n || 1;
+      intent.return_role = "row";
+      intent.return_fields = [];
+      intent.return_all_columns = true;
+    }
+  }
+
   if (topNLimit > 0 && inferredSortHeader) {
     intent.operation = "topnrows";
     intent.limit = intent.limit || topNLimit;
@@ -736,6 +783,15 @@ function applyStructuralOverrides(intent) {
     inferredSortHeader &&
     String(intent.return_fields[0]).trim() ===
       String(inferredSortHeader).trim();
+
+  if (
+    String(intent.operation || "").toLowerCase() === "sortby" &&
+    Array.isArray(intent.return_fields) &&
+    intent.return_fields.length >= 2 &&
+    String(intent.return_role || "").toLowerCase() === "entity_name"
+  ) {
+    delete intent.return_role;
+  }
 
   // sortby인데 명시 반환열이 없고 "행/대상 목록" 요청이면 전체 행 반환으로 보정
   if (
@@ -1141,7 +1197,7 @@ function _extractTopNLimit(msg = "") {
   const s = String(msg || "");
   const m =
     s.match(/(?:상위|하위|top|bottom)\s*(\d+)/i) ||
-    s.match(/(\d+)\s*(?:명|개|건)\b/i) ||
+    s.match(/(\d+)\s*(?:명|개|건)(?:\s|$|[을를이가은는의,.;!?])/i) ||
     s.match(/(?:최근|최신|오래된|높은|낮은)\s*순(?:으로)?\s*(\d+)/i);
   return m ? Number(m[1]) : 0;
 }
@@ -1180,6 +1236,16 @@ function _extractRankMetricHint(msg = "") {
   const raw = String(msg || "").trim();
   if (!raw) return null;
 
+  // 날짜/근무 기간 문맥의 최신/오래됨/빠름/늦음은 날짜열 기준 정렬
+  if (
+    /(입사|근무|재직|날짜|일자|date)/i.test(raw) &&
+    /(가장\s*(최근|오래|빠른|늦은)|최근\s*순|오래된\s*순|최신|oldest|earliest|latest)/i.test(
+      raw,
+    )
+  ) {
+    return "날짜";
+  }
+
   const patterns = [
     /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:이|가)?\s*가장\s*(?:높은|낮은)/,
     /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:상위|하위|top|bottom)\s*\d*/i,
@@ -1213,6 +1279,12 @@ function _inferSortHeaderHint(msg = "", fallback = null) {
 
 function _inferSortOrderFromMessage(msg = "") {
   const s = String(msg || "");
+  if (/(가장\s*(오래|빠른)|오래된\s*순|예전|earliest|oldest)/i.test(s)) {
+    return "asc";
+  }
+  if (/(가장\s*(최근|늦은)|최근\s*순|최신|latest|most\s*recent)/i.test(s)) {
+    return "desc";
+  }
   if (
     /(하위|낮은\s*순|작은\s*순|오름차순|asc|오래된|예전|earliest|oldest)/i.test(
       s,
@@ -1259,6 +1331,33 @@ function _extractRequestedReturnFields(msg = "") {
     )
   ) {
     return [];
+  }
+
+  const entityFieldAfterSort = raw.match(
+    /(?:높은\s*순|낮은\s*순|오름차순|내림차순|정렬|순으로)\s*(?:으로)?\s*(?:직원|사람|항목|레코드)?\s*([가-힣A-Za-z0-9_ ]+?)\s*(?:,|및|그리고|와|과)\s*([가-힣A-Za-z0-9_ ]+?)\s*(?:을|를)?\s*(?:보여줘|출력해줘|가져와줘|알려줘|get|show|return)/i,
+  );
+  if (entityFieldAfterSort) {
+    return [
+      ...new Set(
+        [entityFieldAfterSort[1], entityFieldAfterSort[2]]
+          .map(_cleanReturnFieldToken)
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  // "직원 이름과 연봉"처럼 대상어+열거가 섞인 요청 보정
+  const entityFieldEnum = raw.match(
+    /(?:직원|사람|항목|레코드)?\s*([가-힣A-Za-z0-9_ ]+?)\s*(?:,|및|그리고|와|과)\s*([가-힣A-Za-z0-9_ ]+?)\s*(?:을|를)?\s*(?:보여줘|출력해줘|가져와줘|알려줘|get|show|return)/i,
+  );
+  if (entityFieldEnum) {
+    return [
+      ...new Set(
+        [entityFieldEnum[1], entityFieldEnum[2]]
+          .map(_cleanReturnFieldToken)
+          .filter(Boolean),
+      ),
+    ];
   }
 
   // “... 이름, 부서, 직급, 연봉을 가져와줘/보여줘 ...” 같은 열거형 요청을 일반적으로 추출

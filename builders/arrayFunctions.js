@@ -905,6 +905,13 @@ const arrayFunctionBuilder = {
     const { bestReturn, bestLookup } = ctx;
     const it = ctx.intent || {};
 
+    const resolvedReturnCols = _resolvedReturnColumns(ctx);
+    const primaryReturn = resolvedReturnCols[0] || bestReturn || null;
+    const effectiveReturnHeaders =
+      Array.isArray(it.return_headers) && it.return_headers.length
+        ? it.return_headers
+        : resolvedReturnCols.map((c) => c.header).filter(Boolean);
+
     const wantsRowReturn =
       String(it.return_role || "").toLowerCase() === "row" ||
       it.return_all_columns === true;
@@ -916,12 +923,8 @@ const arrayFunctionBuilder = {
       ctx?.resolved?.baseSheet ||
       null;
 
-    if (
-      ((Array.isArray(it.return_headers) && it.return_headers.length) ||
-        wantsRowReturn) &&
-      (bestReturn || (wantsRowReturn && rowBaseSheet))
-    ) {
-      const sheetName = bestReturn?.sheetName || rowBaseSheet;
+    if ((effectiveReturnHeaders.length || wantsRowReturn) && primaryReturn) {
+      const sheetName = primaryReturn.sheetName;
       const sheetInfo = ctx.allSheetsData?.[sheetName];
       if (!sheetInfo) return `=ERROR("시트 정보를 찾을 수 없습니다.")`;
 
@@ -1006,7 +1009,7 @@ const arrayFunctionBuilder = {
               firstColIdx0 +
               1,
           )
-        : it.return_headers
+        : effectiveReturnHeaders
             .map((h) => {
               const key = String(h).trim();
               const m = byName.get(key) || findMetaByContains(key);
@@ -1630,6 +1633,10 @@ function _topNRows(ctx, buildConditionMask) {
     firstColIdx0 +
     1;
 
+  const wantsRowReturn =
+    String(it.return_role || "").toLowerCase() === "row" ||
+    it.return_all_columns === true;
+
   const want =
     Array.isArray(it.return_headers) && it.return_headers.length
       ? it.return_headers
@@ -1647,7 +1654,9 @@ function _topNRows(ctx, buildConditionMask) {
       );
     })
     .filter((v) => Number.isFinite(v));
-  if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+  if (!retIdxs.length && !wantsRowReturn) {
+    return `=ERROR("반환 열을 찾을 수 없습니다.")`;
+  }
 
   const n = Math.max(1, Number(it.take_n || it.limit || 5));
   const order =
@@ -1670,6 +1679,9 @@ function _topNRows(ctx, buildConditionMask) {
     return true;
   });
   if (!conds.length) {
+    if (wantsRowReturn) {
+      return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(s, ${n}))`;
+    }
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
   }
 
@@ -1719,6 +1731,9 @@ function _topNRows(ctx, buildConditionMask) {
   }
 
   if (!maskParts.length) {
+    if (wantsRowReturn) {
+      return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(s, ${limitN}))`;
+    }
     return `=LET(t, ${fullA1}, s, SORTBY(t, CHOOSECOLS(t, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
   }
 
