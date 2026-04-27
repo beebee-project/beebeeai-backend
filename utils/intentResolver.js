@@ -1,5 +1,16 @@
 const formulaUtils = require("./formulaUtils");
 
+function _isRedundantQuotedEqualityFilter(f, raw = "") {
+  const quoted = _extractQuotedLiteral(raw);
+  if (!quoted || !_inferTextOperator(raw)) return false;
+
+  const op = String(f?.operator || "=").toLowerCase();
+  if (op !== "=" && op !== "==") return false;
+
+  const v = String(f?.value ?? "").trim();
+  return _normToken(v) === _normToken(quoted);
+}
+
 function toRef(sheetName, header, meta, sheetInfo) {
   if (!meta || !sheetInfo) return null;
   const columnLetter = meta.columnLetter;
@@ -610,6 +621,14 @@ function _inferFiltersBySampleValues(ctx, schema, baseSheet) {
   const raw = _rawText(schema);
   if (!raw || !ctx?.allSheetsData) return [];
 
+  // quoted literal + text operator 요청은
+  // starts_with / ends_with / contains 조건만 사용한다.
+  // sample equality 조건까지 만들면 "EMP0" 같은 값이
+  // =EMP0 조건으로 중복 생성될 수 있다.
+  if (_extractQuotedLiteral(raw) && _inferTextOperator(raw)) {
+    return [];
+  }
+
   const tokens = _expandRawTokens(raw).filter((t) => !_isStopToken(t));
   const out = [];
   const columns = _collectAllMetaColumns(ctx, baseSheet);
@@ -894,7 +913,20 @@ function _inferDateFiltersByTypedColumns(ctx, schema, baseSheet) {
 }
 
 function augmentFiltersFromRaw(ctx, schema, baseSheet) {
-  const existing = Array.isArray(schema.filters) ? schema.filters : [];
+  const raw = _rawText(schema);
+  const hasQuotedTextOperator = !!(
+    _extractQuotedLiteral(raw) && _inferTextOperator(raw)
+  );
+  const existing = (Array.isArray(schema.filters) ? schema.filters : []).filter(
+    (f) => {
+      if (!hasQuotedTextOperator) return true;
+      const op = String(f?.operator || "=").toLowerCase();
+      const vt = String(f?.value_type || "").toLowerCase();
+      // quoted literal + starts/ends/contains 요청에서는
+      // 기존 equality text filter가 중복 조건으로 들어오는 것을 차단
+      return !(vt === "text" && (op === "=" || op === "=="));
+    },
+  );
   return _dedupeFilters([
     ...existing,
     ..._inferCellRefEqualityFilters(ctx, schema, baseSheet),
@@ -908,6 +940,10 @@ function augmentFiltersFromRaw(ctx, schema, baseSheet) {
 function resolveFilterColumns(ctx, schema, baseSheet) {
   const out = [];
   const seen = new Set();
+  const raw = _rawText(schema);
+  const hasQuotedTextOperator = !!(
+    _extractQuotedLiteral(raw) && _inferTextOperator(raw)
+  );
   const filters = augmentFiltersFromRaw(ctx, schema, baseSheet);
 
   const pushUnique = (item) => {
@@ -937,6 +973,7 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
             pickBestColumnInSheet(ctx, x.header, baseSheet, "filter") ||
             pickBestColumnAnySheet(ctx, x.header, "filter");
           const item = { ...x, ref: _normalizeRefRange(ref, ctx) };
+          if (_isRedundantQuotedEqualityFilter(item, raw)) return null;
           const innerKey = JSON.stringify([
             item.header || "",
             item.operator || "",
@@ -987,6 +1024,22 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
           f.header || schema.header_hint || null,
           baseSheet || ctx.bestReturn?.sheetName || null,
         );
+    }
+
+    const op = String(f?.operator || "=").toLowerCase();
+    const vt = String(f?.value_type || "").toLowerCase();
+    const source = String(f?.source || "");
+    if (
+      hasQuotedTextOperator &&
+      vt === "text" &&
+      (op === "=" || op === "==") &&
+      source !== "text_operator_match"
+    ) {
+      continue;
+    }
+
+    if (_isRedundantQuotedEqualityFilter(f, raw)) {
+      continue;
     }
 
     pushUnique({ ...f, ref: _normalizeRefRange(ref, ctx) });

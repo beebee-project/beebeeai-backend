@@ -1492,6 +1492,17 @@ function resolveOp(op) {
   return typeof formulaBuilder[base] === "function" ? base : null;
 }
 
+function getDebugReturnHeaders(ctx = {}) {
+  return (ctx?.resolved?.returnColumns || [])
+    .map((x) => {
+      const h = String(x?.header || "").trim();
+      if (!h) return null;
+      if (/^-?\d+(?:\.\d+)?$/.test(h.replace(/,/g, ""))) return null;
+      return h;
+    })
+    .filter(Boolean);
+}
+
 /* ---------------------------------------------
  * 파일 전처리 유틸
  * -------------------------------------------*/
@@ -2223,9 +2234,7 @@ exports.handleConversion = async (req, res, next) => {
             fallbackAttempted: false,
             fallbackFunctions: [],
             resolvedBaseSheet: context?.resolved?.baseSheet || null,
-            resolvedReturnHeaders: (context?.resolved?.returnColumns || []).map(
-              (x) => x.header,
-            ),
+            resolvedReturnHeaders: getDebugReturnHeaders(context),
             resolvedLookupHeader:
               context?.resolved?.lookupColumn?.header || null,
             resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
@@ -2345,9 +2354,7 @@ exports.handleConversion = async (req, res, next) => {
           v.ok && shouldAttemptCompatibilityFallback(compatibility),
         fallbackFunctions,
         resolvedBaseSheet: context?.resolved?.baseSheet || null,
-        resolvedReturnHeaders: (context?.resolved?.returnColumns || []).map(
-          (x) => x.header,
-        ),
+        resolvedReturnHeaders: getDebugReturnHeaders(context),
         resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
         resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
       },
