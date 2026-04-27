@@ -260,6 +260,15 @@ function getResolverMode(ctx = {}) {
 }
 
 function shouldUseDirectBuilder(intent = {}, ctx = {}) {
+  const raw = String(intent?.raw_message || ctx?.message || "");
+  if (
+    /["'][^"']+["']/.test(raw) &&
+    /(포함|시작|끝나는|끝\s*나는|contains|starts?\s*with|ends?\s*with)/i.test(
+      raw,
+    )
+  ) {
+    return false;
+  }
   return shouldUseDirectGate(intent, ctx);
 }
 
@@ -268,6 +277,7 @@ function shouldUseDirectBuilder(intent = {}, ctx = {}) {
  * -------------------------------------------*/
 function _deduceOp(text = "") {
   const s = String(text).toLowerCase();
+  if (/(중복\s*없이|중복\s*제거|unique|uniq)/i.test(s)) return "unique";
   if (/(세로로\s*(합치|합쳐|붙이|붙여)|vstack)/.test(s)) return "vstack";
   if (/(한\s*열로\s*펴|한열로\s*펴|tocol|세로로\s*펼쳐|flatten)/.test(s))
     return "tocol";
@@ -409,6 +419,7 @@ function buildLocalIntentFromText(text = "") {
   const uniqueTarget =
     headerHint ||
     requestedReturnFields[0] ||
+    _extractListTargetFromMessage(original) ||
     _extractSortHintFromMessage(original);
 
   if (isUniqueListRequest && uniqueTarget) {
@@ -658,6 +669,7 @@ function applyStructuralOverrides(intent) {
   const uniqueTarget =
     intent.header_hint ||
     requestedReturnFields[0] ||
+    _extractListTargetFromMessage(raw) ||
     _extractSortHintFromMessage(raw);
   const topNLimit = _extractTopNLimit(raw);
   const wantsSortedList = _looksLikeSortedListRequest(raw);
@@ -669,7 +681,10 @@ function applyStructuralOverrides(intent) {
 
   if (
     wantsUniqueList &&
-    (op === "sortby" || op === "filter" || op === "formula") &&
+    (op === "sortby" ||
+      op === "filter" ||
+      op === "formula" ||
+      op === "unique") &&
     uniqueTarget
   ) {
     intent.operation = "unique";
@@ -1038,6 +1053,7 @@ const OP_ALIASES = {
   rankcolumn: "rankcolumn",
 
   sortby: "sortby",
+  unique: "unique",
   regexmatch: "regexmatch",
   textsplit: "textsplit",
 };
@@ -1253,6 +1269,17 @@ function _extractSortHintFromMessage(msg = "") {
     if (phrase && phrase.length <= 40) return phrase;
   }
   return null;
+}
+
+function _extractListTargetFromMessage(msg = "") {
+  const raw = String(msg || "");
+  const m = raw.match(/([가-힣A-Za-z0-9_()\/ -]+?)\s*목록/u);
+  if (!m?.[1]) return null;
+  return _cleanHintPhrase(m[1])
+    .replace(/중복\s*없이/g, "")
+    .replace(/가나다순으로?/g, "")
+    .replace(/정렬해줘/g, "")
+    .trim();
 }
 
 function _pushUniqueFilterSpec(out, spec) {

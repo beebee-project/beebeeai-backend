@@ -646,6 +646,68 @@ function _inferFiltersBySampleValues(ctx, schema, baseSheet) {
   return _dedupeFilters(out);
 }
 
+function _extractQuotedLiteral(raw = "") {
+  const m = String(raw || "").match(/["']([^"']+)["']/);
+  return m?.[1] ? String(m[1]).trim() : null;
+}
+
+function _inferTextOperator(raw = "") {
+  const s = String(raw || "");
+  if (/(포함|contains|include)/i.test(s)) return "contains";
+  if (/(시작|starts?\s*with)/i.test(s)) return "starts_with";
+  if (/(끝나는|끝\s*나는|끝|ends?\s*with)/i.test(s)) return "ends_with";
+  return null;
+}
+
+function _inferTextOperatorFilters(ctx, schema, baseSheet) {
+  const raw = _rawText(schema);
+  if (!raw || !ctx?.allSheetsData) return [];
+
+  const operator = _inferTextOperator(raw);
+  const value = _extractQuotedLiteral(raw);
+  if (!operator || !value) return [];
+
+  const columns = _collectAllMetaColumns(ctx, baseSheet).filter(
+    (c) => !_isNumericColumn(c.meta) && !_isDateColumn(c.meta, c.header),
+  );
+
+  let best = null;
+  for (const col of columns) {
+    let score = 0;
+    const headerNorm = _normToken(col.header);
+    const rawNorm = _normToken(raw);
+
+    if (rawNorm.includes(headerNorm)) score += 40;
+
+    const terms =
+      typeof formulaUtils.expandTermsFromText === "function"
+        ? [...formulaUtils.expandTermsFromText(col.header)]
+        : [headerNorm];
+
+    if (terms.some((t) => t && rawNorm.includes(_normToken(t)))) {
+      score += 20;
+    }
+
+    // 명시 헤더/동의어 문맥이 없는 경우에는 오탐 방지를 위해 채택하지 않음
+    if (score <= 0) continue;
+
+    const ref = _normalizeRefRange(col.ref, ctx);
+    const candidate = {
+      ...ref,
+      header: col.header,
+      operator,
+      value,
+      value_type: "text",
+      source: "text_operator_match",
+      score,
+    };
+
+    if (!best || candidate.score > best.score) best = candidate;
+  }
+
+  return best ? [best] : [];
+}
+
 function _inferNumericFiltersByTypedColumns(ctx, schema, baseSheet) {
   const raw = _rawText(schema);
   if (!raw || !ctx?.allSheetsData) return [];
@@ -766,6 +828,7 @@ function augmentFiltersFromRaw(ctx, schema, baseSheet) {
   const existing = Array.isArray(schema.filters) ? schema.filters : [];
   return _dedupeFilters([
     ...existing,
+    ..._inferTextOperatorFilters(ctx, schema, baseSheet),
     ..._inferFiltersBySampleValues(ctx, schema, baseSheet),
     ..._inferNumericFiltersByTypedColumns(ctx, schema, baseSheet),
     ..._inferDateFiltersByTypedColumns(ctx, schema, baseSheet),
