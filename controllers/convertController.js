@@ -689,6 +689,44 @@ function applyStructuralOverrides(intent) {
   const hasMetric = !!intent.header_hint || !!intent.return_hint;
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
+  const cellLookupRef = raw
+    .match(/\b([A-Z]{1,3}\d{1,7})\b/i)?.[1]
+    ?.toUpperCase();
+  const looksLikeCellLookup =
+    !!cellLookupRef &&
+    /(에\s*있는|의|로|기준|값)/.test(raw) &&
+    /(가져와줘|찾아줘|조회해줘|보여줘|알려줘|return|lookup|get|show)/i.test(
+      raw,
+    );
+
+  const rawLookupReturnFields = _extractRequestedReturnFields(raw);
+
+  if (
+    looksLikeCellLookup &&
+    rawLookupReturnFields.length >= 1 &&
+    !/(순으로|정렬|순위|랭크|등수|상위|하위|top|bottom)/i.test(raw)
+  ) {
+    intent.operation = "xlookup";
+    intent.lookup_value = cellLookupRef;
+    intent.lookup = {
+      ...(intent.lookup || {}),
+      value_ref: cellLookupRef,
+      value: cellLookupRef,
+      match_mode: "exact",
+    };
+    intent.lookup_role = intent.lookup_role || "entity_id";
+    if (!intent.lookup_hint) {
+      if (/(직원\s*ID|사번|employee\s*id)/i.test(raw)) {
+        intent.lookup_hint = "직원 ID";
+      } else if (/(직원|사람|인원|대상)/i.test(raw)) {
+        intent.lookup_hint = "ID";
+      }
+    }
+    intent.return_fields = rawLookupReturnFields;
+    intent.return_role = "value";
+    delete intent.return_hint;
+    delete intent.group_by;
+  }
   const wantsUniqueList = _looksLikeUniqueListRequest(raw);
   const requestedReturnFields =
     Array.isArray(intent.return_fields) && intent.return_fields.length
@@ -987,6 +1025,13 @@ function normalizeLookupIntent(intent) {
     intent.return_fields = [...new Set(intent.return_fields.map(String))];
   }
 
+  if (Array.isArray(intent.return_fields) && intent.return_fields.length > 1) {
+    intent.return_arrays = intent.return_fields.map((header) => ({
+      header,
+      sheet: intent.return?.sheet || intent.return_array?.sheet || undefined,
+    }));
+  }
+
   return intent;
 }
 
@@ -1246,6 +1291,18 @@ function _extractRankMetricHint(msg = "") {
     return "날짜";
   }
 
+  // "연봉 순위 열", "매출 순위 컬럼" 등 rank column 기준 추출
+  const rankColMetric = raw.match(
+    /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:순위|랭크|등수|rank)\s*(?:열|컬럼|column)?/i,
+  );
+  if (rankColMetric) {
+    const phrase = _cleanHintPhrase(rankColMetric[1])
+      .replace(/^(?:전체|모든)\s*/u, "")
+      .replace(/\s*(?:직원|사람|행|레코드|항목)\s*(?:의)?$/u, "")
+      .trim();
+    if (phrase) return phrase;
+  }
+
   const patterns = [
     /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:이|가)?\s*가장\s*(?:높은|낮은)/,
     /([가-힣A-Za-z0-9_()\/ -]+?)\s*(?:상위|하위|top|bottom)\s*\d*/i,
@@ -1331,6 +1388,25 @@ function _extractRequestedReturnFields(msg = "") {
     )
   ) {
     return [];
+  }
+
+  // 셀 참조 lookup + 다중 반환열
+  const cellLookupFieldEnum = raw.match(
+    /\b[A-Z]{1,3}\d{1,7}\b.*?(?:의|에\s*있는)\s+([가-힣A-Za-z0-9_ ]+?)\s*(?:,|및|그리고|와|과)\s*([가-힣A-Za-z0-9_ ]+?)\s*(?:을|를)?\s*(?:동시에\s*)?(?:가져와줘|보여줘|출력해줘|알려줘|get|show|return)/i,
+  );
+  if (cellLookupFieldEnum) {
+    return [
+      ...new Set(
+        [cellLookupFieldEnum[1], cellLookupFieldEnum[2]]
+          .map((x) =>
+            _cleanReturnFieldToken(x)
+              .replace(/^(?:직원|사람|항목|레코드)\s*의\s*/u, "")
+              .replace(/\s*동시에\s*$/u, "")
+              .trim(),
+          )
+          .filter(Boolean),
+      ),
+    ];
   }
 
   const entityFieldAfterSort = raw.match(
@@ -1515,6 +1591,8 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
     const value = _cleanCategoryValue(m[1]);
     const header = String(m[2] || "").trim();
     if (!value || !header) continue;
+
+    if (/^(직원|사람|항목|레코드|대상|값)$/u.test(value)) continue;
 
     _pushUniqueFilterSpec(out, {
       role: "category_filter",
