@@ -36,7 +36,7 @@ function _formatScalar(
   if (v == null) return _q("");
 
   // 셀 참조 / 범위는 그대로
-  if (typeof v === "string") {
+  if (typeof v === "string" && valueType !== "text") {
     const s = v.trim();
     if (
       /^\$?[A-Z]{1,3}\$?[0-9]{1,7}(?::\$?[A-Z]{1,3}\$?[0-9]{1,7})?$/i.test(s) ||
@@ -57,7 +57,12 @@ function _formatScalar(
     return `DATEVALUE(${_q(iso)})`;
   }
 
-  const lit = typeof formatValue === "function" ? formatValue(v) : _q(v);
+  let lit = typeof formatValue === "function" ? formatValue(v) : _q(v);
+  if (typeof v === "string" && valueType === "text") {
+    const s = String(lit || "").trim();
+    const isQuoted = /^".*"$/.test(s);
+    if (!isQuoted) lit = _q(v);
+  }
   if (caseSensitive) return lit;
   return `LOWER(TRIM(${lit}&""))`;
 }
