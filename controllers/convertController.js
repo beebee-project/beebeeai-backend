@@ -282,7 +282,16 @@ function _deduceOp(text = "") {
     return "minrow";
   if (/(average|avg|mean|평균)/.test(s)) return "average";
   if (/(sum|total|합계|총합|합\b)/.test(s)) return "sum";
-  if (/(count|개수|갯수|건수|수량|카운트)/.test(s)) return "count";
+  if (/(count|개수|갯수|건수|수량|카운트|인원수|몇\s*명|명수)/.test(s)) {
+    return "count";
+  }
+  if (
+    /(?:[가-힣A-Za-z0-9_()\/ -]+)\s*(?:수|명)(?:\s|$|[을를이가은는의,.;!?])/.test(
+      s,
+    )
+  ) {
+    return "count";
+  }
   if (/(xlookup|lookup|찾아|조회|검색|참조)/.test(s)) return "xlookup";
   if (/(filter|필터)/.test(s)) return "filter";
   if (/\b(if|조건|만약)\b/.test(s)) return "if";

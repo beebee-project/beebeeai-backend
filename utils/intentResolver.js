@@ -404,9 +404,378 @@ function resolveSortColumn(ctx, schema, baseSheet) {
   );
 }
 
+function _normToken(s = "") {
+  return formulaUtils.norm
+    ? formulaUtils.norm(s)
+    : String(s || "")
+        .trim()
+        .toLowerCase();
+}
+
+function _rawText(schema = {}) {
+  return String(schema.raw_message || schema.message || schema.prompt || "");
+}
+
+function _extractRawTokens(raw = "") {
+  return String(raw || "")
+    .split(/[^가-힣A-Za-z0-9_.-]+/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 1);
+}
+
+function _stripTokenSuffix(token = "") {
+  return String(token || "")
+    .trim()
+    .replace(/(이면서|이지만|이고|이며|인데)$/u, "")
+    .replace(/(인|인것|인값|인항목)$/u, "")
+    .replace(/(이|가|은|는|을|를|의|로|으로)$/u, "")
+    .trim();
+}
+
+function _expandRawTokens(raw = "") {
+  const out = [];
+  const seen = new Set();
+
+  for (const token of _extractRawTokens(raw)) {
+    for (const cand of [token, _stripTokenSuffix(token)]) {
+      const t = String(cand || "").trim();
+      if (!t || seen.has(t)) continue;
+      seen.add(t);
+      out.push(t);
+    }
+  }
+
+  return out;
+}
+
+function _isStopToken(token = "") {
+  const t = _normToken(token);
+  if (!t) return true;
+  if (/^\d+$/.test(t)) return false;
+  return [
+    "계산",
+    "계산해줘",
+    "구해줘",
+    "보여줘",
+    "가져와줘",
+    "뽑아줘",
+    "목록",
+    "리스트",
+    "표",
+    "전체",
+    "해당",
+    "있는",
+    "에서",
+    "이고",
+    "이며",
+    "이면서",
+    "그리고",
+    "또는",
+    "평균",
+    "합계",
+    "최고",
+    "최저",
+    "중앙값",
+    "직원",
+    "사람",
+    "인원",
+    "수",
+    "명",
+    "개수",
+  ].includes(t);
+}
+
+function _sampleValues(meta = {}) {
+  return Array.isArray(meta.sampleValues) ? meta.sampleValues : [];
+}
+
+function _columnType(meta = {}) {
+  return String(meta.dominantType || meta.clusterType || "").toLowerCase();
+}
+
+function _isNumericColumn(meta = {}) {
+  return (
+    _columnType(meta) === "number" || Number(meta.numericRatio || 0) >= 0.5
+  );
+}
+
+function _isDateColumn(meta = {}, header = "") {
+  const t = _columnType(meta);
+  if (t === "date" || t === "datetime") return true;
+  return looksLikeDateHeader(header);
+}
+
+function _valueAppearsInSamples(token, meta = {}) {
+  const nt = _normToken(token);
+  if (!nt || _isStopToken(nt)) return false;
+  return _sampleValues(meta).some((v) => _normToken(v) === nt);
+}
+
+function _collectAllMetaColumns(ctx, preferredBaseSheet = null) {
+  const out = [];
+  for (const sheetName of getPreferredSheetNames(ctx, preferredBaseSheet)) {
+    const info = ctx?.allSheetsData?.[sheetName];
+    if (!info?.metaData) continue;
+    for (const [header, meta] of Object.entries(info.metaData)) {
+      out.push({
+        sheetName,
+        info,
+        header,
+        meta,
+        ref: toRef(sheetName, header, meta, info),
+      });
+    }
+  }
+  return out.filter((x) => x.ref);
+}
+
+function _normalizeRefRange(ref, ctx) {
+  if (!ref?.sheetName || !ref?.columnLetter) return ref;
+  const info = ctx?.allSheetsData?.[ref.sheetName];
+  if (!info) return ref;
+
+  const startRow = info.startRow || ref.startRow;
+  const lastDataRow = info.lastDataRow || ref.lastDataRow;
+
+  return {
+    ...ref,
+    startRow,
+    lastDataRow,
+    cell: `'${ref.sheetName}'!${ref.columnLetter}${startRow}`,
+    range: `'${ref.sheetName}'!${ref.columnLetter}${startRow}:${ref.columnLetter}${lastDataRow}`,
+  };
+}
+
+function _scoreSampleValueCandidate(raw, token, col) {
+  let score = 0;
+  const nt = _normToken(token);
+  const nh = _normToken(col.header);
+
+  if (!nt || !nh) return 0;
+
+  // 토큰이 실제 sampleValues에 있는 것은 기본 조건
+  if (!_valueAppearsInSamples(token, col.meta)) return 0;
+
+  score += 10;
+
+  // 문장에 헤더명이 함께 등장하면 강한 보너스
+  if (_normToken(raw).includes(nh)) score += 30;
+
+  // 헤더 동의어/확장어가 문장에 있으면 보너스
+  const terms =
+    typeof formulaUtils.expandTermsFromText === "function"
+      ? [...formulaUtils.expandTermsFromText(col.header)]
+      : [nh];
+  if (terms.some((t) => t && _normToken(raw).includes(_normToken(t)))) {
+    score += 15;
+  }
+
+  // 1글자 토큰은 오탐 위험이 높지만,
+  // 문장에 해당 컬럼 헤더/동의어 문맥이 있으면 정상 조건으로 인정
+  if (nt.length === 1 && score < 25) score -= 20;
+  if (nt.length === 1 && score >= 25) score += 10;
+
+  // 숫자/날짜 컬럼은 sample text filter 후보에서 감점
+  if (_isNumericColumn(col.meta) || _isDateColumn(col.meta, col.header)) {
+    score -= 50;
+  }
+
+  return score;
+}
+
+function _dedupeFilters(filters = []) {
+  const out = [];
+  const seen = new Set();
+
+  for (const f of filters) {
+    if (!f) continue;
+    const key = [
+      f.sheetName || "",
+      f.columnLetter || "",
+      f.header || "",
+      f.operator || "=",
+      String(f.value ?? ""),
+      f.value_type || "",
+    ].join("::");
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(f);
+  }
+
+  return out;
+}
+
+function _inferFiltersBySampleValues(ctx, schema, baseSheet) {
+  const raw = _rawText(schema);
+  if (!raw || !ctx?.allSheetsData) return [];
+
+  const tokens = _expandRawTokens(raw).filter((t) => !_isStopToken(t));
+  const out = [];
+  const columns = _collectAllMetaColumns(ctx, baseSheet);
+
+  for (const token of tokens) {
+    let best = null;
+
+    for (const col of columns) {
+      const score = _scoreSampleValueCandidate(raw, token, col);
+      if (score <= 0) continue;
+
+      const ref = _normalizeRefRange(col.ref, ctx);
+      const candidate = {
+        ...ref,
+        header: col.header,
+        operator: "=",
+        value: token,
+        value_type: "text",
+        source: "sample_value_match",
+        score,
+      };
+
+      if (!best || candidate.score > best.score) {
+        best = candidate;
+      }
+    }
+
+    // 1글자 토큰은 명확한 후보만 채택
+    if (best && (String(token).length > 1 || best.score >= 25)) {
+      out.push(best);
+    }
+  }
+
+  return _dedupeFilters(out);
+}
+
+function _inferNumericFiltersByTypedColumns(ctx, schema, baseSheet) {
+  const raw = _rawText(schema);
+  if (!raw || !ctx?.allSheetsData) return [];
+
+  const out = [];
+  const rules = [
+    {
+      re: /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:[가-힣A-Za-z%]+)?\s*(?:이상|부터|>=|≥)/g,
+      op: ">=",
+    },
+    {
+      re: /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:[가-힣A-Za-z%]+)?\s*(?:초과|>|보다\s*큰)/g,
+      op: ">",
+    },
+    {
+      re: /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:[가-힣A-Za-z%]+)?\s*(?:이하|까지|<=|≤)/g,
+      op: "<=",
+    },
+    {
+      re: /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:[가-힣A-Za-z%]+)?\s*(?:미만|<|보다\s*작은)/g,
+      op: "<",
+    },
+  ];
+
+  const numericCols = _collectAllMetaColumns(ctx, baseSheet).filter((c) =>
+    _isNumericColumn(c.meta),
+  );
+
+  for (const { re, op } of rules) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(raw))) {
+      const value = String(m[1]).replace(/,/g, "");
+
+      const hinted =
+        numericCols.find((c) => raw.includes(c.header)) ||
+        numericCols.find((c) => {
+          const key = String(
+            c.meta.canonicalKey || c.meta.clusterCandidate || "",
+          );
+          return key && raw.toLowerCase().includes(key.toLowerCase());
+        }) ||
+        null;
+
+      const ref =
+        hinted ||
+        pickNumericColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
+        pickNumericColumnAnySheet(ctx, schema.header_hint || null, baseSheet);
+
+      const normalized = _normalizeRefRange(ref, ctx);
+      if (normalized?.header) {
+        out.push({
+          ...normalized,
+          header: normalized.header,
+          operator: op,
+          value,
+          value_type: "number",
+          source: "typed_numeric_match",
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+function _inferDateFiltersByTypedColumns(ctx, schema, baseSheet) {
+  const raw = _rawText(schema);
+  if (!raw || !ctx?.allSheetsData) return [];
+
+  const out = [];
+  const rules = [
+    {
+      re: /((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:이후|부터|>=|≥)/g,
+      op: ">=",
+    },
+    {
+      re: /((?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:이전|전|<)/g,
+      op: "<",
+    },
+    { re: /((?:19|20)\d{2})\s*년\s*(?:이후|부터|>=|≥)/g, op: ">=", year: true },
+    { re: /((?:19|20)\d{2})\s*년\s*(?:이전|전|<)/g, op: "<", year: true },
+  ];
+
+  const dateCols = _collectAllMetaColumns(ctx, baseSheet).filter((c) =>
+    _isDateColumn(c.meta, c.header),
+  );
+
+  for (const { re, op, year } of rules) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(raw))) {
+      const value = year ? `${m[1]}-01-01` : String(m[1]).replace(/[./]/g, "-");
+      const hinted = dateCols.find((c) => raw.includes(c.header)) || null;
+      const ref =
+        hinted ||
+        pickDateColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
+        pickDateColumnAnySheet(ctx, schema.header_hint || null, baseSheet);
+
+      const normalized = _normalizeRefRange(ref, ctx);
+      if (normalized?.header) {
+        out.push({
+          ...normalized,
+          header: normalized.header,
+          operator: op,
+          value,
+          value_type: "date",
+          source: "typed_date_match",
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+function augmentFiltersFromRaw(ctx, schema, baseSheet) {
+  const existing = Array.isArray(schema.filters) ? schema.filters : [];
+  return _dedupeFilters([
+    ...existing,
+    ..._inferFiltersBySampleValues(ctx, schema, baseSheet),
+    ..._inferNumericFiltersByTypedColumns(ctx, schema, baseSheet),
+    ..._inferDateFiltersByTypedColumns(ctx, schema, baseSheet),
+  ]);
+}
+
 function resolveFilterColumns(ctx, schema, baseSheet) {
   const out = [];
   const seen = new Set();
+  const filters = augmentFiltersFromRaw(ctx, schema, baseSheet);
 
   const pushUnique = (item) => {
     if (!item) return;
@@ -426,7 +795,7 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
     out.push(item);
   };
 
-  for (const f of schema.filters || []) {
+  for (const f of filters) {
     if (f?.logical_operator && Array.isArray(f.conditions)) {
       const innerSeen = new Set();
       const inner = f.conditions
@@ -434,7 +803,7 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
           const ref =
             pickBestColumnInSheet(ctx, x.header, baseSheet, "filter") ||
             pickBestColumnAnySheet(ctx, x.header, "filter");
-          const item = { ...x, ref };
+          const item = { ...x, ref: _normalizeRefRange(ref, ctx) };
           const innerKey = JSON.stringify([
             item.header || "",
             item.operator || "",
@@ -456,7 +825,16 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
 
     let ref = null;
 
-    if (f?.header) {
+    // raw augmentation에서 이미 sheetName/columnLetter가 정해진 경우
+    // 다시 pickBestColumn*을 타지 말고 해당 ref를 우선 사용한다.
+    // 그래야 H91:H177이 H101:H177처럼 밀리는 문제를 막을 수 있다.
+    if (f?.ref?.range) {
+      ref = _normalizeRefRange(f.ref, ctx);
+    } else if (f?.sheetName && f?.columnLetter) {
+      ref = _normalizeRefRange(f, ctx);
+    }
+
+    if (!ref && f?.header) {
       ref =
         pickBestColumnInSheet(ctx, f.header, baseSheet, "filter") ||
         pickBestColumnAnySheet(ctx, f.header, "filter");
@@ -478,7 +856,7 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
         );
     }
 
-    pushUnique({ ...f, ref });
+    pushUnique({ ...f, ref: _normalizeRefRange(ref, ctx) });
   }
 
   return out;
