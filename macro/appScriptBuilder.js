@@ -496,6 +496,14 @@ function buildFilterRangeScript(intent) {
   else if (col.index) colPos = col.index;
 
   const criteria = intent.criteria || "";
+  const filterMode = intent.filterMode || null;
+
+  let criteriaBuilder = `.whenTextEqualTo(${JSON.stringify(criteria)})`;
+  if (filterMode === "notBlank") {
+    criteriaBuilder = `.whenTextDoesNotEqualTo("")`;
+  } else if (filterMode === "blank") {
+    criteriaBuilder = `.whenTextEqualTo("")`;
+  }
 
   return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -507,7 +515,7 @@ function buildFilterRangeScript(intent) {
   }
 
   const crit = SpreadsheetApp.newFilterCriteria()
-    .whenTextEqualTo(${JSON.stringify(criteria)})
+    ${criteriaBuilder}
     .build();
 
   filter.setColumnFilterCriteria(${colPos}, crit);

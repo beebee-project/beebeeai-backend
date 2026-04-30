@@ -364,14 +364,22 @@ End Sub`;
 function buildFilterRangeVba(intent) {
   const col = getColumnLetterOrIndex(intent.column);
   const criteria = escapeVbaString(intent.criteria || "");
+  const filterMode = intent.filterMode || null;
   const procName = toMacroProcedureName(intent);
   const rangeExpr = getVbaRangeExpr(intent);
 
   const fieldExpr =
     col.index || (col.letter ? `Range("${col.letter}1").Column` : 1);
 
+  let criteriaExpr = `"${criteria}"`;
+  if (filterMode === "notBlank") {
+    criteriaExpr = `"<>"`;
+  } else if (filterMode === "blank") {
+    criteriaExpr = `"="`;
+  }
+
   return `Sub ${procName}()
-    ${rangeExpr}.AutoFilter Field:=${fieldExpr}, Criteria1:="${criteria}"
+    ${rangeExpr}.AutoFilter Field:=${fieldExpr}, Criteria1:=${criteriaExpr}
 End Sub`;
 }
 

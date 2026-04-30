@@ -141,6 +141,13 @@ function sanitizeIntent(raw) {
     intent.criteria = raw.criteria.trim();
   }
 
+  if (typeof raw.filterMode === "string") {
+    const mode = raw.filterMode.trim();
+    if (["blank", "notBlank"].includes(mode)) {
+      intent.filterMode = mode;
+    }
+  }
+
   if (typeof raw.value === "string" || typeof raw.value === "number") {
     intent.value = raw.value;
   }

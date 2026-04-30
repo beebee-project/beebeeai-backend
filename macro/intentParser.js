@@ -209,6 +209,10 @@ function detectValue(text) {
 
 // 필터 기준 값 추출: "완료만", "'완료'만" 등에서 값 추정
 function detectFilterCriteria(text) {
+  if (text.includes("완료")) return "완료";
+  if (text.includes("보류")) return "보류";
+  if (text.includes("진행")) return "진행";
+
   // 1) 따옴표가 있으면 그 안의 값을 우선 사용
   const quoted = text.match(/["“”‘’']([^"“”‘’']+)["“”‘’']/);
   if (quoted) {
@@ -221,9 +225,33 @@ function detectFilterCriteria(text) {
     return m[1].trim();
   }
 
-  if (text.includes("완료")) return "완료";
-  if (text.includes("보류")) return "보류";
-  if (text.includes("진행")) return "진행";
+  return null;
+}
+
+function detectFilterMode(text) {
+  const t = String(text || "").toLowerCase();
+
+  if (
+    (t.includes("빈") || t.includes("공백")) &&
+    (t.includes("제외") || t.includes("빼고") || t.includes("아닌"))
+  ) {
+    return "notBlank";
+  }
+
+  if (
+    t.includes("값이 있는") ||
+    t.includes("값 있는") ||
+    t.includes("비어있지")
+  ) {
+    return "notBlank";
+  }
+
+  if (
+    (t.includes("빈") || t.includes("공백")) &&
+    (t.includes("만") || t.includes("보여") || t.includes("필터"))
+  ) {
+    return "blank";
+  }
 
   return null;
 }
@@ -578,6 +606,7 @@ function parseMacroIntent(text) {
   if (hasFilterKeyword) {
     const colInfo = detectColumnInfo(originalText); // { letter, index }
     const criteria = detectFilterCriteria(originalText) || "";
+    const filterMode = detectFilterMode(originalText);
     const range = detectTargetRange(originalText);
     const hasHeader = detectHeaderFlag(originalText);
 
@@ -586,6 +615,7 @@ function parseMacroIntent(text) {
       target: { range: range || null },
       column: colInfo,
       criteria,
+      filterMode,
       hasHeader,
       text: originalText,
     };
