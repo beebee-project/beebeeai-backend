@@ -359,9 +359,40 @@ function buildConditionMask(ctx, formatValue) {
     return true;
   });
 
+  const _cellRefEqualityInfo = (expr = "") => {
+    const s = String(expr || "");
+    const m = s.match(
+      /LOWER\(TRIM\(([^)]*![A-Z]+\d+:[A-Z]+\d+)&""\)\)\s*=\s*LOWER\(TRIM\(([A-Z]+\d+)&""\)\)/i,
+    );
+    if (!m) return null;
+    return { range: m[1], cell: m[2].toUpperCase() };
+  };
+
+  const _quotedCellTextEqualityInfo = (expr = "") => {
+    const s = String(expr || "");
+    const m = s.match(
+      /LOWER\(TRIM\(([^)]*![A-Z]+\d+:[A-Z]+\d+)&""\)\)\s*=\s*LOWER\(TRIM\("([A-Z]+\d+)"&""\)\)/i,
+    );
+    if (!m) return null;
+    return { range: m[1], cell: m[2].toUpperCase() };
+  };
+
+  const cellRefEqualityKeys = new Set(
+    filteredExprs
+      .map(_cellRefEqualityInfo)
+      .filter(Boolean)
+      .map((x) => `${x.range}|${x.cell}`),
+  );
+
+  const cellRefSafeExprs = filteredExprs.filter((expr) => {
+    const q = _quotedCellTextEqualityInfo(expr);
+    if (!q) return true;
+    return !cellRefEqualityKeys.has(`${q.range}|${q.cell}`);
+  });
+
   const uniqExprs = [];
   const seen = new Set();
-  for (const e of filteredExprs) {
+  for (const e of cellRefSafeExprs) {
     const key = String(e).replace(/\s+/g, "");
     if (seen.has(key)) continue;
     seen.add(key);
