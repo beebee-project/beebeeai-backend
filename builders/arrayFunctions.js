@@ -1762,6 +1762,8 @@ function _ratio(ctx, buildConditionMask) {
     ? ctx.resolved.filterColumns
     : [];
 
+  const useSubsetDenominator = wantsSubsetDenominator && filterCols.length >= 2;
+
   const maskExpr =
     typeof buildConditionMask === "function" ? buildConditionMask(ctx) : null;
 
@@ -1787,7 +1789,7 @@ function _ratio(ctx, buildConditionMask) {
     String(it.ratio_scope || "").toLowerCase() === "subset";
 
   // 기본: 조건 만족 / 전체
-  if (!wantsSubsetDenominator || filterCols.length < 2) {
+  if (!useSubsetDenominator) {
     return `=IFERROR(ROWS(FILTER(${denominatorRange}, ${maskExpr}))/ROWS(${denominatorRange}), 0)`;
   }
 
