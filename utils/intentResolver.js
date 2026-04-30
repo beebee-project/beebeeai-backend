@@ -459,6 +459,15 @@ function _expandRawTokens(raw = "") {
   return out;
 }
 
+function _isNegativeExistenceRaw(raw = "") {
+  return /(존재하지\s*않는|존재하지않는|없는|없음)/.test(String(raw || ""));
+}
+
+function _isFragmentFromNegativeExistence(value = "") {
+  const t = _normToken(value);
+  return ["않", "않는", "없는", "없음", "존재하지", "존재하지않는"].includes(t);
+}
+
 function _isStopToken(token = "") {
   const t = _normToken(token);
   if (!t) return true;
@@ -484,6 +493,12 @@ function _isStopToken(token = "") {
     "이면서",
     "그리고",
     "또는",
+    "없는",
+    "없음",
+    "존재하지",
+    "존재하지않는",
+    "않",
+    "않는",
     "평균",
     "합계",
     "최고",
@@ -622,6 +637,9 @@ function _dedupeFilters(filters = []) {
 function _inferFiltersBySampleValues(ctx, schema, baseSheet) {
   const raw = _rawText(schema);
   if (!raw || !ctx?.allSheetsData) return [];
+  if (/(존재하지\s*않는|존재하지않는|없는|없음)/.test(raw)) {
+    return [];
+  }
 
   const quotedLiteral = _extractQuotedLiteral(raw);
   const textOperator = _inferTextOperator(raw);
@@ -1055,6 +1073,14 @@ function augmentFiltersFromRaw(ctx, schema, baseSheet) {
     ...(Array.isArray(schema.filters) ? schema.filters : []),
     ...(Array.isArray(schema.filter_specs) ? schema.filter_specs : []),
   ].filter((f) => {
+    if (
+      _isNegativeExistenceRaw(raw) &&
+      String(f?.value_type || "").toLowerCase() === "text" &&
+      _isFragmentFromNegativeExistence(f?.value)
+    ) {
+      return false;
+    }
+
     if (!hasQuotedTextOperator) return true;
     const op = String(f?.operator || "=").toLowerCase();
     const vt = String(f?.value_type || "").toLowerCase();
@@ -1100,6 +1126,13 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
   };
 
   for (const f of filters) {
+    if (
+      _isNegativeExistenceRaw(raw) &&
+      String(f?.value_type || "").toLowerCase() === "text" &&
+      _isFragmentFromNegativeExistence(f?.value)
+    ) {
+      continue;
+    }
     if (f?.logical_operator && Array.isArray(f.conditions)) {
       const innerSeen = new Set();
       const inner = f.conditions

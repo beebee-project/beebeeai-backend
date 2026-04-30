@@ -254,7 +254,9 @@ function buildSingleConditionExpr(cond, ctx, formatValue) {
 }
 
 function buildConditionMask(ctx, formatValue) {
-  const raw = ctx?.resolved?.filterColumns?.length
+  const hasResolvedFilterColumns = Array.isArray(ctx?.resolved?.filterColumns);
+
+  const raw = hasResolvedFilterColumns
     ? ctx.resolved.filterColumns
     : Array.isArray(ctx?.intent?.filters)
       ? ctx.intent.filters
@@ -262,7 +264,21 @@ function buildConditionMask(ctx, formatValue) {
         ? ctx.intent.conditions
         : [];
 
-  const exprs = raw
+  const sanitizedRaw = raw.filter((f) => {
+    const rawText = String(ctx?.intent?.raw_message || ctx?.message || "");
+    const value = String(f?.value ?? "").trim();
+
+    if (
+      /(존재하지\s*않는|존재하지않는|없는|없음)/.test(rawText) &&
+      ["않", "않는", "없는", "없음", "존재하지", "존재하지않는"].includes(value)
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const exprs = sanitizedRaw
     .map((c) => buildSingleConditionExpr(c, ctx, formatValue))
     .filter(Boolean);
 
