@@ -266,24 +266,64 @@ function buildConditionMask(ctx, formatValue) {
     .map((c) => buildSingleConditionExpr(c, ctx, formatValue))
     .filter(Boolean);
 
-  const hasOrdinalExpr = exprs.some((e) =>
-    /MATCH\(TRIM\(.+?\&""\),\s*\{/.test(String(e)),
+  const _extractPrimaryRangeKey = (expr = "") => {
+    const s = String(expr || "");
+
+    // equality 기준: LEFT side 기준으로만 range 추출
+    const leftEq = s.match(/LOWER\(TRIM\(([^)]*![A-Z]+\d+:[A-Z]+\d+)&""\)\)/);
+    if (leftEq) {
+      const m = leftEq[1].match(/!([A-Z]+)\d+:\1\d+/);
+      if (m) return m[1];
+    }
+
+    // ordinal 기준
+    const leftOrdinal = s.match(
+      /MATCH\(TRIM\(([^)]*![A-Z]+\d+:[A-Z]+\d+)&""\)/,
+    );
+    if (leftOrdinal) {
+      const m = leftOrdinal[1].match(/!([A-Z]+)\d+:\1\d+/);
+      if (m) return m[1];
+    }
+
+    // fallback (최후)
+    const m = s.match(/'[^']+'!([A-Z]+)\d+:\1\d+/);
+    return m ? m[1] : null;
+  };
+
+  const ordinalRangeKeys = new Set(
+    exprs
+      .filter((e) => /MATCH\(TRIM\(.+?\&""\),\s*\{/.test(String(e)))
+      .map(_extractPrimaryRangeKey)
+      .filter(Boolean),
   );
 
-  const hasAggregateExpr = exprs.some((e) => /AVERAGE\(/i.test(String(e)));
+  const aggregateRangeKeys = new Set(
+    exprs
+      .filter((e) => /AVERAGE\(/i.test(String(e)))
+      .map(_extractPrimaryRangeKey)
+      .filter(Boolean),
+  );
 
   const filteredExprs = exprs.filter((e) => {
     const s = String(e);
+    const key = _extractPrimaryRangeKey(s);
 
-    if (hasOrdinalExpr) {
-      if (/MATCH\(TRIM\(.+?\&""\),\s*\{/.test(s)) return true;
-      if (/LOWER\(TRIM\(.+?\&""\)\)\s*=\s*LOWER\(TRIM\("/.test(s)) {
-        return false;
-      }
+    // ordinal 조건 자체는 유지
+    if (/MATCH\(TRIM\(.+?\&""\),\s*\{/.test(s)) return true;
+
+    // ordinal과 같은 열의 plain equality만 제거
+    if (
+      key &&
+      ordinalRangeKeys.has(key) &&
+      /LOWER\(TRIM\(.+?\&""\)\)\s*=\s*LOWER\(TRIM\("/.test(s)
+    ) {
+      return false;
     }
 
+    // aggregate와 같은 열의 "평균" 텍스트 비교만 제거
     if (
-      hasAggregateExpr &&
+      key &&
+      aggregateRangeKeys.has(key) &&
       /LOWER\(TRIM\(.+?\&""\)\)\s*(?:>=|<=|>|<|=)\s*LOWER\(TRIM\("평균"/.test(s)
     ) {
       return false;
