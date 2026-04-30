@@ -695,6 +695,12 @@ function applyStructuralOverrides(intent) {
     intent.return_fields = [];
     intent.has_explicit_return = false;
   }
+  if (
+    String(intent.operation || "").toLowerCase() === "ratio" &&
+    /(중|중에서|에서|within|among)/i.test(raw)
+  ) {
+    intent.ratio_scope = "subset";
+  }
   const cellLookupRef = raw
     .match(/\b([A-Z]{1,3}\d{1,7})\b/i)?.[1]
     ?.toUpperCase();

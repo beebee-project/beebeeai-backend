@@ -1757,16 +1757,17 @@ function _topNRows(ctx, buildConditionMask) {
 }
 
 function _ratio(ctx, buildConditionMask) {
+  const it = ctx.intent || {};
+  const filterCols = Array.isArray(ctx?.resolved?.filterColumns)
+    ? ctx.resolved.filterColumns
+    : [];
+
   const maskExpr =
     typeof buildConditionMask === "function" ? buildConditionMask(ctx) : null;
 
   if (!maskExpr) {
     return `=ERROR("비율을 계산할 조건을 찾을 수 없습니다.")`;
   }
-
-  const filterCols = Array.isArray(ctx?.resolved?.filterColumns)
-    ? ctx.resolved.filterColumns
-    : [];
 
   const primaryFilter =
     filterCols.find((f) => f?.ref?.range || f?.range) || null;
@@ -1782,7 +1783,37 @@ function _ratio(ctx, buildConditionMask) {
     return `=ERROR("비율 계산 기준 열을 찾을 수 없습니다.")`;
   }
 
-  return `=IFERROR(ROWS(FILTER(${denominatorRange}, ${maskExpr}))/ROWS(${denominatorRange}), 0)`;
+  const wantsSubsetDenominator =
+    String(it.ratio_scope || "").toLowerCase() === "subset";
+
+  // 기본: 조건 만족 / 전체
+  if (!wantsSubsetDenominator || filterCols.length < 2) {
+    return `=IFERROR(ROWS(FILTER(${denominatorRange}, ${maskExpr}))/ROWS(${denominatorRange}), 0)`;
+  }
+
+  // subset ratio:
+  // 앞쪽 조건을 분모, 전체 조건을 분자로 사용
+  // 예: "영업 부서 중 A등급 비율"
+  //   denominator = 영업
+  //   numerator   = 영업 * A
+  const denominatorCtx = {
+    ...ctx,
+    resolved: {
+      ...(ctx.resolved || {}),
+      filterColumns: [filterCols[0]],
+    },
+  };
+
+  const denominatorMask =
+    typeof buildConditionMask === "function"
+      ? buildConditionMask(denominatorCtx)
+      : null;
+
+  if (!denominatorMask) {
+    return `=IFERROR(ROWS(FILTER(${denominatorRange}, ${maskExpr}))/ROWS(${denominatorRange}), 0)`;
+  }
+
+  return `=IFERROR(ROWS(FILTER(${denominatorRange}, ${maskExpr}))/ROWS(FILTER(${denominatorRange}, ${denominatorMask})), 0)`;
 }
 
 function _rankColumn(ctx) {
