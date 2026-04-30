@@ -623,15 +623,24 @@ function _inferFiltersBySampleValues(ctx, schema, baseSheet) {
   const raw = _rawText(schema);
   if (!raw || !ctx?.allSheetsData) return [];
 
-  // quoted literal + text operator 요청은
-  // starts_with / ends_with / contains 조건만 사용한다.
-  // sample equality 조건까지 만들면 "EMP0" 같은 값이
-  // =EMP0 조건으로 중복 생성될 수 있다.
-  if (_extractQuotedLiteral(raw) && _inferTextOperator(raw)) {
-    return [];
-  }
+  const quotedLiteral = _extractQuotedLiteral(raw);
+  const textOperator = _inferTextOperator(raw);
 
-  const tokens = _expandRawTokens(raw).filter((t) => !_isStopToken(t));
+  // quoted literal + text operator 요청에서는 quoted literal 자체만
+  // sample equality 후보에서 제외한다.
+  // 예: 이름에 "민" 포함 + 영업 부서
+  //   - "민"은 contains 조건으로만 처리
+  //   - "영업"은 sample equality 조건으로 유지
+  const skipSampleToken = quotedLiteral && textOperator ? quotedLiteral : null;
+
+  const tokens = _expandRawTokens(raw).filter((t) => {
+    if (_isStopToken(t)) return false;
+    if (skipSampleToken && _normToken(t) === _normToken(skipSampleToken)) {
+      return false;
+    }
+    return true;
+  });
+
   const out = [];
   const columns = _collectAllMetaColumns(ctx, baseSheet);
 
@@ -1159,14 +1168,6 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
     const op = String(f?.operator || "=").toLowerCase();
     const vt = String(f?.value_type || "").toLowerCase();
     const source = String(f?.source || "");
-    if (
-      hasQuotedTextOperator &&
-      vt === "text" &&
-      (op === "=" || op === "==") &&
-      source !== "text_operator_match"
-    ) {
-      continue;
-    }
 
     if (_isRedundantQuotedEqualityFilter(f, raw)) {
       continue;
