@@ -341,6 +341,77 @@ function buildConditionMask(ctx, formatValue) {
     uniqExprs.push(e);
   }
 
+  const _extractEqualityKey = (expr = "") => {
+    const s = String(expr || "");
+
+    // LOWER(TRIM('나무'!C91:C177&""))=LOWER(TRIM("영업"&""))
+    const m = s.match(
+      /^\(?LOWER\(TRIM\(([^)]*![A-Z]+\d+:[A-Z]+\d+)&""\)\)\s*=\s*LOWER\(TRIM\("([^"]+)"&""\)\)\)?$/i,
+    );
+
+    if (!m) return null;
+
+    const range = m[1];
+    const value = m[2];
+
+    const col = range.match(/!([A-Z]+)\d+:\1\d+/);
+    if (!col) return null;
+
+    return {
+      colKey: col[1],
+      value: String(value || "").trim(),
+      expr: s,
+    };
+  };
+
+  const equalityGroups = new Map();
+
+  for (const expr of uniqExprs) {
+    const parsed = _extractEqualityKey(expr);
+    if (!parsed) continue;
+
+    const arr = equalityGroups.get(parsed.colKey) || [];
+    arr.push({ expr, value: parsed.value });
+    equalityGroups.set(parsed.colKey, arr);
+  }
+
+  const orExprsByOriginal = new Map();
+
+  for (const [_colKey, items] of equalityGroups) {
+    const uniqueValues = [...new Set(items.map((x) => x.value))];
+
+    // 같은 열에 서로 다른 equality 값이 2개 이상이면 OR로 묶음
+    if (uniqueValues.length < 2) continue;
+
+    const orExpr = `((${items.map((x) => x.expr).join("+")})>0)`;
+
+    for (const item of items) {
+      orExprsByOriginal.set(item.expr, orExpr);
+    }
+  }
+
+  if (orExprsByOriginal.size) {
+    const next = [];
+    const pushedOr = new Set();
+
+    for (const expr of uniqExprs) {
+      const orExpr = orExprsByOriginal.get(expr);
+
+      if (orExpr) {
+        if (!pushedOr.has(orExpr)) {
+          next.push(orExpr);
+          pushedOr.add(orExpr);
+        }
+        continue;
+      }
+
+      next.push(expr);
+    }
+
+    uniqExprs.length = 0;
+    uniqExprs.push(...next);
+  }
+
   // window 조건 추가
   const win = ctx?.intent?.window;
   if (

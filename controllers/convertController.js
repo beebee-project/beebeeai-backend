@@ -818,6 +818,11 @@ function applyStructuralOverrides(intent) {
     intent.header_hint = inferredSortHeader;
     intent.sort_order = asc ? "asc" : "desc";
     intent.sorted = true;
+    intent.row_return = {
+      mode: asc ? "min" : "max",
+      sortBy: inferredSortHeader,
+      take: 1,
+    };
 
     const rawRequested = _extractRequestedReturnFields(raw);
     if (rawRequested.length) {
@@ -843,6 +848,12 @@ function applyStructuralOverrides(intent) {
     intent.header_hint = intent.header_hint || inferredSortHeader;
     intent.sort_order = intent.sort_order || inferredSortOrder;
     intent.sorted = true;
+    intent.row_return = {
+      mode: inferredSortOrder === "asc" ? "min" : "max",
+      sortBy: intent.header_hint || inferredSortHeader,
+      take: intent.take_n || intent.limit || topNLimit,
+    };
+
     if (requestedReturnFields.length) {
       intent.return_fields = requestedReturnFields;
     }

@@ -1380,6 +1380,7 @@ const arrayFunctionBuilder = {
 
 function _extremeRow(ctx, which, buildConditionMask) {
   const it = ctx.intent || {};
+  const rowReturn = it.row_return || {};
   const best = _resolvedPrimaryReturn(ctx);
   const resolvedSort = _resolvedSortColumn(ctx);
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
@@ -1437,6 +1438,7 @@ function _extremeRow(ctx, which, buildConditionMask) {
   };
 
   const sortHint =
+    rowReturn.sortBy ||
     resolvedSort?.header ||
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
@@ -1475,7 +1477,12 @@ function _extremeRow(ctx, which, buildConditionMask) {
     .filter((v) => Number.isFinite(v));
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
-  const order = which === "min" ? 1 : -1;
+  const order =
+    rowReturn.mode === "min" ||
+    String(it.sort_order || "").toLowerCase() === "asc" ||
+    which === "min"
+      ? 1
+      : -1;
   const conds = Array.isArray(it.conditions)
     ? it.conditions.filter(Boolean)
     : [];
@@ -1545,6 +1552,7 @@ function _extremeRow(ctx, which, buildConditionMask) {
 
 function _topNRows(ctx, buildConditionMask) {
   const it = ctx.intent || {};
+  const rowReturn = it.row_return || {};
   const best = _resolvedPrimaryReturn(ctx);
   const resolvedSort = _resolvedSortColumn(ctx);
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
@@ -1609,6 +1617,7 @@ function _topNRows(ctx, buildConditionMask) {
   };
 
   const sortHint =
+    rowReturn.sortBy ||
     resolvedSort?.header ||
     (typeof it.sort_by === "string" && it.sort_by) ||
     (it.sort_by && typeof it.sort_by === "object" && it.sort_by.header) ||
@@ -1658,9 +1667,12 @@ function _topNRows(ctx, buildConditionMask) {
     return `=ERROR("반환 열을 찾을 수 없습니다.")`;
   }
 
-  const n = Math.max(1, Number(it.take_n || it.limit || 5));
+  const n = Math.max(1, Number(rowReturn.take || it.take_n || it.limit || 5));
   const order =
-    String(it.sort_order || "desc").toLowerCase() === "asc" ? 1 : -1;
+    rowReturn.mode === "min" ||
+    String(it.sort_order || "desc").toLowerCase() === "asc"
+      ? 1
+      : -1;
 
   const rawConds = Array.isArray(it.conditions)
     ? it.conditions.filter(Boolean)
