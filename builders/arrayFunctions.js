@@ -861,6 +861,9 @@ const arrayFunctionBuilder = {
   monthcount: (ctx) => _monthCountTable(ctx),
   yearcount: (ctx) => _yearCountTable(ctx),
 
+  ratio: (ctx, _formatValue, _buildConditionPairs, buildConditionMask) =>
+    _ratio(ctx, buildConditionMask),
+
   // ---------------------- SORT ----------------------
   sort: (ctx) => {
     const { bestReturn, allSheetsData } = ctx;
@@ -1751,6 +1754,35 @@ function _topNRows(ctx, buildConditionMask) {
 
   const maskExpr = maskParts.join(" * ");
   return `=LET(t, ${fullA1}, f, FILTER(t, ${maskExpr}), s, SORTBY(f, CHOOSECOLS(f, ${criterionIdx}), ${order}), TAKE(CHOOSECOLS(s, ${retIdxs.join(", ")}), ${n}))`;
+}
+
+function _ratio(ctx, buildConditionMask) {
+  const maskExpr =
+    typeof buildConditionMask === "function" ? buildConditionMask(ctx) : null;
+
+  if (!maskExpr) {
+    return `=ERROR("비율을 계산할 조건을 찾을 수 없습니다.")`;
+  }
+
+  const filterCols = Array.isArray(ctx?.resolved?.filterColumns)
+    ? ctx.resolved.filterColumns
+    : [];
+
+  const primaryFilter =
+    filterCols.find((f) => f?.ref?.range || f?.range) || null;
+
+  const denominatorRange =
+    primaryFilter?.ref?.range ||
+    primaryFilter?.range ||
+    ctx?.resolved?.returnColumns?.[0]?.range ||
+    ctx?.bestReturn?.range ||
+    null;
+
+  if (!denominatorRange) {
+    return `=ERROR("비율 계산 기준 열을 찾을 수 없습니다.")`;
+  }
+
+  return `=IFERROR(ROWS(FILTER(${denominatorRange}, ${maskExpr}))/ROWS(${denominatorRange}), 0)`;
 }
 
 function _rankColumn(ctx) {

@@ -689,6 +689,12 @@ function applyStructuralOverrides(intent) {
   const hasMetric = !!intent.header_hint || !!intent.return_hint;
   const op = String(intent.operation || "").toLowerCase();
   const raw = String(intent.raw_message || "").trim();
+  if (/(비율|퍼센트|percent|percentage|rate)/i.test(raw)) {
+    intent.operation = "ratio";
+    intent.header_hint = intent.header_hint || null;
+    intent.return_fields = [];
+    intent.has_explicit_return = false;
+  }
   const cellLookupRef = raw
     .match(/\b([A-Z]{1,3}\d{1,7})\b/i)?.[1]
     ?.toUpperCase();
@@ -1252,6 +1258,12 @@ const OP_ALIASES = {
   unique: "unique",
   regexmatch: "regexmatch",
   textsplit: "textsplit",
+
+  // 비율
+  ratio: "ratio",
+  percent: "ratio",
+  percentage: "ratio",
+  rate: "ratio",
 };
 
 function _detectGroupByFromMessage(msg = "") {
