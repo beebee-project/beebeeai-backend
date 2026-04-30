@@ -221,11 +221,13 @@ function buildSetValueScript(intent) {
   const rangeRef = (intent.target && intent.target.range) || "A1";
   const value = intent.value ?? "";
   const fnName = toAppsScriptFunctionName(intent);
+  const valueExpr =
+    value === "__TODAY__" ? "new Date()" : JSON.stringify(value);
 
   return `function ${fnName}() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const range = sheet.getRange("${rangeRef}");
-  range.setValue(${JSON.stringify(value)});
+  range.setValue(${valueExpr});
 }`;
 }
 

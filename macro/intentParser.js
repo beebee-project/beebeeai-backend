@@ -58,6 +58,10 @@ function detectTwoRanges(text) {
 // ✅ 열 정보 추출 (insertColumn / deleteColumn 용)
 function detectColumnInfo(text) {
   const upper = text.toUpperCase();
+  const ordinalColMatch = text.match(/([0-9]+)\s*번째\s*열/);
+  if (ordinalColMatch) {
+    return { letter: null, index: parseInt(ordinalColMatch[1], 10) };
+  }
 
   // B열, C 열
   const colLetterMatch = upper.match(/([A-Z])\s*열/);
@@ -180,6 +184,17 @@ function detectValue(text) {
     return quoteMatch[1].trim();
   }
 
+  if (text.includes("오늘") && text.includes("날짜")) {
+    return "__TODAY__";
+  }
+
+  const numberValueMatch = text.match(
+    /(?:에\s*)?([0-9]+(?:\.[0-9]+)?)\s*(?:이라고\s*)?(?:입력|적어|써줘|써 줘|기록)/,
+  );
+  if (numberValueMatch) {
+    return Number(numberValueMatch[1]);
+  }
+
   // 따옴표가 없으면 '입력/적어/써줘/기록' 뒤를 값으로 추정 (MVP)
   const parts = text.split(/입력|적어|써줘|써 줘|기록/);
   if (parts.length > 1) {
@@ -205,6 +220,10 @@ function detectFilterCriteria(text) {
   if (m) {
     return m[1].trim();
   }
+
+  if (text.includes("완료")) return "완료";
+  if (text.includes("보류")) return "보류";
+  if (text.includes("진행")) return "진행";
 
   return null;
 }
@@ -308,6 +327,25 @@ function parseMacroIntent(text) {
         /[a-z]\s*열/i.test(originalText) ||
         /[0-9]+\s*행/i.test(originalText)));
 
+  if (
+    tNorm.includes("필터") &&
+    (tNorm.includes("초기화") ||
+      tNorm.includes("해제") ||
+      tNorm.includes("제거"))
+  ) {
+    return { type: "unknown", text: originalText };
+  }
+
+  const isWholeSheetValueClear =
+    (tNorm.includes("현재 시트 전체") ||
+      tNorm.includes("전체 데이터") ||
+      tNorm.includes("전체")) &&
+    (tNorm.includes("값") || tNorm.includes("내용")) &&
+    (tNorm.includes("지워") ||
+      tNorm.includes("삭제") ||
+      tNorm.includes("비워") ||
+      tNorm.includes("초기화"));
+
   // ─────────────────────────────
   // 0-2) 그룹 집계 (groupByAggregate)
   // 예: "A열 기준 개수", "A열 기준 B열 평균", "부서별 평균 연봉"
@@ -367,6 +405,14 @@ function parseMacroIntent(text) {
   // deleteRow/deleteColumn보다 먼저 처리해서
   // "A1 지워줘", "C열 비워줘" 같은 요청을 범위 삭제로 인식
   // ─────────────────────────────
+  if (isWholeSheetValueClear) {
+    return {
+      type: "clearRange",
+      target: { range: "__USED_RANGE__" },
+      text: originalText,
+    };
+  }
+
   if (
     hasClearKeyword &&
     !tNorm.includes("시트") &&
@@ -498,6 +544,9 @@ function parseMacroIntent(text) {
     if (
       tNorm.includes("내림") ||
       tNorm.includes("큰 순") ||
+      tNorm.includes("큰 값부터") ||
+      tNorm.includes("가장 큰") ||
+      tNorm.includes("높은 순") ||
       tNorm.includes("z-") ||
       tNorm.includes("z~") ||
       tNorm.includes("역순")
@@ -522,7 +571,9 @@ function parseMacroIntent(text) {
     tNorm.includes("필터") ||
     tNorm.includes("걸러") ||
     tNorm.includes("만 보") || // "완료만 보이게"
-    tNorm.includes("만 남기"); // "완료만 남기고"
+    tNorm.includes("만 남기") ||
+    tNorm.includes("남겨줘") ||
+    tNorm.includes("제외하고 보여");
 
   if (hasFilterKeyword) {
     const colInfo = detectColumnInfo(originalText); // { letter, index }

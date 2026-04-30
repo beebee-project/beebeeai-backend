@@ -247,11 +247,16 @@ End Sub`;
  * =======================*/
 function buildSetValueVba(intent) {
   const rangeRef = getRangeRef(intent, "A1");
-  const value = escapeVbaString(intent.value ?? "");
   const procName = toMacroProcedureName(intent);
+  const value =
+    typeof intent.value === "number"
+      ? String(intent.value)
+      : intent.value === "__TODAY__"
+        ? "Date"
+        : `"${escapeVbaString(intent.value ?? "")}"`;
 
   return `Sub ${procName}()
-    Range("${rangeRef}").Value = "${value}"
+    Range("${rangeRef}").Value = ${value}
 End Sub`;
 }
 
@@ -274,9 +279,13 @@ End Sub`;
 function buildClearRangeVba(intent) {
   const rangeRef = getRangeRef(intent, "A1:A10");
   const procName = toMacroProcedureName(intent);
+  const targetExpr =
+    rangeRef === "__USED_RANGE__"
+      ? "ActiveSheet.UsedRange"
+      : `Range("${rangeRef}")`;
 
   return `Sub ${procName}()
-    Range("${rangeRef}").Clear
+    ${targetExpr}.Clear
 End Sub`;
 }
 
