@@ -290,41 +290,52 @@ function buildConditionMask(ctx, formatValue) {
     return m ? m[1] : null;
   };
 
+  const _isOrdinalExpr = (expr = "") =>
+    /MATCH\(TRIM\(.+?\&""\),\s*\{/.test(String(expr));
+
+  const _isPlainTextEqualityExpr = (expr = "") =>
+    /LOWER\(TRIM\(.+?\&""\)\)\s*=\s*LOWER\(TRIM\("/.test(String(expr));
+
+  const _isAggregateExpr = (expr = "") => /AVERAGE\(/i.test(String(expr));
+
+  const _isAggregateTextCompareExpr = (expr = "") =>
+    /LOWER\(TRIM\(.+?\&""\)\)\s*(?:>=|<=|>|<|=)\s*LOWER\(TRIM\("평균"/.test(
+      String(expr),
+    );
+
   const ordinalRangeKeys = new Set(
+    exprs.filter(_isOrdinalExpr).map(_extractPrimaryRangeKey).filter(Boolean),
+  );
+
+  const aggregateTextCompareKeys = new Set(
     exprs
-      .filter((e) => /MATCH\(TRIM\(.+?\&""\),\s*\{/.test(String(e)))
+      .filter(_isAggregateTextCompareExpr)
       .map(_extractPrimaryRangeKey)
       .filter(Boolean),
   );
 
-  const aggregateRangeKeys = new Set(
-    exprs
-      .filter((e) => /AVERAGE\(/i.test(String(e)))
-      .map(_extractPrimaryRangeKey)
-      .filter(Boolean),
+  const aggregateFormulaKeys = new Set(
+    exprs.filter(_isAggregateExpr).map(_extractPrimaryRangeKey).filter(Boolean),
   );
 
   const filteredExprs = exprs.filter((e) => {
-    const s = String(e);
-    const key = _extractPrimaryRangeKey(s);
+    const key = _extractPrimaryRangeKey(e);
 
     // ordinal 조건 자체는 유지
-    if (/MATCH\(TRIM\(.+?\&""\),\s*\{/.test(s)) return true;
+    if (_isOrdinalExpr(e)) return true;
 
     // ordinal과 같은 열의 plain equality만 제거
-    if (
-      key &&
-      ordinalRangeKeys.has(key) &&
-      /LOWER\(TRIM\(.+?\&""\)\)\s*=\s*LOWER\(TRIM\("/.test(s)
-    ) {
+    if (key && ordinalRangeKeys.has(key) && _isPlainTextEqualityExpr(e)) {
       return false;
     }
 
-    // aggregate와 같은 열의 "평균" 텍스트 비교만 제거
+    // aggregate formula와 같은 열에 있는 "평균" 텍스트 비교만 제거
+    // 단순히 같은 열이라는 이유로 숫자 비교/다른 조건을 제거하지 않는다.
     if (
       key &&
-      aggregateRangeKeys.has(key) &&
-      /LOWER\(TRIM\(.+?\&""\)\)\s*(?:>=|<=|>|<|=)\s*LOWER\(TRIM\("평균"/.test(s)
+      aggregateFormulaKeys.has(key) &&
+      aggregateTextCompareKeys.has(key) &&
+      _isAggregateTextCompareExpr(e)
     ) {
       return false;
     }
