@@ -1762,6 +1762,30 @@ function _ratio(ctx, buildConditionMask) {
     ? ctx.resolved.filterColumns
     : [];
 
+  const ratioFilters = [];
+  const seenRatioFilterKeys = new Set();
+
+  for (const f of filterCols) {
+    const key = [
+      String(f?.header || f?.header_hint || f?.target || "")
+        .trim()
+        .toLowerCase(),
+      String(f?.operator || "=")
+        .trim()
+        .toLowerCase(),
+      String(f?.value ?? "")
+        .trim()
+        .toLowerCase(),
+      String(f?.value_type || "")
+        .trim()
+        .toLowerCase(),
+    ].join("|");
+
+    if (seenRatioFilterKeys.has(key)) continue;
+    seenRatioFilterKeys.add(key);
+    ratioFilters.push(f);
+  }
+
   const maskExpr =
     typeof buildConditionMask === "function" ? buildConditionMask(ctx) : null;
 
@@ -1770,7 +1794,7 @@ function _ratio(ctx, buildConditionMask) {
   }
 
   const primaryFilter =
-    filterCols.find((f) => f?.ref?.range || f?.range) || null;
+    ratioFilters.find((f) => f?.ref?.range || f?.range) || null;
 
   const denominatorRange =
     primaryFilter?.ref?.range ||
@@ -1786,7 +1810,8 @@ function _ratio(ctx, buildConditionMask) {
   const wantsSubsetDenominator =
     String(it.ratio_scope || "").toLowerCase() === "subset";
 
-  const useSubsetDenominator = wantsSubsetDenominator && filterCols.length >= 2;
+  const useSubsetDenominator =
+    wantsSubsetDenominator && ratioFilters.length >= 2;
 
   // 기본: 조건 만족 / 전체
   if (!useSubsetDenominator) {
@@ -1802,7 +1827,7 @@ function _ratio(ctx, buildConditionMask) {
     ...ctx,
     resolved: {
       ...(ctx.resolved || {}),
-      filterColumns: [filterCols[0]],
+      filterColumns: [ratioFilters[0]],
     },
   };
 
