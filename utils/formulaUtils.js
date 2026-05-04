@@ -5,7 +5,7 @@ const { CLUSTER_DEFS, inferClusterFromText } = require("./clusterSchema");
 const SCORING_WEIGHTS = {
   EXACT_MATCH: 30,
   PARTIAL_MATCH: 2,
-  SYNONYM_MATCH: 0.2,
+  SYNONYM_MATCH: 8,
   SHEET_NAME_BONUS: 1.5,
   NUMERIC_COLUMN_BONUS: 3,
   NUMERIC_COLUMN_PENALTY: -5,
@@ -489,42 +489,172 @@ function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
    텍스트/스코어링 동의어
 ========================================= */
 const SYNONYMS = {
-  매출: ["매출", "총매출", "매출액", "revenue", "sales", "판매액", "판매금액"],
-  연봉: ["연봉", "급여", "salary", "annual salary", "pay"],
-  점수: ["점수", "성적", "평점", "score", "grade"],
-  재고: ["재고", "재고수량", "inventory", "stock", "qty", "quantity"],
-  판매량: [
-    "판매량",
+  // 🔥 역할 기반 구조 (완전 범용화 핵심)
+
+  person: [
+    "이름",
+    "성명",
+    "직원명",
+    "사원명",
+    "환자명",
+    "학생명",
+    "선수명",
+    "고객명",
+    "회원명",
+    "담당자",
+    "name",
+    "person",
+  ],
+
+  organization: [
+    "부서",
+    "팀",
+    "소속",
+    "조직",
+    "진료과",
+    "학과",
+    "학부",
+    "반",
+    "구단",
+    "학교",
+    "기관",
+    "department",
+    "team",
+    "group",
+    "organization",
+  ],
+
+  date: [
+    "날짜",
+    "일자",
+    "방문일",
+    "진료일",
+    "입학일",
+    "입사일",
+    "경기일",
+    "등록일",
+    "생성일",
+    "수정일",
+    "시작일",
+    "종료일",
+    "date",
+    "day",
+    "visit date",
+    "hire date",
+  ],
+
+  amount: [
+    "연봉",
+    "급여",
+    "월급",
+    "임금",
+    "보수",
+    "금액",
+    "가격",
+    "단가",
+    "매출",
+    "매출액",
+    "수납액",
+    "결제금액",
+    "총액",
+    "salary",
+    "pay",
+    "amount",
+    "price",
+    "cost",
+    "revenue",
+  ],
+
+  score: [
+    "점수",
+    "성적",
+    "평점",
+    "학점",
+    "득점",
+    "포인트",
+    "골",
+    "score",
+    "grade",
+    "gpa",
+    "points",
+    "goals",
+  ],
+
+  quantity: [
+    "수량",
+    "개수",
+    "건수",
+    "인원수",
+    "환자수",
+    "학생수",
+    "경기수",
     "판매수량",
-    "출고량",
-    "sold",
-    "sales volume",
-    "units sold",
+    "quantity",
+    "count",
+    "qty",
   ],
-  카테고리: ["카테고리", "분류", "품목", "category", "type"],
-  후기등급: [
-    "후기등급",
-    "리뷰등급",
-    "평점등급",
-    "review grade",
-    "rating grade",
+
+  grade: [
+    "등급",
+    "평가등급",
+    "평가 등급",
+    "학년",
+    "레벨",
+    "등수",
+    "grade",
+    "rating",
+    "level",
+    "rank",
   ],
-  안전재고: [
-    "안전재고",
-    "적정재고",
-    "최소재고",
-    "safety stock",
-    "buffer stock",
+
+  id: [
+    "id",
+    "아이디",
+    "사번",
+    "직원id",
+    "번호",
+    "고유번호",
+    "employeeid",
+    "emp id",
   ],
-  입고일: ["입고일", "입고 날짜", "입고날짜", "inbound date", "received date"],
-  상품명: ["상품명", "제품명", "품명", "item", "product", "product name"],
-  직원ID: ["직원id", "사번", "employeeid", "emp id", "id"],
-  이름: ["이름", "성명", "직원명", "사원명", "name"],
-  부서: ["부서", "소속", "팀", "department"],
-  직급: ["직급", "직책", "position", "title"],
-  평가등급: ["평가등급", "평가 등급", "등급", "grade", "rating"],
-  입사일: ["입사일", "입사 날짜", "입사날짜", "hire date", "joining date"],
+
+  status: ["상태", "진행상태", "처리상태", "완료", "미완료", "status", "state"],
 };
+
+function getSynonyms(...keys) {
+  const out = [];
+  const seen = new Set();
+
+  for (const key of keys.flat()) {
+    const list = SYNONYMS[key] || [];
+    for (const v of list) {
+      const s = String(v || "").trim();
+      if (!s) continue;
+
+      const norm = s.toLowerCase();
+      if (seen.has(norm)) continue;
+
+      seen.add(norm);
+      out.push(s);
+    }
+  }
+
+  return out;
+}
+
+function includesAlias(text, ...keys) {
+  const raw = String(text || "").toLowerCase();
+  const aliases = getSynonyms(...keys);
+
+  return aliases.some((kw) => raw.includes(String(kw).toLowerCase()));
+}
+
+function textIncludesAnyAlias(text, ...keys) {
+  const raw = String(text || "").toLowerCase();
+  return getSynonyms(...keys).some((kw) =>
+    raw.includes(String(kw).toLowerCase()),
+  );
+}
 
 function norm(s = "") {
   return String(s)
@@ -548,7 +678,7 @@ function expandTermsFromText(text = "") {
       const norms = list.map(norm);
       if (norms.includes(base)) {
         // 전체 확장 대신 base 제외 상위 몇 개만 제한 사용
-        for (const v of list.slice(0, 3)) {
+        for (const v of list.slice(0, 8)) {
           const nv = norm(v);
           if (nv && nv !== base) terms.add(nv);
         }
@@ -751,4 +881,8 @@ module.exports = {
   columnLetterToIndex,
   indexToColumnLetter,
   isNumericLike,
+  SYNONYMS,
+  getSynonyms,
+  textIncludesAnyAlias,
+  includesAlias,
 };

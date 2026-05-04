@@ -48,7 +48,12 @@ async function getOrBuildAllSheetsData(fileBuffer) {
     console.log("[metaCache] MISS", hash.slice(0, 8));
   }
 
-  const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+  const workbook = XLSX.read(fileBuffer, {
+    type: "buffer",
+    cellDates: true,
+    cellNF: true,
+    cellText: false,
+  });
   const allSheetsData = buildAllSheetsData(workbook);
   const sheetStateSig = makeSheetStateSig(allSheetsData);
 

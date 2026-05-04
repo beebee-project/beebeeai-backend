@@ -158,8 +158,7 @@ function _coerceNumber(expr) {
 }
 
 function _coerceDate(expr) {
-  // 텍스트 날짜면 DATEVALUE로, 이미 날짜/시리얼이면 원본 유지
-  return `IFERROR(DATEVALUE(${_trimText(expr)}), ${expr})`;
+  return `IF(ISNUMBER(${expr}), ${expr}, IFERROR(DATEVALUE(TRIM(${expr}&"")), ${expr}))`;
 }
 
 function _isSheetsContext(ctx) {
@@ -1386,6 +1385,7 @@ function _extremeRow(ctx, which, buildConditionMask) {
   const rowReturn = it.row_return || {};
   const best = _resolvedPrimaryReturn(ctx);
   const resolvedSort = _resolvedSortColumn(ctx);
+  const resolvedDate = ctx?.resolved?.dateColumn || null;
   if (!best) return `=ERROR("기준 열을 찾을 수 없습니다.")`;
   const sheetName = best.sheetName;
   const sheetInfo = ctx.allSheetsData?.[sheetName];
@@ -1452,10 +1452,31 @@ function _extremeRow(ctx, which, buildConditionMask) {
     (resolvedSort?.columnLetter
       ? { columnLetter: resolvedSort.columnLetter }
       : null) ||
+    (resolvedDate?.columnLetter
+      ? { columnLetter: resolvedDate.columnLetter }
+      : null) ||
     (sortHint
       ? byName.get(String(sortHint).trim()) ||
         findMetaByContains(String(sortHint).trim())
-      : null);
+      : null) ||
+    (() => {
+      const raw = String(it.raw_message || ctx?.message || "");
+      if (
+        !/(최근|최신|오래|빠른|늦은|입사|경기|방문|등록|date|일자|날짜)/i.test(
+          raw,
+        )
+      ) {
+        return null;
+      }
+
+      const hit = metaEntries.find(([h]) =>
+        /(입사일자|입사일|경기일|방문일|진료일|등록일|일자|날짜|date)/i.test(
+          String(h || ""),
+        ),
+      );
+
+      return hit?.[1] || null;
+    })();
   if (!criterionMeta?.columnLetter) {
     return `=ERROR("기준 열의 위치를 찾을 수 없습니다.")`;
   }
@@ -1464,20 +1485,79 @@ function _extremeRow(ctx, which, buildConditionMask) {
     firstColIdx0 +
     1;
 
+  const resolvedReturns = _resolvedReturnColumns(ctx);
+
+  const rawForReturn = String(it.raw_message || ctx?.message || "");
+
+  const personSynonyms = formulaUtils.getSynonyms("person");
+
+  const inferredNameReturn = formulaUtils.includesAlias(rawForReturn, "person");
+
+  const explicitReturnHints = [];
+
+  const pushReturnHint = (header) => {
+    const h = String(header || "").trim();
+    if (!h || explicitReturnHints.includes(h)) return;
+    explicitReturnHints.push(h);
+  };
+
+  const rawNormForReturn = normHeader(rawForReturn);
+
+  for (const [h] of metaEntries) {
+    const header = String(h || "").trim();
+    if (!header) continue;
+
+    const hn = normHeader(header);
+    if (!hn) continue;
+
+    if (rawNormForReturn.includes(hn)) {
+      pushReturnHint(header);
+    }
+  }
+
+  if (inferredNameReturn && !explicitReturnHints.length) {
+    for (const h of personSynonyms) {
+      const m =
+        byName.get(String(h).trim()) || findMetaByContains(String(h).trim());
+      if (m?.columnLetter) {
+        pushReturnHint(h);
+        break;
+      }
+    }
+  }
+
+  if (Array.isArray(it.return_fields)) {
+    for (const h of it.return_fields) pushReturnHint(h);
+  }
+
+  const resolvedReturnHeaders = resolvedReturns
+    .map((c) => c.header)
+    .filter(Boolean);
+
   const want =
     Array.isArray(it.return_headers) && it.return_headers.length
       ? it.return_headers
-      : ["이름", "부서", "직급", "연봉"];
-  const retIdxs = want
-    .map((h) => {
-      const key = String(h).trim();
-      const m = byName.get(key) || findMetaByContains(key);
-      if (!m?.columnLetter) return null;
-      return (
-        formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
-      );
-    })
-    .filter((v) => Number.isFinite(v));
+      : explicitReturnHints.length
+        ? explicitReturnHints
+        : resolvedReturnHeaders.length
+          ? resolvedReturnHeaders
+          : personSynonyms;
+
+  const retIdxs = [
+    ...new Set(
+      want
+        .map((h) => {
+          const key = String(h).trim();
+          const m = byName.get(key) || findMetaByContains(key);
+          if (!m?.columnLetter) return null;
+          return (
+            formulaUtils.columnLetterToIndex(m.columnLetter) - firstColIdx0 + 1
+          );
+        })
+        .filter((v) => Number.isFinite(v)),
+    ),
+  ];
+
   if (!retIdxs.length) return `=ERROR("반환 열을 찾을 수 없습니다.")`;
 
   const order =

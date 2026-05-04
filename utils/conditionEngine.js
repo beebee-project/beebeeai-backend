@@ -24,7 +24,7 @@ function _coerceNumber(expr) {
 }
 
 function _coerceDate(expr) {
-  return `IFERROR(DATEVALUE(TRIM(${expr}&"")), ${expr})`;
+  return `IF(ISNUMBER(${expr}), ${expr}, IFERROR(DATEVALUE(TRIM(${expr}&"")), ${expr}))`;
 }
 
 const ORDINAL_MAPS = {
