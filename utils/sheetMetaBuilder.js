@@ -242,6 +242,97 @@ function buildColumnProfile(header, values, stats) {
   };
 }
 
+function isNonEmptyCell(v) {
+  return v != null && String(v).trim() !== "";
+}
+
+function rowNonEmptyIndexes(row = []) {
+  const out = [];
+  for (let i = 0; i < row.length; i++) {
+    if (isNonEmptyCell(row[i])) out.push(i);
+  }
+  return out;
+}
+
+function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
+  const blocks = [];
+  if (!Array.isArray(json) || !Array.isArray(headerRowIndexes)) return blocks;
+
+  const sortedHeaders = [...headerRowIndexes].sort((a, b) => a - b);
+
+  for (let i = 0; i < sortedHeaders.length; i++) {
+    const headerIndex = sortedHeaders[i];
+    const headerRow = json[headerIndex] || [];
+    const headerCols = rowNonEmptyIndexes(headerRow);
+
+    if (headerCols.length < 2) continue;
+
+    let dataStart = headerIndex + 1;
+    while (
+      dataStart < json.length &&
+      nonEmptyCount(json[dataStart] || []) === 0
+    ) {
+      dataStart++;
+    }
+
+    if (dataStart >= json.length) continue;
+
+    const nextHeaderIndex =
+      sortedHeaders.find((idx) => idx > headerIndex) ?? json.length;
+
+    let dataEnd = dataStart - 1;
+    for (let r = dataStart; r < Math.min(nextHeaderIndex, json.length); r++) {
+      const row = json[r] || [];
+      const nonEmpty = nonEmptyCount(row);
+
+      if (nonEmpty === 0) {
+        // 빈 행 이후 다시 데이터가 나오면 다음 블록 가능성이 있으므로 현재 블록 종료
+        break;
+      }
+
+      dataEnd = r;
+    }
+
+    if (dataEnd < dataStart) continue;
+
+    const minCol = Math.min(...headerCols);
+    const maxCol = Math.max(...headerCols);
+
+    const columns = headerCols
+      .map((idx) => {
+        const header = String(headerRow[idx] || "").trim();
+        if (!header) return null;
+        return {
+          header,
+          columnIndex: idx + 1,
+          columnLetter: indexToColumnLetter(idx),
+        };
+      })
+      .filter(Boolean);
+
+    blocks.push({
+      tableId: `${sheetName || "Sheet"}#T${blocks.length + 1}`,
+      sheetName,
+      headerRow: headerIndex + 1,
+      headerRows: [headerIndex + 1],
+      dataStartRow: dataStart + 1,
+      dataEndRow: dataEnd + 1,
+      startCol: indexToColumnLetter(minCol),
+      endCol: indexToColumnLetter(maxCol),
+      startColIndex: minCol + 1,
+      endColIndex: maxCol + 1,
+      range: `'${sheetName}'!${indexToColumnLetter(minCol)}${headerIndex + 1}:${indexToColumnLetter(maxCol)}${dataEnd + 1}`,
+      dataRange: `'${sheetName}'!${indexToColumnLetter(minCol)}${dataStart + 1}:${indexToColumnLetter(maxCol)}${dataEnd + 1}`,
+      columns,
+      score:
+        scoreHeaderRowCandidate(headerRow) +
+        Math.min(dataEnd - dataStart + 1, 50),
+    });
+  }
+
+  return blocks;
+}
+
 // workbook (XLSX.read 결과) → allSheetsData
 function buildAllSheetsData(workbook) {
   const allSheetsData = {};
@@ -305,6 +396,7 @@ function buildAllSheetsData(workbook) {
       .sort((a, b) => b.score - a.score);
 
     const bestHeaderCandidate = headerCandidates[0] || null;
+    const tableBlocks = detectTableBlocks(json, headerRowIndexes, sheetName);
 
     // 3) 헤더처럼 보이는 각 행에서 metaData 채우기
     const metaData = {};
@@ -394,6 +486,7 @@ function buildAllSheetsData(workbook) {
       startRow,
       lastDataRow,
       metaData,
+      tableBlocks,
       headerCandidates,
       bestHeaderRow:
         bestHeaderCandidate?.rowIndex != null
