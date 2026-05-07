@@ -420,10 +420,8 @@ function inferExpectedType(operation = "") {
 }
 
 function bestHeaderInSheet(sheetInfo, sheetName, termSet, operation) {
-  const MINIMUM_SCORE_THRESHOLD = 10;
-  // ambiguity(불확실) 판단을 위한 Top-2 추적
-  // gap이 작으면 "그럴듯하게 틀림" 위험이 큼 → 상위에서 ERROR/확인 유도
-  const AMBIGUOUS_GAP_THRESHOLD = 12; // 초기값(보수적). 운영 피드백으로 튜닝
+  const MINIMUM_SCORE_THRESHOLD = 12;
+  const AMBIGUOUS_GAP_THRESHOLD = 8; // 초기값(보수적). 운영 피드백으로 튜닝
 
   let best = { header: "", score: -1, col: null };
   let runnerUp = { header: "", score: -1, col: null };
@@ -454,9 +452,24 @@ function bestHeaderInSheet(sheetInfo, sheetName, termSet, operation) {
     };
 
   const gap = best.score - (runnerUp?.score ?? -1);
-  const isAmbiguous = !!(runnerUp?.col && gap < AMBIGUOUS_GAP_THRESHOLD);
+  const hasStrongMatch =
+    best.score >= SCORING_WEIGHTS.EXACT_MATCH || gap >= AMBIGUOUS_GAP_THRESHOLD;
 
-  return { ...best, runnerUp, gap, isAmbiguous };
+  const isAmbiguous = !!(
+    runnerUp?.col &&
+    !hasStrongMatch &&
+    gap < AMBIGUOUS_GAP_THRESHOLD
+  );
+
+  return {
+    ...best,
+    runnerUp,
+    gap,
+    isAmbiguous,
+    ambiguityReason: isAmbiguous
+      ? `후보 열이 모호합니다: ${best.header} / ${runnerUp.header}`
+      : "",
+  };
 }
 
 function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
@@ -478,6 +491,7 @@ function findBestColumnAcrossSheets(allSheetsData, termSet, operation) {
       ambiguityGap: cand.gap ?? 0,
       runnerUpHeader: cand.runnerUp?.header || null,
       runnerUpColumnLetter: cand.runnerUp?.col?.columnLetter || null,
+      ambiguityReason: cand.ambiguityReason || "",
     };
 
     if (!winner || hit.score > winner.score) winner = hit;
@@ -714,6 +728,7 @@ function scoreColumn(
   let roleScore = 0;
   let typeScore = 0;
   let synonymScore = 0;
+  let profileScore = 0;
 
   const desiredCluster = options.desiredCluster || null;
   const desiredRole = options.desiredRole || null;
@@ -738,6 +753,59 @@ function scoreColumn(
 
   const dominantType =
     meta?.profileType || meta?.clusterType || meta?.dominantType || null;
+
+  const profileType = String(meta?.profileType || "").toLowerCase();
+  const uniqueRatio = Number(meta?.uniqueRatio ?? 1);
+  const uniqueCount = Number(meta?.uniqueCount ?? 0);
+  const numericRatio = Number(meta?.numericRatio ?? 0);
+  const dateRatio =
+    Number(meta?.dateRatio ?? 0) + Number(meta?.datetimeRatio ?? 0);
+
+  const op = String(operation || "").toLowerCase();
+
+  const wantsNumber =
+    expectedType === "number" ||
+    [
+      "sum",
+      "average",
+      "avg",
+      "mean",
+      "min",
+      "max",
+      "median",
+      "stdev",
+      "rank",
+      "rankcolumn",
+      "topn",
+      "topnrows",
+    ].includes(op);
+
+  const wantsDate =
+    expectedType === "date" ||
+    /(date|날짜|일자|최근|최신|이후|이전|입사|방문|경기|등록)/i.test(
+      [...termSet].join(" "),
+    );
+
+  const wantsCategory =
+    desiredRole === "group" ||
+    ["group", "group_by", "countifs", "averageifs", "sumifs"].includes(op);
+
+  if (wantsNumber) {
+    if (profileType === "number" || numericRatio >= 0.8) profileScore += 6;
+    if (profileType === "date" || dateRatio >= 0.6) profileScore -= 4;
+    if (profileType === "text" && numericRatio < 0.3) profileScore -= 3;
+  }
+
+  if (wantsDate) {
+    if (profileType === "date" || dateRatio >= 0.6) profileScore += 6;
+    if (profileType === "number" && dateRatio < 0.2) profileScore -= 2;
+  }
+
+  if (wantsCategory) {
+    if (profileType === "category") profileScore += 5;
+    if (uniqueRatio <= 0.4 && uniqueCount > 1) profileScore += 3;
+    if (profileType === "number" && uniqueRatio > 0.7) profileScore -= 3;
+  }
 
   if (
     expectedType &&
@@ -782,7 +850,15 @@ function scoreColumn(
     if (meta?.clusterType === "ordered_text") typeScore -= 2;
     if (meta?.clusterType === "date") typeScore -= 1;
   }
-  score = clusterScore + roleScore + typeScore + lexicalScore + synonymScore;
+
+  score =
+    lexicalScore +
+    clusterScore +
+    roleScore +
+    typeScore +
+    synonymScore +
+    profileScore;
+
   return score;
 }
 
