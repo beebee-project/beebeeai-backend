@@ -305,6 +305,63 @@ function mergeHeaderRows(json = [], headerRowIndexes = [], headerIndex) {
   };
 }
 
+function cloneJsonRows(json = []) {
+  return json.map((row) => (Array.isArray(row) ? [...row] : []));
+}
+
+function fillMergedCellsForHeaderRows(
+  json = [],
+  merges = [],
+  headerRowIndexes = [],
+) {
+  const out = cloneJsonRows(json);
+  if (!Array.isArray(merges) || !merges.length) return out;
+
+  const headerSet = new Set(headerRowIndexes);
+
+  for (const m of merges) {
+    const startRow = m?.s?.r;
+    const endRow = m?.e?.r;
+    const startCol = m?.s?.c;
+    const endCol = m?.e?.c;
+
+    if (
+      startRow == null ||
+      endRow == null ||
+      startCol == null ||
+      endCol == null
+    ) {
+      continue;
+    }
+
+    // 헤더 후보 행과 겹치는 병합셀만 처리
+    let touchesHeader = false;
+    for (let r = startRow; r <= endRow; r++) {
+      if (headerSet.has(r)) {
+        touchesHeader = true;
+        break;
+      }
+    }
+    if (!touchesHeader) continue;
+
+    const source = out[startRow]?.[startCol];
+    if (source == null || String(source).trim() === "") continue;
+
+    for (let r = startRow; r <= endRow; r++) {
+      if (!headerSet.has(r)) continue;
+
+      if (!out[r]) out[r] = [];
+      for (let c = startCol; c <= endCol; c++) {
+        if (out[r][c] == null || String(out[r][c]).trim() === "") {
+          out[r][c] = source;
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
 function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
   const blocks = [];
   if (!Array.isArray(json) || !Array.isArray(headerRowIndexes)) return blocks;
@@ -453,13 +510,22 @@ function buildAllSheetsData(workbook) {
       .sort((a, b) => b.score - a.score);
 
     const bestHeaderCandidate = headerCandidates[0] || null;
-    const tableBlocks = detectTableBlocks(json, headerRowIndexes, sheetName);
+    const headerJson = fillMergedCellsForHeaderRows(
+      json,
+      ws["!merges"] || [],
+      headerRowIndexes,
+    );
+    const tableBlocks = detectTableBlocks(
+      headerJson,
+      headerRowIndexes,
+      sheetName,
+    );
 
     // 3) 헤더처럼 보이는 각 행에서 metaData 채우기
     const metaData = {};
 
     for (const headerIndex of headerRowIndexes) {
-      const headers = json[headerIndex] || [];
+      const headers = headerJson[headerIndex] || [];
 
       // 이 헤더 바로 아래에서 실제 데이터가 시작하는 행 (0-based index)
       let dataStart = headerIndex + 1;
