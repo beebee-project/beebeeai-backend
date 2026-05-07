@@ -254,6 +254,57 @@ function rowNonEmptyIndexes(row = []) {
   return out;
 }
 
+function normalizeHeaderText(v) {
+  return String(v ?? "").trim();
+}
+
+function mergeHeaderRows(json = [], headerRowIndexes = [], headerIndex) {
+  const idx = headerRowIndexes.indexOf(headerIndex);
+  if (idx <= 0) return null;
+
+  const prevHeaderIndex = headerRowIndexes[idx - 1];
+
+  // 바로 위 행만 multi-row header 후보로 인정
+  if (headerIndex - prevHeaderIndex !== 1) return null;
+
+  const upper = json[prevHeaderIndex] || [];
+  const lower = json[headerIndex] || [];
+  const upperNonEmpty = nonEmptyCount(upper);
+  const lowerNonEmpty = nonEmptyCount(lower);
+
+  if (upperNonEmpty < 1 || lowerNonEmpty < 2) return null;
+
+  const maxLen = Math.max(upper.length, lower.length);
+  const merged = [];
+  let lastUpper = "";
+
+  for (let i = 0; i < maxLen; i++) {
+    const up = normalizeHeaderText(upper[i]);
+    const low = normalizeHeaderText(lower[i]);
+
+    if (up) lastUpper = up;
+
+    if (!low) {
+      merged[i] = "";
+      continue;
+    }
+
+    if (lastUpper && lastUpper !== low) {
+      merged[i] = `${lastUpper} ${low}`.trim();
+    } else {
+      merged[i] = low;
+    }
+  }
+
+  const mergedNonEmpty = nonEmptyCount(merged);
+  if (mergedNonEmpty < 2) return null;
+
+  return {
+    headerRows: [prevHeaderIndex + 1, headerIndex + 1],
+    merged,
+  };
+}
+
 function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
   const blocks = [];
   if (!Array.isArray(json) || !Array.isArray(headerRowIndexes)) return blocks;
@@ -263,7 +314,9 @@ function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
   for (let i = 0; i < sortedHeaders.length; i++) {
     const headerIndex = sortedHeaders[i];
     const headerRow = json[headerIndex] || [];
-    const headerCols = rowNonEmptyIndexes(headerRow);
+    const mergedHeaderInfo = mergeHeaderRows(json, sortedHeaders, headerIndex);
+    const effectiveHeaderRow = mergedHeaderInfo?.merged || headerRow;
+    const headerCols = rowNonEmptyIndexes(effectiveHeaderRow);
 
     if (headerCols.length < 2) continue;
 
@@ -300,10 +353,13 @@ function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
 
     const columns = headerCols
       .map((idx) => {
-        const header = String(headerRow[idx] || "").trim();
+        const header = String(effectiveHeaderRow[idx] || "").trim();
+        const originalHeader = String(headerRow[idx] || "").trim();
         if (!header) return null;
+
         return {
           header,
+          originalHeader: originalHeader || header,
           columnIndex: idx + 1,
           columnLetter: indexToColumnLetter(idx),
         };
@@ -314,7 +370,8 @@ function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
       tableId: `${sheetName || "Sheet"}#T${blocks.length + 1}`,
       sheetName,
       headerRow: headerIndex + 1,
-      headerRows: [headerIndex + 1],
+      headerRows: mergedHeaderInfo?.headerRows || [headerIndex + 1],
+      hasMergedHeader: !!mergedHeaderInfo,
       dataStartRow: dataStart + 1,
       dataEndRow: dataEnd + 1,
       startCol: indexToColumnLetter(minCol),
@@ -325,7 +382,7 @@ function detectTableBlocks(json = [], headerRowIndexes = [], sheetName = "") {
       dataRange: `'${sheetName}'!${indexToColumnLetter(minCol)}${dataStart + 1}:${indexToColumnLetter(maxCol)}${dataEnd + 1}`,
       columns,
       score:
-        scoreHeaderRowCandidate(headerRow) +
+        scoreHeaderRowCandidate(effectiveHeaderRow) +
         Math.min(dataEnd - dataStart + 1, 50),
     });
   }
