@@ -837,7 +837,14 @@ function applyStructuralOverrides(intent) {
     };
 
     const rawRequested = _extractRequestedReturnFields(raw);
-    if (rawRequested.length) {
+    const rawRequestedLooksEntityName =
+      rawRequested.length === 1 &&
+      /(이름|성명|\bname\b)/i.test(String(rawRequested[0] || "")) &&
+      String(rawRequested[0] || "")
+        .replace(/(이름|성명|\bname\b)/gi, "")
+        .trim().length > 0;
+
+    if (rawRequested.length && !rawRequestedLooksEntityName) {
       intent.return_fields = rawRequested;
     } else if (/(이름|성명)/.test(raw)) {
       intent.return_role = "entity_name";
@@ -1018,6 +1025,16 @@ function applyStructuralOverrides(intent) {
       if (intent.lookup) delete intent.lookup;
       if (intent.lookup_array) delete intent.lookup_array;
     }
+  }
+
+  // Row-return 계열에서 "이름/성명/name"을 요청한 경우,
+  // _extractRequestedReturnFields 결과보다 entity_name 반환을 우선한다.
+  // 예: 가장 최근 입사한 직원 이름, 가장 최근 경기 선수 이름
+  // 특정 도메인/파일명이 아니라 "행 선택 + 이름 반환" 패턴이다.
+  if (_isRowEntityOp(intent.operation) && /(이름|성명|\bname\b)/i.test(raw)) {
+    intent.return_role = "entity_name";
+    intent.return_fields = [];
+    delete intent.return_hint;
   }
 
   return intent;
@@ -2666,6 +2683,62 @@ exports.handleConversion = async (req, res, next) => {
           debugMeta,
         });
       }
+    }
+
+    // 5-1) Ambiguity Guard
+    // 열 후보가 모호하면 그럴듯한 오답 수식 생성을 중단한다.
+    if (context?.resolved?.hasBlockingAmbiguity) {
+      const first = context.resolved.ambiguities[0] || {};
+      const out = `=ERROR("열 후보가 모호합니다. '${first.header || "선택된 열"}' 또는 '${first.runnerUpHeader || "다른 후보"}' 중 어떤 열을 사용할지 더 구체적으로 입력해 주세요.")`;
+      const compatibility = detectFormulaCompatibility(out);
+      const debugMeta = buildDebugMeta({
+        rawReason: "ERROR_FORMULA",
+        cacheHit: _dbgCacheHit,
+        intentOp: intent?.operation,
+        intentCacheKey: _dbgIntentCacheKey,
+        intentVersion: INTENT_VERSION,
+        clusterVersion: CLUSTER_VERSION,
+        resolverMode: getResolverMode(context),
+        validator: validateFormula(out),
+        timing: {
+          preprocess: _ms(_tPreStart, _tPreEnd),
+          intent: _ms(_tIntentStart, _tIntentEnd),
+          build: _ms(_tBuildStart, _tBuildEnd),
+          total: Date.now() - startedAt,
+        },
+        extra: {
+          compatibility,
+          compatibilityLevel: compatibility?.level || null,
+          fallbackAttempted: false,
+          fallbackFunctions: [],
+          resolvedBaseSheet: context?.resolved?.baseSheet || null,
+          resolvedReturnHeaders: getDebugReturnHeaders(context),
+          resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
+          resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+          ambiguityGuard: true,
+          ambiguities: context.resolved.ambiguities,
+        },
+      });
+
+      await writeRequestLog({
+        traceId,
+        userId: req.user?.id,
+        route: "/convert",
+        engine: "formula",
+        status: "failed",
+        reason: "VALIDATION_ERROR",
+        isFallback: false,
+        prompt: message,
+        latencyMs: Date.now() - startedAt,
+        debugMeta,
+      });
+
+      return sendFormulaResponse(res, {
+        excelFormula: out,
+        sheetsFormula: out,
+        compatibility,
+        debugMeta,
+      });
     }
 
     // 6) 빌더 호출

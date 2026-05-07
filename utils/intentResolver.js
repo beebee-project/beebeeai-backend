@@ -50,7 +50,63 @@ function pickBestColumnAnySheet(ctx, headerLike, role = "lookup") {
     isAmbiguous: !!hit.isAmbiguous,
     ambiguityGap: hit.ambiguityGap ?? null,
     runnerUpHeader: hit.runnerUpHeader ?? null,
+    ambiguityReason: hit.ambiguityReason || "",
   };
+}
+
+function _ambiguityIssue(c, role = "unknown") {
+  if (!c?.isAmbiguous) return null;
+  return {
+    role,
+    header: c.header || null,
+    sheetName: c.sheetName || null,
+    gap: c.ambiguityGap ?? null,
+    runnerUpHeader: c.runnerUpHeader ?? null,
+    message:
+      c.ambiguityReason ||
+      `후보 열이 모호합니다: ${c.header || "알 수 없음"} / ${
+        c.runnerUpHeader || "다른 후보"
+      }`,
+  };
+}
+
+function _collectAmbiguities(resolved = {}) {
+  const out = [];
+
+  for (const c of resolved.returnColumns || []) {
+    const issue = _ambiguityIssue(c, "return");
+    if (issue) out.push(issue);
+  }
+
+  for (const [role, c] of [
+    ["lookup", resolved.lookupColumn],
+    ["group", resolved.groupColumn],
+    ["sort", resolved.sortColumn],
+  ]) {
+    const issue = _ambiguityIssue(c, role);
+    if (issue) out.push(issue);
+  }
+
+  for (const f of resolved.filterColumns || []) {
+    const ref = f?.ref || f;
+    const issue = _ambiguityIssue(ref, "filter");
+    if (issue) out.push(issue);
+
+    if (f?.logical_operator && Array.isArray(f.conditions)) {
+      for (const sub of f.conditions) {
+        const subIssue = _ambiguityIssue(sub?.ref || sub, "filter");
+        if (subIssue) out.push(subIssue);
+      }
+    }
+  }
+
+  const seen = new Set();
+  return out.filter((x) => {
+    const key = `${x.role}|${x.sheetName}|${x.header}|${x.runnerUpHeader}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function pickBestColumnInSheet(ctx, headerLike, sheetName, role = "lookup") {
@@ -276,6 +332,56 @@ function resolveBaseSheet(ctx, schema) {
   return [...scoreBySheet.entries()].sort((a, b) => b[1] - a[1])[0][0];
 }
 
+function _looksLikeEntityNameReturn(schema = {}) {
+  const raw = _rawText(schema);
+  const op = String(schema?.operation || "").toLowerCase();
+
+  if (!["maxrow", "minrow", "topnrows"].includes(op)) return false;
+  return /(이름|성명|\bname\b)/i.test(raw);
+}
+
+function _pickEntityNameColumn(ctx, schema, baseSheet) {
+  const raw = _rawText(schema);
+
+  // "선수 이름", "직원 이름", "학생 이름"처럼 이름 앞의 대상어를 추출
+  const entityMatch = raw.match(
+    /([가-힣A-Za-z0-9_]+)\s*(?:의\s*)?(?:이름|성명|\bname\b)/i,
+  );
+  const entityToken = entityMatch?.[1] ? _normToken(entityMatch[1]) : "";
+
+  const sheets = getPreferredSheetNames(ctx, baseSheet);
+  let best = null;
+
+  for (const sheetName of sheets) {
+    const cols = listColumnsInSheet(ctx, sheetName);
+
+    for (const c of cols) {
+      const h = _normToken(c.header);
+      if (!h) continue;
+
+      let score = 0;
+
+      // 직접적인 이름 열
+      if (/(이름|성명|name)/i.test(String(c.header || ""))) score += 100;
+
+      // 대상어 + 명 패턴: 선수명, 직원명, 고객명 등
+      if (entityToken && h.includes(entityToken) && /명$/.test(h)) {
+        score += 90;
+      }
+
+      // 너무 일반적인 집계/분류 열은 감점
+      if (/(팀|부서|학과|분류|구분|등급|상태|지역|카테고리)/.test(h)) {
+        score -= 30;
+      }
+
+      if (score <= 0) continue;
+      if (!best || score > best.score) best = { ...c, score };
+    }
+  }
+
+  return best;
+}
+
 function resolveReturnColumns(ctx, schema, baseSheet) {
   const out = [];
   const seen = new Set();
@@ -286,9 +392,13 @@ function resolveReturnColumns(ctx, schema, baseSheet) {
     ? op
     : "return";
 
-  // 이름 목록 요청은 "이름" 열을 최우선으로 resolved
-  if (String(schema?.return_role || "") === "entity_name") {
+  // 이름/성명 요청은 "이름 계열" 열을 최우선으로 resolved
+  if (
+    String(schema?.return_role || "") === "entity_name" ||
+    _looksLikeEntityNameReturn(schema)
+  ) {
     const nameCol =
+      _pickEntityNameColumn(ctx, schema, baseSheet) ||
       pickBestColumnInSheet(ctx, "이름", baseSheet, "return") ||
       pickBestColumnAnySheet(ctx, "이름", "return");
 
@@ -1386,25 +1496,30 @@ function resolveIntent(ctx) {
     sortColumn: resolveSortColumn(ctx, schema, baseSheet),
     filterColumns,
     ambiguities: [],
+    hasBlockingAmbiguity: false,
   };
 
-  const candidates = [
-    ...resolved.returnColumns,
-    resolved.lookupColumn,
-    resolved.groupColumn,
-    resolved.sortColumn,
-  ].filter(Boolean);
+  resolved.ambiguities = _collectAmbiguities(resolved);
+  resolved.hasBlockingAmbiguity = resolved.ambiguities.some((a) => {
+    const op = String(
+      schema?.operation || ctx?.intent?.operation || "",
+    ).toLowerCase();
 
-  for (const c of candidates) {
-    if (c.isAmbiguous) {
-      resolved.ambiguities.push({
-        header: c.header,
-        sheetName: c.sheetName,
-        gap: c.ambiguityGap ?? null,
-        runnerUpHeader: c.runnerUpHeader ?? null,
-      });
+    // 목록/필터 요청은 조건열이 명확하면 return 후보 ambiguity만으로 막지 않는다.
+    if (op === "filter" && a.role === "return") return false;
+
+    // 월별/연도별 날짜 파생 group은 group_by 후보가 임시로 잡힌 경우가 있어 막지 않는다.
+    if (
+      a.role === "group" &&
+      /(월별|연도별|일별|주별|monthly|yearly|daily|weekly)/i.test(
+        String(ctx?.intent?.raw_message || ctx?.message || ""),
+      )
+    ) {
+      return false;
     }
-  }
+
+    return true;
+  });
 
   return resolved;
 }
