@@ -200,6 +200,48 @@ function analyzeSamples(values) {
   };
 }
 
+function normalizeSampleValue(v) {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v ?? "").trim();
+}
+
+function buildColumnProfile(header, values, stats) {
+  const nonEmptyValues = values
+    .map(normalizeSampleValue)
+    .filter((v) => v !== "");
+
+  const uniqueValues = [...new Set(nonEmptyValues)];
+  const sampleCount = Number(stats?.sampleCount || nonEmptyValues.length || 0);
+  const uniqueCount = uniqueValues.length;
+  const uniqueRatio = sampleCount > 0 ? uniqueCount / sampleCount : 0;
+
+  const dominantType = String(stats?.dominantType || "mixed").toLowerCase();
+
+  let profileType = dominantType;
+  if (Number(stats?.numericRatio || 0) >= 0.8) profileType = "number";
+  else if (
+    Number(stats?.dateRatio || 0) + Number(stats?.datetimeRatio || 0) >=
+    0.6
+  ) {
+    profileType = "date";
+  } else if (
+    Number(stats?.textRatio || 0) >= 0.6 &&
+    uniqueRatio <= 0.4 &&
+    uniqueCount <= 30
+  ) {
+    profileType = "category";
+  } else if (Number(stats?.textRatio || 0) >= 0.6) {
+    profileType = "text";
+  }
+
+  return {
+    profileType,
+    uniqueCount,
+    uniqueRatio,
+    uniqueValues: uniqueValues.slice(0, 20),
+  };
+}
+
 // workbook (XLSX.read 결과) → allSheetsData
 function buildAllSheetsData(workbook) {
   const allSheetsData = {};
@@ -305,6 +347,7 @@ function buildAllSheetsData(workbook) {
           .slice(0, 5)
           .map((v) => String(v).trim())
           .filter(Boolean);
+        const profile = buildColumnProfile(name, values, stats);
         const clusterCandidate = inferClusterCandidate(
           name,
           sampleValues,
@@ -326,6 +369,10 @@ function buildAllSheetsData(workbook) {
           columnIndex: idx + 1,
           canonicalKey: clusterCandidate || null,
           sampleValues,
+          profileType: profile.profileType,
+          uniqueCount: profile.uniqueCount,
+          uniqueRatio: profile.uniqueRatio,
+          uniqueValues: profile.uniqueValues,
           clusterCandidate,
           inferredRole,
           clusterType,

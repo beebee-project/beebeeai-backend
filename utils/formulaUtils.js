@@ -736,7 +736,9 @@ function scoreColumn(
     roleScore += SCORING_WEIGHTS.ROLE_MATCH;
   }
 
-  const dominantType = meta?.clusterType || meta?.dominantType || null;
+  const dominantType =
+    meta?.profileType || meta?.clusterType || meta?.dominantType || null;
+
   if (
     expectedType &&
     dominantType &&
