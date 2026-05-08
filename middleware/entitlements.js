@@ -1,13 +1,14 @@
 const User = require("../models/User");
 const { getLimits } = require("../services/usageService");
+const { getEffectivePlan } = require("../utils/subscriptionStatus");
 
 module.exports = function requireEntitlement(feature) {
   // feature: "formulaConversion" | "fileUpload"
   return async (req, res, next) => {
-    const user = await User.findById(req.user.id, "plan usage");
+    const user = await User.findById(req.user.id, "plan usage subscription");
     if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-    const plan = user.plan || "FREE";
+    const plan = getEffectivePlan(user);
     const limits = getLimits(plan);
     const usage = {
       formulaConversions: user.usage?.formulaConversions || 0,

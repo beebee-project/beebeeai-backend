@@ -1,5 +1,9 @@
 const User = require("../models/User");
 const paymentService = require("./paymentService");
+const {
+  getEffectivePlan,
+  isSubscriptionActive,
+} = require("../utils/subscriptionStatus");
 
 function isLocalBypassMode() {
   return process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1";
@@ -15,22 +19,13 @@ function hasSubscriptionSignal(sub = {}) {
   );
 }
 
-function isSubscriptionActiveStrict(sub = {}) {
-  const status = String(sub.status || "NONE").toUpperCase();
-  return (
-    hasSubscriptionSignal(sub) &&
-    ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status)
-  );
-}
-
 function getEffectivePlanFromUser(user) {
-  const base = paymentService.getEffectivePlan(user.plan || "FREE");
-  // ✅ 베타모드일 때만 plan(PRO)을 그대로 인정
-  if (paymentService.isBetaMode() && base === "PRO") return "PRO";
-  // ✅ 베타모드가 아니면 "구독 시그널 + status"일 때만 PRO
-  if (isSubscriptionActiveStrict(user.subscription || {})) return "PRO";
+  // 베타모드일 때만 DB plan(PRO)을 그대로 인정
+  if (paymentService.isBetaMode()) {
+    return paymentService.getEffectivePlan(user?.plan || "FREE");
+  }
 
-  return "FREE";
+  return getEffectivePlan(user);
 }
 
 const LIMITS = {

@@ -42,17 +42,16 @@ function selectGateway() {
 
 function isSubscriptionActive(sub = {}, now = new Date()) {
   const status = String(sub?.status || "").toUpperCase();
-
-  // 결제 시작/재구독을 막아야 하는 상태들
   const lockedStatuses = ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"];
 
-  if (lockedStatuses.includes(status)) return true;
+  if (!lockedStatuses.includes(status)) return false;
 
-  // (선택) status가 비어있더라도 날짜가 미래면 잠금 처리하고 싶으면 아래 활성화
-  // if (sub?.trialEndsAt && new Date(sub.trialEndsAt) > now) return true;
-  // if (sub?.nextChargeAt && new Date(sub.nextChargeAt) > now) return true;
+  if (!sub?.nextChargeAt) return false;
 
-  return false;
+  const expiresAt = new Date(sub.nextChargeAt);
+  if (Number.isNaN(expiresAt.getTime())) return false;
+
+  return expiresAt > now;
 }
 
 exports.isSubscriptionActive = isSubscriptionActive;

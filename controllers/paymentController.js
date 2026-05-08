@@ -1,6 +1,10 @@
 const paymentService = require("../services/paymentService");
 const User = require("../models/User");
 const tossClient = require("../config/tossClient");
+const {
+  isSubscriptionActive,
+  getEffectivePlan,
+} = require("../utils/subscriptionStatus");
 
 function ensureAbsoluteUrl(url, fallbackOrigin) {
   // url이 "www.xxx" 같이 스킴 없이 들어오면 fallbackOrigin 붙여서 보정
@@ -76,26 +80,26 @@ exports.getUsage = async (req, res) => {
 
 // 플랜 목록
 exports.getPlans = (req, res) => {
+  const isSubscribed = isSubscriptionActive(user);
+  const plan = paymentService.isBetaMode()
+    ? paymentService.getEffectivePlan(user.plan || "FREE")
+    : getEffectivePlan(user);
+
+  const status = String(user?.subscription?.status || "INACTIVE").toUpperCase();
+
   res.json({
-    provider: paymentService.getProvider(),
-    currency: paymentService.getCurrency(),
+    plan,
+    subscriptionStatus: isSubscribed ? status : "INACTIVE",
     betaMode: paymentService.isBetaMode(),
-    plans: [
-      {
-        code: "FREE",
-        price: 0,
-        interval: "month",
-        features: ["NL→Sheet"],
-        available: true,
-      },
-      {
-        code: "PRO",
-        price: 5900,
-        interval: "month",
-        features: ["우선지원", "고급기능"],
-        available: !paymentService.isBetaMode(),
-      },
-    ],
+    isSubscribed,
+    usage: {
+      formulaConversions: user?.usage?.formulaConversions ?? 0,
+      fileUploads: user?.usage?.fileUploads ?? 0,
+    },
+    limits:
+      plan === "PRO"
+        ? { formulaConversions: null, fileUploads: 5 }
+        : { formulaConversions: 10, fileUploads: 1 },
   });
 };
 
