@@ -243,8 +243,31 @@ exports.completeSubscription = async (req, res) => {
       return res.status(500).json({ error: "billingKey 발급 실패" });
     }
 
-    // 구독 등록 완료: 즉시 ACTIVE, 다음 청구일은 1개월 후
+    // billingKey 발급 후 첫 결제를 먼저 수행
     const now = new Date();
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 5900);
+    const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
+    const orderId = `sub-init-${req.user.id}-${now.getTime()}`;
+
+    try {
+      await paymentService.chargeBillingKey({
+        customerKey,
+        billingKey: issued.billingKey,
+        amount,
+        orderId,
+        orderName,
+        idempotencyKey: orderId,
+      });
+    } catch (e) {
+      console.error("[completeSubscription] initial charge failed:", e);
+
+      return res.status(402).json({
+        ok: false,
+        error: "첫 결제에 실패했습니다. 카드 정보를 확인해주세요.",
+        code: "INITIAL_CHARGE_FAILED",
+      });
+    }
+
     const nextChargeAt = paymentService.addMonths(now, 1);
 
     const user = await User.findById(req.user.id);
@@ -259,7 +282,9 @@ exports.completeSubscription = async (req, res) => {
       startedAt: user.subscription?.startedAt || now,
       trialEndsAt: null,
       nextChargeAt,
-      lastChargedAt: null,
+      lastChargedAt: now,
+      lastOrderId: orderId,
+      lastChargeKey: `init-${now.getTime()}`,
     };
 
     await user.save();
