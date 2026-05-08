@@ -125,8 +125,14 @@ function pickBestColumnInSheet(ctx, headerLike, sheetName, role = "lookup") {
       return h.includes(t) || t.includes(h);
     });
 
-    const finalScore = score || (partial ? 50 : 0);
-    if (!finalScore) continue;
+    let finalScore = score || (partial ? 50 : 0);
+
+    if (_isAbstractHeader(header)) {
+      const abstractScore = _scoreAbstractHeaderByProfile(meta, role);
+      finalScore += abstractScore;
+    }
+
+    if (!finalScore || finalScore <= 0) continue;
 
     const ref = toRef(sheetName, header, meta, info);
     if (!winner || finalScore > winner.score) {
@@ -156,6 +162,12 @@ function pickBestColumnInTableBlock(
     const header = String(col.header || "").trim();
     if (!header) continue;
 
+    const meta = info.metaData[header] || {
+      columnLetter: col.columnLetter,
+      startRow: tableBlock.dataStartRow,
+      lastRow: tableBlock.dataEndRow,
+    };
+
     const score =
       formulaUtils.norm(headerLike) === formulaUtils.norm(header) ? 999 : 0;
 
@@ -164,14 +176,14 @@ function pickBestColumnInTableBlock(
       return h.includes(t) || t.includes(h);
     });
 
-    const finalScore = score || (partial ? 60 : 0);
-    if (!finalScore) continue;
+    let finalScore = score || (partial ? 60 : 0);
 
-    const meta = info.metaData[header] || {
-      columnLetter: col.columnLetter,
-      startRow: tableBlock.dataStartRow,
-      lastRow: tableBlock.dataEndRow,
-    };
+    if (_isAbstractHeader(header)) {
+      const abstractScore = _scoreAbstractHeaderByProfile(meta, role);
+      finalScore += abstractScore;
+    }
+
+    if (!finalScore || finalScore <= 0) continue;
 
     const ref = {
       sheetName,
@@ -242,9 +254,16 @@ function pickNumericColumnInSheet(ctx, sheetName, preferredHint = null) {
   let best = null;
   for (const c of cols) {
     const info = ctx.allSheetsData?.[c.sheetName];
-    const meta = info?.metaData?.[c.header];
+    const meta = info?.metaData?.[c.header] || {};
     const numericRatio = Number(meta?.numericRatio || 0);
     let score = numericRatio;
+
+    if (_isAbstractHeader(c.header)) {
+      score += Math.max(
+        0,
+        _scoreAbstractHeaderByProfile(meta, "average") / 100,
+      );
+    }
 
     if (preferredHint) {
       const normH = formulaUtils.norm(c.header);
@@ -852,6 +871,58 @@ function _metaSemanticRole(meta = {}, header = "") {
     meta.clusterRole ||
     _inferSemanticRoleFromMeta(header, meta)
   );
+}
+
+function _isAbstractHeader(header = "") {
+  const h = _normToken(header);
+  return /^(값\d*|항목\d*|구분\d*|내용\d*|data\d*|value\d*|col\d*|column\d*)$/i.test(
+    h,
+  );
+}
+
+function _scoreAbstractHeaderByProfile(meta = {}, op = "") {
+  const semanticRole = _metaSemanticRole(meta, "");
+  const profileType = _profileType(meta);
+  const numericRatio = Number(meta.numericRatio || 0);
+  const dateRatio =
+    Number(meta.dateRatio || 0) + Number(meta.datetimeRatio || 0);
+  const textRatio = Number(meta.textRatio || 0);
+  const uniqueRatio = Number(meta.uniqueRatio || 0);
+  const uniqueCount = Number(meta.uniqueCount || 0);
+
+  let score = 0;
+
+  if (
+    ["sum", "average", "min", "max", "median", "stdev", "var_s"].includes(op)
+  ) {
+    if (
+      semanticRole === "metric" ||
+      numericRatio >= 0.7 ||
+      profileType === "number"
+    )
+      score += 25;
+    if (semanticRole === "category" || textRatio >= 0.5) score -= 15;
+    if (semanticRole === "date" || dateRatio >= 0.5) score -= 15;
+  }
+
+  if (op === "filter" || op === "count") {
+    const categoryLike =
+      semanticRole === "category" ||
+      (textRatio >= 0.5 &&
+        uniqueCount >= 2 &&
+        uniqueCount <= 30 &&
+        uniqueRatio <= 0.6);
+
+    if (categoryLike) score += 15;
+    if (semanticRole === "metric" || numericRatio >= 0.7) score -= 5;
+  }
+
+  if (["maxrow", "minrow", "topnrows", "sortby"].includes(op)) {
+    if (semanticRole === "date" || dateRatio >= 0.5) score += 20;
+    if (semanticRole === "metric" || numericRatio >= 0.7) score += 15;
+  }
+
+  return score;
 }
 
 function _isNumericColumn(meta = {}) {
