@@ -420,6 +420,15 @@ function _pickEntityNameColumn(ctx, schema, baseSheet) {
       // 직접적인 이름 열
       if (/(이름|성명|name)/i.test(String(c.header || ""))) score += 100;
 
+      const info = ctx?.allSheetsData?.[sheetName];
+      const meta = info?.metaData?.[c.header] || {};
+      const semanticRole = _metaSemanticRole(meta, c.header);
+
+      if (semanticRole === "entity_name") score += 80;
+      if (semanticRole === "id") score -= 40;
+      if (semanticRole === "metric") score -= 50;
+      if (semanticRole === "date") score -= 50;
+
       // 대상어 + 명 패턴: 선수명, 직원명, 고객명 등
       if (entityToken && h.includes(entityToken) && /명$/.test(h)) {
         score += 90;
@@ -472,15 +481,13 @@ function _scoreTableBlockForIntent(ctx, schema = {}, block = {}) {
   }
 
   if (["sum", "average", "min", "max", "median"].includes(op)) {
-    if (
-      (block.columns || []).some((c) =>
-        /(금액|액|비용|점수|성적|연봉|급여|매출|수량|score|amount|salary|sales)/i.test(
-          c.header,
-        ),
-      )
-    ) {
-      score += 15;
-    }
+    const info = ctx?.allSheetsData?.[block.sheetName];
+    const hasMetricColumn = (block.columns || []).some((c) => {
+      const meta = info?.metaData?.[c.header] || {};
+      return _metaSemanticRole(meta, c.header) === "metric";
+    });
+
+    if (hasMetricColumn) score += 15;
   }
 
   if (op === "count") {
@@ -789,6 +796,62 @@ function _columnType(meta = {}) {
   return String(meta.dominantType || meta.clusterType || "").toLowerCase();
 }
 
+function _profileType(meta = {}) {
+  return String(meta.profileType || meta.dominantType || "").toLowerCase();
+}
+
+function _inferSemanticRoleFromMeta(header = "", meta = {}) {
+  const h = _normToken(header);
+  const profileType = _profileType(meta);
+  const numericRatio = Number(meta.numericRatio || 0);
+  const dateRatio =
+    Number(meta.dateRatio || 0) + Number(meta.datetimeRatio || 0);
+  const uniqueRatio = Number(meta.uniqueRatio || 0);
+  const uniqueCount = Number(meta.uniqueCount || 0);
+  const textRatio = Number(meta.textRatio || 0);
+
+  if (dateRatio >= 0.5 || profileType === "date") return "date";
+
+  if (
+    numericRatio >= 0.7 &&
+    !/(id|코드|번호|사번|학번|환자번호|관리번호)$/i.test(h)
+  ) {
+    return "metric";
+  }
+
+  if (
+    /(id|코드|번호|사번|학번|환자번호|관리번호)$/i.test(h) ||
+    (textRatio >= 0.5 && uniqueRatio >= 0.8 && uniqueCount >= 5)
+  ) {
+    return "id";
+  }
+
+  if (
+    profileType === "category" ||
+    (textRatio >= 0.5 &&
+      uniqueCount >= 2 &&
+      uniqueCount <= 30 &&
+      uniqueRatio <= 0.6)
+  ) {
+    return "category";
+  }
+
+  if (/(이름|성명|name|명)$/i.test(String(header || ""))) {
+    return "entity_name";
+  }
+
+  return "unknown";
+}
+
+function _metaSemanticRole(meta = {}, header = "") {
+  return (
+    meta.inferredRole ||
+    meta.semanticRole ||
+    meta.clusterRole ||
+    _inferSemanticRoleFromMeta(header, meta)
+  );
+}
+
 function _isNumericColumn(meta = {}) {
   return (
     _columnType(meta) === "number" || Number(meta.numericRatio || 0) >= 0.5
@@ -875,6 +938,11 @@ function _scoreSampleValueCandidate(raw, token, col) {
   if (_isNumericColumn(col.meta) || _isDateColumn(col.meta, col.header)) {
     score -= 50;
   }
+
+  const semanticRole = _metaSemanticRole(col.meta, col.header);
+
+  if (semanticRole === "category") score += 10;
+  if (semanticRole === "id") score -= 10;
 
   return score;
 }
