@@ -826,13 +826,15 @@ function _inferSemanticRoleFromMeta(header = "", meta = {}) {
     return "id";
   }
 
-  if (
-    profileType === "category" ||
-    (textRatio >= 0.5 &&
-      uniqueCount >= 2 &&
-      uniqueCount <= 30 &&
-      uniqueRatio <= 0.6)
-  ) {
+  const categoryConfidence =
+    textRatio >= 0.5 &&
+    numericRatio < 0.5 &&
+    dateRatio < 0.5 &&
+    uniqueCount >= 2 &&
+    uniqueCount <= 30 &&
+    uniqueRatio <= 0.6;
+
+  if (profileType === "category" || categoryConfidence) {
     return "category";
   }
 
