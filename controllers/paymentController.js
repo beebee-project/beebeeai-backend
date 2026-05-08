@@ -34,17 +34,6 @@ exports.getUsage = async (req, res) => {
     );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
-    // ✅ 구독 시그널 기반 "실제 구독" 판정 (베타 잔재 방어)
-    const sub = user.subscription || {};
-    const status = String(sub.status || "NONE").toUpperCase();
-    const hasSignal = !!(
-      sub.billingKey ||
-      sub.customerKey ||
-      sub.startedAt ||
-      sub.trialEndsAt ||
-      sub.nextChargeAt
-    );
-
     const isSubscribed = isSubscriptionActive(user);
 
     const plan = paymentService.isBetaMode()
@@ -63,7 +52,7 @@ exports.getUsage = async (req, res) => {
     res.json({
       plan,
       subscriptionStatus: isSubscribed ? status : "INACTIVE",
-      betaMode: paymentService.isBetaMode(), // false 변겅 시 제거
+      betaMode: paymentService.isBetaMode(),
       isSubscribed,
       usage: {
         formulaConversions: user?.usage?.formulaConversions ?? 0,
