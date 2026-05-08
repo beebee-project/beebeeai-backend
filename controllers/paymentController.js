@@ -45,16 +45,15 @@ exports.getUsage = async (req, res) => {
       sub.nextChargeAt
     );
 
-    const isSubscribed =
-      hasSignal && ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(status);
+    const isSubscribed = isSubscriptionActive(user);
 
-    // BETA_MODE=true면 plan(PRO)을 존중할 수 있지만,
-    // BETA_MODE=false에서는 subscription signal 없으면 무조건 FREE로 처리
     const plan = paymentService.isBetaMode()
-      ? paymentService.getEffectivePlan(user.plan)
-      : isSubscribed
-        ? "PRO"
-        : "FREE";
+      ? paymentService.getEffectivePlan(user.plan || "FREE")
+      : getEffectivePlan(user);
+
+    const status = String(
+      user?.subscription?.status || "INACTIVE",
+    ).toUpperCase();
 
     const limits =
       plan === "PRO"
