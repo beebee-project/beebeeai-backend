@@ -137,6 +137,62 @@ function pickBestColumnInSheet(ctx, headerLike, sheetName, role = "lookup") {
   return winner;
 }
 
+function pickBestColumnInTableBlock(
+  ctx,
+  headerLike,
+  tableBlock,
+  role = "lookup",
+) {
+  if (!ctx?.allSheetsData || !headerLike || !tableBlock?.sheetName) return null;
+
+  const terms = formulaUtils.expandTermsFromText(String(headerLike));
+  const sheetName = tableBlock.sheetName;
+  const info = ctx.allSheetsData[sheetName];
+  if (!info?.metaData) return null;
+
+  let winner = null;
+
+  for (const col of tableBlock.columns || []) {
+    const header = String(col.header || "").trim();
+    if (!header) continue;
+
+    const score =
+      formulaUtils.norm(headerLike) === formulaUtils.norm(header) ? 999 : 0;
+
+    const partial = [...terms].some((t) => {
+      const h = formulaUtils.norm(header);
+      return h.includes(t) || t.includes(h);
+    });
+
+    const finalScore = score || (partial ? 60 : 0);
+    if (!finalScore) continue;
+
+    const meta = info.metaData[header] || {
+      columnLetter: col.columnLetter,
+      startRow: tableBlock.dataStartRow,
+      lastRow: tableBlock.dataEndRow,
+    };
+
+    const ref = {
+      sheetName,
+      header,
+      columnLetter: col.columnLetter,
+      startRow: tableBlock.dataStartRow,
+      lastDataRow: tableBlock.dataEndRow,
+      cell: `'${sheetName}'!${col.columnLetter}${tableBlock.dataStartRow}`,
+      range: `'${sheetName}'!${col.columnLetter}${tableBlock.dataStartRow}:${col.columnLetter}${tableBlock.dataEndRow}`,
+      score: finalScore,
+      tableId: tableBlock.tableId,
+    };
+
+    if (!winner || ref.score > winner.score) {
+      winner = ref;
+    }
+  }
+
+  return winner;
+}
+
 function listColumnsInSheet(ctx, sheetName) {
   const info = ctx?.allSheetsData?.[sheetName];
   if (!info?.metaData) return [];
@@ -382,6 +438,89 @@ function _pickEntityNameColumn(ctx, schema, baseSheet) {
   return best;
 }
 
+function _scoreTableBlockForIntent(ctx, schema = {}, block = {}) {
+  const raw = _rawText(schema);
+  const rawNorm = _normToken(raw);
+  const op = String(schema?.operation || "").toLowerCase();
+
+  let score = 0;
+
+  const headers = (block.columns || []).map((c) => String(c.header || ""));
+  const headerNorms = headers.map(_normToken).filter(Boolean);
+
+  const hints = [
+    schema.header_hint,
+    schema.return_hint,
+    schema.group_by,
+    schema.lookup?.key_header,
+    ...(schema.return_fields || []),
+    ...(schema.filters || []).map((f) => f?.header).filter(Boolean),
+  ].filter(Boolean);
+
+  for (const h of hints) {
+    const nh = _normToken(h);
+    if (!nh) continue;
+
+    for (const bh of headerNorms) {
+      if (bh === nh) score += 80;
+      else if (bh.includes(nh) || nh.includes(bh)) score += 35;
+    }
+  }
+
+  for (const bh of headerNorms) {
+    if (bh && rawNorm.includes(bh)) score += 20;
+  }
+
+  if (["sum", "average", "min", "max", "median"].includes(op)) {
+    if (
+      (block.columns || []).some((c) =>
+        /(금액|액|비용|점수|성적|연봉|급여|매출|수량|score|amount|salary|sales)/i.test(
+          c.header,
+        ),
+      )
+    ) {
+      score += 15;
+    }
+  }
+
+  if (op === "count") {
+    score += Math.min(block.columns?.length || 0, 10);
+  }
+
+  score += Math.min(Number(block.score || 0), 30);
+
+  return score;
+}
+
+function selectBestTableBlock(ctx, schema = {}, baseSheet = null) {
+  const blocks = [];
+
+  for (const sheetName of getPreferredSheetNames(ctx, baseSheet)) {
+    const sheetBlocks = ctx?.allSheetsData?.[sheetName]?.tableBlocks || [];
+    for (const block of sheetBlocks) {
+      const score = _scoreTableBlockForIntent(ctx, schema, block);
+      if (score > 0) {
+        blocks.push({ ...block, scoreForIntent: score });
+      }
+    }
+  }
+
+  if (!blocks.length) return null;
+
+  blocks.sort((a, b) => b.scoreForIntent - a.scoreForIntent);
+  const best = blocks[0];
+  const runnerUp = blocks[1] || null;
+
+  return {
+    ...best,
+    runnerUpTableId: runnerUp?.tableId || null,
+    runnerUpScoreForIntent: runnerUp?.scoreForIntent ?? null,
+    tableAmbiguityGap: runnerUp
+      ? best.scoreForIntent - runnerUp.scoreForIntent
+      : null,
+  };
+}
+
 function resolveReturnColumns(ctx, schema, baseSheet) {
   const out = [];
   const seen = new Set();
@@ -416,7 +555,14 @@ function resolveReturnColumns(ctx, schema, baseSheet) {
   }
 
   for (const rf of schema.return_fields || []) {
-    const inBase = pickBestColumnInSheet(ctx, rf, baseSheet, returnRole);
+    const inTable = pickBestColumnInTableBlock(
+      ctx,
+      rf,
+      schema.selectedTableBlock || ctx?.resolved?.selectedTableBlock,
+      returnRole,
+    );
+    const inBase =
+      inTable || pickBestColumnInSheet(ctx, rf, baseSheet, returnRole);
     const any = inBase || pickBestColumnAnySheet(ctx, rf, returnRole);
     if (!any) continue;
 
@@ -499,6 +645,12 @@ function resolveLookupColumn(ctx, schema, baseSheet) {
 function resolveGroupColumn(ctx, schema, baseSheet) {
   if (!schema.group_by) return null;
   return (
+    pickBestColumnInTableBlock(
+      ctx,
+      schema.group_by,
+      schema.selectedTableBlock || ctx?.resolved?.selectedTableBlock,
+      "group",
+    ) ||
     pickBestColumnInSheet(ctx, schema.group_by, baseSheet, "group") ||
     pickBestColumnAnySheet(ctx, schema.group_by, "group")
   );
@@ -516,6 +668,12 @@ function resolveSortColumn(ctx, schema, baseSheet) {
   if (!sortHint) return null;
 
   return (
+    pickBestColumnInTableBlock(
+      ctx,
+      sortHint,
+      schema.selectedTableBlock || ctx?.resolved?.selectedTableBlock,
+      "sort",
+    ) ||
     pickBestColumnInSheet(ctx, sortHint, baseSheet, "sort") ||
     pickBestColumnAnySheet(ctx, sortHint, "sort") ||
     pickNumericColumnInSheet(ctx, baseSheet, sortHint) ||
@@ -1481,6 +1639,11 @@ function _dedupeAggregateTextFilters(filters = []) {
 function resolveIntent(ctx) {
   const schema = ctx.intent || {};
   const baseSheet = resolveBaseSheet(ctx, schema);
+  const selectedTableBlock = selectBestTableBlock(ctx, schema, baseSheet);
+  const schemaForResolve = {
+    ...schema,
+    selectedTableBlock,
+  };
   const filterColumns = _dedupeOrdinalEqualityFilters(
     _dedupeAggregateTextFilters(
       _dedupeDateRangeFilters(resolveFilterColumns(ctx, schema, baseSheet)),
@@ -1490,11 +1653,12 @@ function resolveIntent(ctx) {
   const resolved = {
     platform: ctx.engine || "excel",
     baseSheet,
-    returnColumns: resolveReturnColumns(ctx, schema, baseSheet),
-    lookupColumn: resolveLookupColumn(ctx, schema, baseSheet),
-    groupColumn: resolveGroupColumn(ctx, schema, baseSheet),
-    sortColumn: resolveSortColumn(ctx, schema, baseSheet),
-    filterColumns,
+    selectedTableBlock,
+    returnColumns: resolveReturnColumns(ctx, schemaForResolve, baseSheet),
+    lookupColumn: resolveLookupColumn(ctx, schemaForResolve, baseSheet),
+    groupColumn: resolveGroupColumn(ctx, schemaForResolve, baseSheet),
+    sortColumn: resolveSortColumn(ctx, schemaForResolve, baseSheet),
+    filterColumns: resolveFilterColumns(ctx, schemaForResolve, baseSheet),
     ambiguities: [],
     hasBlockingAmbiguity: false,
   };
@@ -1528,6 +1692,7 @@ function buildResolvedContext(ctx, resolved) {
   return {
     ...ctx,
     resolved,
+    selectedTableBlock: resolved?.selectedTableBlock || null,
     bestReturn: resolved?.returnColumns?.[0] || ctx.bestReturn || null,
     bestLookup: resolved?.lookupColumn || ctx.bestLookup || null,
   };
