@@ -5,7 +5,6 @@ const {
   sendVerificationEmail,
   sendPasswordResetEmail,
 } = require("../services/emailService");
-const { isSubscriptionActive } = require("../utils/subscriptionStatus");
 
 function normalizeEmail(raw) {
   return String(raw || "")
@@ -174,24 +173,6 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({
         message: "이메일 인증이 완료되지 않았습니다. 메일함을 확인해주세요.",
       });
-    }
-
-    const subStatus = String(user.subscription?.status || "").toUpperCase();
-
-    if (
-      ["ACTIVE", "PAST_DUE", "CANCELED_PENDING"].includes(subStatus) &&
-      !isSubscriptionActive(user)
-    ) {
-      user.plan = "FREE";
-      user.subscription = {
-        ...(user.subscription || {}),
-        status: subStatus === "CANCELED_PENDING" ? "CANCELED" : "INACTIVE",
-        cancelAtPeriodEnd: false,
-        nextChargeAt: null,
-        endedAt: new Date(),
-      };
-
-      await user.save();
     }
 
     const token = signToken(user._id);
