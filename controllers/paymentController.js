@@ -80,26 +80,18 @@ exports.getUsage = async (req, res) => {
 
 // 플랜 목록
 exports.getPlans = (req, res) => {
-  const isSubscribed = isSubscriptionActive(user);
-  const plan = paymentService.isBetaMode()
-    ? paymentService.getEffectivePlan(user.plan || "FREE")
-    : getEffectivePlan(user);
-
-  const status = String(user?.subscription?.status || "INACTIVE").toUpperCase();
-
   res.json({
-    plan,
-    subscriptionStatus: isSubscribed ? status : "INACTIVE",
     betaMode: paymentService.isBetaMode(),
-    isSubscribed,
-    usage: {
-      formulaConversions: user?.usage?.formulaConversions ?? 0,
-      fileUploads: user?.usage?.fileUploads ?? 0,
+    plans: {
+      FREE: {
+        formulaConversions: 10,
+        fileUploads: 1,
+      },
+      PRO: {
+        formulaConversions: null,
+        fileUploads: 5,
+      },
     },
-    limits:
-      plan === "PRO"
-        ? { formulaConversions: null, fileUploads: 5 }
-        : { formulaConversions: 10, fileUploads: 1 },
   });
 };
 
