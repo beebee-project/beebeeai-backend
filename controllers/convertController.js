@@ -1669,6 +1669,58 @@ function _looksLikeCountRequest(msg = "") {
   return /(인원수|개수|갯수|건수|수량|카운트|몇\s*명)/.test(s);
 }
 
+function _relativeDateExprFromMessage(original = "") {
+  const s = String(original || "");
+
+  const monthMatch = s.match(/최근\s*(\d+)\s*개월(?:\s*이내)?/);
+  const headerHint = _extractRelativeDateHeaderHint(original);
+  if (monthMatch) {
+    return {
+      header_hint: headerHint,
+      operator: ">=",
+      value: `EDATE(TODAY(), -${Number(monthMatch[1])})`,
+      value_type: "date_expr",
+    };
+  }
+
+  const dayMatch = s.match(/최근\s*(\d+)\s*일(?:\s*이내)?/);
+  if (dayMatch) {
+    return {
+      header_hint: headerHint,
+      operator: ">=",
+      value: `TODAY()-${Number(dayMatch[1])}`,
+      value_type: "date_expr",
+    };
+  }
+
+  const yearMatch = s.match(/최근\s*(\d+)\s*년(?:\s*이내)?/);
+  if (yearMatch) {
+    return {
+      header_hint: headerHint,
+      operator: ">=",
+      value: `EDATE(TODAY(), -${Number(yearMatch[1]) * 12})`,
+      value_type: "date_expr",
+    };
+  }
+
+  return null;
+}
+
+function _extractRelativeDateHeaderHint(original = "") {
+  const s = String(original || "");
+
+  const byHeader = s.match(
+    /([가-힣A-Za-z0-9_]+)\s*기준\s*최근\s*\d+\s*(?:개월|일|년)/,
+  );
+  if (byHeader?.[1]) return byHeader[1].trim();
+
+  const m = s.match(
+    /최근\s*\d+\s*(?:개월|일|년)(?:\s*이내)?\s*([가-힣A-Za-z0-9_]+?)\s*(?:한|된|일|날짜)/,
+  );
+
+  return m?.[1] ? m[1].trim() : null;
+}
+
 function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
   const original = String(msg || "");
   const out = [];
@@ -1773,78 +1825,89 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
   }
 
   // 2) 날짜 조건
-  const isoRange = original.match(
-    /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:부터|~|-)\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})/,
-  );
-  if (isoRange) {
+  const relativeDate = _relativeDateExprFromMessage(original);
+  if (relativeDate) {
     _pushUniqueFilterSpec(out, {
       role: "date_filter",
-      header_hint: null,
-      operator: "between",
-      min: isoRange[1].replace(/[./]/g, "-"),
-      max: isoRange[2].replace(/[./]/g, "-"),
-      value_type: "date",
+      header_hint: relativeDate.header_hint || null,
+      operator: relativeDate.operator,
+      value: relativeDate.value,
+      value_type: relativeDate.value_type,
     });
   } else {
-    const isoAfter = original.match(
-      /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(이후|후|부터)/,
+    const isoRange = original.match(
+      /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(?:부터|~|-)\s*(\d{4}[./-]\d{1,2}[./-]\d{1,2})/,
     );
-    if (isoAfter) {
-      _pushUniqueFilterSpec(out, {
-        role: "date_filter",
-        header_hint: null,
-        operator: ">=",
-        value: isoAfter[1].replace(/[./]/g, "-"),
-        value_type: "date",
-      });
-    }
-
-    const isoBefore = original.match(
-      /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(이전|전|까지)/,
-    );
-    if (isoBefore) {
-      _pushUniqueFilterSpec(out, {
-        role: "date_filter",
-        header_hint: null,
-        operator: "<=",
-        value: isoBefore[1].replace(/[./]/g, "-"),
-        value_type: "date",
-      });
-    }
-
-    const yearRange = original.match(
-      /(20\d{2})\s*년?\s*[~\-부터]\s*(20\d{2})\s*년?/,
-    );
-    if (yearRange) {
+    if (isoRange) {
       _pushUniqueFilterSpec(out, {
         role: "date_filter",
         header_hint: null,
         operator: "between",
-        min: `${yearRange[1]}-01-01`,
-        max: `${yearRange[2]}-12-31`,
+        min: isoRange[1].replace(/[./]/g, "-"),
+        max: isoRange[2].replace(/[./]/g, "-"),
         value_type: "date",
       });
     } else {
-      const yearAfter = original.match(/(20\d{2})\s*년?\s*(이후|후)/);
-      if (yearAfter) {
+      const isoAfter = original.match(
+        /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(이후|후|부터)/,
+      );
+      if (isoAfter) {
         _pushUniqueFilterSpec(out, {
           role: "date_filter",
           header_hint: null,
           operator: ">=",
-          value: `${yearAfter[1]}-01-01`,
+          value: isoAfter[1].replace(/[./]/g, "-"),
           value_type: "date",
         });
       }
 
-      const yearBefore = original.match(/(20\d{2})\s*년?\s*(이전|전)/);
-      if (yearBefore) {
+      const isoBefore = original.match(
+        /(\d{4}[./-]\d{1,2}[./-]\d{1,2})\s*(이전|전|까지)/,
+      );
+      if (isoBefore) {
         _pushUniqueFilterSpec(out, {
           role: "date_filter",
           header_hint: null,
-          operator: "<",
-          value: `${yearBefore[1]}-01-01`,
+          operator: "<=",
+          value: isoBefore[1].replace(/[./]/g, "-"),
           value_type: "date",
         });
+      }
+
+      const yearRange = original.match(
+        /(20\d{2})\s*년?\s*[~\-부터]\s*(20\d{2})\s*년?/,
+      );
+      if (yearRange) {
+        _pushUniqueFilterSpec(out, {
+          role: "date_filter",
+          header_hint: null,
+          operator: "between",
+          min: `${yearRange[1]}-01-01`,
+          max: `${yearRange[2]}-12-31`,
+          value_type: "date",
+        });
+      } else {
+        const yearAfter = original.match(/(20\d{2})\s*년?\s*(이후|후)/);
+        if (yearAfter) {
+          _pushUniqueFilterSpec(out, {
+            role: "date_filter",
+            header_hint: null,
+            operator: ">=",
+            value: `${yearAfter[1]}-01-01`,
+            value_type: "date",
+          });
+        }
+
+        const yearBefore = original.match(/(20\d{2})\s*년?\s*(이전|전)/);
+        if (yearBefore) {
+          _pushUniqueFilterSpec(out, {
+            role: "date_filter",
+            header_hint: null,
+            operator: "<",
+            value: `${yearBefore[1]}-01-01`,
+            value_type: "date",
+          });
+        }
       }
     }
   }
@@ -1886,23 +1949,16 @@ function _extractRoleFilterSpecsFromMessage(msg = "", headerHint = null) {
 }
 
 function _filterSpecsToLegacyConditions(filterSpecs = []) {
-  return (Array.isArray(filterSpecs) ? filterSpecs : [])
-    .map((spec) => {
-      if (!spec) return null;
-      if (spec.operator === "between" && spec.min != null && spec.max != null) {
-        return {
-          target: spec.header_hint || spec.header || null,
-          operator: "between",
-          min: spec.min,
-          max: spec.max,
-          value_type: spec.value_type || null,
-        };
-      }
+  return filterSpecs
+    .map((f) => {
+      const target = f.header || f.header_hint || null;
+      if (!target) return null;
+
       return {
-        target: spec.header_hint || spec.header || null,
-        operator: spec.operator || "=",
-        value: spec.value,
-        value_type: spec.value_type || null,
+        target,
+        operator: f.operator || "=",
+        value: f.value,
+        value_type: f.value_type,
       };
     })
     .filter(Boolean);

@@ -1586,9 +1586,10 @@ function resolveFilterColumns(ctx, schema, baseSheet) {
         pickBestColumnInSheet(ctx, f.header, baseSheet, "filter") ||
         pickBestColumnAnySheet(ctx, f.header, "filter");
     } else if (f?.role === "date_filter") {
+      const dateHint = f.header || f.header_hint || schema.header_hint || null;
       ref =
-        pickDateColumnInSheet(ctx, baseSheet, schema.header_hint || null) ||
-        pickDateColumnAnySheet(ctx, schema.header_hint || null);
+        pickDateColumnInSheet(ctx, baseSheet, dateHint) ||
+        pickDateColumnAnySheet(ctx, dateHint);
     } else if (
       f?.role === "metric_filter" ||
       f?.role === "aggregate_filter" ||

@@ -60,6 +60,10 @@ function _formatScalar(
     return String(v).trim();
   }
 
+  if (valueType === "date_expr") {
+    return String(v || "").trim();
+  }
+
   if (valueType === "date" || _isIsoDateLiteral(v)) {
     const iso = String(v).trim().replace(/[./]/g, "-");
     return `DATEVALUE(${_q(iso)})`;
@@ -205,9 +209,18 @@ function _buildLeafExpr(cond, ctx, formatValue) {
   }
 
   // date compare
-  if (valueType === "date" || _isIsoDateLiteral(rawVal)) {
+  if (
+    valueType === "date" ||
+    valueType === "date_expr" ||
+    _isIsoDateLiteral(rawVal)
+  ) {
     const left = _coerceDate(range);
-    const right = _formatScalar(rawVal, formatValue, "date", caseSensitive);
+    const right = _formatScalar(
+      rawVal,
+      formatValue,
+      valueType === "date_expr" ? "date_expr" : "date",
+      caseSensitive,
+    );
     return `(${left}${op}${right})`;
   }
 
