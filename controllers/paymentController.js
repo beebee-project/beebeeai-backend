@@ -1,6 +1,7 @@
 const paymentService = require("../services/paymentService");
 const User = require("../models/User");
 const tossClient = require("../config/tossClient");
+const { resetUserToFreeState } = require("../services/accountResetService");
 const {
   isSubscriptionActive,
   getEffectivePlan,
@@ -160,17 +161,12 @@ exports.startSubscription = async (req, res) => {
       }
 
       // ✅ 기간이 끝났으면 만료 확정 (billingKey는 유지)
-      await User.updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            plan: "FREE",
-            "subscription.status": "CANCELED",
-            "subscription.cancelAtPeriodEnd": false,
-          },
-          // billingKey/customerKey는 유지 (A 정책)
-        },
-      );
+      await resetUserToFreeState(user._id, {
+        status: "CANCELED",
+        cancelAtPeriodEnd: false,
+        endedAt: now,
+        nextChargeAt: null,
+      });
     }
 
     // ✅ [기존] 2) customerKey 생성
@@ -340,26 +336,69 @@ exports.cronCharge = async (req, res) => {
   try {
     console.log("[cronCharge] hit", now.toISOString());
 
+    const orphanProUsers = await User.find(
+      {
+        plan: "PRO",
+        $and: [
+          {
+            $or: [
+              { "subscription.billingKey": { $exists: false } },
+              { "subscription.billingKey": null },
+              { "subscription.billingKey": "" },
+            ],
+          },
+          {
+            $or: [
+              { "subscription.status": { $exists: false } },
+              {
+                "subscription.status": {
+                  $in: ["NONE", "INACTIVE", "CANCELED"],
+                },
+              },
+            ],
+          },
+        ],
+      },
+      "_id",
+    ).lean();
+
+    let betaDowngradedCount = 0;
+
+    for (const u of orphanProUsers) {
+      const r = await resetUserToFreeState(u._id, {
+        status: "INACTIVE",
+        nextChargeAt: null,
+        cancelAtPeriodEnd: false,
+        endedAt: now,
+      });
+
+      if (r.ok) betaDowngradedCount += 1;
+    }
+
     // 1) 만료 확정 처리 (✅ 중복 제거 + 보안검증 이후 실행)
     // - 해지 예약인데 기간이 끝난 유저를 FREE + CANCELED로 확정
     // - A정책: billingKey/customerKey는 유지
-    const expiredCanceled = await User.updateMany(
+    const expiredCanceledUsers = await User.find(
       {
         "subscription.status": "CANCELED_PENDING",
         "subscription.cancelAtPeriodEnd": true,
         "subscription.nextChargeAt": { $ne: null, $lte: now },
       },
-      {
-        $set: {
-          plan: "FREE",
-          "subscription.status": "CANCELED",
-          "subscription.cancelAtPeriodEnd": false,
-          "subscription.endedAt": now,
-          // 정책적으로 nextChargeAt은 "더 이상 청구 없음"이므로 null로 정리 추천
-          "subscription.nextChargeAt": null,
-        },
-      },
-    );
+      "_id",
+    ).lean();
+
+    let expiredCanceledCount = 0;
+
+    for (const u of expiredCanceledUsers) {
+      const r = await resetUserToFreeState(u._id, {
+        status: "CANCELED",
+        cancelAtPeriodEnd: false,
+        endedAt: now,
+        nextChargeAt: null,
+      });
+
+      if (r.ok) expiredCanceledCount += 1;
+    }
 
     // 2) 구독 청구 금액/상품명
     const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 5900);
@@ -479,8 +518,8 @@ exports.cronCharge = async (req, res) => {
       now,
       purged,
       cleaned: {
-        expiredCanceled:
-          expiredCanceled?.modifiedCount ?? expiredCanceled?.nModified ?? 0,
+        expiredCanceled: expiredCanceledCount,
+        betaDowngraded: betaDowngradedCount,
       },
       targets: targets.length,
       successCount,
