@@ -13,6 +13,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const macroRoutes = require("./routes/macroRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const cronRoutes = require("./routes/cronRoutes");
+const automationRoutes = require("./routes/automationRoutes");
 const { startDailySummaryCron } = require("./cron/dailySummaryCron");
 
 // 앱 초기화
@@ -104,6 +105,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api/convert", convertRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/macro", macroRoutes);
+app.use("/api/automation", automationRoutes);
 app.use("/admin", adminRoutes);
 app.use("/cron", cronRoutes);
 
