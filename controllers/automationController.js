@@ -3,11 +3,17 @@ const fs = require("fs");
 const crypto = require("crypto");
 const XLSX = require("xlsx");
 const User = require("../models/User");
-const { downloadToBuffer, saveJsonObject } = require("../utils/storage");
+const {
+  downloadToBuffer,
+  saveJsonObject,
+  readJsonObject,
+} = require("../utils/storage");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const {
   buildQueryTablesFromWorkbook,
 } = require("../automation/queryTableBuilder");
+const { parseQueryIntent } = require("../automation/queryIntentParser");
+const { executeQueryIntent } = require("../automation/queryExecutor");
 
 function findUserFile(user, fileName) {
   if (!user || !fileName) return null;
@@ -69,6 +75,71 @@ async function buildQueryTablesForFile(req, fileName) {
 
   return { fileHash, sheetStateSig, tables };
 }
+
+exports.executeQuery = async (req, res, next) => {
+  try {
+    const { queryTablesKey, message, intent } = req.body || {};
+
+    if (!queryTablesKey) {
+      return res.status(400).json({
+        ok: false,
+        error: "queryTablesKey가 필요합니다.",
+      });
+    }
+
+    const saved = await readJsonObject(queryTablesKey);
+    const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
+
+    if (!queryIntent?.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: queryIntent?.error || "query intent 생성 실패",
+        intent: queryIntent,
+      });
+    }
+
+    const result = executeQueryIntent(saved.tables || [], queryIntent);
+
+    return res.json({
+      ok: true,
+      queryTablesKey,
+      fileName: saved.fileName,
+      fileHash: saved.fileHash,
+      intent: queryIntent,
+      result,
+    });
+  } catch (e) {
+    console.error("[automation.executeQuery]", e);
+    next(e);
+  }
+};
+
+exports.analyzeQueryIntent = async (req, res, next) => {
+  try {
+    const { queryTablesKey, message } = req.body || {};
+
+    if (!queryTablesKey || !message) {
+      return res.status(400).json({
+        ok: false,
+        error: "queryTablesKey와 message가 필요합니다.",
+      });
+    }
+
+    const saved = await readJsonObject(queryTablesKey);
+    const intent = parseQueryIntent(message, saved.tables || []);
+
+    return res.json({
+      ok: true,
+      queryTablesKey,
+      fileName: saved.fileName,
+      fileHash: saved.fileHash,
+      intent,
+    });
+  } catch (e) {
+    console.error("[automation.analyzeQueryIntent]", e);
+    next(e);
+  }
+};
 
 exports.previewQueryTables = async (req, res, next) => {
   try {

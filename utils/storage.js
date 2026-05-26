@@ -241,6 +241,11 @@ async function saveJsonObject(name, obj) {
   return { localName: null, gcsName: name };
 }
 
+async function readJsonObject(name) {
+  const buffer = await downloadToBuffer(name);
+  return JSON.parse(buffer.toString("utf8"));
+}
+
 module.exports = {
   uploadBufferToGCS,
   downloadToBuffer,
@@ -254,4 +259,5 @@ module.exports = {
   getBucket: () => bucket,
   localAbsPath,
   saveJsonObject,
+  readJsonObject,
 };
