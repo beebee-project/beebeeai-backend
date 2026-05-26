@@ -215,6 +215,32 @@ async function writeMetaCache(key, value) {
   }
 }
 
+async function saveJsonObject(name, obj) {
+  const payload = Buffer.from(JSON.stringify(obj, null, 2), "utf8");
+
+  if (IS_LOCAL_STORAGE) {
+    const abs = localAbsPath(name);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, payload);
+    return { localName: name, gcsName: null };
+  }
+
+  if (!GCS_ENABLED || !bucket) {
+    throw new Error("GCS storage is disabled");
+  }
+
+  const file = bucket.file(name);
+  await file.save(payload, {
+    contentType: "application/json; charset=utf-8",
+    resumable: false,
+    metadata: {
+      cacheControl: "private, max-age=0, no-transform",
+    },
+  });
+
+  return { localName: null, gcsName: name };
+}
+
 module.exports = {
   uploadBufferToGCS,
   downloadToBuffer,
@@ -227,4 +253,5 @@ module.exports = {
   isLocalStorage: () => IS_LOCAL_STORAGE,
   getBucket: () => bucket,
   localAbsPath,
+  saveJsonObject,
 };

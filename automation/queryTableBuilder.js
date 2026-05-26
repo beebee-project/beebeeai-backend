@@ -30,6 +30,23 @@ function cellValue(row, colIndex1Based) {
   return row?.[colIndex1Based - 1] ?? null;
 }
 
+function colLetter(n) {
+  let s = "";
+  let x = Number(n || 0);
+
+  while (x > 0) {
+    const m = (x - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    x = Math.floor((x - 1) / 26);
+  }
+
+  return s || "A";
+}
+
+function isEmptyCell(v) {
+  return v == null || String(v).trim() === "";
+}
+
 function coerceValue(value, type) {
   if (value == null || value === "") return null;
 
@@ -57,35 +74,65 @@ function inferColumnType(meta = {}) {
   return "text";
 }
 
-function buildFallbackBlockFromMeta(sheetName, sheetInfo = {}) {
+function buildFallbackBlockFromMeta(sheetName, sheetInfo = {}, rows = []) {
   const meta = sheetInfo.metaData || {};
   const entries = Object.entries(meta);
 
-  if (!entries.length) return null;
+  if (!rows.length) return null;
 
-  entries.sort((a, b) => {
-    const ai = Number(a[1]?.columnIndex || 9999);
-    const bi = Number(b[1]?.columnIndex || 9999);
-    return ai - bi;
-  });
+  let headerRow = Number(sheetInfo.startRow || 1);
 
-  const firstMeta = entries[0]?.[1] || {};
-  const headerRow = Number(firstMeta.headerRow || 1);
+  const headerRowCounts = new Map();
+
+  for (const [, m] of entries) {
+    const hr = Number(m?.headerRow || m?.startRow || 0);
+    if (!hr) continue;
+    headerRowCounts.set(hr, (headerRowCounts.get(hr) || 0) + 1);
+  }
+
+  if (headerRowCounts.size) {
+    headerRow = Array.from(headerRowCounts.entries()).sort(
+      (a, b) => b[1] - a[1] || a[0] - b[0],
+    )[0][0];
+  }
+
+  const row = rows[headerRow - 1] || [];
+  const columns = [];
+
+  for (let i = 0; i < row.length; i += 1) {
+    const rawHeader = row[i];
+
+    if (isEmptyCell(rawHeader)) continue;
+
+    const header = String(rawHeader).trim();
+
+    // fallback에서는 실제 headerRow의 셀만 컬럼으로 채택
+    const metaForHeader = meta[header] || {};
+
+    columns.push({
+      header,
+      originalHeader: header,
+      columnIndex: i + 1,
+      columnLetter: metaForHeader.columnLetter || colLetter(i + 1),
+    });
+  }
+
+  if (!columns.length) return null;
+
   const dataStartRow = Number(
-    firstMeta.startRow || sheetInfo.startRow || headerRow + 1,
-  );
-  const dataEndRow = Number(
-    sheetInfo.lastDataRow || firstMeta.lastRow || dataStartRow,
+    sheetInfo.dataStartRow || sheetInfo.startRow || headerRow + 1,
   );
 
-  const columns = entries.map(([header, m], idx) => ({
-    header,
-    originalHeader: header,
-    columnIndex: Number(m.columnIndex || idx + 1),
-    columnLetter: m.columnLetter,
-  }));
+  let dataEndRow = Number(sheetInfo.lastDataRow || rows.length);
 
-  if (!columns.length || dataEndRow < dataStartRow) return null;
+  while (dataEndRow >= dataStartRow) {
+    const r = rows[dataEndRow - 1] || [];
+    const hasValue = columns.some((c) => !isEmptyCell(r[c.columnIndex - 1]));
+    if (hasValue) break;
+    dataEndRow -= 1;
+  }
+
+  if (dataEndRow < dataStartRow) return null;
 
   const startCol = columns[0].columnLetter || "A";
   const endCol = columns[columns.length - 1].columnLetter || startCol;
@@ -108,6 +155,27 @@ function buildFallbackBlockFromMeta(sheetName, sheetInfo = {}) {
   };
 }
 
+function scoreQueryTable(table = {}) {
+  const rowCount = Number(table.rowCount || 0);
+  const colCount = Array.isArray(table.columns) ? table.columns.length : 0;
+
+  let score = 0;
+
+  if (rowCount > 0) score += 30;
+  if (rowCount >= 5) score += 15;
+  if (colCount >= 2) score += 20;
+  if (colCount >= 4) score += 10;
+
+  const typedCols = (table.columns || []).filter((c) =>
+    ["number", "date", "category"].includes(String(c.type || "").toLowerCase()),
+  ).length;
+
+  if (typedCols > 0) score += 15;
+  if (table.isFallback) score -= 5;
+
+  return Math.max(0, Math.min(100, score));
+}
+
 function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
   const tables = [];
 
@@ -126,7 +194,11 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
       : [];
 
     if (!blocks.length) {
-      const fallbackBlock = buildFallbackBlockFromMeta(sheetName, sheetInfo);
+      const fallbackBlock = buildFallbackBlockFromMeta(
+        sheetName,
+        sheetInfo,
+        rows,
+      );
       if (fallbackBlock) blocks.push(fallbackBlock);
     }
 
@@ -134,8 +206,12 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
       const rawColumns = (block.columns || []).map((c, idx) => {
         const meta = sheetInfo.metaData?.[c.header] || {};
         return {
-          header: c.header,
-          originalHeader: c.originalHeader || c.header,
+          header: String(
+            c.header || c.originalHeader || `Column${idx + 1}`,
+          ).trim(),
+          originalHeader: String(
+            c.originalHeader || c.header || `Column${idx + 1}`,
+          ).trim(),
           columnIndex: c.columnIndex || idx + 1,
           columnLetter: c.columnLetter,
           type: inferColumnType(meta),
@@ -147,7 +223,11 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
         };
       });
 
-      const columns = uniqueKeys(rawColumns);
+      const safeRawColumns = rawColumns.filter(
+        (c) => c.header && c.header !== "null" && c.header !== "undefined",
+      );
+
+      const columns = uniqueKeys(safeRawColumns);
       const data = [];
 
       for (let r = block.dataStartRow; r <= block.dataEndRow; r += 1) {
@@ -166,9 +246,10 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
         if (nonEmpty > 0) data.push(obj);
       }
 
-      tables.push({
+      const queryTable = {
         tableId: block.tableId,
         isFallback: !!block.isFallback,
+        source: block.isFallback ? "fallback" : "tableBlock",
         tableName: normalizeKey(block.tableId.replace("#", "_"), "table"),
         sheetName,
         range: block.range,
@@ -179,9 +260,29 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
         rowCount: data.length,
         columns,
         rows: data,
-      });
+      };
+
+      queryTable.confidence = scoreQueryTable(queryTable);
+      tables.push(queryTable);
     }
   }
+
+  let bestIdx = -1;
+  let bestScore = -1;
+
+  for (let i = 0; i < tables.length; i += 1) {
+    const t = tables[i];
+    const score = Number(t.confidence || 0);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+
+  tables.forEach((t, idx) => {
+    t.isPrimary = idx === bestIdx;
+  });
 
   return tables;
 }
