@@ -18,6 +18,7 @@ const { executeQueryIntent } = require("../automation/queryExecutor");
 const {
   buildSummaryWorkbook,
   workbookToBuffer,
+  buildChartSpec,
 } = require("../automation/summarySheetBuilder");
 
 function findUserFile(user, fileName) {
@@ -104,6 +105,7 @@ exports.createSummarySheet = async (req, res, next) => {
     }
 
     const result = executeQueryIntent(saved.tables || [], queryIntent);
+    const chartSpec = buildChartSpec(result);
 
     if (!result?.ok) {
       return res.status(400).json({
@@ -141,6 +143,7 @@ exports.createSummarySheet = async (req, res, next) => {
       summarySheetKey: key,
       localName: stored.localName,
       gcsName: stored.gcsName,
+      chartSpec,
       intent: queryIntent,
       result,
     });

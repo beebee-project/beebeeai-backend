@@ -1,5 +1,34 @@
 const XLSX = require("xlsx");
 
+function buildChartDataRows(result = {}) {
+  if (result.resultType !== "grouped") return [];
+
+  const groupHeader = result.groupBy?.header || "그룹";
+  const metricHeader = result.metric?.header || "값";
+
+  return (result.rows || []).map((r) => ({
+    [groupHeader]: r[groupHeader] ?? "",
+    [metricHeader]: r.value,
+    행수: r.rowCount,
+  }));
+}
+
+function buildChartSpec(result = {}) {
+  if (result.resultType !== "grouped") return null;
+
+  const groupHeader = result.groupBy?.header || "그룹";
+  const metricHeader = result.metric?.header || "값";
+
+  return {
+    version: "chart_spec_v1",
+    recommendedType: "bar",
+    title: `${groupHeader}별 ${metricHeader}`,
+    categoryField: groupHeader,
+    valueField: metricHeader,
+    rowCount: Array.isArray(result.rows) ? result.rows.length : 0,
+  };
+}
+
 function setColumnWidths(ws, rows = []) {
   if (!rows.length) return;
 
@@ -99,6 +128,15 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
   wsResult["!freeze"] = { xSplit: 0, ySplit: 1 };
   XLSX.utils.book_append_sheet(wb, wsResult, "분석결과");
 
+  const chartDataRows = buildChartDataRows(result);
+  if (chartDataRows.length) {
+    const wsChartData = XLSX.utils.json_to_sheet(chartDataRows);
+    setColumnWidths(wsChartData, chartDataRows);
+    formatNumberCells(wsChartData);
+    wsChartData["!freeze"] = { xSplit: 0, ySplit: 1 };
+    XLSX.utils.book_append_sheet(wb, wsChartData, "차트데이터");
+  }
+
   return wb;
 }
 
@@ -112,4 +150,5 @@ function workbookToBuffer(workbook) {
 module.exports = {
   buildSummaryWorkbook,
   workbookToBuffer,
+  buildChartSpec,
 };
