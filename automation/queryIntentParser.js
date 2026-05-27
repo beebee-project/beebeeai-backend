@@ -133,6 +133,44 @@ function parseQueryIntent(message = "", queryTables = []) {
   const groupBy = detectGroupBy(message, columns);
   const filters = detectFilters(message, columns);
 
+  const metric = metricColumn
+    ? {
+        columnKey: metricColumn.key,
+        header: metricColumn.header,
+        type: metricColumn.type,
+      }
+    : null;
+
+  const groupBySpec = groupBy
+    ? {
+        columnKey: groupBy.key,
+        header: groupBy.header,
+        type: groupBy.type,
+      }
+    : null;
+
+  const plan = {
+    version: "query_plan_v1",
+    tableId: table.tableId,
+    steps: [
+      ...(filters.length ? [{ type: "filter", filters }] : []),
+      ...(groupBySpec
+        ? [
+            {
+              type: "groupBy",
+              columnKey: groupBySpec.columnKey,
+              header: groupBySpec.header,
+            },
+          ]
+        : []),
+      {
+        type: "aggregate",
+        operation,
+        metric,
+      },
+    ],
+  };
+
   return {
     ok: true,
     version: "query_intent_v1",
@@ -145,21 +183,10 @@ function parseQueryIntent(message = "", queryTables = []) {
       isPrimary: !!table.isPrimary,
     },
     operation,
-    metric: metricColumn
-      ? {
-          columnKey: metricColumn.key,
-          header: metricColumn.header,
-          type: metricColumn.type,
-        }
-      : null,
-    groupBy: groupBy
-      ? {
-          columnKey: groupBy.key,
-          header: groupBy.header,
-          type: groupBy.type,
-        }
-      : null,
+    metric,
+    groupBy: groupBySpec,
     filters,
+    plan,
   };
 }
 

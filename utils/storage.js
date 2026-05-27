@@ -246,6 +246,30 @@ async function readJsonObject(name) {
   return JSON.parse(buffer.toString("utf8"));
 }
 
+async function saveBufferObject(name, buffer, contentType) {
+  if (IS_LOCAL_STORAGE) {
+    const abs = localAbsPath(name);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, buffer);
+    return { localName: name, gcsName: null };
+  }
+
+  if (!GCS_ENABLED || !bucket) {
+    throw new Error("GCS storage is disabled");
+  }
+
+  const file = bucket.file(name);
+  await file.save(buffer, {
+    contentType: contentType || "application/octet-stream",
+    resumable: false,
+    metadata: {
+      cacheControl: "private, max-age=0, no-transform",
+    },
+  });
+
+  return { localName: null, gcsName: name };
+}
+
 module.exports = {
   uploadBufferToGCS,
   downloadToBuffer,
@@ -260,4 +284,5 @@ module.exports = {
   localAbsPath,
   saveJsonObject,
   readJsonObject,
+  saveBufferObject,
 };

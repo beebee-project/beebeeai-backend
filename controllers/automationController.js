@@ -7,6 +7,7 @@ const {
   downloadToBuffer,
   saveJsonObject,
   readJsonObject,
+  saveBufferObject,
 } = require("../utils/storage");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const {
@@ -14,6 +15,10 @@ const {
 } = require("../automation/queryTableBuilder");
 const { parseQueryIntent } = require("../automation/queryIntentParser");
 const { executeQueryIntent } = require("../automation/queryExecutor");
+const {
+  buildSummaryWorkbook,
+  workbookToBuffer,
+} = require("../automation/summarySheetBuilder");
 
 function findUserFile(user, fileName) {
   if (!user || !fileName) return null;
@@ -75,6 +80,75 @@ async function buildQueryTablesForFile(req, fileName) {
 
   return { fileHash, sheetStateSig, tables };
 }
+
+exports.createSummarySheet = async (req, res, next) => {
+  try {
+    const { queryTablesKey, message, intent } = req.body || {};
+
+    if (!queryTablesKey) {
+      return res.status(400).json({
+        ok: false,
+        error: "queryTablesKey가 필요합니다.",
+      });
+    }
+
+    const saved = await readJsonObject(queryTablesKey);
+    const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
+
+    if (!queryIntent?.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: queryIntent?.error || "query intent 생성 실패",
+        intent: queryIntent,
+      });
+    }
+
+    const result = executeQueryIntent(saved.tables || [], queryIntent);
+
+    if (!result?.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: result?.error || "query 실행 실패",
+        intent: queryIntent,
+        result,
+      });
+    }
+
+    const workbook = buildSummaryWorkbook({
+      fileName: saved.fileName,
+      message,
+      intent: queryIntent,
+      result,
+    });
+
+    const buffer = workbookToBuffer(workbook);
+
+    const userId = req.user?.id || "local-dev";
+    const rand = crypto.randomBytes(6).toString("hex");
+    const key = `summary-sheets/${userId}/${saved.fileHash}/${Date.now()}_${rand}.xlsx`;
+
+    const stored = await saveBufferObject(
+      key,
+      buffer,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    return res.json({
+      ok: true,
+      fileName: saved.fileName,
+      fileHash: saved.fileHash,
+      queryTablesKey,
+      summarySheetKey: key,
+      localName: stored.localName,
+      gcsName: stored.gcsName,
+      intent: queryIntent,
+      result,
+    });
+  } catch (e) {
+    console.error("[automation.createSummarySheet]", e);
+    next(e);
+  }
+};
 
 exports.executeQuery = async (req, res, next) => {
   try {
