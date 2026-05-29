@@ -5,7 +5,8 @@
   "main": "app.js",
   "license": "ISC",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "test:automation": "node tests/automationRegressionTests.js"
   },
   "engines": {
     "node": "20.x"

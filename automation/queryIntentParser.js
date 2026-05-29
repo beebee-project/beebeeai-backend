@@ -1,9 +1,81 @@
-function normalizeText(v = "") {
-  return String(v)
-    .toLowerCase()
-    .replace(/\([^)]*\)/g, "")
-    .replace(/[^가-힣a-z0-9]/gi, "")
-    .trim();
+const {
+  findMetricRecipe,
+  findCompareRecipe,
+  normalizeText,
+} = require("./metricRecipeRegistry");
+
+function findDateColumn(columns = [], text = "") {
+  const direct = findColumnByText(columns, text);
+  if (direct && String(direct.type) === "date") return direct;
+
+  return columns.find((c) => String(c.type) === "date") || null;
+}
+
+function findColumnByHints(columns = [], hints = [], excludeKey = null) {
+  return (
+    columns.find((c) => {
+      if (excludeKey && c.key === excludeKey) return false;
+
+      const haystack = normalizeText(
+        `${c.header || ""} ${c.originalHeader || ""} ${c.key || ""}`,
+      );
+
+      return hints.some((h) => haystack.includes(normalizeText(h)));
+    }) || null
+  );
+}
+
+function detectDerivedGroup(message = "", columns = []) {
+  const s = String(message || "");
+
+  if (!s.includes("연도별")) return null;
+
+  const dateCol = findDateColumn(columns, s);
+  if (!dateCol) return null;
+
+  return {
+    type: "derive",
+    fn: "year",
+    sourceColumnKey: dateCol.key,
+    sourceHeader: dateCol.header,
+    outputKey: `${dateCol.key}_year`,
+    outputHeader: `${dateCol.header} 연도`,
+  };
+}
+
+function detectRateSpec(message = "", columns = [], deriveStep = null) {
+  const recipe = findMetricRecipe(message);
+  if (!recipe) return null;
+
+  const numeratorCol = findColumnByHints(
+    columns,
+    recipe.numerator?.columnHints || [],
+    deriveStep?.sourceColumnKey,
+  );
+
+  if (!numeratorCol) {
+    return {
+      type: "rate",
+      unresolved: true,
+      reason: "NUMERATOR_COLUMN_NOT_FOUND",
+      requiredHints: recipe.numerator?.columnHints || [],
+      outputHeader: recipe.outputHeader || "비율",
+      multiplier: recipe.multiplier || 100,
+    };
+  }
+
+  return {
+    type: "rate",
+    recipeId: recipe.id,
+    numerator: {
+      type: recipe.numerator?.type || "exists",
+      columnKey: numeratorCol.key,
+      header: numeratorCol.header,
+    },
+    denominator: recipe.denominator || { type: "count" },
+    outputHeader: recipe.outputHeader || "비율",
+    multiplier: recipe.multiplier || 100,
+  };
 }
 
 function includesAny(s, words = []) {
@@ -113,6 +185,137 @@ function detectFilters(message = "", columns = []) {
   return filters;
 }
 
+function detectLimit(message = "") {
+  const s = String(message || "");
+
+  const m =
+    s.match(/상위\s*(\d+)\s*(개|명|건)?/) ||
+    s.match(/top\s*(\d+)/i) ||
+    s.match(/(\d+)\s*(개|명|건)\s*(?:만|까지)?/);
+
+  if (!m) return null;
+
+  return {
+    type: "limit",
+    count: Number(m[1]),
+  };
+}
+
+function detectDeriveStep(message = "", table = null) {
+  const s = String(message || "");
+
+  const columns = table?.columns || [];
+
+  const dateColumn =
+    columns.find((c) => c.type === "date") ||
+    columns.find((c) =>
+      /(일|날짜|date|입사|퇴사|등록|생성)/i.test(c.header || ""),
+    );
+
+  if (!dateColumn) return null;
+
+  if (/연월별|월도별|년월별|연월\s*별|년월\s*별/.test(s)) {
+    return {
+      type: "derive",
+      fn: "yearMonth",
+      sourceColumnKey: dateColumn.key,
+      sourceHeader: dateColumn.header,
+      outputKey: `${dateColumn.key}_year_month`,
+      outputHeader: `${dateColumn.header} 연월`,
+    };
+  }
+
+  if (/연도별|년도별|연도\s*별/.test(s)) {
+    return {
+      type: "derive",
+      fn: "year",
+      sourceColumnKey: dateColumn.key,
+      sourceHeader: dateColumn.header,
+      outputKey: `${dateColumn.key}_year`,
+      outputHeader: `${dateColumn.header} 연도`,
+    };
+  }
+
+  if (/분기별|분기\s*별|quarter/i.test(s)) {
+    return {
+      type: "derive",
+      fn: "quarter",
+      sourceColumnKey: dateColumn.key,
+      sourceHeader: dateColumn.header,
+      outputKey: `${dateColumn.key}_quarter`,
+      outputHeader: `${dateColumn.header} 분기`,
+    };
+  }
+
+  if (/월별|개월별|월\s*별/.test(s)) {
+    return {
+      type: "derive",
+      fn: "month",
+      sourceColumnKey: dateColumn.key,
+      sourceHeader: dateColumn.header,
+      outputKey: `${dateColumn.key}_month`,
+      outputHeader: `${dateColumn.header} 월`,
+    };
+  }
+
+  return null;
+}
+
+function detectSort(message = "", metric = null) {
+  const s = String(message || "");
+
+  if (!metric?.columnKey) return null;
+
+  if (/높은\s*순|내림차순|큰\s*순|상위|top/i.test(s)) {
+    return {
+      type: "sort",
+      by: metric.columnKey,
+      header: metric.header,
+      direction: "desc",
+    };
+  }
+
+  if (/낮은\s*순|오름차순|작은\s*순|하위/i.test(s)) {
+    return {
+      type: "sort",
+      by: metric.columnKey,
+      header: metric.header,
+      direction: "asc",
+    };
+  }
+
+  return null;
+}
+
+function detectCompareStep(message = "", metric = null, groupBySpec = null) {
+  const recipe = findCompareRecipe(message);
+
+  if (!recipe) return null;
+  if (!metric?.columnKey || !groupBySpec?.columnKey) {
+    return {
+      type: "compare",
+      unresolved: true,
+      reason: "COMPARE_REQUIRES_METRIC_AND_GROUP",
+      outputHeader: recipe.outputHeader || "증감률",
+    };
+  }
+
+  return {
+    type: "compare",
+    recipeId: recipe.id,
+    mode: recipe.mode || "previous",
+    method: recipe.method || "growthRate",
+    metric,
+    groupBy: {
+      columnKey: groupBySpec.columnKey,
+      header: groupBySpec.header,
+    },
+    outputHeader: recipe.outputHeader || "증감률",
+    multiplier: recipe.multiplier || 100,
+    defaultAggregate: recipe.defaultAggregate || "sum",
+  };
+}
+
 function parseQueryIntent(message = "", queryTables = []) {
   const table =
     queryTables.find((t) => t.isPrimary) ||
@@ -128,10 +331,87 @@ function parseQueryIntent(message = "", queryTables = []) {
   }
 
   const columns = table.columns || [];
-  const operation = detectOperation(message);
+  let operation = detectOperation(message);
   const metricColumn = detectMetricColumn(message, columns, operation);
   const groupBy = detectGroupBy(message, columns);
   const filters = detectFilters(message, columns);
+  const deriveStep = detectDeriveStep(message, table);
+  const rateStep = detectRateSpec(message, columns, deriveStep);
+
+  const isYearlyRateRequest =
+    /연도별|년도별|연도\s*별/.test(message) && /율|비율/.test(message);
+
+  if (isYearlyRateRequest && rateStep?.unresolved) {
+    const baseDeriveStep = deriveStep;
+
+    if (!baseDeriveStep) {
+      return {
+        ok: false,
+        code: "DERIVE_COLUMN_NOT_FOUND",
+        error: "연도별 계산에 사용할 날짜 컬럼을 찾을 수 없습니다.",
+        message,
+      };
+    }
+
+    return {
+      ok: true,
+      version: "query_intent_v1",
+      message,
+      table: {
+        tableId: table.tableId,
+        tableName: table.tableName,
+        sheetName: table.sheetName,
+        confidence: table.confidence,
+        isPrimary: !!table.isPrimary,
+      },
+      operation: "multi",
+      metric: null,
+      groupBy: {
+        columnKey: baseDeriveStep.outputKey,
+        header: baseDeriveStep.outputHeader,
+        type: "category",
+        derived: true,
+      },
+      filters,
+      plan: {
+        version: "query_plan_v1",
+        tableId: table.tableId,
+        pipelines: [
+          {
+            id: "base_count",
+            label: "기준 건수",
+            steps: [
+              baseDeriveStep,
+              {
+                type: "groupBy",
+                columnKey: baseDeriveStep.outputKey,
+                header: baseDeriveStep.outputHeader,
+              },
+              {
+                type: "aggregate",
+                operation: "count",
+                metric: null,
+              },
+            ],
+          },
+        ],
+      },
+      derive: baseDeriveStep,
+      rate: null,
+    };
+  }
+
+  if (rateStep?.unresolved) {
+    return {
+      ok: false,
+      code: rateStep.reason,
+      error: "비율 계산에 필요한 기준 컬럼을 찾을 수 없습니다.",
+      requiredHints: rateStep.requiredHints,
+      message,
+    };
+  }
+
+  if (rateStep) operation = "rate";
 
   const metric = metricColumn
     ? {
@@ -141,18 +421,42 @@ function parseQueryIntent(message = "", queryTables = []) {
       }
     : null;
 
-  const groupBySpec = groupBy
+  const sortStep = detectSort(message, metric);
+  const limitStep = detectLimit(message);
+
+  const groupBySpec = deriveStep
     ? {
-        columnKey: groupBy.key,
-        header: groupBy.header,
-        type: groupBy.type,
+        columnKey: deriveStep.outputKey,
+        header: deriveStep.outputHeader,
+        type: "category",
+        derived: true,
       }
-    : null;
+    : groupBy
+      ? {
+          columnKey: groupBy.key,
+          header: groupBy.header,
+          type: groupBy.type,
+        }
+      : null;
+
+  const compareStep = detectCompareStep(message, metric, groupBySpec);
+
+  if (compareStep?.unresolved) {
+    return {
+      ok: false,
+      code: compareStep.reason,
+      error: "비교 계산에는 기준 지표와 그룹 기준이 필요합니다.",
+      message,
+    };
+  }
+
+  if (compareStep) operation = "growthRate";
 
   const plan = {
     version: "query_plan_v1",
     tableId: table.tableId,
     steps: [
+      ...(deriveStep ? [deriveStep] : []),
       ...(filters.length ? [{ type: "filter", filters }] : []),
       ...(groupBySpec
         ? [
@@ -163,11 +467,20 @@ function parseQueryIntent(message = "", queryTables = []) {
             },
           ]
         : []),
-      {
-        type: "aggregate",
-        operation,
-        metric,
-      },
+      ...(rateStep
+        ? [rateStep]
+        : [
+            {
+              type: "aggregate",
+              operation: compareStep
+                ? compareStep.defaultAggregate || "sum"
+                : operation,
+              metric,
+            },
+          ]),
+      ...(compareStep ? [compareStep] : []),
+      ...(sortStep ? [sortStep] : []),
+      ...(limitStep ? [limitStep] : []),
     ],
   };
 
@@ -187,6 +500,11 @@ function parseQueryIntent(message = "", queryTables = []) {
     groupBy: groupBySpec,
     filters,
     plan,
+    derive: deriveStep,
+    rate: rateStep,
+    sort: sortStep,
+    limit: limitStep,
+    compare: compareStep,
   };
 }
 

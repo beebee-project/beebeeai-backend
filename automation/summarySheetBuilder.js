@@ -82,13 +82,28 @@ function formatNumberCells(ws) {
 
 function resultToRows(result = {}) {
   if (result.resultType === "grouped") {
-    return (result.rows || []).map((r) => ({
-      [result.groupBy?.header || "그룹"]: r[result.groupBy?.header] ?? "",
-      작업: r.operation,
-      지표: r.metric,
-      값: r.value,
-      행수: r.rowCount,
-    }));
+    const groupHeader = result.groupBy?.header || "그룹";
+    const extraKeys = ["기준값", "비교값", "증감률"].filter((k) =>
+      (result.rows || []).some((r) =>
+        Object.prototype.hasOwnProperty.call(r, k),
+      ),
+    );
+
+    return (result.rows || []).map((r) => {
+      const base = {
+        [groupHeader]: r[groupHeader] ?? "",
+        작업: r.operation,
+        지표: r.metric,
+        값: r.value,
+        행수: r.rowCount,
+      };
+
+      for (const key of extraKeys) {
+        base[key] = r[key];
+      }
+
+      return base;
+    });
   }
 
   if (result.resultType === "scalar") {
