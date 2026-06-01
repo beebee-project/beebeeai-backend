@@ -93,6 +93,15 @@ const COMPARE_RECIPES = [
     outputHeader: "증감률",
     multiplier: 100,
     defaultAggregate: "sum",
+    offsetHints: [
+      { match: ["전년대비", "전년 대비", "yoy"], offset: 12, unit: "month" },
+      { match: ["전월대비", "전월 대비", "mom"], offset: 1, unit: "month" },
+      {
+        match: ["전분기대비", "전분기 대비", "qoq"],
+        offset: 1,
+        unit: "quarter",
+      },
+    ],
   },
 ];
 

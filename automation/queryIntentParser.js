@@ -287,6 +287,24 @@ function detectSort(message = "", metric = null) {
   return null;
 }
 
+function detectCompareOffset(message = "", recipe = {}) {
+  const s = normalizeText(message);
+
+  for (const hint of recipe.offsetHints || []) {
+    if ((hint.match || []).some((kw) => s.includes(normalizeText(kw)))) {
+      return {
+        offset: hint.offset,
+        unit: hint.unit,
+      };
+    }
+  }
+
+  return {
+    offset: 1,
+    unit: "previous",
+  };
+}
+
 function detectCompareStep(message = "", metric = null, groupBySpec = null) {
   const recipe = findCompareRecipe(message);
 
@@ -299,6 +317,8 @@ function detectCompareStep(message = "", metric = null, groupBySpec = null) {
       outputHeader: recipe.outputHeader || "증감률",
     };
   }
+
+  const offsetSpec = detectCompareOffset(message, recipe);
 
   return {
     type: "compare",
@@ -313,22 +333,145 @@ function detectCompareStep(message = "", metric = null, groupBySpec = null) {
     outputHeader: recipe.outputHeader || "증감률",
     multiplier: recipe.multiplier || 100,
     defaultAggregate: recipe.defaultAggregate || "sum",
+    offset: offsetSpec.offset,
+    offsetUnit: offsetSpec.unit,
   };
 }
 
-function parseQueryIntent(message = "", queryTables = []) {
-  const table =
-    queryTables.find((t) => t.isPrimary) ||
-    queryTables.sort(
-      (a, b) => Number(b.confidence || 0) - Number(a.confidence || 0),
-    )[0];
+function detectWindowStep(message = "", metric = null, groupBySpec = null) {
+  const s = normalizeText(message);
 
-  if (!table) {
+  if (!metric?.columnKey) return null;
+
+  if (/누적|누계|runningtotal|cumulative/i.test(message)) {
+    return {
+      type: "window",
+      method: "cumulativeSum",
+      metric,
+      groupBy: groupBySpec
+        ? {
+            columnKey: groupBySpec.columnKey,
+            header: groupBySpec.header,
+          }
+        : null,
+      outputHeader: `누적 ${metric.header || "값"}`,
+    };
+  }
+
+  const rollingMatch =
+    String(message).match(
+      /최근\s*(\d+)\s*(개월|월|일|년)\s*(?:평균|이동평균)/,
+    ) ||
+    String(message).match(
+      /(\d+)\s*(개월|월|일|년)\s*(?:이동평균|rolling\s*average)/i,
+    );
+
+  if (rollingMatch) {
+    const size = Number(rollingMatch[1]);
+
+    return {
+      type: "window",
+      method: "rollingAverage",
+      size,
+      unit: rollingMatch[2],
+      metric,
+      groupBy: groupBySpec
+        ? {
+            columnKey: groupBySpec.columnKey,
+            header: groupBySpec.header,
+          }
+        : null,
+      outputHeader: `${size}${rollingMatch[2]} 이동평균`,
+    };
+  }
+
+  return null;
+}
+
+function scoreTableForMessage(table = {}, message = "") {
+  const s = normalizeText(message);
+
+  const columns = table.columns || [];
+  let score = Number(table.isPrimary ? 5 : 0);
+  score += Number(table.confidence || 0) / 20;
+
+  const tableText = normalizeText(
+    `${table.tableName || ""} ${table.sheetName || ""}`,
+  );
+
+  if (tableText && s.includes(tableText)) score += 20;
+
+  for (const col of columns) {
+    const header = normalizeText(
+      `${col.header || ""} ${col.originalHeader || ""} ${col.key || ""}`,
+    );
+
+    if (!header) continue;
+
+    if (s.includes(header)) score += 10;
+    else if (header.includes(s)) score += 3;
+  }
+
+  const groupHint = String(message)
+    .match(/(.+?)별/)?.[1]
+    ?.trim();
+  if (groupHint) {
+    const matched = findColumnByText(columns, groupHint);
+    if (matched) score += 15;
+  }
+
+  return score;
+}
+
+function selectBestTable(queryTables = [], message = "") {
+  if (!Array.isArray(queryTables) || !queryTables.length) return null;
+
+  const ranked = [...queryTables]
+    .map((table) => ({
+      table,
+      score: scoreTableForMessage(table, message),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const best = ranked[0];
+  const second = ranked[1];
+
+  if (second && best.score - second.score <= 2) {
+    return {
+      ambiguous: true,
+      candidates: ranked.slice(0, 3).map((r) => ({
+        tableId: r.table.tableId,
+        tableName: r.table.tableName,
+        sheetName: r.table.sheetName,
+        score: r.score,
+      })),
+    };
+  }
+
+  return best.table;
+}
+
+function parseQueryIntent(message = "", queryTables = []) {
+  const selected = selectBestTable(queryTables, message);
+
+  if (!selected) {
     return {
       ok: false,
       error: "분석 가능한 테이블이 없습니다.",
     };
   }
+
+  if (selected?.ambiguous) {
+    return {
+      ok: false,
+      code: "AMBIGUOUS_TABLE",
+      error: "요청에 맞는 테이블을 명확히 선택할 수 없습니다.",
+      candidates: selected.candidates,
+      message,
+    };
+  }
+
+  const table = selected;
 
   const columns = table.columns || [];
   let operation = detectOperation(message);
@@ -341,7 +484,7 @@ function parseQueryIntent(message = "", queryTables = []) {
   const isYearlyRateRequest =
     /연도별|년도별|연도\s*별/.test(message) && /율|비율/.test(message);
 
-  if (isYearlyRateRequest && rateStep?.unresolved) {
+  if (isYearlyRateRequest && rateStep && !rateStep.unresolved) {
     const baseDeriveStep = deriveStep;
 
     if (!baseDeriveStep) {
@@ -394,7 +537,43 @@ function parseQueryIntent(message = "", queryTables = []) {
               },
             ],
           },
+          {
+            id: "event_count",
+            label: rateStep?.outputHeader || "이벤트 건수",
+            steps: [
+              baseDeriveStep,
+              {
+                type: "filter",
+                filters: [
+                  {
+                    columnKey: rateStep?.numerator?.columnKey,
+                    header: rateStep?.numerator?.header,
+                    operator: "exists",
+                    valueType: "exists",
+                  },
+                ],
+              },
+              {
+                type: "groupBy",
+                columnKey: baseDeriveStep.outputKey,
+                header: baseDeriveStep.outputHeader,
+              },
+              {
+                type: "aggregate",
+                operation: "count",
+                metric: null,
+              },
+            ],
+          },
         ],
+        combine: {
+          type: "combineRatio",
+          numeratorPipeline: "event_count",
+          denominatorPipeline: "base_count",
+          operation: "rate",
+          outputHeader: rateStep?.outputHeader || "비율",
+          multiplier: rateStep?.multiplier || 100,
+        },
       },
       derive: baseDeriveStep,
       rate: null,
@@ -441,6 +620,10 @@ function parseQueryIntent(message = "", queryTables = []) {
 
   const compareStep = detectCompareStep(message, metric, groupBySpec);
 
+  const windowStep = detectWindowStep(message, metric, groupBySpec);
+
+  if (windowStep) operation = windowStep.method;
+
   if (compareStep?.unresolved) {
     return {
       ok: false,
@@ -472,13 +655,18 @@ function parseQueryIntent(message = "", queryTables = []) {
         : [
             {
               type: "aggregate",
-              operation: compareStep
-                ? compareStep.defaultAggregate || "sum"
-                : operation,
+              operation: windowStep
+                ? includesAny(String(message), ["평균", "average", "avg"])
+                  ? "average"
+                  : "sum"
+                : compareStep
+                  ? compareStep.defaultAggregate || "sum"
+                  : operation,
               metric,
             },
           ]),
       ...(compareStep ? [compareStep] : []),
+      ...(windowStep ? [windowStep] : []),
       ...(sortStep ? [sortStep] : []),
       ...(limitStep ? [limitStep] : []),
     ],
@@ -505,6 +693,7 @@ function parseQueryIntent(message = "", queryTables = []) {
     sort: sortStep,
     limit: limitStep,
     compare: compareStep,
+    window: windowStep,
   };
 }
 

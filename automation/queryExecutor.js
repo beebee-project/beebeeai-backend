@@ -1,3 +1,41 @@
+function buildExecutionMeta({
+  table = {},
+  intent = {},
+  plan = {},
+  steps = [],
+  resultType = "",
+}) {
+  return {
+    version: "execution_meta_v1",
+    table: {
+      tableId: table.tableId,
+      tableName: table.tableName,
+      sheetName: table.sheetName,
+    },
+    intent: {
+      operation: intent.operation,
+      metric: intent.metric,
+      groupBy: intent.groupBy,
+    },
+    planVersion: plan?.version || null,
+    resultType,
+    steps: (steps || []).map((s, idx) => ({
+      index: idx,
+      type: s.type,
+      operation: s.operation || s.method || s.fn || null,
+      input: {
+        columnKey:
+          s.columnKey || s.sourceColumnKey || s.metric?.columnKey || null,
+        header: s.header || s.sourceHeader || s.metric?.header || null,
+      },
+      output: {
+        columnKey: s.outputKey || null,
+        header: s.outputHeader || null,
+      },
+    })),
+  };
+}
+
 function toComparable(value) {
   if (value == null || value === "") return null;
 
@@ -136,6 +174,8 @@ function matchFilter(row, filter = {}) {
   const right = toComparable(filter.value);
 
   switch (filter.operator) {
+    case "exists":
+      return raw != null && String(raw).trim() !== "";
     case "=":
       return String(left ?? "").trim() === String(right ?? "").trim();
     case "!=":
@@ -231,15 +271,20 @@ function applyCompareRows(rows = [], compareStep = null) {
   if (!compareStep || compareStep.method !== "growthRate") return rows;
 
   const outputHeader = compareStep.outputHeader || "증감률";
+  const offset = Number(compareStep.offset || 1);
+
+  const groupHeader = compareStep.groupBy?.header;
 
   const sorted = [...rows].sort((a, b) => {
-    const av = String(a[compareStep.groupBy?.header] ?? "");
-    const bv = String(b[compareStep.groupBy?.header] ?? "");
+    const av = String(a[groupHeader] ?? "");
+    const bv = String(b[groupHeader] ?? "");
     return av.localeCompare(bv);
   });
 
   return sorted.map((row, idx) => {
-    if (idx === 0) {
+    const baseIdx = idx - offset;
+
+    if (baseIdx < 0) {
       return {
         ...row,
         기준값: null,
@@ -248,7 +293,7 @@ function applyCompareRows(rows = [], compareStep = null) {
       };
     }
 
-    const prev = sorted[idx - 1];
+    const prev = sorted[baseIdx];
     const prevValue = Number(prev.value);
     const currValue = Number(row.value);
 
@@ -269,6 +314,50 @@ function applyCompareRows(rows = [], compareStep = null) {
   });
 }
 
+function applyWindowRows(rows = [], windowStep = null) {
+  if (!windowStep) return rows;
+
+  const outputHeader = windowStep.outputHeader || "window";
+  const sorted = [...rows];
+
+  if (windowStep.method === "cumulativeSum") {
+    let acc = 0;
+
+    return sorted.map((row) => {
+      const v = Number(row.value || 0);
+      acc += Number.isFinite(v) ? v : 0;
+
+      return {
+        ...row,
+        [outputHeader]: acc,
+      };
+    });
+  }
+
+  if (windowStep.method === "rollingAverage") {
+    const size = Math.max(Number(windowStep.size || 1), 1);
+
+    return sorted.map((row, idx) => {
+      const start = Math.max(0, idx - size + 1);
+      const slice = sorted.slice(start, idx + 1);
+      const values = slice
+        .map((r) => Number(r.value))
+        .filter((v) => Number.isFinite(v));
+
+      const avg = values.length
+        ? values.reduce((a, b) => a + b, 0) / values.length
+        : null;
+
+      return {
+        ...row,
+        [outputHeader]: avg,
+      };
+    });
+  }
+
+  return rows;
+}
+
 function executeSinglePipeline(table = {}, intent = {}, steps = []) {
   const rows = applyDeriveSteps(
     Array.isArray(table.rows) ? table.rows : [],
@@ -285,6 +374,7 @@ function executeSinglePipeline(table = {}, intent = {}, steps = []) {
   const sortStep = steps.find((s) => s.type === "sort");
   const limitStep = steps.find((s) => s.type === "limit");
   const compareStep = steps.find((s) => s.type === "compare");
+  const windowStep = steps.find((s) => s.type === "window");
 
   const operation = rateStep
     ? "rate"
@@ -316,8 +406,10 @@ function executeSinglePipeline(table = {}, intent = {}, steps = []) {
     }
 
     const comparedRows = applyCompareRows(resultRows, compareStep);
+    const windowedRows = applyWindowRows(comparedRows, windowStep);
+
     const finalRows = applyLimitRows(
-      applySortRows(comparedRows, sortStep),
+      applySortRows(windowedRows, sortStep),
       limitStep,
     );
 
@@ -332,6 +424,13 @@ function executeSinglePipeline(table = {}, intent = {}, steps = []) {
       rowCount: filteredRows.length,
       resultType: "grouped",
       rows: finalRows,
+      executionMeta: buildExecutionMeta({
+        table,
+        intent,
+        plan: { steps },
+        steps,
+        resultType: "grouped",
+      }),
     };
   }
 
@@ -361,6 +460,68 @@ function executeSinglePipeline(table = {}, intent = {}, steps = []) {
   };
 }
 
+function mergePipelineRatio(pipelines = [], combineStep = null) {
+  if (!combineStep || combineStep.type !== "combineRatio") return null;
+
+  const numerator = pipelines.find(
+    (p) => p.id === combineStep.numeratorPipeline,
+  );
+  const denominator = pipelines.find(
+    (p) => p.id === combineStep.denominatorPipeline,
+  );
+
+  if (!numerator || !denominator) {
+    return {
+      ok: false,
+      error: "비율 계산에 필요한 pipeline 결과가 없습니다.",
+    };
+  }
+
+  const groupHeader =
+    denominator.groupBy?.header || numerator.groupBy?.header || "그룹";
+
+  const numeratorMap = new Map(
+    (numerator.rows || []).map((r) => [
+      String(r[groupHeader] ?? ""),
+      Number(r.value || 0),
+    ]),
+  );
+
+  const rows = (denominator.rows || []).map((baseRow) => {
+    const key = String(baseRow[groupHeader] ?? "");
+    const denominatorValue = Number(baseRow.value || 0);
+    const numeratorValue = Number(numeratorMap.get(key) || 0);
+
+    const value =
+      denominatorValue > 0
+        ? (numeratorValue / denominatorValue) *
+          Number(combineStep.multiplier || 100)
+        : null;
+
+    return {
+      [groupHeader]: key,
+      operation: combineStep.operation || "ratio",
+      metric: combineStep.outputHeader || "비율",
+      value,
+      numerator: numeratorValue,
+      denominator: denominatorValue,
+      rowCount: denominatorValue,
+    };
+  });
+
+  return {
+    ok: true,
+    operation: combineStep.operation || "ratio",
+    metric: {
+      header: combineStep.outputHeader || "비율",
+      type: "rate",
+    },
+    groupBy: denominator.groupBy || numerator.groupBy,
+    resultType: "grouped",
+    rows,
+  };
+}
+
 function executePipelines(table = {}, intent = {}, plan = {}) {
   const pipelines = Array.isArray(plan.pipelines) ? plan.pipelines : [];
 
@@ -373,6 +534,21 @@ function executePipelines(table = {}, intent = {}, plan = {}) {
       ...result,
     };
   });
+
+  const combineStep = Array.isArray(plan.combine)
+    ? plan.combine[0]
+    : plan.combine;
+
+  const combined = mergePipelineRatio(results, combineStep);
+
+  if (combined) {
+    return {
+      ok: combined.ok,
+      resultType: "multi",
+      pipelines: results,
+      combined,
+    };
+  }
 
   return {
     ok: results.every((r) => r.ok),
@@ -403,14 +579,23 @@ function executeQueryIntent(queryTables = [], intent = {}) {
     return {
       ok: multiResult.ok,
       table: intent.table,
-      operation: intent.operation,
-      metric: intent.metric,
-      groupBy: intent.groupBy,
+      operation: multiResult.combined?.operation || intent.operation,
+      metric: multiResult.combined?.metric || intent.metric,
+      groupBy: multiResult.combined?.groupBy || intent.groupBy,
       filters: intent.filters || [],
       plan,
       rowCount: Array.isArray(table.rows) ? table.rows.length : 0,
-      resultType: "multi",
+      resultType: multiResult.combined ? "grouped" : "multi",
+      rows: multiResult.combined?.rows || [],
       pipelines: multiResult.pipelines,
+      combined: multiResult.combined || null,
+      executionMeta: buildExecutionMeta({
+        table,
+        intent,
+        plan,
+        steps: plan.pipelines?.flatMap((p) => p.steps || []) || [],
+        resultType: multiResult.combined ? "grouped" : "multi",
+      }),
     };
   }
 
@@ -430,6 +615,7 @@ function executeQueryIntent(queryTables = [], intent = {}) {
   const limitStep = steps.find((s) => s.type === "limit");
   const deriveStep = steps.find((s) => s.type === "derive");
   const compareStep = steps.find((s) => s.type === "compare");
+  const windowStep = steps.find((s) => s.type === "window");
 
   const operation = rateStep
     ? "rate"
@@ -451,7 +637,11 @@ function executeQueryIntent(queryTables = [], intent = {}) {
     for (const [groupValue, groupRowsValue] of groups.entries()) {
       resultRows.push({
         [groupBy.header || groupBy.columnKey]: groupValue,
-        operation: compareStep ? "growthRate" : operation,
+        operation: windowStep
+          ? windowStep.method
+          : compareStep
+            ? "growthRate"
+            : operation,
         metric: rateStep?.outputHeader || metric?.header || null,
         value: rateStep
           ? rateValue(groupRowsValue, rateStep)
@@ -461,16 +651,21 @@ function executeQueryIntent(queryTables = [], intent = {}) {
     }
 
     const comparedRows = applyCompareRows(resultRows, compareStep);
+    const windowedRows = applyWindowRows(comparedRows, windowStep);
 
     const finalRows = applyLimitRows(
-      applySortRows(comparedRows, sortStep),
+      applySortRows(windowedRows, sortStep),
       limitStep,
     );
 
     return {
       ok: true,
       table: intent.table,
-      operation: compareStep ? "growthRate" : operation,
+      operation: windowStep
+        ? windowStep.method
+        : compareStep
+          ? "growthRate"
+          : operation,
       metric: rateStep
         ? { header: rateStep.outputHeader, type: "rate" }
         : metric,
@@ -480,6 +675,13 @@ function executeQueryIntent(queryTables = [], intent = {}) {
       rowCount: filteredRows.length,
       resultType: "grouped",
       rows: finalRows,
+      executionMeta: buildExecutionMeta({
+        table,
+        intent,
+        plan,
+        steps,
+        resultType: "grouped",
+      }),
     };
   }
 
@@ -508,6 +710,13 @@ function executeQueryIntent(queryTables = [], intent = {}) {
         ? filteredRows.slice(0, 100)
         : [],
     plan,
+    executionMeta: buildExecutionMeta({
+      table,
+      intent,
+      plan,
+      steps,
+      resultType: operation === "list" ? "rows" : "scalar",
+    }),
   };
 }
 
