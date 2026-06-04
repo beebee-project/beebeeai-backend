@@ -245,6 +245,68 @@ function groupRows(rows = [], groupBy) {
   return groups;
 }
 
+function pivotRows(
+  rows = [],
+  pivotStep = {},
+  operation = "count",
+  metric = null,
+) {
+  const rowGroup = pivotStep.rowGroup;
+  const columnGroup = pivotStep.columnGroup;
+
+  const rowHeader = rowGroup?.header || rowGroup?.columnKey || "행";
+  const colKey = columnGroup?.columnKey;
+
+  const rowMap = new Map();
+  const columnValues = new Set();
+
+  for (const row of rows) {
+    const rowValue = String(row[rowGroup.columnKey] ?? "");
+    const colValue = String(row[colKey] ?? "");
+
+    columnValues.add(colValue);
+
+    if (!rowMap.has(rowValue)) {
+      rowMap.set(rowValue, {
+        [rowHeader]: rowValue,
+      });
+    }
+  }
+
+  const sortedColumnValues = Array.from(columnValues).sort();
+
+  for (const rowValue of rowMap.keys()) {
+    const base = rowMap.get(rowValue);
+
+    for (const colValue of sortedColumnValues) {
+      const subset = rows.filter(
+        (r) =>
+          String(r[rowGroup.columnKey] ?? "") === rowValue &&
+          String(r[colKey] ?? "") === colValue,
+      );
+
+      const value = aggregate(subset, operation, metric);
+
+      base[colValue] = value == null ? (operation === "count" ? 0 : "") : value;
+    }
+  }
+
+  return {
+    ok: true,
+    operation: "pivot",
+    metric,
+    groupBy: rowGroup,
+    pivot: {
+      rowGroup,
+      columnGroup,
+      columns: sortedColumnValues,
+    },
+    rowCount: rows.length,
+    resultType: "pivot",
+    rows: Array.from(rowMap.values()),
+  };
+}
+
 function applySortRows(rows = [], sortStep = null) {
   if (!sortStep?.by) return rows;
 
@@ -616,12 +678,31 @@ function executeQueryIntent(queryTables = [], intent = {}) {
   const deriveStep = steps.find((s) => s.type === "derive");
   const compareStep = steps.find((s) => s.type === "compare");
   const windowStep = steps.find((s) => s.type === "window");
+  const pivotStep = steps.find((s) => s.type === "pivot");
 
   const operation = rateStep
     ? "rate"
     : aggregateStep?.operation || intent.operation;
 
   const metric = aggregateStep?.metric || intent.metric;
+
+  if (pivotStep?.rowGroup?.columnKey && pivotStep?.columnGroup?.columnKey) {
+    const pivotResult = pivotRows(filteredRows, pivotStep, operation, metric);
+
+    return {
+      ...pivotResult,
+      table: intent.table,
+      filters,
+      plan,
+      executionMeta: buildExecutionMeta({
+        table,
+        intent,
+        plan,
+        steps,
+        resultType: "pivot",
+      }),
+    };
+  }
 
   const groupBy = groupByStep
     ? {

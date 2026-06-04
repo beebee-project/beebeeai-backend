@@ -153,6 +153,75 @@ exports.createSummarySheet = async (req, res, next) => {
   }
 };
 
+exports.exportXlsx = async (req, res) => {
+  try {
+    const { queryTablesKey, message } = req.body || {};
+
+    if (!queryTablesKey || !message) {
+      return res.status(400).json({
+        ok: false,
+        code: "MISSING_REQUIRED_FIELDS",
+        error: "queryTablesKey와 message가 필요합니다.",
+      });
+    }
+
+    const saved = await readJsonObject(queryTablesKey);
+    const tables = saved.tables || [];
+
+    const intent = parseQueryIntent(message, tables);
+
+    if (!intent.ok) {
+      return res.status(400).json({
+        ok: false,
+        intent,
+        code: intent.code,
+        error: intent.error || "query intent 생성 실패",
+      });
+    }
+
+    const result = executeQueryIntent(tables, intent);
+
+    if (!result.ok) {
+      return res.status(400).json({
+        ok: false,
+        intent,
+        result,
+        error: result.error || "query 실행 실패",
+      });
+    }
+
+    const workbook = buildSummaryWorkbook({
+      fileName: saved.fileName || "",
+      message,
+      intent,
+      result,
+    });
+
+    const buffer = workbookToBuffer(workbook);
+
+    const fileName = `automation_${Date.now()}.xlsx`;
+    const outputDir = path.join(process.cwd(), "generated", "automation");
+    fs.mkdirSync(outputDir, { recursive: true });
+
+    const filePath = path.join(outputDir, fileName);
+    fs.writeFileSync(filePath, buffer);
+
+    return res.json({
+      ok: true,
+      fileName,
+      filePath,
+      sheetNames: workbook.SheetNames || [],
+      result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      code: "EXPORT_XLSX_FAILED",
+      error: err.message,
+    });
+  }
+};
+
 exports.executeQuery = async (req, res, next) => {
   try {
     const { queryTablesKey, message, intent } = req.body || {};

@@ -119,6 +119,67 @@ function detectMetricColumn(message = "", columns = [], operation = "") {
   return numberCols[0] || null;
 }
 
+function detectPivotSpec(message = "", columns = [], deriveStep = null) {
+  const s = String(message || "");
+
+  const m = s.match(/(.+?)별\s+(.+?)별/);
+  if (!m) return null;
+
+  const rowHint = m[1].trim();
+  const colHint = m[2].trim();
+
+  let rowGroup = null;
+  let columnGroup = null;
+  const extraDerives = [];
+
+  if (/연도|년도/.test(rowHint) && deriveStep?.fn === "year") {
+    rowGroup = {
+      columnKey: deriveStep.outputKey,
+      header: deriveStep.outputHeader,
+      derived: true,
+    };
+  } else if (/연월|년월/.test(rowHint) && deriveStep?.fn === "yearMonth") {
+    rowGroup = {
+      columnKey: deriveStep.outputKey,
+      header: deriveStep.outputHeader,
+      derived: true,
+    };
+  } else if (/월/.test(rowHint) && deriveStep?.fn === "month") {
+    rowGroup = {
+      columnKey: deriveStep.outputKey,
+      header: deriveStep.outputHeader,
+      derived: true,
+    };
+  } else {
+    const rowCol = findColumnByText(columns, rowHint);
+    if (rowCol) {
+      rowGroup = {
+        columnKey: rowCol.key,
+        header: rowCol.header,
+        type: rowCol.type,
+      };
+    }
+  }
+
+  const colCol = findColumnByText(columns, colHint);
+  if (colCol) {
+    columnGroup = {
+      columnKey: colCol.key,
+      header: colCol.header,
+      type: colCol.type,
+    };
+  }
+
+  if (!rowGroup || !columnGroup) return null;
+
+  return {
+    type: "pivot",
+    rowGroup,
+    columnGroup,
+    extraDerives,
+  };
+}
+
 function detectGroupBy(message = "", columns = []) {
   const m = String(message).match(/(.+?)별/);
   if (!m) return null;
@@ -479,6 +540,7 @@ function parseQueryIntent(message = "", queryTables = []) {
   const groupBy = detectGroupBy(message, columns);
   const filters = detectFilters(message, columns);
   const deriveStep = detectDeriveStep(message, table);
+  const pivotSpec = detectPivotSpec(message, columns, deriveStep);
   const rateStep = detectRateSpec(message, columns, deriveStep);
 
   const isYearlyRateRequest =
@@ -618,6 +680,14 @@ function parseQueryIntent(message = "", queryTables = []) {
         }
       : null;
 
+  const pivotStep = pivotSpec
+    ? {
+        type: "pivot",
+        rowGroup: pivotSpec.rowGroup,
+        columnGroup: pivotSpec.columnGroup,
+      }
+    : null;
+
   const compareStep = detectCompareStep(message, metric, groupBySpec);
 
   const windowStep = detectWindowStep(message, metric, groupBySpec);
@@ -641,15 +711,17 @@ function parseQueryIntent(message = "", queryTables = []) {
     steps: [
       ...(deriveStep ? [deriveStep] : []),
       ...(filters.length ? [{ type: "filter", filters }] : []),
-      ...(groupBySpec
-        ? [
-            {
-              type: "groupBy",
-              columnKey: groupBySpec.columnKey,
-              header: groupBySpec.header,
-            },
-          ]
-        : []),
+      ...(pivotStep
+        ? [pivotStep]
+        : groupBySpec
+          ? [
+              {
+                type: "groupBy",
+                columnKey: groupBySpec.columnKey,
+                header: groupBySpec.header,
+              },
+            ]
+          : []),
       ...(rateStep
         ? [rateStep]
         : [
@@ -694,6 +766,7 @@ function parseQueryIntent(message = "", queryTables = []) {
     limit: limitStep,
     compare: compareStep,
     window: windowStep,
+    pivot: pivotStep,
   };
 }
 

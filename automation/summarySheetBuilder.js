@@ -1,32 +1,168 @@
 const XLSX = require("xlsx");
 
 function buildChartDataRows(result = {}) {
-  if (result.resultType !== "grouped") return [];
+  if (result.resultType === "grouped") {
+    const groupHeader = result.groupBy?.header || "그룹";
+    const metricHeader = result.metric?.header || "값";
 
-  const groupHeader = result.groupBy?.header || "그룹";
-  const metricHeader = result.metric?.header || "값";
+    return (result.rows || []).map((r) => ({
+      [groupHeader]: r[groupHeader] ?? "",
+      [metricHeader]: r.value,
+      행수: r.rowCount,
+    }));
+  }
 
-  return (result.rows || []).map((r) => ({
-    [groupHeader]: r[groupHeader] ?? "",
-    [metricHeader]: r.value,
-    행수: r.rowCount,
-  }));
+  if (result.resultType === "pivot") {
+    return result.rows || [];
+  }
+
+  return [];
+}
+
+function appendSheetSafe(wb, ws, name) {
+  let safeName = String(name || "Sheet").slice(0, 31);
+  const existing = new Set(wb.SheetNames || []);
+
+  if (!existing.has(safeName)) {
+    XLSX.utils.book_append_sheet(wb, ws, safeName);
+    return;
+  }
+
+  let idx = 2;
+  while (existing.has(`${safeName}_${idx}`.slice(0, 31))) {
+    idx += 1;
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, `${safeName}_${idx}`.slice(0, 31));
+}
+
+function objectToAoa(obj = {}, prefix = "") {
+  const rows = [];
+
+  function walk(value, keyPath) {
+    if (value == null || typeof value !== "object") {
+      rows.push([keyPath, value ?? ""]);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, idx) => {
+        walk(item, `${keyPath}[${idx}]`);
+      });
+      return;
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      walk(child, keyPath ? `${keyPath}.${key}` : key);
+    }
+  }
+
+  walk(obj, prefix);
+
+  return rows.length ? rows : [["", ""]];
 }
 
 function buildChartSpec(result = {}) {
-  if (result.resultType !== "grouped") return null;
+  if (result.resultType === "grouped") {
+    const groupHeader = result.groupBy?.header || "그룹";
+    const metricHeader = result.metric?.header || "값";
 
-  const groupHeader = result.groupBy?.header || "그룹";
-  const metricHeader = result.metric?.header || "값";
+    return {
+      version: "chart_spec_v1",
+      recommendedType: "bar",
+      title: `${groupHeader}별 ${metricHeader}`,
+      categoryField: groupHeader,
+      valueField: metricHeader,
+      rowCount: Array.isArray(result.rows) ? result.rows.length : 0,
+    };
+  }
 
-  return {
-    version: "chart_spec_v1",
-    recommendedType: "bar",
-    title: `${groupHeader}별 ${metricHeader}`,
-    categoryField: groupHeader,
-    valueField: metricHeader,
-    rowCount: Array.isArray(result.rows) ? result.rows.length : 0,
-  };
+  if (result.resultType === "pivot") {
+    const rowHeader =
+      result.pivot?.rowGroup?.header || result.groupBy?.header || "그룹";
+
+    return {
+      version: "chart_spec_v1",
+      recommendedType:
+        (result.pivot?.columns || []).length <= 5
+          ? "stacked_bar"
+          : "pivot_table",
+      title: `${rowHeader} 기준 교차 분석`,
+      categoryField: rowHeader,
+      seriesFields: result.pivot?.columns || [],
+      rowCount: Array.isArray(result.rows) ? result.rows.length : 0,
+    };
+  }
+
+  return null;
+}
+
+function buildInsightRows(result = {}) {
+  const rows = [];
+
+  if (!Array.isArray(result.rows) || !result.rows.length) {
+    return [["요약", "분석 결과가 없습니다."]];
+  }
+
+  rows.push([
+    "요약",
+    `${result.operation || "분석"} 결과 ${result.rows.length}건이 생성되었습니다.`,
+  ]);
+
+  if (result.resultType === "pivot") {
+    rows.push(["분석유형", "Pivot 교차 분석 결과입니다."]);
+    rows.push(["행 기준", result.pivot?.rowGroup?.header || ""]);
+    rows.push(["열 기준", result.pivot?.columnGroup?.header || ""]);
+    rows.push(["열 항목 수", result.pivot?.columns?.length || 0]);
+    rows.push(["결과 행 수", result.rows?.length || 0]);
+
+    return rows;
+  }
+
+  if (result.resultType === "grouped") {
+    const groupHeader = result.groupBy?.header || "그룹";
+    const valueRows = result.rows
+      .filter((r) => Number.isFinite(Number(r.value)))
+      .map((r) => ({
+        label: r[groupHeader],
+        value: Number(r.value),
+      }));
+
+    if (result.resultType === "pivot") {
+      rows.push(["분석유형", "Pivot 교차 분석 결과입니다."]);
+      rows.push(["행 기준", result.pivot?.rowGroup?.header || ""]);
+      rows.push(["열 기준", result.pivot?.columnGroup?.header || ""]);
+      rows.push(["열 항목 수", result.pivot?.columns?.length || 0]);
+      rows.push(["결과 행 수", result.rows?.length || 0]);
+
+      return rows;
+    }
+
+    if (valueRows.length) {
+      const max = valueRows.reduce((a, b) => (b.value > a.value ? b : a));
+      const min = valueRows.reduce((a, b) => (b.value < a.value ? b : a));
+
+      rows.push(["최대값", `${max.label}: ${max.value}`]);
+      rows.push(["최소값", `${min.label}: ${min.value}`]);
+    }
+
+    const growthRows = result.rows.filter((r) =>
+      Number.isFinite(Number(r["증감률"])),
+    );
+
+    if (growthRows.length) {
+      const maxGrowth = growthRows.reduce((a, b) =>
+        Number(b["증감률"]) > Number(a["증감률"]) ? b : a,
+      );
+
+      rows.push([
+        "최대 증감률",
+        `${maxGrowth[groupHeader]}: ${Number(maxGrowth["증감률"]).toFixed(2)}%`,
+      ]);
+    }
+  }
+
+  return rows;
 }
 
 function setColumnWidths(ws, rows = []) {
@@ -59,24 +195,91 @@ function setAoaColumnWidths(ws, aoa = []) {
   });
 }
 
-function formatNumberCells(ws) {
+function inferNumberFormat(header = "", result = {}) {
+  const h = String(header || "");
+
+  if (
+    result.operation === "rate" ||
+    result.operation === "growthRate" ||
+    h.includes("%") ||
+    h.includes("률") ||
+    h.includes("비율")
+  ) {
+    return {
+      z: "0.00%",
+      divideBy100: true,
+    };
+  }
+
+  if (result.metric?.type === "number") {
+    return {
+      z: Number.isInteger(result.value) ? "#,##0" : "#,##0.00",
+      divideBy100: false,
+    };
+  }
+
+  return {
+    z: "#,##0.00",
+    divideBy100: false,
+  };
+}
+
+function formatNumberCells(ws, result = {}) {
   if (!ws["!ref"]) return;
 
   const range = XLSX.utils.decode_range(ws["!ref"]);
 
-  for (let r = range.s.r; r <= range.e.r; r += 1) {
+  for (let r = range.s.r + 1; r <= range.e.r; r += 1) {
     for (let c = range.s.c; c <= range.e.c; c += 1) {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = ws[addr];
 
-      if (!cell || cell.t !== "n") continue;
+      if (!cell || typeof cell.v !== "number") continue;
 
-      if (Number.isInteger(cell.v)) {
-        cell.z = "#,##0";
-      } else {
-        cell.z = "#,##0.00";
+      const headerAddr = XLSX.utils.encode_cell({ r: range.s.r, c });
+      const header = ws[headerAddr]?.v || "";
+
+      const fmt = inferNumberFormat(header, result);
+      cell.z = fmt.z;
+
+      if (fmt.divideBy100) {
+        cell.v = cell.v / 100;
       }
     }
+  }
+}
+
+function styleHeaderRow(ws) {
+  if (!ws["!ref"]) return;
+
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+  const headerRow = range.s.r;
+
+  for (let c = range.s.c; c <= range.e.c; c += 1) {
+    const addr = XLSX.utils.encode_cell({ r: headerRow, c });
+    const cell = ws[addr];
+
+    if (!cell) continue;
+
+    cell.s = {
+      font: { bold: true },
+      alignment: { horizontal: "center", vertical: "center" },
+    };
+  }
+}
+
+function applyDefaultSheetOptions(ws) {
+  if (!ws) return;
+
+  ws["!freeze"] = {
+    xSplit: 0,
+    ySplit: 1,
+  };
+
+  if (ws["!ref"]) {
+    ws["!autofilter"] = {
+      ref: ws["!ref"],
+    };
   }
 }
 
@@ -116,6 +319,10 @@ function resultToRows(result = {}) {
     ];
   }
 
+  if (result.resultType === "pivot") {
+    return result.rows || [];
+  }
+
   return result.rows || [];
 }
 
@@ -126,7 +333,11 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
     ["요청", message || ""],
     ["원본 파일", fileName || ""],
     ["테이블", result?.table?.tableName || intent?.table?.tableName || ""],
+    ["결과 유형", result?.resultType || ""],
     ["작업", result?.operation || intent?.operation || ""],
+    ["지표", result?.metric?.header || intent?.metric?.header || ""],
+    ["그룹 기준", result?.groupBy?.header || intent?.groupBy?.header || ""],
+    ["결과 행 수", Array.isArray(result?.rows) ? result.rows.length : 0],
     ["생성일시", new Date().toISOString()],
     [],
   ];
@@ -135,21 +346,74 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
   setAoaColumnWidths(wsSummary, summaryRows);
-  XLSX.utils.book_append_sheet(wb, wsSummary, "요약");
+  styleHeaderRow(wsSummary);
+  applyDefaultSheetOptions(wsSummary);
+  appendSheetSafe(wb, wsSummary, "요약");
 
   const wsResult = XLSX.utils.json_to_sheet(rows);
   setColumnWidths(wsResult, rows);
-  formatNumberCells(wsResult);
+  formatNumberCells(wsResult, result);
+  styleHeaderRow(wsResult);
+  applyDefaultSheetOptions(wsResult);
   wsResult["!freeze"] = { xSplit: 0, ySplit: 1 };
-  XLSX.utils.book_append_sheet(wb, wsResult, "분석결과");
+  appendSheetSafe(wb, wsResult, "분석결과");
+
+  if (result?.plan) {
+    const planRows = objectToAoa(result.plan);
+    const wsPlan = XLSX.utils.aoa_to_sheet([["항목", "값"], ...planRows]);
+    setAoaColumnWidths(wsPlan, [["항목", "값"], ...planRows]);
+    styleHeaderRow(wsPlan);
+    applyDefaultSheetOptions(wsPlan);
+    XLSX.utils.book_append_sheet(wb, wsPlan, "실행계획");
+  }
+
+  if (result?.executionMeta) {
+    const metaRows = objectToAoa(result.executionMeta);
+    const wsMeta = XLSX.utils.aoa_to_sheet([["항목", "값"], ...metaRows]);
+    setAoaColumnWidths(wsMeta, [["항목", "값"], ...metaRows]);
+    styleHeaderRow(wsMeta);
+    applyDefaultSheetOptions(wsMeta);
+    XLSX.utils.book_append_sheet(wb, wsMeta, "실행메타");
+  }
 
   const chartDataRows = buildChartDataRows(result);
   if (chartDataRows.length) {
     const wsChartData = XLSX.utils.json_to_sheet(chartDataRows);
     setColumnWidths(wsChartData, chartDataRows);
-    formatNumberCells(wsChartData);
+    formatNumberCells(wsChartData, result);
+    styleHeaderRow(wsChartData);
+    applyDefaultSheetOptions(wsChartData);
     wsChartData["!freeze"] = { xSplit: 0, ySplit: 1 };
-    XLSX.utils.book_append_sheet(wb, wsChartData, "차트데이터");
+    appendSheetSafe(wb, wsChartData, "차트데이터");
+  }
+
+  const chartSpec = buildChartSpec(result);
+
+  if (chartSpec) {
+    const chartSpecRows = objectToAoa(chartSpec);
+
+    const wsChartSpec = XLSX.utils.aoa_to_sheet([
+      ["항목", "값"],
+      ...chartSpecRows,
+    ]);
+
+    setAoaColumnWidths(wsChartSpec, [["항목", "값"], ...chartSpecRows]);
+    styleHeaderRow(wsChartSpec);
+    applyDefaultSheetOptions(wsChartSpec);
+    appendSheetSafe(wb, wsChartSpec, "차트설정");
+  }
+
+  const insightRows = buildInsightRows(result);
+
+  if (insightRows.length) {
+    const wsInsight = XLSX.utils.aoa_to_sheet([
+      ["항목", "내용"],
+      ...insightRows,
+    ]);
+    setAoaColumnWidths(wsInsight, [["항목", "내용"], ...insightRows]);
+    styleHeaderRow(wsInsight);
+    applyDefaultSheetOptions(wsInsight);
+    appendSheetSafe(wb, wsInsight, "인사이트");
   }
 
   return wb;
