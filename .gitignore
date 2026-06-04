@@ -12,7 +12,6 @@ meta-cache/
 .local_uploads/
 tests/
 script/
-generated/
 
 # ==================================
 # Node.js

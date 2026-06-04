@@ -200,7 +200,12 @@ exports.exportXlsx = async (req, res) => {
     const buffer = workbookToBuffer(workbook);
 
     const fileName = `automation_${Date.now()}.xlsx`;
-    const outputDir = path.join(process.cwd(), "generated", "automation");
+    const outputDir = path.join(
+      process.cwd(),
+      ".local_uploads",
+      "generated",
+      "automation",
+    );
     fs.mkdirSync(outputDir, { recursive: true });
 
     const filePath = path.join(outputDir, fileName);
