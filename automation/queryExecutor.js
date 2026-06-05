@@ -233,6 +233,35 @@ function aggregate(rows = [], operation = "list", metric = null) {
   return rows;
 }
 
+function aggregateOutputHeader(spec = {}) {
+  if (spec.outputHeader) return spec.outputHeader;
+
+  const metricHeader = spec.metric?.header || "값";
+
+  const labels = {
+    average: "평균",
+    sum: "합계",
+    count: "건수",
+    max: "최대",
+    min: "최소",
+  };
+
+  return spec.operation === "count"
+    ? labels.count
+    : `${labels[spec.operation] || spec.operation} ${metricHeader}`;
+}
+
+function applyMultiAggregate(rows = [], aggregates = []) {
+  const out = {};
+
+  for (const spec of aggregates) {
+    const header = aggregateOutputHeader(spec);
+    out[header] = aggregate(rows, spec.operation, spec.metric);
+  }
+
+  return out;
+}
+
 function groupRows(rows = [], groupBy) {
   const groups = new Map();
 
@@ -522,6 +551,52 @@ function executeSinglePipeline(table = {}, intent = {}, steps = []) {
   };
 }
 
+function mergePipelineRows(pipelines = []) {
+  const valid = pipelines.filter((p) => Array.isArray(p.rows) && p.rows.length);
+  if (!valid.length) return null;
+
+  const groupHeader =
+    valid.find((p) => p.groupBy?.header)?.groupBy?.header || "그룹";
+
+  const rowMap = new Map();
+
+  for (const pipeline of valid) {
+    const valueHeader =
+      pipeline.label ||
+      pipeline.metric?.header ||
+      pipeline.id ||
+      pipeline.operation ||
+      "값";
+
+    for (const row of pipeline.rows || []) {
+      const key = String(row[groupHeader] ?? "");
+
+      if (!rowMap.has(key)) {
+        rowMap.set(key, {
+          [groupHeader]: key,
+        });
+      }
+
+      const base = rowMap.get(key);
+
+      base[valueHeader] =
+        row.value ?? row[valueHeader] ?? row.count ?? row.rowCount ?? null;
+    }
+  }
+
+  return {
+    ok: true,
+    operation: "pipelineCombine",
+    resultType: "grouped",
+    groupBy: valid[0]?.groupBy || null,
+    metric: {
+      header: "pipelineCombine",
+      type: "multi",
+    },
+    rows: Array.from(rowMap.values()),
+  };
+}
+
 function mergePipelineRatio(pipelines = [], combineStep = null) {
   if (!combineStep || combineStep.type !== "combineRatio") return null;
 
@@ -601,7 +676,8 @@ function executePipelines(table = {}, intent = {}, plan = {}) {
     ? plan.combine[0]
     : plan.combine;
 
-  const combined = mergePipelineRatio(results, combineStep);
+  const combined =
+    mergePipelineRatio(results, combineStep) || mergePipelineRows(results);
 
   if (combined) {
     return {
@@ -656,7 +732,6 @@ function executeQueryIntent(queryTables = [], intent = {}) {
         intent,
         plan,
         steps: plan.pipelines?.flatMap((p) => p.steps || []) || [],
-        resultType: multiResult.combined ? "grouped" : "multi",
       }),
     };
   }
@@ -679,6 +754,7 @@ function executeQueryIntent(queryTables = [], intent = {}) {
   const compareStep = steps.find((s) => s.type === "compare");
   const windowStep = steps.find((s) => s.type === "window");
   const pivotStep = steps.find((s) => s.type === "pivot");
+  const multiAggregateStep = steps.find((s) => s.type === "multiAggregate");
 
   const operation = rateStep
     ? "rate"
@@ -716,19 +792,27 @@ function executeQueryIntent(queryTables = [], intent = {}) {
     const resultRows = [];
 
     for (const [groupValue, groupRowsValue] of groups.entries()) {
-      resultRows.push({
-        [groupBy.header || groupBy.columnKey]: groupValue,
-        operation: windowStep
-          ? windowStep.method
-          : compareStep
-            ? "growthRate"
-            : operation,
-        metric: rateStep?.outputHeader || metric?.header || null,
-        value: rateStep
-          ? rateValue(groupRowsValue, rateStep)
-          : aggregate(groupRowsValue, operation, metric),
-        rowCount: groupRowsValue.length,
-      });
+      if (multiAggregateStep?.aggregates?.length) {
+        resultRows.push({
+          [groupBy.header || groupBy.columnKey]: groupValue,
+          ...applyMultiAggregate(groupRowsValue, multiAggregateStep.aggregates),
+          rowCount: groupRowsValue.length,
+        });
+      } else {
+        resultRows.push({
+          [groupBy.header || groupBy.columnKey]: groupValue,
+          operation: windowStep
+            ? windowStep.method
+            : compareStep
+              ? "growthRate"
+              : operation,
+          metric: rateStep?.outputHeader || metric?.header || null,
+          value: rateStep
+            ? rateValue(groupRowsValue, rateStep)
+            : aggregate(groupRowsValue, operation, metric),
+          rowCount: groupRowsValue.length,
+        });
+      }
     }
 
     const comparedRows = applyCompareRows(resultRows, compareStep);

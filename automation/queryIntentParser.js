@@ -99,12 +99,279 @@ function detectOperation(message = "") {
 
   if (includesAny(s, ["평균", "average", "avg"])) return "average";
   if (includesAny(s, ["합계", "총합", "sum", "total"])) return "sum";
-  if (includesAny(s, ["개수", "몇 명", "몇개", "몇 개", "수"])) return "count";
+  if (includesAny(s, ["개수", "몇 명", "몇개", "몇 개"])) return "count";
   if (includesAny(s, ["최대", "최고", "max"])) return "max";
   if (includesAny(s, ["최소", "최저", "min"])) return "min";
   if (includesAny(s, ["목록", "리스트", "보여", "출력"])) return "list";
 
   return "list";
+}
+
+function isCountRequest(message = "") {
+  const s = String(message || "");
+
+  return (
+    /개수|건수|인원수|명수|항목수|레코드수/i.test(s) ||
+    /\bcount\b/i.test(s) ||
+    /\brow\s*count\b/i.test(s)
+  );
+}
+
+function detectMultiAggregates(message = "", columns = []) {
+  const s = String(message || "");
+
+  const specs = [];
+  const countRequested = isCountRequest(message);
+
+  const candidates = [
+    { operation: "average", match: ["평균", "average", "avg"] },
+    { operation: "sum", match: ["합계", "총합", "sum", "total"] },
+    {
+      operation: "count",
+      match: [
+        "개수",
+        "건수",
+        "인원수",
+        "명수",
+        "항목수",
+        "레코드수",
+        "row count",
+        "count",
+      ],
+    },
+    { operation: "max", match: ["최대", "최고", "max"] },
+    { operation: "min", match: ["최소", "최저", "min"] },
+  ];
+
+  for (const candidate of candidates) {
+    if (
+      candidate.operation === "count"
+        ? !countRequested
+        : !candidate.match.some((kw) => s.includes(kw))
+    ) {
+      continue;
+    }
+
+    const metric =
+      candidate.operation === "count"
+        ? null
+        : detectMetricColumn(message, columns, candidate.operation);
+
+    specs.push({
+      type: "aggregate",
+      operation: candidate.operation,
+      metric: metric
+        ? {
+            columnKey: metric.key,
+            header: metric.header,
+            type: metric.type,
+          }
+        : null,
+      outputHeader:
+        candidate.operation === "count"
+          ? "건수"
+          : `${candidate.match[0]} ${metric?.header || "값"}`,
+    });
+  }
+
+  const dedup = [];
+  const seen = new Set();
+
+  for (const spec of specs) {
+    const metricKey = spec.metric?.columnKey || "__count__";
+    const key = `${spec.operation}:${metricKey}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    dedup.push(spec);
+  }
+
+  return dedup.length >= 2 ? dedup : [];
+}
+
+function detectCountPipelineSpec(
+  message = "",
+  columns = [],
+  groupBySpec = null,
+) {
+  const s = String(message || "");
+
+  if (!groupBySpec?.columnKey) return null;
+  if (!/수와|건수와|개수와|count/i.test(s)) return null;
+
+  const countHints = [];
+
+  for (const col of columns) {
+    const h = String(col.header || "");
+    if (!h) continue;
+
+    if (s.includes(h) && String(col.type) !== "number") {
+      countHints.push(col);
+    }
+  }
+
+  if (countHints.length < 2) return null;
+
+  return {
+    type: "pipelineCombine",
+    pipelines: countHints.slice(0, 3).map((col) => ({
+      id: `${col.key}_count`,
+      label: `${col.header} 건수`,
+      steps: [
+        {
+          type: "filter",
+          filters: [
+            {
+              columnKey: col.key,
+              header: col.header,
+              operator: "exists",
+              valueType: "exists",
+            },
+          ],
+        },
+        {
+          type: "groupBy",
+          columnKey: groupBySpec.columnKey,
+          header: groupBySpec.header,
+        },
+        {
+          type: "aggregate",
+          operation: "count",
+          metric: null,
+        },
+      ],
+    })),
+  };
+}
+
+function detectMixedPipelineSpec(
+  message = "",
+  columns = [],
+  groupBySpec = null,
+) {
+  if (!groupBySpec?.columnKey) return null;
+
+  const s = String(message || "");
+  const pipelines = [];
+
+  const metric = detectMetricColumn(message, columns, "average");
+
+  if (/평균|average|avg/i.test(s) && metric?.key) {
+    pipelines.push({
+      id: `avg_${metric.key}`,
+      label: `평균 ${metric.header}`,
+      steps: [
+        {
+          type: "groupBy",
+          columnKey: groupBySpec.columnKey,
+          header: groupBySpec.header,
+        },
+        {
+          type: "aggregate",
+          operation: "average",
+          metric: {
+            columnKey: metric.key,
+            header: metric.header,
+            type: metric.type,
+          },
+        },
+      ],
+    });
+  }
+
+  if (/합계|총합|sum|total/i.test(s) && metric?.key) {
+    pipelines.push({
+      id: `sum_${metric.key}`,
+      label: `합계 ${metric.header}`,
+      steps: [
+        {
+          type: "groupBy",
+          columnKey: groupBySpec.columnKey,
+          header: groupBySpec.header,
+        },
+        {
+          type: "aggregate",
+          operation: "sum",
+          metric: {
+            columnKey: metric.key,
+            header: metric.header,
+            type: metric.type,
+          },
+        },
+      ],
+    });
+  }
+
+  if (/최대|최고|max/i.test(s) && metric?.key) {
+    pipelines.push({
+      id: `max_${metric.key}`,
+      label: `최대 ${metric.header}`,
+      steps: [
+        {
+          type: "groupBy",
+          columnKey: groupBySpec.columnKey,
+          header: groupBySpec.header,
+        },
+        {
+          type: "aggregate",
+          operation: "max",
+          metric: {
+            columnKey: metric.key,
+            header: metric.header,
+            type: metric.type,
+          },
+        },
+      ],
+    });
+  }
+
+  if (/최소|최저|min/i.test(s) && metric?.key) {
+    pipelines.push({
+      id: `min_${metric.key}`,
+      label: `최소 ${metric.header}`,
+      steps: [
+        {
+          type: "groupBy",
+          columnKey: groupBySpec.columnKey,
+          header: groupBySpec.header,
+        },
+        {
+          type: "aggregate",
+          operation: "min",
+          metric: {
+            columnKey: metric.key,
+            header: metric.header,
+            type: metric.type,
+          },
+        },
+      ],
+    });
+  }
+
+  if (isCountRequest(message)) {
+    pipelines.push({
+      id: "count_rows",
+      label: "건수",
+      steps: [
+        {
+          type: "groupBy",
+          columnKey: groupBySpec.columnKey,
+          header: groupBySpec.header,
+        },
+        {
+          type: "aggregate",
+          operation: "count",
+          metric: null,
+        },
+      ],
+    });
+  }
+
+  return pipelines.length >= 2
+    ? {
+        type: "pipelineCombine",
+        pipelines,
+      }
+    : null;
 }
 
 function detectMetricColumn(message = "", columns = [], operation = "") {
@@ -536,7 +803,13 @@ function parseQueryIntent(message = "", queryTables = []) {
 
   const columns = table.columns || [];
   let operation = detectOperation(message);
+
+  if (isCountRequest(message)) {
+    operation = "count";
+  }
+
   const metricColumn = detectMetricColumn(message, columns, operation);
+  const multiAggregates = detectMultiAggregates(message, columns);
   const groupBy = detectGroupBy(message, columns);
   const filters = detectFilters(message, columns);
   const deriveStep = detectDeriveStep(message, table);
@@ -692,7 +965,32 @@ function parseQueryIntent(message = "", queryTables = []) {
 
   const windowStep = detectWindowStep(message, metric, groupBySpec);
 
+  const countPipelineSpec = detectCountPipelineSpec(
+    message,
+    columns,
+    groupBySpec,
+  );
+
+  const shouldUseMixedPipeline = /건수|개수|count|row\s*count/i.test(
+    String(message || ""),
+  );
+
+  const mixedPipelineSpec =
+    shouldUseMixedPipeline && !compareStep && !windowStep && !pivotStep
+      ? detectMixedPipelineSpec(message, columns, groupBySpec)
+      : null;
+
+  const shouldUseMultiAggregate =
+    multiAggregates.length &&
+    groupBySpec &&
+    !compareStep &&
+    !windowStep &&
+    !pivotStep;
+
   if (windowStep) operation = windowStep.method;
+  if (shouldUseMultiAggregate) {
+    operation = "multiAggregate";
+  }
 
   if (compareStep?.unresolved) {
     return {
@@ -704,6 +1002,42 @@ function parseQueryIntent(message = "", queryTables = []) {
   }
 
   if (compareStep) operation = "growthRate";
+
+  const pipelineSpec = countPipelineSpec || mixedPipelineSpec;
+
+  if (pipelineSpec?.pipelines?.length) {
+    return {
+      ok: true,
+      version: "query_intent_v1",
+      message,
+      table: {
+        tableId: table.tableId,
+        tableName: table.tableName,
+        sheetName: table.sheetName,
+        confidence: table.confidence,
+        isPrimary: !!table.isPrimary,
+      },
+      operation: "pipelineCombine",
+      metric: null,
+      groupBy: groupBySpec,
+      filters,
+      plan: {
+        version: "query_plan_v1",
+        tableId: table.tableId,
+        pipelines: pipelineSpec.pipelines,
+        combine: {
+          type: "mergeRows",
+        },
+      },
+      derive: deriveStep,
+      rate: rateStep,
+      sort: sortStep,
+      limit: limitStep,
+      compare: compareStep,
+      window: windowStep,
+      pivot: pivotStep,
+    };
+  }
 
   const plan = {
     version: "query_plan_v1",
@@ -724,19 +1058,26 @@ function parseQueryIntent(message = "", queryTables = []) {
           : []),
       ...(rateStep
         ? [rateStep]
-        : [
-            {
-              type: "aggregate",
-              operation: windowStep
-                ? includesAny(String(message), ["평균", "average", "avg"])
-                  ? "average"
-                  : "sum"
-                : compareStep
-                  ? compareStep.defaultAggregate || "sum"
-                  : operation,
-              metric,
-            },
-          ]),
+        : shouldUseMultiAggregate
+          ? [
+              {
+                type: "multiAggregate",
+                aggregates: multiAggregates,
+              },
+            ]
+          : [
+              {
+                type: "aggregate",
+                operation: windowStep
+                  ? includesAny(String(message), ["평균", "average", "avg"])
+                    ? "average"
+                    : "sum"
+                  : compareStep
+                    ? compareStep.defaultAggregate || "sum"
+                    : operation,
+                metric,
+              },
+            ]),
       ...(compareStep ? [compareStep] : []),
       ...(windowStep ? [windowStep] : []),
       ...(sortStep ? [sortStep] : []),
@@ -757,6 +1098,7 @@ function parseQueryIntent(message = "", queryTables = []) {
     },
     operation,
     metric,
+    multiAggregates,
     groupBy: groupBySpec,
     filters,
     plan,

@@ -2,6 +2,13 @@ const XLSX = require("xlsx");
 
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
+    if (
+      result.resultType === "grouped" &&
+      (result.operation === "multiAggregate" ||
+        result.operation === "pipelineCombine")
+    ) {
+      return result.rows || [];
+    }
     const groupHeader = result.groupBy?.header || "그룹";
     const metricHeader = result.metric?.header || "값";
 
@@ -128,16 +135,6 @@ function buildInsightRows(result = {}) {
         value: Number(r.value),
       }));
 
-    if (result.resultType === "pivot") {
-      rows.push(["분석유형", "Pivot 교차 분석 결과입니다."]);
-      rows.push(["행 기준", result.pivot?.rowGroup?.header || ""]);
-      rows.push(["열 기준", result.pivot?.columnGroup?.header || ""]);
-      rows.push(["열 항목 수", result.pivot?.columns?.length || 0]);
-      rows.push(["결과 행 수", result.rows?.length || 0]);
-
-      return rows;
-    }
-
     if (valueRows.length) {
       const max = valueRows.reduce((a, b) => (b.value > a.value ? b : a));
       const min = valueRows.reduce((a, b) => (b.value < a.value ? b : a));
@@ -199,11 +196,10 @@ function inferNumberFormat(header = "", result = {}) {
   const h = String(header || "");
 
   if (
-    result.operation === "rate" ||
-    result.operation === "growthRate" ||
     h.includes("%") ||
     h.includes("률") ||
-    h.includes("비율")
+    h.includes("비율") ||
+    (result.metric?.type === "rate" && h === "값")
   ) {
     return {
       z: "0.00%",
@@ -285,6 +281,12 @@ function applyDefaultSheetOptions(ws) {
 
 function resultToRows(result = {}) {
   if (result.resultType === "grouped") {
+    if (
+      result.operation === "multiAggregate" ||
+      result.operation === "pipelineCombine"
+    ) {
+      return result.rows || [];
+    }
     const groupHeader = result.groupBy?.header || "그룹";
     const extraKeys = ["기준값", "비교값", "증감률"].filter((k) =>
       (result.rows || []).some((r) =>
