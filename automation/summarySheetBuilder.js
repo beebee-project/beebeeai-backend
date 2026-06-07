@@ -1,4 +1,7 @@
 const XLSX = require("xlsx");
+const { buildNarrativeSections } = require("./reportNarrativeBuilder");
+const { recommendChartSpec } = require("./chartRecommendationBuilder");
+const { buildReportSections } = require("./reportSectionBuilder");
 
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
@@ -70,38 +73,7 @@ function objectToAoa(obj = {}, prefix = "") {
 }
 
 function buildChartSpec(result = {}) {
-  if (result.resultType === "grouped") {
-    const groupHeader = result.groupBy?.header || "그룹";
-    const metricHeader = result.metric?.header || "값";
-
-    return {
-      version: "chart_spec_v1",
-      recommendedType: "bar",
-      title: `${groupHeader}별 ${metricHeader}`,
-      categoryField: groupHeader,
-      valueField: metricHeader,
-      rowCount: Array.isArray(result.rows) ? result.rows.length : 0,
-    };
-  }
-
-  if (result.resultType === "pivot") {
-    const rowHeader =
-      result.pivot?.rowGroup?.header || result.groupBy?.header || "그룹";
-
-    return {
-      version: "chart_spec_v1",
-      recommendedType:
-        (result.pivot?.columns || []).length <= 5
-          ? "stacked_bar"
-          : "pivot_table",
-      title: `${rowHeader} 기준 교차 분석`,
-      categoryField: rowHeader,
-      seriesFields: result.pivot?.columns || [],
-      rowCount: Array.isArray(result.rows) ? result.rows.length : 0,
-    };
-  }
-
-  return null;
+  return recommendChartSpec(result);
 }
 
 function buildInsightRows(result = {}) {
@@ -346,6 +318,17 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
 
   const rows = resultToRows(result);
 
+  const narrative = buildNarrativeSections(result, {
+    message,
+    fileName,
+  });
+
+  const reportSections = buildReportSections({
+    fileName,
+    message,
+    result,
+  });
+
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
   setAoaColumnWidths(wsSummary, summaryRows);
   styleHeaderRow(wsSummary);
@@ -405,7 +388,14 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
     appendSheetSafe(wb, wsChartSpec, "차트설정");
   }
 
-  const insightRows = buildInsightRows(result);
+  const narrativeRows = [
+    ["제목", narrative.title],
+    ["요약", narrative.summary],
+    ...(narrative.highlights || []).map((v, idx) => [`핵심 ${idx + 1}`, v]),
+    [],
+  ];
+
+  const insightRows = [...narrativeRows, ...buildInsightRows(result)];
 
   if (insightRows.length) {
     const wsInsight = XLSX.utils.aoa_to_sheet([
@@ -416,6 +406,23 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
     styleHeaderRow(wsInsight);
     applyDefaultSheetOptions(wsInsight);
     appendSheetSafe(wb, wsInsight, "인사이트");
+  }
+
+  const reportSectionRows = objectToAoa(reportSections);
+
+  if (reportSectionRows.length) {
+    const wsReportSections = XLSX.utils.aoa_to_sheet([
+      ["항목", "값"],
+      ...reportSectionRows,
+    ]);
+
+    setAoaColumnWidths(wsReportSections, [
+      ["항목", "값"],
+      ...reportSectionRows,
+    ]);
+    styleHeaderRow(wsReportSections);
+    applyDefaultSheetOptions(wsReportSections);
+    appendSheetSafe(wb, wsReportSections, "보고서구성");
   }
 
   return wb;

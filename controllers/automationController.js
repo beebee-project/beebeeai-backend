@@ -20,6 +20,17 @@ const {
   workbookToBuffer,
   buildChartSpec,
 } = require("../automation/summarySheetBuilder");
+const { buildReportSections } = require("../automation/reportSectionBuilder");
+const { renderReportPpt } = require("../automation/reportPptRenderer");
+
+const REPORT_DIR = path.join(
+  process.cwd(),
+  ".local_uploads",
+  "generated",
+  "reports",
+);
+
+const PPT_DIR = path.join(process.cwd(), ".local_uploads", "generated", "ppt");
 
 function findUserFile(user, fileName) {
   if (!user || !fileName) return null;
@@ -153,6 +164,69 @@ exports.createSummarySheet = async (req, res, next) => {
   }
 };
 
+function writeReportJson({ fileName, message, result }) {
+  fs.mkdirSync(REPORT_DIR, { recursive: true });
+
+  const report = buildReportSections({
+    fileName,
+    message,
+    result,
+  });
+
+  const output = {
+    ok: true,
+    version: "report_export_v1",
+    generatedAt: new Date().toISOString(),
+    source: {
+      fileName: fileName || "",
+      message: message || "",
+    },
+    result: {
+      operation: result?.operation || "",
+      resultType: result?.resultType || "",
+      rowCount: Array.isArray(result?.rows) ? result.rows.length : 0,
+    },
+    report,
+  };
+
+  const outputName = `report_${Date.now()}.json`;
+  const filePath = path.join(REPORT_DIR, outputName);
+
+  fs.writeFileSync(filePath, JSON.stringify(output, null, 2), "utf-8");
+
+  return {
+    ok: true,
+    fileName: outputName,
+    filePath,
+    report,
+  };
+}
+
+async function writeReportPpt({ fileName, message, result }) {
+  fs.mkdirSync(PPT_DIR, { recursive: true });
+
+  const report = buildReportSections({
+    fileName,
+    message,
+    result,
+  });
+
+  const pptx = renderReportPpt(report);
+
+  const outputName = `report_${Date.now()}.pptx`;
+  const filePath = path.join(PPT_DIR, outputName);
+
+  await pptx.writeFile({ fileName: filePath });
+
+  return {
+    ok: true,
+    fileName: outputName,
+    filePath,
+    report,
+    slideCount: Array.isArray(report.sections) ? report.sections.length : 0,
+  };
+}
+
 exports.exportXlsx = async (req, res) => {
   try {
     const { queryTablesKey, message } = req.body || {};
@@ -222,6 +296,125 @@ exports.exportXlsx = async (req, res) => {
     return res.status(500).json({
       ok: false,
       code: "EXPORT_XLSX_FAILED",
+      error: err.message,
+    });
+  }
+};
+
+exports.exportReportJson = async (req, res) => {
+  try {
+    const { queryTablesKey, message } = req.body || {};
+
+    if (!queryTablesKey || !message) {
+      return res.status(400).json({
+        ok: false,
+        code: "MISSING_REQUIRED_FIELDS",
+        error: "queryTablesKey와 message가 필요합니다.",
+      });
+    }
+
+    const saved = await readJsonObject(queryTablesKey);
+    const tables = saved.tables || [];
+
+    const intent = parseQueryIntent(message, tables);
+
+    if (!intent.ok) {
+      return res.status(400).json({
+        ok: false,
+        intent,
+        code: intent.code,
+        error: intent.error || "query intent 생성 실패",
+      });
+    }
+
+    const result = executeQueryIntent(tables, intent);
+
+    if (!result.ok) {
+      return res.status(400).json({
+        ok: false,
+        intent,
+        result,
+        error: result.error || "query 실행 실패",
+      });
+    }
+
+    const exported = writeReportJson({
+      fileName: saved.fileName || "",
+      message,
+      result,
+    });
+
+    return res.json({
+      ok: true,
+      fileName: exported.fileName,
+      filePath: exported.filePath,
+      report: exported.report,
+      result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      code: "EXPORT_REPORT_JSON_FAILED",
+      error: err.message,
+    });
+  }
+};
+
+exports.exportPptx = async (req, res) => {
+  try {
+    const { queryTablesKey, message } = req.body || {};
+
+    if (!queryTablesKey || !message) {
+      return res.status(400).json({
+        ok: false,
+        code: "MISSING_REQUIRED_FIELDS",
+        error: "queryTablesKey와 message가 필요합니다.",
+      });
+    }
+
+    const saved = await readJsonObject(queryTablesKey);
+    const tables = saved.tables || [];
+
+    const intent = parseQueryIntent(message, tables);
+
+    if (!intent.ok) {
+      return res.status(400).json({
+        ok: false,
+        intent,
+        code: intent.code,
+        error: intent.error || "query intent 생성 실패",
+      });
+    }
+
+    const result = executeQueryIntent(tables, intent);
+
+    if (!result.ok) {
+      return res.status(400).json({
+        ok: false,
+        intent,
+        result,
+        error: result.error || "query 실행 실패",
+      });
+    }
+
+    const exported = await writeReportPpt({
+      fileName: saved.fileName || "",
+      message,
+      result,
+    });
+
+    return res.json({
+      ok: true,
+      fileName: exported.fileName,
+      filePath: exported.filePath,
+      slideCount: exported.slideCount,
+      report: exported.report,
+      result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      code: "EXPORT_PPTX_FAILED",
       error: err.message,
     });
   }
