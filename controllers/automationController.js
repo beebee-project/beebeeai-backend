@@ -202,7 +202,7 @@ function writeReportJson({ fileName, message, result }) {
   };
 }
 
-async function writeReportPpt({ fileName, message, result }) {
+async function writeReportPpt({ fileName, message, result, template }) {
   fs.mkdirSync(PPT_DIR, { recursive: true });
 
   const report = buildReportSections({
@@ -211,7 +211,7 @@ async function writeReportPpt({ fileName, message, result }) {
     result,
   });
 
-  const pptx = renderReportPpt(report);
+  const pptx = renderReportPpt(report, { template });
 
   const outputName = `report_${Date.now()}.pptx`;
   const filePath = path.join(PPT_DIR, outputName);
@@ -222,6 +222,7 @@ async function writeReportPpt({ fileName, message, result }) {
     ok: true,
     fileName: outputName,
     filePath,
+    template: template || "default",
     report,
     slideCount: Array.isArray(report.sections) ? report.sections.length : 0,
   };
@@ -362,7 +363,7 @@ exports.exportReportJson = async (req, res) => {
 
 exports.exportPptx = async (req, res) => {
   try {
-    const { queryTablesKey, message } = req.body || {};
+    const { queryTablesKey, message, template } = req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -401,12 +402,14 @@ exports.exportPptx = async (req, res) => {
       fileName: saved.fileName || "",
       message,
       result,
+      template,
     });
 
     return res.json({
       ok: true,
       fileName: exported.fileName,
       filePath: exported.filePath,
+      template: exported.template,
       slideCount: exported.slideCount,
       report: exported.report,
       result,

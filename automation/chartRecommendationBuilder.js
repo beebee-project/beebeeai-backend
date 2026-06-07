@@ -1,5 +1,23 @@
+function inferLabelKey(row = {}) {
+  const keys = Object.keys(row || {});
+
+  return (
+    keys.find((key) => /name|이름|title|제목|label|항목|id$/i.test(key)) ||
+    keys.find((key) => typeof row[key] === "string" && row[key].trim()) ||
+    keys[0] ||
+    "항목"
+  );
+}
+
 function getGroupHeader(result = {}) {
-  return result.groupBy?.header || result.pivot?.rowGroup?.header || "그룹";
+  if (result.groupBy?.header) return result.groupBy.header;
+  if (result.pivot?.rowGroup?.header) return result.pivot.rowGroup.header;
+
+  if (result.resultType === "rows") {
+    return inferLabelKey(result.rows?.[0] || {});
+  }
+
+  return "그룹";
 }
 
 function getMetricHeader(result = {}) {
