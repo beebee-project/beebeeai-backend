@@ -22,6 +22,15 @@ const {
 } = require("../automation/summarySheetBuilder");
 const { buildReportSections } = require("../automation/reportSectionBuilder");
 const { renderReportPpt } = require("../automation/reportPptRenderer");
+const {
+  buildNormalizedQueryTables,
+} = require("../automation/normalizedQueryTableBuilder");
+const {
+  buildAnalysisRecipeCandidates,
+} = require("../automation/analysisRecipeCandidateBuilder");
+const {
+  executeAnalysisRecipeCandidate,
+} = require("../automation/analysisRecipeExecutor");
 
 const REPORT_DIR = path.join(
   process.cwd(),
@@ -92,6 +101,46 @@ async function buildQueryTablesForFile(req, fileName) {
 
   return { fileHash, sheetStateSig, tables };
 }
+
+async function executeAnalysisCandidate(req, res) {
+  try {
+    const { normalizedQueryTables, candidate } = req.body || {};
+
+    if (!Array.isArray(normalizedQueryTables)) {
+      return res.status(400).json({
+        ok: false,
+        code: "NORMALIZED_QUERY_TABLES_REQUIRED",
+        message: "normalizedQueryTables가 필요합니다.",
+      });
+    }
+
+    if (!candidate || !candidate.recipeType || !candidate.tableId) {
+      return res.status(400).json({
+        ok: false,
+        code: "ANALYSIS_CANDIDATE_REQUIRED",
+        message: "실행할 분석 후보가 필요합니다.",
+      });
+    }
+
+    const result = executeAnalysisRecipeCandidate({
+      normalizedQueryTables,
+      candidate,
+    });
+
+    const status = result.ok ? 200 : 400;
+    return res.status(status).json(result);
+  } catch (error) {
+    console.error("executeAnalysisCandidate error:", error);
+
+    return res.status(500).json({
+      ok: false,
+      code: "ANALYSIS_CANDIDATE_EXECUTE_FAILED",
+      message: "분석 후보 실행 중 오류가 발생했습니다.",
+    });
+  }
+}
+
+exports.executeAnalysisCandidate = executeAnalysisCandidate;
 
 exports.createSummarySheet = async (req, res, next) => {
   try {
@@ -504,12 +553,20 @@ exports.previewQueryTables = async (req, res, next) => {
       fileName,
     );
 
+    const normalizedQueryTables = buildNormalizedQueryTables(tables);
+
+    const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
+      normalizedQueryTables,
+    );
+
     return res.json({
       ok: true,
       fileName,
       fileHash,
       sheetStateSig,
       tableCount: tables.length,
+      normalizedQueryTables,
+      analysisRecipeCandidates,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
@@ -554,6 +611,12 @@ exports.saveQueryTables = async (req, res, next) => {
       fileName,
     );
 
+    const normalizedQueryTables = buildNormalizedQueryTables(tables);
+
+    const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
+      normalizedQueryTables,
+    );
+
     const now = new Date();
     const userId = req.user?.id || "local-dev";
     const rand = crypto.randomBytes(6).toString("hex");
@@ -568,6 +631,8 @@ exports.saveQueryTables = async (req, res, next) => {
       tableCount: tables.length,
       createdAt: now.toISOString(),
       tables,
+      normalizedQueryTables,
+      analysisRecipeCandidates,
     };
 
     const saved = await saveJsonObject(key, payload);
@@ -579,6 +644,8 @@ exports.saveQueryTables = async (req, res, next) => {
       sheetStateSig,
       tableCount: tables.length,
       queryTablesKey: key,
+      normalizedQueryTables,
+      analysisRecipeCandidates,
       localName: saved.localName,
       gcsName: saved.gcsName,
       tables: tables.map((t) => ({

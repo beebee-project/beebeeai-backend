@@ -12,5 +12,9 @@ router.post("/export-xlsx", automationController.exportXlsx);
 router.post("/summary-sheet", automationController.createSummarySheet);
 router.post("/export-report-json", automationController.exportReportJson);
 router.post("/export-pptx", automationController.exportPptx);
+router.post(
+  "/execute-analysis-candidate",
+  automationController.executeAnalysisCandidate,
+);
 
 module.exports = router;
