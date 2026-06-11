@@ -21,6 +21,10 @@ const {
   deleteEncryptedQueryJson,
   deleteEncryptedQueryJsonByFileName,
 } = require("../services/encryptedJsonStorageService");
+const {
+  encryptBuffer,
+  decryptBuffer,
+} = require("../services/encryptedFileService");
 
 exports.upload = async (req, res) => {
   const saved = await saveToStorage(req);
@@ -80,18 +84,31 @@ exports.uploadFile = async (req, res, next) => {
     const existingFile = user.uploadedFiles.find(
       (f) => f.originalName === originalName,
     );
+
     if (existingFile) {
       await deleteObject(existingFile.localName || existingFile.gcsName);
+
+      if (existingFile.queryJsonKey) {
+        await deleteEncryptedQueryJson(existingFile.queryJsonKey);
+      }
+
+      await deleteEncryptedQueryJsonByFileName({
+        userId: String(user._id),
+        fileName: existingFile.originalName,
+      });
 
       user.uploadedFiles = user.uploadedFiles.filter(
         (f) => f.originalName !== originalName,
       );
     }
 
+    const encryptedFile = encryptBuffer(req.file.buffer);
+
     const saved = await uploadBufferToGCS({
       userId: user._id,
-      buffer: req.file.buffer,
+      buffer: encryptedFile.buffer,
       originalName,
+      metadata: encryptedFile.metadata,
     });
 
     let queryJsonMeta = null;
@@ -137,6 +154,10 @@ exports.uploadFile = async (req, res, next) => {
       gcsName: saved.gcsName,
       localName: saved.localName,
       size: req.file.size,
+      encrypted: true,
+      encryptionVersion: encryptedFile.metadata.encryptionVersion,
+      encryptionIv: encryptedFile.metadata.encryptionIv,
+      encryptionTag: encryptedFile.metadata.encryptionTag,
       queryJsonKey: queryJsonMeta?.queryJsonKey || null,
     };
     user.uploadedFiles.push(newFile);
@@ -177,9 +198,15 @@ exports.downloadFile = async (req, res, next) => {
       `attachment; filename*=UTF-8''${encodedFilename}`,
     );
 
-    const buffer = await downloadToBuffer(
-      fileInfo.localName || fileInfo.gcsName,
-    );
+    let buffer = await downloadToBuffer(fileInfo.localName || fileInfo.gcsName);
+
+    if (fileInfo.encrypted) {
+      buffer = decryptBuffer(buffer, {
+        encryptionIv: fileInfo.encryptionIv,
+        encryptionTag: fileInfo.encryptionTag,
+      });
+    }
+
     res.end(buffer);
   } catch (error) {
     next(error);

@@ -93,7 +93,12 @@ function localAbsPath(name) {
   return path.join(LOCAL_UPLOAD_ROOT, name);
 }
 
-async function uploadBufferToGCS({ userId, buffer, originalName }) {
+async function uploadBufferToGCS({
+  userId,
+  buffer,
+  originalName,
+  metadata = {},
+}) {
   const { mime } = await sniffMime(buffer, originalName);
   const hash = sha256(buffer);
   if (IS_LOCAL_STORAGE) {
@@ -111,11 +116,16 @@ async function uploadBufferToGCS({ userId, buffer, originalName }) {
   const file = bucket.file(key);
 
   await file.save(buffer, {
-    contentType: mime,
+    contentType: "application/octet-stream",
     resumable: false,
     metadata: {
       cacheControl: "private, max-age=0, no-transform",
-      metadata: { sha256: hash, originalName },
+      metadata: {
+        sha256: hash,
+        originalName,
+        encrypted: metadata.encryptionVersion ? "true" : "false",
+        ...metadata,
+      },
     },
   });
 
