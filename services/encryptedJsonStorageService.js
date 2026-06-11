@@ -93,6 +93,5 @@ async function deleteEncryptedQueryJson(queryJsonKey) {
 
 module.exports = {
   saveEncryptedQueryJson,
-  cleanupExpiredQueryJson,
   deleteEncryptedQueryJson,
 };

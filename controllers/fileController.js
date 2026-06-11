@@ -20,7 +20,6 @@ const {
 
 const {
   saveEncryptedQueryJson,
-  cleanupExpiredQueryJson,
   deleteEncryptedQueryJson,
 } = require("../services/encryptedJsonStorageService");
 
