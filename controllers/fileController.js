@@ -5,6 +5,24 @@ const {
   deleteObject,
   isStorageEnabled,
 } = require("../utils/storage");
+const XLSX = require("xlsx");
+
+const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
+const {
+  buildQueryTablesFromWorkbook,
+} = require("../automation/queryTableBuilder");
+const {
+  buildNormalizedQueryTables,
+} = require("../automation/normalizedQueryTableBuilder");
+const {
+  buildAnalysisRecipeCandidates,
+} = require("../automation/analysisRecipeCandidateBuilder");
+
+const {
+  saveEncryptedQueryJson,
+  cleanupExpiredQueryJson,
+  deleteEncryptedQueryJson,
+} = require("../services/encryptedJsonStorageService");
 
 exports.upload = async (req, res) => {
   const saved = await saveToStorage(req);
@@ -78,11 +96,53 @@ exports.uploadFile = async (req, res, next) => {
       originalName,
     });
 
+    let queryJsonMeta = null;
+
+    try {
+      cleanupExpiredQueryJson();
+
+      const { fileHash, allSheetsData, sheetStateSig } =
+        await getOrBuildAllSheetsData(req.file.buffer);
+
+      const workbook = XLSX.read(req.file.buffer, {
+        type: "buffer",
+        cellDates: true,
+        cellNF: true,
+        cellText: false,
+      });
+
+      const tables = buildQueryTablesFromWorkbook(workbook, allSheetsData);
+      const normalizedQueryTables = buildNormalizedQueryTables(tables);
+      const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
+        normalizedQueryTables,
+      );
+
+      queryJsonMeta = saveEncryptedQueryJson({
+        userId: String(user._id),
+        fileName: originalName,
+        payload: {
+          version: "query_tables_v2",
+          fileName: originalName,
+          fileHash,
+          sheetStateSig,
+          tableCount: tables.length,
+          createdAt: new Date().toISOString(),
+          tables,
+          normalizedQueryTables,
+          analysisRecipeCandidates,
+        },
+      });
+    } catch (error) {
+      console.error("[file.upload.autoQueryJson]", error);
+    }
+
     const newFile = {
       originalName,
-      gcsName: saved.gcsName || null,
-      localName: saved.localName || null,
+      gcsName: saved.gcsName,
+      localName: saved.localName,
       size: req.file.size,
+      queryJsonKey: queryJsonMeta?.queryJsonKey || null,
+      queryJsonExpiresAt: queryJsonMeta?.expiresAt || null,
     };
     user.uploadedFiles.push(newFile);
     await user.save();
@@ -154,6 +214,10 @@ exports.deleteFile = async (req, res, next) => {
     }
 
     await deleteObject(fileInfo.localName || fileInfo.gcsName);
+
+    if (fileInfo?.queryJsonKey) {
+      deleteEncryptedQueryJson(fileInfo.queryJsonKey);
+    }
 
     user.uploadedFiles = user.uploadedFiles.filter(
       (f) => f.originalName !== originalName,
