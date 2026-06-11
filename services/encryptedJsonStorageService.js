@@ -1,23 +1,28 @@
-const fs = require("fs");
-const path = require("path");
 const crypto = require("crypto");
+const { Storage } = require("@google-cloud/storage");
 
-const QUERY_JSON_DIR =
-  process.env.QUERY_JSON_DIR ||
-  path.join(process.cwd(), ".local_uploads/query-json");
+const HAS_GCS_ENV = Boolean(
+  process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON &&
+  process.env.GCLOUD_PROJECT &&
+  process.env.GCS_BUCKET_NAME,
+);
 
-const QUERY_JSON_TTL_MS =
-  Number(process.env.QUERY_JSON_TTL_MS) || 1000 * 60 * 30;
+const storage = HAS_GCS_ENV
+  ? new Storage({
+      projectId: process.env.GCLOUD_PROJECT,
+      credentials: JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON),
+    })
+  : null;
+
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
+const QUERY_JSON_PREFIX =
+  process.env.QUERY_JSON_GCS_PREFIX || "query-json/encrypted";
 
 const SECRET =
   process.env.QUERY_JSON_SECRET || process.env.JWT_SECRET || "dev-query-secret";
 
 function getKey() {
   return crypto.createHash("sha256").update(SECRET).digest();
-}
-
-function ensureDir() {
-  fs.mkdirSync(QUERY_JSON_DIR, { recursive: true });
 }
 
 function encryptJson(payload) {
@@ -36,62 +41,54 @@ function encryptJson(payload) {
   };
 }
 
-function deleteEncryptedQueryJson(queryJsonKey) {
-  if (!queryJsonKey) return;
-
-  ensureDir();
-
-  const safeName = path.basename(queryJsonKey);
-  const filePath = path.join(QUERY_JSON_DIR, safeName);
-
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-}
-
-function saveEncryptedQueryJson({ userId, fileName, payload }) {
-  ensureDir();
-
+function buildQueryJsonKey(userId) {
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const safeUserId = String(userId || "anonymous").replace(/[^\w.-]/g, "_");
   const id = crypto.randomUUID();
-  const filePath = path.join(QUERY_JSON_DIR, `${safeUserId}_${id}.json`);
+
+  return `${QUERY_JSON_PREFIX}/${safeUserId}/${yyyy}/${mm}/${id}.json`;
+}
+
+async function saveEncryptedQueryJson({ userId, fileName, payload }) {
+  if (!storage || !BUCKET_NAME) {
+    console.warn("[queryJsonStorage] GCS disabled - skip save");
+    return null;
+  }
+
+  const bucket = storage.bucket(BUCKET_NAME);
+  const key = buildQueryJsonKey(userId);
 
   const body = {
     version: "encrypted_query_json_v1",
-    userId: safeUserId,
+    userId: String(userId || "anonymous"),
     fileName,
     createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + QUERY_JSON_TTL_MS).toISOString(),
     encrypted: encryptJson(payload),
   };
 
-  fs.writeFileSync(filePath, JSON.stringify(body), "utf8");
+  await bucket.file(key).save(JSON.stringify(body), {
+    contentType: "application/json; charset=utf-8",
+    resumable: false,
+    metadata: {
+      cacheControl: "private, max-age=0, no-store",
+      metadata: {
+        fileName: String(fileName || ""),
+      },
+    },
+  });
 
   return {
-    queryJsonKey: path.basename(filePath),
-    queryJsonPath: filePath,
-    expiresAt: body.expiresAt,
+    queryJsonKey: key,
   };
 }
 
-function cleanupExpiredQueryJson() {
-  ensureDir();
+async function deleteEncryptedQueryJson(queryJsonKey) {
+  if (!storage || !BUCKET_NAME || !queryJsonKey) return;
 
-  const now = Date.now();
-
-  fs.readdirSync(QUERY_JSON_DIR).forEach((name) => {
-    const filePath = path.join(QUERY_JSON_DIR, name);
-
-    try {
-      const raw = JSON.parse(fs.readFileSync(filePath, "utf8"));
-      if (raw.expiresAt && new Date(raw.expiresAt).getTime() <= now) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (_) {
-      // 깨진 파일은 정리
-      fs.unlinkSync(filePath);
-    }
-  });
+  const bucket = storage.bucket(BUCKET_NAME);
+  await bucket.file(queryJsonKey).delete({ ignoreNotFound: true });
 }
 
 module.exports = {

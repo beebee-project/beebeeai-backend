@@ -99,8 +99,6 @@ exports.uploadFile = async (req, res, next) => {
     let queryJsonMeta = null;
 
     try {
-      cleanupExpiredQueryJson();
-
       const { fileHash, allSheetsData, sheetStateSig } =
         await getOrBuildAllSheetsData(req.file.buffer);
 
@@ -117,7 +115,7 @@ exports.uploadFile = async (req, res, next) => {
         normalizedQueryTables,
       );
 
-      queryJsonMeta = saveEncryptedQueryJson({
+      queryJsonMeta = await saveEncryptedQueryJson({
         userId: String(user._id),
         fileName: originalName,
         payload: {
@@ -142,7 +140,6 @@ exports.uploadFile = async (req, res, next) => {
       localName: saved.localName,
       size: req.file.size,
       queryJsonKey: queryJsonMeta?.queryJsonKey || null,
-      queryJsonExpiresAt: queryJsonMeta?.expiresAt || null,
     };
     user.uploadedFiles.push(newFile);
     await user.save();
@@ -216,7 +213,7 @@ exports.deleteFile = async (req, res, next) => {
     await deleteObject(fileInfo.localName || fileInfo.gcsName);
 
     if (fileInfo?.queryJsonKey) {
-      deleteEncryptedQueryJson(fileInfo.queryJsonKey);
+      await deleteEncryptedQueryJson(fileInfo.queryJsonKey);
     }
 
     user.uploadedFiles = user.uploadedFiles.filter(
