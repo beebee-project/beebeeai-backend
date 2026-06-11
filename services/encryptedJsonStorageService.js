@@ -91,7 +91,33 @@ async function deleteEncryptedQueryJson(queryJsonKey) {
   await bucket.file(queryJsonKey).delete({ ignoreNotFound: true });
 }
 
+async function deleteEncryptedQueryJsonByFileName({ userId, fileName }) {
+  if (!storage || !BUCKET_NAME || !userId || !fileName) return;
+
+  const safeUserId = String(userId).replace(/[^\w.-]/g, "_");
+  const prefix = `${QUERY_JSON_PREFIX}/${safeUserId}/`;
+
+  const bucket = storage.bucket(BUCKET_NAME);
+  const [files] = await bucket.getFiles({ prefix });
+
+  await Promise.all(
+    files.map(async (file) => {
+      try {
+        const [metadata] = await file.getMetadata();
+        const metaFileName = metadata?.metadata?.fileName;
+
+        if (metaFileName === fileName) {
+          await file.delete({ ignoreNotFound: true });
+        }
+      } catch (error) {
+        console.error("[queryJson.deleteByFileName]", error.message);
+      }
+    }),
+  );
+}
+
 module.exports = {
   saveEncryptedQueryJson,
   deleteEncryptedQueryJson,
+  deleteEncryptedQueryJsonByFileName,
 };

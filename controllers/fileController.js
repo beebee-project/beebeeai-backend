@@ -6,7 +6,6 @@ const {
   isStorageEnabled,
 } = require("../utils/storage");
 const XLSX = require("xlsx");
-
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const {
   buildQueryTablesFromWorkbook,
@@ -17,10 +16,10 @@ const {
 const {
   buildAnalysisRecipeCandidates,
 } = require("../automation/analysisRecipeCandidateBuilder");
-
 const {
   saveEncryptedQueryJson,
   deleteEncryptedQueryJson,
+  deleteEncryptedQueryJsonByFileName,
 } = require("../services/encryptedJsonStorageService");
 
 exports.upload = async (req, res) => {
@@ -211,13 +210,19 @@ exports.deleteFile = async (req, res, next) => {
 
     await deleteObject(fileInfo.localName || fileInfo.gcsName);
 
-    if (fileInfo?.queryJsonKey) {
+    if (fileInfo.queryJsonKey) {
       await deleteEncryptedQueryJson(fileInfo.queryJsonKey);
     }
+
+    await deleteEncryptedQueryJsonByFileName({
+      userId: String(user._id),
+      fileName: fileInfo.originalName,
+    });
 
     user.uploadedFiles = user.uploadedFiles.filter(
       (f) => f.originalName !== originalName,
     );
+
     await user.save();
 
     res.status(200).json(user.uploadedFiles);
