@@ -45,7 +45,28 @@ const userSchema = new mongoose.Schema({
   // ===========================
   // 파일 & 사용량
   // ===========================
-  uploadedFiles: [fileSchema],
+  uploadedFiles: [
+    {
+      originalName: String,
+      gcsName: String,
+      localName: String,
+      size: Number,
+      uploadDate: {
+        type: Date,
+        default: Date.now,
+      },
+
+      encrypted: {
+        type: Boolean,
+        default: false,
+      },
+      encryptionVersion: String,
+      encryptionIv: String,
+      encryptionTag: String,
+
+      queryJsonKey: String,
+    },
+  ],
 
   usage: {
     formulaConversions: { type: Number, default: 0 },
