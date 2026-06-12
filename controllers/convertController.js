@@ -330,6 +330,32 @@ function _deduceOp(text = "") {
   return "formula";
 }
 
+function makeRawColumnMetaMap(queryTables = []) {
+  const map = new Map();
+
+  queryTables.forEach((table) => {
+    const tableId = table.tableId || table.id || "";
+    const sheetName = table.sheetName || table.sheet || "Sheet1";
+
+    (table.columns || []).forEach((column) => {
+      const header =
+        column.header ||
+        column.originalHeader ||
+        column.name ||
+        column.key ||
+        column.label;
+
+      if (!header) return;
+
+      map.set(`${tableId}::${header}`, column);
+      map.set(`${sheetName}::${header}`, column);
+      map.set(header, column);
+    });
+  });
+
+  return map;
+}
+
 /* ---------------------------------------------
  * buildLocalIntentFromText(text)
  * -------------------------------------------
@@ -3247,20 +3273,35 @@ function buildAllSheetsDataFromQueryTables(
 
       if (!header) return;
 
-      const rawColumnIndex =
-        typeof column === "object" && column.columnIndex != null
-          ? Number(column.columnIndex) - 1
-          : typeof column === "object" && column.index != null
-            ? Number(column.index)
+      const columnIndex =
+        typeof column === "object" && column.index != null
+          ? column.index
+          : typeof column === "object" && column.columnIndex != null
+            ? Number(column.columnIndex) - 1
             : index;
 
-      const columnIndex = Math.max(0, rawColumnIndex);
+      const rawColumnMetaMap = makeRawColumnMetaMap(queryTables);
+
+      const rawColumn =
+        rawColumnMetaMap.get(`${table.tableId || table.id || ""}::${header}`) ||
+        rawColumnMetaMap.get(`${sheetName}::${header}`) ||
+        rawColumnMetaMap.get(header) ||
+        {};
 
       const columnLetter =
-        typeof column === "object" &&
-        (column.columnLetter || column.letter || column.excelColumn)
-          ? column.columnLetter || column.letter || column.excelColumn
-          : columnLetterFromIndex(columnIndex);
+        column.columnLetter ||
+        column.letter ||
+        column.excelColumn ||
+        rawColumn.columnLetter ||
+        rawColumn.letter ||
+        rawColumn.excelColumn ||
+        (rawColumn.columnIndex != null
+          ? columnLetterFromIndex(Number(rawColumn.columnIndex) - 1)
+          : column.columnIndex != null
+            ? columnLetterFromIndex(Number(column.columnIndex) - 1)
+            : column.index != null
+              ? columnLetterFromIndex(Number(column.index))
+              : columnLetterFromIndex(index));
 
       const numericRatio =
         typeof column === "object" && typeof column.numericRatio === "number"
@@ -3358,7 +3399,7 @@ async function loadQueryContextFromSelectedFile(req, fileName) {
       normalizedQueryTables: queryJson.normalizedQueryTables || [],
       analysisRecipeCandidates: queryJson.analysisRecipeCandidates || [],
       allSheetsData,
-      fileHash: unwrapFileHash(queryJson),
+      fileHash: queryJson.fileHash || null,
       sheetStateSig:
         queryJson.sheetStateSig || makeSheetStateSig(allSheetsData),
     };
