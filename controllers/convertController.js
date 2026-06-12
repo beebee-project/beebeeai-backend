@@ -26,6 +26,9 @@ const {
 } = require("../utils/formulaCompatibility");
 const { tryGenerateFallbackFormula } = require("../utils/formulaFallback");
 const { buildConditionMask } = require("../utils/conditionEngine");
+const {
+  readEncryptedQueryJson,
+} = require("../services/encryptedJsonStorageService");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -2470,14 +2473,40 @@ exports.handleConversion = async (req, res, next) => {
     }
 
     // 1) 파일 전처리(옵션)
+    // 암호화 원본 파일을 직접 파싱하지 않고, 업로드 시 저장한 암호화 query-json을 우선 사용
     _tPreStart = process.hrtime.bigint();
-    const { isFileAttached, preprocessed } =
-      await loadAndPreprocessFromStorageIfPossible(req.user, fileName);
+
+    const queryContext = await loadQueryContextFromSelectedFile(req, fileName);
+
+    let isFileAttached = !!queryContext;
+    let preprocessed = queryContext
+      ? {
+          fileHash: queryContext.fileHash,
+          allSheetsData: queryContext.allSheetsData,
+          sheetStateSig: queryContext.sheetStateSig,
+          queryTables: queryContext.queryTables,
+          normalizedQueryTables: queryContext.normalizedQueryTables,
+          analysisRecipeCandidates: queryContext.analysisRecipeCandidates,
+        }
+      : null;
+
+    // query-json이 없는 기존 파일 또는 로컬 테스트만 기존 경로 fallback
+    if (!preprocessed) {
+      const fallback = await loadAndPreprocessFromStorageIfPossible(
+        req.user,
+        fileName,
+      );
+
+      isFileAttached = fallback.isFileAttached;
+      preprocessed = fallback.preprocessed;
+    }
+
     _tPreEnd = process.hrtime.bigint();
 
     const fileHash = preprocessed?.fileHash || null;
     const allSheetsData = preprocessed?.allSheetsData || null;
-    const sheetStateSig = makeSheetStateSig(allSheetsData);
+    const sheetStateSig =
+      preprocessed?.sheetStateSig || makeSheetStateSig(allSheetsData);
 
     // 2) 메타 힌트(LLM용)
     let metaHintForModel = "No file data provided.";
@@ -2595,6 +2624,8 @@ exports.handleConversion = async (req, res, next) => {
       message,
       formulaBuilder,
       allSheetsData,
+      queryTables: preprocessed?.queryTables || [],
+      normalizedQueryTables: preprocessed?.normalizedQueryTables || [],
     });
     _dbgCtx = context;
     if (isFileAttached && allSheetsData) {
@@ -3130,6 +3161,102 @@ async function convert(nl, options = {}, meta = {}) {
   // ✅ 조건 매칭 불확실로 인해 중단 요청이 들어온 경우
   if (ctx.__errorFormula) return ctx.__errorFormula;
   return built;
+}
+
+function columnLetterFromIndex(index = 0) {
+  let n = Number(index) + 1;
+  let s = "";
+
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+
+  return s || "A";
+}
+
+function buildAllSheetsDataFromQueryTables(queryTables = []) {
+  const allSheetsData = {};
+
+  queryTables.forEach((table) => {
+    const sheetName = table.sheetName || table.sheet || "Sheet1";
+    const rows = Array.isArray(table.rows) ? table.rows : [];
+    const columns = Array.isArray(table.columns) ? table.columns : [];
+
+    if (!allSheetsData[sheetName]) {
+      allSheetsData[sheetName] = {
+        rowCount: rows.length,
+        startRow: table.dataStartRow || 2,
+        lastDataRow: (table.dataStartRow || 2) + Math.max(rows.length - 1, 0),
+        metaData: {},
+      };
+    }
+
+    const sheetInfo = allSheetsData[sheetName];
+    sheetInfo.rowCount = Math.max(sheetInfo.rowCount || 0, rows.length);
+    sheetInfo.lastDataRow = Math.max(
+      sheetInfo.lastDataRow || 2,
+      (table.dataStartRow || 2) + Math.max(rows.length - 1, 0),
+    );
+
+    columns.forEach((column, index) => {
+      const header = column.header || column.name || column.key;
+      if (!header) return;
+
+      const columnLetter =
+        column.columnLetter ||
+        column.letter ||
+        column.excelColumn ||
+        columnLetterFromIndex(column.index ?? index);
+
+      sheetInfo.metaData[header] = {
+        columnLetter,
+        numericRatio:
+          typeof column.numericRatio === "number"
+            ? column.numericRatio
+            : column.type === "number"
+              ? 1
+              : 0,
+      };
+    });
+  });
+
+  return allSheetsData;
+}
+
+async function loadQueryContextFromSelectedFile(req, fileName) {
+  if (!fileName || !req.user?.uploadedFiles) return null;
+
+  const fileInfo = req.user.uploadedFiles.find(
+    (file) => file.originalName === fileName,
+  );
+
+  if (!fileInfo?.queryJsonKey) return null;
+
+  try {
+    const queryJson = await readEncryptedQueryJson(fileInfo.queryJsonKey);
+
+    if (!queryJson) return null;
+
+    const queryTables = queryJson.tables || queryJson.queryTables || [];
+    const allSheetsData =
+      queryJson.allSheetsData || buildAllSheetsDataFromQueryTables(queryTables);
+
+    return {
+      fileInfo,
+      queryTables,
+      normalizedQueryTables: queryJson.normalizedQueryTables || [],
+      analysisRecipeCandidates: queryJson.analysisRecipeCandidates || [],
+      allSheetsData,
+      fileHash: queryJson.fileHash || null,
+      sheetStateSig:
+        queryJson.sheetStateSig || makeSheetStateSig(allSheetsData),
+    };
+  } catch (error) {
+    console.error("[convert.queryJson.load]", error);
+    return null;
+  }
 }
 
 module.exports.convert = convert;

@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { Storage } = require("@google-cloud/storage");
+const { downloadToBuffer } = require("../utils/storage");
 
 const HAS_GCS_ENV = Boolean(
   process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON &&
@@ -39,6 +40,32 @@ function encryptJson(payload) {
     tag: cipher.getAuthTag().toString("base64"),
     data: encrypted.toString("base64"),
   };
+}
+
+function decryptJson(encrypted = {}) {
+  const iv = Buffer.from(encrypted.iv || "", "base64");
+  const tag = Buffer.from(encrypted.tag || "", "base64");
+  const data = Buffer.from(encrypted.data || "", "base64");
+
+  const decipher = crypto.createDecipheriv("aes-256-gcm", getKey(), iv);
+  decipher.setAuthTag(tag);
+
+  const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+
+  return JSON.parse(decrypted.toString("utf8"));
+}
+
+async function readEncryptedQueryJson(queryJsonKey) {
+  if (!queryJsonKey) return null;
+
+  const buffer = await downloadToBuffer(queryJsonKey);
+  const body = JSON.parse(buffer.toString("utf8"));
+
+  if (!body?.encrypted) {
+    return null;
+  }
+
+  return decryptJson(body.encrypted);
 }
 
 function buildQueryJsonKey(userId) {
@@ -120,4 +147,5 @@ module.exports = {
   saveEncryptedQueryJson,
   deleteEncryptedQueryJson,
   deleteEncryptedQueryJsonByFileName,
+  readEncryptedQueryJson,
 };
