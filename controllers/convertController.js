@@ -3247,12 +3247,14 @@ function buildAllSheetsDataFromQueryTables(
 
       if (!header) return;
 
-      const columnIndex =
-        typeof column === "object" && column.index != null
-          ? column.index
-          : typeof column === "object" && column.columnIndex != null
-            ? Number(column.columnIndex) - 1
+      const rawColumnIndex =
+        typeof column === "object" && column.columnIndex != null
+          ? Number(column.columnIndex) - 1
+          : typeof column === "object" && column.index != null
+            ? Number(column.index)
             : index;
+
+      const columnIndex = Math.max(0, rawColumnIndex);
 
       const columnLetter =
         typeof column === "object" &&
