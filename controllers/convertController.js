@@ -2495,6 +2495,7 @@ exports.handleConversion = async (req, res, next) => {
           queryTables: queryContext.queryTables,
           normalizedQueryTables: queryContext.normalizedQueryTables,
           analysisRecipeCandidates: queryContext.analysisRecipeCandidates,
+          source: "query-json",
         }
       : null;
 
@@ -2506,7 +2507,12 @@ exports.handleConversion = async (req, res, next) => {
       );
 
       isFileAttached = fallback.isFileAttached;
-      preprocessed = fallback.preprocessed;
+      preprocessed = fallback.preprocessed
+        ? {
+            ...fallback.preprocessed,
+            source: "fallback-preprocess",
+          }
+        : null;
     }
 
     _tPreEnd = process.hrtime.bigint();
@@ -2689,6 +2695,7 @@ exports.handleConversion = async (req, res, next) => {
               resolvedReturnHeaders: [],
               resolvedLookupHeader: null,
               resolvedGroupHeader: null,
+              queryContextSource: preprocessed?.source || null,
             },
           });
 
@@ -2759,6 +2766,7 @@ exports.handleConversion = async (req, res, next) => {
             resolvedLookupHeader:
               context?.resolved?.lookupColumn?.header || null,
             resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+            queryContextSource: preprocessed?.source || null,
           },
         });
 
@@ -2815,6 +2823,7 @@ exports.handleConversion = async (req, res, next) => {
           resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
           ambiguityGuard: true,
           ambiguities: context.resolved.ambiguities,
+          queryContextSource: preprocessed?.source || null,
         },
       });
 
@@ -2934,6 +2943,7 @@ exports.handleConversion = async (req, res, next) => {
         resolvedReturnHeaders: getDebugReturnHeaders(context),
         resolvedLookupHeader: context?.resolved?.lookupColumn?.header || null,
         resolvedGroupHeader: context?.resolved?.groupColumn?.header || null,
+        queryContextSource: preprocessed?.source || null,
       },
     });
 
@@ -2996,6 +3006,7 @@ exports.handleConversion = async (req, res, next) => {
           stack: err?.stack?.slice?.(0, 500),
           compatibility: _dbgCompatibility || null,
           resolvedBaseSheet: _dbgCtx?.resolved?.baseSheet || null,
+          queryContextSource: preprocessed?.source || null,
         },
       }),
     });
@@ -3277,7 +3288,48 @@ function buildAllSheetsDataFromQueryTables(
   return allSheetsData;
 }
 
+function unwrapAllSheetsData(queryJson = {}) {
+  return (
+    queryJson?.allSheetsData?.allSheetsData || queryJson?.allSheetsData || null
+  );
+}
+
+function unwrapFileHash(queryJson = {}) {
+  return queryJson?.fileHash || queryJson?.allSheetsData?.fileHash || null;
+}
+
 async function loadQueryContextFromSelectedFile(req, fileName) {
+  const localQueryTablePath = path.join(
+    process.cwd(),
+    ".local_uploads",
+    "query-tables",
+    `${String(fileName || "")
+      .replace(/[\\/:*?"<>|]/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()}.json`,
+  );
+
+  if (process.env.LOCAL_DEV === "1" && fs.existsSync(localQueryTablePath)) {
+    const queryJson = JSON.parse(fs.readFileSync(localQueryTablePath, "utf-8"));
+
+    const queryTables = queryJson.tables || queryJson.queryTables || [];
+    const normalizedQueryTables = queryJson.normalizedQueryTables || [];
+    const allSheetsData =
+      unwrapAllSheetsData(queryJson) ||
+      buildAllSheetsDataFromQueryTables(queryTables, normalizedQueryTables);
+
+    return {
+      fileInfo: { originalName: fileName },
+      queryTables,
+      normalizedQueryTables,
+      analysisRecipeCandidates: queryJson.analysisRecipeCandidates || [],
+      allSheetsData,
+      fileHash: unwrapFileHash(queryJson),
+      sheetStateSig:
+        queryJson.sheetStateSig || makeSheetStateSig(allSheetsData),
+    };
+  }
+
   if (!fileName || !req.user?.uploadedFiles) return null;
 
   const fileInfo = req.user.uploadedFiles.find(
@@ -3295,7 +3347,7 @@ async function loadQueryContextFromSelectedFile(req, fileName) {
     const normalizedQueryTables = queryJson.normalizedQueryTables || [];
 
     const allSheetsData =
-      queryJson.allSheetsData ||
+      unwrapAllSheetsData(queryJson) ||
       buildAllSheetsDataFromQueryTables(queryTables, normalizedQueryTables);
 
     return {
@@ -3304,7 +3356,7 @@ async function loadQueryContextFromSelectedFile(req, fileName) {
       normalizedQueryTables: queryJson.normalizedQueryTables || [],
       analysisRecipeCandidates: queryJson.analysisRecipeCandidates || [],
       allSheetsData,
-      fileHash: queryJson.fileHash || null,
+      fileHash: unwrapFileHash(queryJson),
       sheetStateSig:
         queryJson.sheetStateSig || makeSheetStateSig(allSheetsData),
     };
