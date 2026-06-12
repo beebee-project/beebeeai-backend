@@ -22,12 +22,12 @@ module.exports = function requireEntitlement(feature) {
       ) {
         return res
           .status(403)
-          .json({ error: "FREE 플랜은 월 20회까지만 수식 생성이 가능합니다." });
+          .json({ error: "FREE 플랜은 월 10회까지만 생성이 가능합니다." });
       }
       if (feature === "fileUpload" && usage.fileUploads >= limits.fileUploads) {
         return res
           .status(403)
-          .json({ error: "FREE 플랜은 파일 업로드 1개까지만 가능합니다." });
+          .json({ error: "FREE 플랜은 파일 업로드 1회만 가능합니다." });
       }
     }
     next();

@@ -6,6 +6,7 @@ const {
   isSubscriptionActive,
   getEffectivePlan,
 } = require("../utils/subscriptionStatus");
+const { getPlanLimits } = require("../config/planLimits");
 
 function ensureAbsoluteUrl(url, fallbackOrigin) {
   // url이 "www.xxx" 같이 스킴 없이 들어오면 fallbackOrigin 붙여서 보정
@@ -45,10 +46,7 @@ exports.getUsage = async (req, res) => {
       user?.subscription?.status || "INACTIVE",
     ).toUpperCase();
 
-    const limits =
-      plan === "PRO"
-        ? { formulaConversions: null, fileUploads: 5 }
-        : { formulaConversions: 10, fileUploads: 1 };
+    const limits = getPlanLimits(plan);
 
     res.json({
       plan,
@@ -72,14 +70,8 @@ exports.getPlans = (req, res) => {
   res.json({
     betaMode: paymentService.isBetaMode(),
     plans: {
-      FREE: {
-        formulaConversions: 10,
-        fileUploads: 1,
-      },
-      PRO: {
-        formulaConversions: null,
-        fileUploads: 5,
-      },
+      FREE: getPlanLimits("FREE"),
+      PRO: getPlanLimits("PRO"),
     },
   });
 };

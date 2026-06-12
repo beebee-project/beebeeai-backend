@@ -4,6 +4,7 @@ const {
   getEffectivePlan,
   isSubscriptionActive,
 } = require("../utils/subscriptionStatus");
+const { getPlanLimits } = require("../config/planLimits");
 
 function isLocalBypassMode() {
   return process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1";
@@ -28,13 +29,8 @@ function getEffectivePlanFromUser(user) {
   return getEffectivePlan(user);
 }
 
-const LIMITS = {
-  FREE: { formulaConversions: 10, fileUploads: 1 },
-  PRO: { formulaConversions: null, fileUploads: null },
-};
-
 function getLimits(plan = "FREE") {
-  return LIMITS[plan] || LIMITS.FREE;
+  return getPlanLimits(plan);
 }
 
 function needMonthlyReset(lastReset, now = new Date()) {
