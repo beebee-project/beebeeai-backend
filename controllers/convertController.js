@@ -3176,49 +3176,85 @@ function columnLetterFromIndex(index = 0) {
   return s || "A";
 }
 
-function buildAllSheetsDataFromQueryTables(queryTables = []) {
+function buildAllSheetsDataFromQueryTables(
+  queryTables = [],
+  normalizedQueryTables = [],
+) {
   const allSheetsData = {};
+  const sourceTables = normalizedQueryTables.length
+    ? normalizedQueryTables
+    : queryTables;
 
-  queryTables.forEach((table) => {
+  sourceTables.forEach((table) => {
     const sheetName = table.sheetName || table.sheet || "Sheet1";
     const rows = Array.isArray(table.rows) ? table.rows : [];
     const columns = Array.isArray(table.columns) ? table.columns : [];
 
+    const startRow = Number(table.dataStartRow || table.startRow || 2);
+    const lastDataRow = startRow + Math.max(rows.length - 1, 0);
+
     if (!allSheetsData[sheetName]) {
       allSheetsData[sheetName] = {
         rowCount: rows.length,
-        startRow: table.dataStartRow || 2,
-        lastDataRow: (table.dataStartRow || 2) + Math.max(rows.length - 1, 0),
+        startRow,
+        lastDataRow,
         metaData: {},
       };
     }
 
     const sheetInfo = allSheetsData[sheetName];
     sheetInfo.rowCount = Math.max(sheetInfo.rowCount || 0, rows.length);
+    sheetInfo.startRow = Math.min(sheetInfo.startRow || startRow, startRow);
     sheetInfo.lastDataRow = Math.max(
-      sheetInfo.lastDataRow || 2,
-      (table.dataStartRow || 2) + Math.max(rows.length - 1, 0),
+      sheetInfo.lastDataRow || lastDataRow,
+      lastDataRow,
     );
 
     columns.forEach((column, index) => {
-      const header = column.header || column.name || column.key;
+      const header =
+        typeof column === "string"
+          ? column
+          : column.header ||
+            column.originalHeader ||
+            column.name ||
+            column.key ||
+            column.label;
+
       if (!header) return;
 
+      const columnIndex =
+        typeof column === "object" && column.index != null
+          ? column.index
+          : index;
+
       const columnLetter =
-        column.columnLetter ||
-        column.letter ||
-        column.excelColumn ||
-        columnLetterFromIndex(column.index ?? index);
+        typeof column === "object" &&
+        (column.columnLetter || column.letter || column.excelColumn)
+          ? column.columnLetter || column.letter || column.excelColumn
+          : columnLetterFromIndex(columnIndex);
+
+      const numericRatio =
+        typeof column === "object" && typeof column.numericRatio === "number"
+          ? column.numericRatio
+          : typeof column === "object" && column.type === "number"
+            ? 1
+            : 0;
 
       sheetInfo.metaData[header] = {
         columnLetter,
-        numericRatio:
-          typeof column.numericRatio === "number"
-            ? column.numericRatio
-            : column.type === "number"
-              ? 1
-              : 0,
+        numericRatio,
       };
+
+      if (
+        typeof column === "object" &&
+        column.originalHeader &&
+        column.originalHeader !== header
+      ) {
+        sheetInfo.metaData[column.originalHeader] = {
+          columnLetter,
+          numericRatio,
+        };
+      }
     });
   });
 
@@ -3240,8 +3276,11 @@ async function loadQueryContextFromSelectedFile(req, fileName) {
     if (!queryJson) return null;
 
     const queryTables = queryJson.tables || queryJson.queryTables || [];
+    const normalizedQueryTables = queryJson.normalizedQueryTables || [];
+
     const allSheetsData =
-      queryJson.allSheetsData || buildAllSheetsDataFromQueryTables(queryTables);
+      queryJson.allSheetsData ||
+      buildAllSheetsDataFromQueryTables(queryTables, normalizedQueryTables);
 
     return {
       fileInfo,
