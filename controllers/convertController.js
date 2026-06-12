@@ -29,6 +29,7 @@ const { buildConditionMask } = require("../utils/conditionEngine");
 const {
   readEncryptedQueryJson,
 } = require("../services/encryptedJsonStorageService");
+const { stripAggregateTerms } = require("../utils/headerHintNormalizer");
 
 // === 빌더 모음 ===
 const logicalFunctionBuilder = require("../builders/logicalFunctions");
@@ -2427,14 +2428,6 @@ function shouldCountConversion(result) {
   return false;
 }
 
-function normalizeHeaderSearchHint(hint = "") {
-  return String(hint || "")
-    .replace(/평균|합계|총합|최고|최저|최대|최소|중앙값|개수|건수|수량/g, "")
-    .replace(/average|avg|sum|total|max|min|median|count/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 /* ---------------------------------------------
  * 메인 컨버전 핸들러
  * -------------------------------------------*/
@@ -2677,11 +2670,11 @@ exports.handleConversion = async (req, res, next) => {
 
       if (hasHints) {
         const rawReturnHint = intent.return_hint || intent.header_hint || "";
-        const normalizedReturnHint = normalizeHeaderSearchHint(rawReturnHint);
+        const normalizedReturnHint = stripAggregateTerms(rawReturnHint);
 
         const searchTerms = {
           return: normalizedReturnHint || rawReturnHint,
-          lookup: normalizeHeaderSearchHint(intent.lookup_hint || ""),
+          lookup: stripAggregateTerms(intent.lookup_hint || ""),
         };
 
         const joint = formulaUtils.findBestSheetAndColumns(
@@ -3160,11 +3153,11 @@ async function convert(nl, options = {}, meta = {}) {
       typeof formulaUtils.findBestSheetAndColumns === "function"
     ) {
       const rawReturnHint = intent.return_hint || intent.header_hint || "";
-      const normalizedReturnHint = normalizeHeaderSearchHint(rawReturnHint);
+      const normalizedReturnHint = stripAggregateTerms(rawReturnHint);
 
       const searchTerms = {
         return: normalizedReturnHint || rawReturnHint,
-        lookup: normalizeHeaderSearchHint(intent.lookup_hint || ""),
+        lookup: stripAggregateTerms(intent.lookup_hint || ""),
       };
 
       const joint = formulaUtils.findBestSheetAndColumns(
