@@ -2401,6 +2401,14 @@ function shouldCountConversion(result) {
   return false;
 }
 
+function normalizeHeaderSearchHint(hint = "") {
+  return String(hint || "")
+    .replace(/평균|합계|총합|최고|최저|최대|최소|중앙값|개수|건수|수량/g, "")
+    .replace(/average|avg|sum|total|max|min|median|count/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /* ---------------------------------------------
  * 메인 컨버전 핸들러
  * -------------------------------------------*/
@@ -2636,9 +2644,12 @@ exports.handleConversion = async (req, res, next) => {
       );
 
       if (hasHints) {
+        const rawReturnHint = intent.return_hint || intent.header_hint || "";
+        const normalizedReturnHint = normalizeHeaderSearchHint(rawReturnHint);
+
         const searchTerms = {
-          return: intent.return_hint || intent.header_hint || "",
-          lookup: intent.lookup_hint || "",
+          return: normalizedReturnHint || rawReturnHint,
+          lookup: normalizeHeaderSearchHint(intent.lookup_hint || ""),
         };
 
         const joint = formulaUtils.findBestSheetAndColumns(
@@ -3111,9 +3122,12 @@ async function convert(nl, options = {}, meta = {}) {
       hasHints &&
       typeof formulaUtils.findBestSheetAndColumns === "function"
     ) {
+      const rawReturnHint = intent.return_hint || intent.header_hint || "";
+      const normalizedReturnHint = normalizeHeaderSearchHint(rawReturnHint);
+
       const searchTerms = {
-        return: intent.return_hint || intent.header_hint || "",
-        lookup: intent.lookup_hint || "",
+        return: normalizedReturnHint || rawReturnHint,
+        lookup: normalizeHeaderSearchHint(intent.lookup_hint || ""),
       };
 
       const joint = formulaUtils.findBestSheetAndColumns(
@@ -3225,7 +3239,9 @@ function buildAllSheetsDataFromQueryTables(
       const columnIndex =
         typeof column === "object" && column.index != null
           ? column.index
-          : index;
+          : typeof column === "object" && column.columnIndex != null
+            ? Number(column.columnIndex) - 1
+            : index;
 
       const columnLetter =
         typeof column === "object" &&
