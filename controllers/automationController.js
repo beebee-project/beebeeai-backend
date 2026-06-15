@@ -17,6 +17,7 @@ const { parseQueryIntent } = require("../automation/queryIntentParser");
 const { executeQueryIntent } = require("../automation/queryExecutor");
 const {
   buildSummaryWorkbook,
+  buildAutomationTemplateWorkbook,
   workbookToBuffer,
   buildChartSpec,
 } = require("../automation/summarySheetBuilder");
@@ -219,11 +220,12 @@ exports.createSummarySheet = async (req, res, next) => {
       });
     }
 
-    const workbook = buildSummaryWorkbook({
+    const workbook = buildAutomationTemplateWorkbook({
       fileName: saved.fileName,
       message,
       intent: queryIntent,
       result,
+      tables: saved.tables || [],
     });
 
     const buffer = workbookToBuffer(workbook);
@@ -246,6 +248,7 @@ exports.createSummarySheet = async (req, res, next) => {
       summarySheetKey: key,
       localName: stored.localName,
       gcsName: stored.gcsName,
+      sheetNames: workbook.SheetNames || [],
       chartSpec,
       intent: queryIntent,
       result,

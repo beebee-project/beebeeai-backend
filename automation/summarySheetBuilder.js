@@ -435,8 +435,113 @@ function workbookToBuffer(workbook) {
   });
 }
 
+function buildAutomationTemplateWorkbook({
+  fileName = "",
+  message = "",
+  intent = null,
+  result = null,
+  tables = [],
+}) {
+  const wb = XLSX.utils.book_new();
+
+  const primaryTable = tables.find((t) => t.isPrimary) || tables[0] || {};
+  const columns = primaryTable.columns || [];
+  const maxColIndex = Math.max(...columns.map((c) => c.columnIndex || 0), 1);
+
+  const headers = Array.from({ length: maxColIndex }, (_, i) => {
+    const col = columns.find((c) => c.columnIndex === i + 1);
+    return col?.header || "";
+  });
+
+  const sourceRows = [
+    headers,
+    ...(primaryTable.rows || [])
+      .slice(0, 200)
+      .map((row) => headers.map((h) => row[h] ?? row[String(h)] ?? "")),
+  ];
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.aoa_to_sheet([
+      ["자동화 템플릿 사용방법"],
+      ["1", "원본데이터 시트에 실제 데이터를 붙여넣습니다."],
+      ["2", "자동화설정 시트에서 기준열/값열/집계방식을 수정합니다."],
+      ["3", "자동화시트 시트의 수식 결과를 확인합니다."],
+      ["4", "필요 시 자동화시트를 복사해 실제 업무 파일에 붙여넣습니다."],
+      [],
+      ["파일명", fileName],
+      ["요청", message],
+      ["작업", result?.operation || intent?.operation || ""],
+    ]),
+    "사용방법",
+  );
+
+  const groupHeader = result?.groupBy?.header || intent?.groupBy?.header || "";
+  const metricHeader = result?.metric?.header || intent?.metric?.header || "";
+
+  const groupCol =
+    columns.find((c) => c.header === groupHeader) ||
+    columns.find((c) => c.role === "group" || c.inferredRole === "group") ||
+    columns[0] ||
+    {};
+
+  const metricCol =
+    columns.find((c) => c.header === metricHeader) ||
+    columns.find((c) => c.role === "metric" || c.inferredRole === "metric") ||
+    columns.find((c) => c.type === "number" || c.dominantType === "number") ||
+    columns[1] ||
+    {};
+
+  const groupLetter = groupCol.columnLetter || groupCol.letter || "A";
+  const metricLetter = metricCol.columnLetter || metricCol.letter || "B";
+  const operation = result?.operation || intent?.operation || "average";
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.aoa_to_sheet([
+      ["항목", "값", "설명"],
+      ["원본시트명", "원본데이터", "데이터가 들어있는 시트명"],
+      ["기준열", groupLetter, "부서/월/분류 등 그룹 기준 열"],
+      ["값열", metricLetter, "합계/평균 계산 대상 열"],
+      ["집계방식", operation, "average, sum, count 중 선택"],
+      ["요청문", message, "자동 생성 기준 요청"],
+    ]),
+    "자동화설정",
+  );
+
+  const autoSheet = XLSX.utils.aoa_to_sheet([
+    ["자동화시트"],
+    ["설정값을 바꾸면 아래 결과가 자동 계산됩니다."],
+    [],
+    ["결과"],
+  ]);
+
+  autoSheet["A5"] = {
+    t: "n",
+    f: `LET(src,"'원본데이터'!",g,INDIRECT(src&자동화설정!B3&":"&자동화설정!B3),v,INDIRECT(src&자동화설정!B4&":"&자동화설정!B4),u,SORT(UNIQUE(FILTER(g,g<>""))),HSTACK(u,SWITCH(자동화설정!B5,"sum",MAP(u,LAMBDA(x,SUMIF(g,x,v))),"count",MAP(u,LAMBDA(x,COUNTIF(g,x))),MAP(u,LAMBDA(x,AVERAGEIF(g,x,v)))))))`,
+  };
+  autoSheet["!ref"] = "A1:B20";
+
+  XLSX.utils.book_append_sheet(wb, autoSheet, "자동화시트");
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.aoa_to_sheet(sourceRows.length ? sourceRows : [["데이터 없음"]]),
+    "원본데이터",
+  );
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.json_to_sheet(result?.rows || []),
+    "실행결과_미리보기",
+  );
+
+  return wb;
+}
+
 module.exports = {
   buildSummaryWorkbook,
+  buildAutomationTemplateWorkbook,
   workbookToBuffer,
   buildChartSpec,
 };
