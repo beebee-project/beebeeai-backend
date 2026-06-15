@@ -524,6 +524,40 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       saved.analysisRecipeCandidates ||
       buildAnalysisRecipeCandidates(normalizedQueryTables);
 
+    const candidates = (analysisRecipeCandidates || []).map(
+      (candidate, index) => {
+        const id =
+          candidate.candidateId ||
+          candidate.id ||
+          candidate.recipeId ||
+          candidate.type ||
+          `candidate_${index + 1}`;
+
+        return {
+          candidateId: id,
+          title:
+            candidate.title ||
+            candidate.name ||
+            candidate.label ||
+            `자동화 후보 ${index + 1}`,
+          description:
+            candidate.description ||
+            candidate.reason ||
+            candidate.summary ||
+            "업로드된 파일 구조를 기반으로 생성 가능한 자동화입니다.",
+          category:
+            candidate.category ||
+            candidate.type ||
+            candidate.recipeId ||
+            "automation",
+          priority: Number.isFinite(candidate.priority)
+            ? candidate.priority
+            : index + 1,
+          candidate,
+        };
+      },
+    );
+
     return res.json({
       ok: true,
       source: "query-tables",
@@ -533,6 +567,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       sheetStateSig: saved.sheetStateSig,
       normalizedQueryTables,
       analysisRecipeCandidates,
+      candidates,
     });
   } catch (e) {
     console.error("[automation.getAnalysisCandidates]", e);
