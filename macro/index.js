@@ -1,6 +1,12 @@
 const { parseMacroIntent } = require("./intentParser");
 const { buildVbaScript } = require("./vbaBuilder");
 const { buildAppsScript } = require("./appScriptBuilder");
+const {
+  findColumnByHeader,
+  findColumnsByRole,
+  findColumnsByType,
+} = require("../utils/queryContextResolver");
+
 const OpenAI = require("openai");
 let client = null;
 if (process.env.OPENAI_API_KEY) {
@@ -188,11 +194,87 @@ function sanitizeIntent(raw) {
   return intent.type ? intent : { type: "unknown" };
 }
 
+function buildMacroContextHint(queryContext) {
+  const columns = [];
+
+  for (const table of queryContext?.normalizedQueryTables ||
+    queryContext?.tables ||
+    []) {
+    for (const col of table.columns || []) {
+      const header = col.header || col.name || col.key;
+      const letter = col.columnLetter || col.letter || "";
+
+      if (!header) continue;
+      columns.push(`${header}${letter ? `=${letter}열` : ""}`);
+    }
+  }
+
+  if (!columns.length) return "";
+
+  return `\n\n[파일 열 정보]\n${columns.slice(0, 80).join(", ")}`;
+}
+
+function enrichIntentFromQueryContext(intent, queryContext, prompt) {
+  if (!intent || !queryContext) {
+    return intent;
+  }
+
+  const text = String(prompt || "");
+
+  /*
+   * sortRange
+   */
+  if (intent.type === "sortRange") {
+    const sortMatch = text.match(
+      /([가-힣A-Za-z0-9_() ]+?)\s*(높은\s*순|낮은\s*순|오름차순|내림차순|최신순|최근순|오래된\s*순|빠른\s*순)/,
+    );
+
+    if (sortMatch) {
+      const header = sortMatch[1].trim();
+      const column = findColumnByHeader(queryContext, header);
+
+      if (column) {
+        intent.column = {
+          letter: column.columnLetter,
+          index: column.columnIndex,
+        };
+
+        if (/높은\s*순|내림차순|최신순|최근순/.test(sortMatch[2])) {
+          intent.direction = "descending";
+        } else {
+          intent.direction = "ascending";
+        }
+      }
+    }
+  }
+
+  /*
+   * filterRange
+   */
+  if (intent.type === "filterRange") {
+    const deptMatch = text.match(/([가-힣A-Za-z0-9_]+)\s*부서/);
+
+    if (deptMatch) {
+      const groupColumns = findColumnsByRole(queryContext, "group");
+
+      if (groupColumns.length) {
+        intent.column = {
+          letter: groupColumns[0].columnLetter,
+        };
+
+        intent.criteria = deptMatch[1];
+      }
+    }
+  }
+
+  return intent;
+}
+
 /**
  * 매크로 코드 생성 엔트리
  * @param {{ prompt: string, target?: "vba" | "appsScript" | "officeScript" }} param0
  */
-exports.generate = async ({ prompt, target }) => {
+exports.generate = async ({ prompt, target, queryContext }) => {
   // 기본값은 VBA
   let macroTarget = "vba";
   if (target === "appsScript") {
@@ -202,11 +284,18 @@ exports.generate = async ({ prompt, target }) => {
   }
 
   // 1) 규칙 기반 파서 먼저 시도
-  let intent = parseMacroIntent(prompt);
+  const promptWithContext = queryContext
+    ? `${prompt}${buildMacroContextHint(queryContext)}`
+    : prompt;
+
+  let intent = parseMacroIntent(promptWithContext);
+
+  intent = enrichIntentFromQueryContext(intent, queryContext, prompt);
 
   // 2) 규칙 기반이 unknown이면 GPT fallback
   if (intent.type === "unknown") {
-    intent = sanitizeIntent(await llmMacroParser(prompt));
+    intent = sanitizeIntent(await llmMacroParser(promptWithContext));
+    intent = enrichIntentFromQueryContext(intent, queryContext, prompt);
   }
 
   // 3) intent → 코드 생성 (VBA / Apps 분기)

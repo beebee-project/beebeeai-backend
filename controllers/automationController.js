@@ -104,13 +104,22 @@ async function buildQueryTablesForFile(req, fileName) {
 
 async function executeAnalysisCandidate(req, res) {
   try {
-    const { normalizedQueryTables, candidate } = req.body || {};
+    const { queryTablesKey, normalizedQueryTables, candidate } = req.body || {};
 
-    if (!Array.isArray(normalizedQueryTables)) {
+    let tablesForExecution = normalizedQueryTables;
+
+    if (!Array.isArray(tablesForExecution) && queryTablesKey) {
+      const saved = await readJsonObject(queryTablesKey);
+      tablesForExecution =
+        saved.normalizedQueryTables ||
+        buildNormalizedQueryTables(saved.tables || []);
+    }
+
+    if (!Array.isArray(tablesForExecution)) {
       return res.status(400).json({
         ok: false,
         code: "NORMALIZED_QUERY_TABLES_REQUIRED",
-        message: "normalizedQueryTables가 필요합니다.",
+        message: "normalizedQueryTables 또는 queryTablesKey가 필요합니다.",
       });
     }
 
@@ -123,7 +132,7 @@ async function executeAnalysisCandidate(req, res) {
     }
 
     const result = executeAnalysisRecipeCandidate({
-      normalizedQueryTables,
+      normalizedQueryTables: tablesForExecution,
       candidate,
     });
 
@@ -469,6 +478,65 @@ exports.exportPptx = async (req, res) => {
       code: "EXPORT_PPTX_FAILED",
       error: err.message,
     });
+  }
+};
+
+exports.getAnalysisCandidates = async (req, res, next) => {
+  try {
+    const { queryTablesKey, fileName } = req.body || {};
+
+    let saved = null;
+    let key = queryTablesKey || null;
+
+    if (key) {
+      saved = await readJsonObject(key);
+    } else if (fileName) {
+      const built = await buildQueryTablesForFile(req, fileName);
+      const normalizedQueryTables = buildNormalizedQueryTables(built.tables);
+      const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
+        normalizedQueryTables,
+      );
+
+      return res.json({
+        ok: true,
+        source: "file",
+        fileName,
+        fileHash: built.fileHash,
+        sheetStateSig: built.sheetStateSig,
+        normalizedQueryTables,
+        analysisRecipeCandidates,
+      });
+    }
+
+    if (!saved) {
+      return res.status(400).json({
+        ok: false,
+        code: "QUERY_TABLES_KEY_OR_FILE_NAME_REQUIRED",
+        error: "queryTablesKey 또는 fileName이 필요합니다.",
+      });
+    }
+
+    const normalizedQueryTables =
+      saved.normalizedQueryTables ||
+      buildNormalizedQueryTables(saved.tables || []);
+
+    const analysisRecipeCandidates =
+      saved.analysisRecipeCandidates ||
+      buildAnalysisRecipeCandidates(normalizedQueryTables);
+
+    return res.json({
+      ok: true,
+      source: "query-tables",
+      queryTablesKey: key,
+      fileName: saved.fileName,
+      fileHash: saved.fileHash,
+      sheetStateSig: saved.sheetStateSig,
+      normalizedQueryTables,
+      analysisRecipeCandidates,
+    });
+  } catch (e) {
+    console.error("[automation.getAnalysisCandidates]", e);
+    next(e);
   }
 };
 

@@ -1,3 +1,13 @@
+const path = require("path");
+const fs = require("fs");
+
+function safeFileName(name = "") {
+  return String(name || "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const macroService = require("../macro/index");
 const { assertCanUse, bumpUsage } = require("../services/usageService");
 const { writeRequestLog } = require("../services/requestLogService");
@@ -5,6 +15,11 @@ const crypto = require("crypto");
 const { classifyReason } = require("../utils/reasonClassifier");
 const { validateMacroResult } = require("../utils/outputValidator");
 const { buildDebugMeta } = require("../utils/debugMetaBuilder");
+const User = require("../models/User");
+const {
+  readEncryptedQueryJson,
+} = require("../services/encryptedJsonStorageService");
+const { readJsonObject } = require("../utils/storage");
 
 function isUnsupportedMacro(result) {
   // 1) intent 기반
@@ -15,13 +30,70 @@ function isUnsupportedMacro(result) {
   return false;
 }
 
+async function loadMacroQueryContext(req, { fileName, queryTablesKey }) {
+  if (queryTablesKey) {
+    const saved = await readJsonObject(queryTablesKey);
+    return {
+      source: "query-tables-key",
+      fileName: saved.fileName,
+      tables: saved.tables || [],
+      normalizedQueryTables: saved.normalizedQueryTables || [],
+    };
+  }
+
+  if (fileName) {
+    const localPath = path.join(
+      __dirname,
+      "..",
+      ".local_uploads",
+      "query-tables",
+      `${safeFileName(fileName)}.json`,
+    );
+
+    if (fs.existsSync(localPath)) {
+      const localJson = JSON.parse(fs.readFileSync(localPath, "utf-8"));
+      return {
+        source: "local-query-table",
+        fileName,
+        tables: localJson.tables || [],
+        normalizedQueryTables: localJson.normalizedQueryTables || [],
+        allSheetsData: localJson.allSheetsData || null,
+      };
+    }
+  }
+
+  if (!fileName || !req.user?.id) return null;
+
+  const user = await User.findById(req.user.id).select("uploadedFiles");
+  const fileInfo = user?.uploadedFiles?.find(
+    (f) => f.originalName === fileName,
+  );
+
+  if (!fileInfo?.queryJsonKey) return null;
+
+  const queryJson = await readEncryptedQueryJson(fileInfo.queryJsonKey);
+
+  return {
+    source: "query-json",
+    fileName,
+    tables: queryJson?.tables || [],
+    normalizedQueryTables: queryJson?.normalizedQueryTables || [],
+  };
+}
+
 exports.generateMacro = async (req, res) => {
   const traceId = crypto.randomUUID
     ? crypto.randomUUID()
     : crypto.randomBytes(16).toString("hex");
   const startedAt = Date.now();
+
+  const { prompt, target, fileName, queryTablesKey } = req.body || {};
+
   try {
-    const { prompt, target } = req.body;
+    const queryContext = await loadMacroQueryContext(req, {
+      fileName,
+      queryTablesKey,
+    });
 
     if (!prompt) {
       const rawReason = "MISSING_PROMPT";
@@ -47,7 +119,11 @@ exports.generateMacro = async (req, res) => {
     }
 
     // ← target도 함께 전달
-    const result = await macroService.generate({ prompt, target });
+    const result = await macroService.generate({
+      prompt,
+      target,
+      queryContext,
+    });
 
     // ✅ 미지원/실패는 성공으로 치지 않음
     if (isUnsupportedMacro(result)) {
@@ -134,9 +210,15 @@ exports.generateMacro = async (req, res) => {
       await bumpUsage(req.user.id, "formulaConversions", 1);
     }
 
-    res.json(result);
+    res.json({
+      ...result,
+      debugMeta: {
+        ...(result.debugMeta || {}),
+        queryContextSource: queryContext?.source || null,
+        fileName: queryContext?.fileName || fileName || null,
+      },
+    });
   } catch (e) {
-    const { prompt, target } = req.body || {};
     const rawReason = e?.code || "MACRO_FAILED";
     const reasonNorm = classifyReason({ reason: rawReason, prompt, error: e });
     await writeRequestLog({
