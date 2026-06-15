@@ -102,6 +102,40 @@ async function buildQueryTablesForFile(req, fileName) {
   return { fileHash, sheetStateSig, tables };
 }
 
+function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
+  return (analysisRecipeCandidates || []).map((candidate, index) => {
+    const id =
+      candidate.candidateId ||
+      candidate.id ||
+      candidate.recipeId ||
+      candidate.type ||
+      `candidate_${index + 1}`;
+
+    return {
+      candidateId: id,
+      title:
+        candidate.title ||
+        candidate.name ||
+        candidate.label ||
+        `자동화 후보 ${index + 1}`,
+      description:
+        candidate.description ||
+        candidate.reason ||
+        candidate.summary ||
+        "업로드된 파일 구조를 기반으로 생성 가능한 자동화입니다.",
+      category:
+        candidate.category ||
+        candidate.type ||
+        candidate.recipeId ||
+        "automation",
+      priority: Number.isFinite(candidate.priority)
+        ? candidate.priority
+        : index + 1,
+      candidate,
+    };
+  });
+}
+
 async function executeAnalysisCandidate(req, res) {
   try {
     const { queryTablesKey, normalizedQueryTables, candidate } = req.body || {};
@@ -288,7 +322,8 @@ async function writeReportPpt({ fileName, message, result, template }) {
 
 exports.exportXlsx = async (req, res) => {
   try {
-    const { queryTablesKey, message } = req.body || {};
+    const { queryTablesKey, message, candidate, executionResult } =
+      req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -301,18 +336,40 @@ exports.exportXlsx = async (req, res) => {
     const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
 
-    const intent = parseQueryIntent(message, tables);
+    let intent = null;
+    let result = executionResult || null;
 
-    if (!intent.ok) {
-      return res.status(400).json({
-        ok: false,
-        intent,
-        code: intent.code,
-        error: intent.error || "query intent 생성 실패",
+    if (!result && candidate) {
+      result = executeAnalysisRecipeCandidate({
+        normalizedQueryTables:
+          saved.normalizedQueryTables ||
+          buildNormalizedQueryTables(saved.tables || []),
+        candidate,
       });
+
+      intent = {
+        ok: true,
+        operation:
+          candidate.recipeType || candidate.type || "analysisCandidate",
+        source: "analysis-candidate",
+        candidate,
+      };
     }
 
-    const result = executeQueryIntent(tables, intent);
+    if (!result) {
+      intent = parseQueryIntent(message, tables);
+
+      if (!intent.ok) {
+        return res.status(400).json({
+          ok: false,
+          intent,
+          code: intent.code,
+          error: intent.error || "query intent 생성 실패",
+        });
+      }
+
+      result = executeQueryIntent(tables, intent);
+    }
 
     if (!result.ok) {
       return res.status(400).json({
@@ -496,6 +553,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
         normalizedQueryTables,
       );
+      const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
 
       return res.json({
         ok: true,
@@ -505,6 +563,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         sheetStateSig: built.sheetStateSig,
         normalizedQueryTables,
         analysisRecipeCandidates,
+        candidates,
       });
     }
 
@@ -524,39 +583,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       saved.analysisRecipeCandidates ||
       buildAnalysisRecipeCandidates(normalizedQueryTables);
 
-    const candidates = (analysisRecipeCandidates || []).map(
-      (candidate, index) => {
-        const id =
-          candidate.candidateId ||
-          candidate.id ||
-          candidate.recipeId ||
-          candidate.type ||
-          `candidate_${index + 1}`;
-
-        return {
-          candidateId: id,
-          title:
-            candidate.title ||
-            candidate.name ||
-            candidate.label ||
-            `자동화 후보 ${index + 1}`,
-          description:
-            candidate.description ||
-            candidate.reason ||
-            candidate.summary ||
-            "업로드된 파일 구조를 기반으로 생성 가능한 자동화입니다.",
-          category:
-            candidate.category ||
-            candidate.type ||
-            candidate.recipeId ||
-            "automation",
-          priority: Number.isFinite(candidate.priority)
-            ? candidate.priority
-            : index + 1,
-          candidate,
-        };
-      },
-    );
+    const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
 
     return res.json({
       ok: true,
