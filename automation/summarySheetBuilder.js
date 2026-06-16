@@ -2,6 +2,17 @@ const XLSX = require("xlsx");
 const { buildNarrativeSections } = require("./reportNarrativeBuilder");
 const { recommendChartSpec } = require("./chartRecommendationBuilder");
 const { buildReportSections } = require("./reportSectionBuilder");
+const {
+  buildColumnRange,
+  buildGroupAggregateFormula,
+  buildRankValueFormula,
+  buildRankLabelFormula,
+  buildRunningSumFormula,
+  buildGrowthRateFormula,
+  buildMaxIfFormula,
+  buildCountIfsFormula,
+  buildPivotAverageFormula,
+} = require("../builders/automationFormulaBuilder");
 
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
@@ -435,6 +446,110 @@ function workbookToBuffer(workbook) {
   });
 }
 
+function getRowValueByColumn(row = {}, col = {}) {
+  const candidates = [
+    col.header,
+    col.key,
+    col.originalHeader,
+    col.name,
+    col.accessor,
+  ].filter(Boolean);
+
+  for (const key of candidates) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) {
+      return row[key] ?? "";
+    }
+  }
+
+  return "";
+}
+
+function getFirstResultDimensionHeader(result = {}) {
+  const firstRow = Array.isArray(result?.rows) ? result.rows[0] : null;
+  if (!firstRow) return "";
+
+  const excluded = new Set([
+    "operation",
+    "metric",
+    "value",
+    "rowCount",
+    "기준값",
+    "비교값",
+    "증감률",
+  ]);
+
+  return (
+    Object.keys(firstRow).find((key) => !excluded.has(key)) ||
+    result?.groupBy?.header ||
+    ""
+  );
+}
+
+function findSourceDateColumn(columns = []) {
+  return (
+    columns.find((c) => c.role === "date" || c.inferredRole === "date") ||
+    columns.find((c) => c.type === "date" || c.dominantType === "date") ||
+    columns.find((c) => String(c.header || "").includes("일")) ||
+    null
+  );
+}
+
+function ensureDerivedGroupColumn({
+  headers,
+  orderedColumns,
+  sourceRows,
+  columns,
+  groupHeader,
+}) {
+  if (!groupHeader) {
+    return { headers, orderedColumns, sourceRows, groupLetter: null };
+  }
+
+  const existingIndex = headers.findIndex((h) => h === groupHeader);
+  if (existingIndex >= 0) {
+    return {
+      headers,
+      orderedColumns,
+      sourceRows,
+      groupLetter: XLSX.utils.encode_col(existingIndex),
+    };
+  }
+
+  const dateCol = findSourceDateColumn(columns);
+  if (!dateCol) {
+    return { headers, orderedColumns, sourceRows, groupLetter: null };
+  }
+
+  const dateColIndex = (dateCol.columnIndex || 1) - 1;
+  const derivedIndex = headers.length;
+  const nextHeaders = [...headers, groupHeader];
+
+  const nextRows = sourceRows.map((row, rowIndex) => {
+    if (rowIndex === 0) return nextHeaders;
+
+    const dateValue = row[dateColIndex];
+    const date = new Date(dateValue);
+
+    let derivedValue = "";
+    if (!Number.isNaN(date.getTime())) {
+      if (String(groupHeader).includes("연월")) {
+        derivedValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      } else if (String(groupHeader).includes("연도")) {
+        derivedValue = date.getFullYear();
+      }
+    }
+
+    return [...row, derivedValue];
+  });
+
+  return {
+    headers: nextHeaders,
+    orderedColumns: [...orderedColumns, null],
+    sourceRows: nextRows,
+    groupLetter: XLSX.utils.encode_col(derivedIndex),
+  };
+}
+
 function buildAutomationTemplateWorkbook({
   fileName = "",
   message = "",
@@ -448,16 +563,23 @@ function buildAutomationTemplateWorkbook({
   const columns = primaryTable.columns || [];
   const maxColIndex = Math.max(...columns.map((c) => c.columnIndex || 0), 1);
 
-  const headers = Array.from({ length: maxColIndex }, (_, i) => {
+  let headers = Array.from({ length: maxColIndex }, (_, i) => {
     const col = columns.find((c) => c.columnIndex === i + 1);
     return col?.header || "";
   });
 
-  const sourceRows = [
+  let orderedColumns = Array.from({ length: maxColIndex }, (_, i) => {
+    return columns.find((c) => c.columnIndex === i + 1) || null;
+  });
+
+  let sourceRows = [
     headers,
-    ...(primaryTable.rows || [])
-      .slice(0, 200)
-      .map((row) => headers.map((h) => row[h] ?? row[String(h)] ?? "")),
+    ...(primaryTable.rows || []).slice(0, 200).map((row) =>
+      orderedColumns.map((col) => {
+        if (!col) return "";
+        return getRowValueByColumn(row, col);
+      }),
+    ),
   ];
 
   XLSX.utils.book_append_sheet(
@@ -476,8 +598,29 @@ function buildAutomationTemplateWorkbook({
     "사용방법",
   );
 
-  const groupHeader = result?.groupBy?.header || intent?.groupBy?.header || "";
+  const resultDimensionHeader = getFirstResultDimensionHeader(result);
+
+  const groupHeader =
+    result?.groupBy?.header ||
+    intent?.groupBy?.header ||
+    resultDimensionHeader ||
+    "";
+
   const metricHeader = result?.metric?.header || intent?.metric?.header || "";
+
+  const derivedGroup = ensureDerivedGroupColumn({
+    headers,
+    orderedColumns,
+    sourceRows,
+    columns,
+    groupHeader,
+  });
+
+  headers = derivedGroup.headers;
+  orderedColumns = derivedGroup.orderedColumns;
+  sourceRows = derivedGroup.sourceRows;
+
+  const derivedGroupLetter = derivedGroup.groupLetter || null;
 
   const groupCol =
     columns.find((c) => c.header === groupHeader) ||
@@ -492,9 +635,26 @@ function buildAutomationTemplateWorkbook({
     columns[1] ||
     {};
 
-  const groupLetter = groupCol.columnLetter || groupCol.letter || "A";
+  const groupLetter =
+    derivedGroupLetter || groupCol.columnLetter || groupCol.letter || "A";
   const metricLetter = metricCol.columnLetter || metricCol.letter || "B";
-  const operation = result?.operation || intent?.operation || "average";
+  const rawOperation = result?.operation || intent?.operation || "average";
+
+  console.log("[automation-template]", {
+    groupHeader,
+    derivedGroupLetter,
+    groupLetter,
+    metricHeader,
+    metricLetter,
+    rawOperation,
+  });
+
+  const operation =
+    rawOperation === "cumulativeSum" ||
+    rawOperation === "rollingAverage" ||
+    rawOperation === "growthRate"
+      ? "sum"
+      : rawOperation;
 
   XLSX.utils.book_append_sheet(
     wb,
@@ -509,18 +669,226 @@ function buildAutomationTemplateWorkbook({
     "자동화설정",
   );
 
-  const autoSheet = XLSX.utils.aoa_to_sheet([
+  const resultRows = Array.isArray(result?.rows) ? result.rows : [];
+  const autoGroupHeader = groupHeader || "기준";
+
+  const uniqueValues = resultRows
+    .map((row) => row[autoGroupHeader])
+    .filter((v) => v !== undefined && v !== null && v !== "");
+
+  const labelRange = buildColumnRange("원본데이터", groupLetter);
+  const valueRange = buildColumnRange("원본데이터", metricLetter);
+
+  const isListTemplate = rawOperation === "list";
+  const isCumulativeTemplate = rawOperation === "cumulativeSum";
+  const isRollingTemplate = rawOperation === "rollingAverage";
+  const isGrowthTemplate = rawOperation === "growthRate";
+  const isPivotTemplate = rawOperation === "pivot";
+  const isMultiAggregateTemplate = rawOperation === "multiAggregate";
+  const isPipelineCombineTemplate = rawOperation === "pipelineCombine";
+
+  let autoRows = [
     ["자동화시트"],
     ["설정값을 바꾸면 아래 결과가 자동 계산됩니다."],
     [],
-    ["결과"],
-  ]);
+  ];
 
-  autoSheet["A5"] = {
-    t: "n",
-    f: `LET(src,"'원본데이터'!",g,INDIRECT(src&자동화설정!B3&":"&자동화설정!B3),v,INDIRECT(src&자동화설정!B4&":"&자동화설정!B4),u,SORT(UNIQUE(FILTER(g,g<>""))),HSTACK(u,SWITCH(자동화설정!B5,"sum",MAP(u,LAMBDA(x,SUMIF(g,x,v))),"count",MAP(u,LAMBDA(x,COUNTIF(g,x))),MAP(u,LAMBDA(x,AVERAGEIF(g,x,v)))))))`,
-  };
-  autoSheet["!ref"] = "A1:B20";
+  if (isPivotTemplate) {
+    const pivotColumns = result?.pivot?.columns || [];
+    autoRows.push(["기준", ...pivotColumns]);
+
+    uniqueValues.forEach((value) => {
+      autoRows.push([value, ...pivotColumns.map(() => null)]);
+    });
+  } else if (isMultiAggregateTemplate) {
+    autoRows.push(["기준", "평균", "최대값", "건수"]);
+    uniqueValues.forEach((value) => autoRows.push([value, null, null, null]));
+  } else if (isPipelineCombineTemplate) {
+    autoRows.push(["상태", "설명"]);
+    autoRows.push([
+      "미지원",
+      "pipelineCombine은 다중 기준/다중 지표 템플릿 분기가 필요합니다.",
+    ]);
+  } else if (isListTemplate) {
+    autoRows.push(["순위", "항목", "값"]);
+    for (let i = 1; i <= Math.min(10, resultRows.length || 10); i += 1) {
+      autoRows.push([i, null, null]);
+    }
+  } else if (isCumulativeTemplate) {
+    autoRows.push(["기준", "값", "누적값"]);
+    uniqueValues.forEach((value) => autoRows.push([value, null, null]));
+  } else if (isRollingTemplate) {
+    autoRows.push(["기준", "값", "이동평균"]);
+    uniqueValues.forEach((value) => autoRows.push([value, null, null]));
+  } else if (isGrowthTemplate) {
+    autoRows.push(["기준", "값", "증감률"]);
+    uniqueValues.forEach((value) => autoRows.push([value, null, null]));
+  } else {
+    autoRows.push(["기준", "값"]);
+    uniqueValues.forEach((value) => autoRows.push([value, null]));
+  }
+
+  const autoSheet = XLSX.utils.aoa_to_sheet(autoRows);
+
+  if (isPivotTemplate) {
+    const pivotColumns = result?.pivot?.columns || [];
+    const rowGroupHeader =
+      result?.pivot?.rowGroup?.header || result?.groupBy?.header || groupHeader;
+    const colGroupHeader = result?.pivot?.columnGroup?.header || "";
+
+    const rowCol = columns.find((c) => c.header === rowGroupHeader) || groupCol;
+    const colCol = columns.find((c) => c.header === colGroupHeader) || {};
+
+    const rowLetter =
+      derivedGroupLetter || rowCol.columnLetter || rowCol.letter || groupLetter;
+    const colLetter = colCol.columnLetter || colCol.letter || groupLetter;
+
+    const rowRange = buildColumnRange("원본데이터", rowLetter);
+    const colRange = buildColumnRange("원본데이터", colLetter);
+
+    for (let r = 0; r < uniqueValues.length; r += 1) {
+      const rowNum = r + 5;
+
+      for (let c = 0; c < pivotColumns.length; c += 1) {
+        const colNum = c + 2;
+        const cellAddr = XLSX.utils.encode_cell({
+          r: rowNum - 1,
+          c: colNum - 1,
+        });
+        const headerAddr = XLSX.utils.encode_cell({
+          r: 3,
+          c: colNum - 1,
+        });
+
+        autoSheet[cellAddr] = {
+          t: "n",
+          f: buildPivotAverageFormula({
+            rowRange,
+            rowCriteriaCell: `A${rowNum}`,
+            colRange,
+            colCriteriaCell: headerAddr,
+            valueRange,
+          }),
+          v: 0,
+        };
+      }
+    }
+  } else if (isMultiAggregateTemplate) {
+    for (let i = 0; i < uniqueValues.length; i += 1) {
+      const rowNum = i + 5;
+
+      autoSheet[`B${rowNum}`] = {
+        t: "n",
+        f: buildGroupAggregateFormula({
+          operation: "average",
+          sheetName: "원본데이터",
+          groupLetter,
+          metricLetter,
+          criteriaCell: `A${rowNum}`,
+        }),
+        v: 0,
+      };
+
+      autoSheet[`C${rowNum}`] = {
+        t: "n",
+        f: buildMaxIfFormula({
+          groupRange: labelRange,
+          criteriaCell: `A${rowNum}`,
+          valueRange,
+        }),
+        v: 0,
+      };
+
+      autoSheet[`D${rowNum}`] = {
+        t: "n",
+        f: buildCountIfsFormula({
+          criteriaRange: labelRange,
+          criteriaCell: `A${rowNum}`,
+        }),
+        v: 0,
+      };
+    }
+  } else if (isPipelineCombineTemplate) {
+    // 현재 베타에서는 안내형 템플릿만 생성
+  } else if (isListTemplate) {
+    for (let i = 0; i < Math.min(10, resultRows.length || 10); i += 1) {
+      const rowNum = i + 5;
+      const rank = i + 1;
+
+      autoSheet[`C${rowNum}`] = {
+        t: "n",
+        f: buildRankValueFormula({ valueRange, rank }),
+        v: 0,
+      };
+
+      autoSheet[`B${rowNum}`] = {
+        t: "s",
+        f: buildRankLabelFormula({
+          labelRange,
+          valueRange,
+          rankValueCell: `C${rowNum}`,
+        }),
+        v: "",
+      };
+    }
+  } else {
+    for (let i = 0; i < uniqueValues.length; i += 1) {
+      const rowNum = i + 5;
+
+      const baseFormula = buildGroupAggregateFormula({
+        operation,
+        sheetName: "원본데이터",
+        groupLetter,
+        metricLetter,
+        criteriaCell: `A${rowNum}`,
+      });
+
+      autoSheet[`B${rowNum}`] = {
+        t: "n",
+        f: baseFormula,
+        v: 0,
+      };
+
+      if (isCumulativeTemplate) {
+        autoSheet[`C${rowNum}`] = {
+          t: "n",
+          f:
+            rowNum === 5
+              ? `IFERROR(B${rowNum},"")`
+              : buildRunningSumFormula({
+                  valueCell: `B${rowNum}`,
+                  previousCell: `C${rowNum - 1}`,
+                }),
+          v: 0,
+        };
+      }
+
+      if (isRollingTemplate) {
+        const startRow = Math.max(5, rowNum - 2);
+        autoSheet[`C${rowNum}`] = {
+          t: "n",
+          f: `IFERROR(AVERAGE(B${startRow}:B${rowNum}),"")`,
+          v: 0,
+        };
+      }
+
+      if (isGrowthTemplate) {
+        autoSheet[`C${rowNum}`] = {
+          t: "n",
+          f:
+            rowNum === 5
+              ? `""`
+              : buildGrowthRateFormula({
+                  currentCell: `B${rowNum}`,
+                  previousCell: `B${rowNum - 1}`,
+                }),
+          v: 0,
+        };
+      }
+    }
+  }
+
+  autoSheet["!ref"] = `A1:C${Math.max(5, autoRows.length)}`;
 
   XLSX.utils.book_append_sheet(wb, autoSheet, "자동화시트");
 
