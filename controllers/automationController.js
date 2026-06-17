@@ -32,6 +32,7 @@ const {
 const {
   executeAnalysisRecipeCandidate,
 } = require("../automation/analysisRecipeExecutor");
+const { decryptBuffer } = require("../services/encryptedFileService");
 
 const REPORT_DIR = path.join(
   process.cwd(),
@@ -86,6 +87,13 @@ async function buildQueryTablesForFile(req, fileName) {
 
     const storageName = fileInfo.localName || fileInfo.gcsName;
     buffer = await downloadToBuffer(storageName);
+
+    if (fileInfo.encrypted) {
+      buffer = decryptBuffer(buffer, {
+        encryptionIv: fileInfo.encryptionIv,
+        encryptionTag: fileInfo.encryptionTag,
+      });
+    }
   }
 
   const { fileHash, allSheetsData, sheetStateSig } =
