@@ -91,6 +91,12 @@ async function buildQueryTablesForFile(req, fileName) {
   const { fileHash, allSheetsData, sheetStateSig } =
     await getOrBuildAllSheetsData(buffer);
 
+  console.log("[query-file-debug]", {
+    fileName,
+    bufferLength: buffer?.length,
+    firstBytes: buffer?.slice(0, 8)?.toString("hex"),
+  });
+
   const workbook = XLSX.read(buffer, {
     type: "buffer",
     cellDates: true,
