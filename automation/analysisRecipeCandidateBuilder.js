@@ -129,18 +129,18 @@ function buildTableCandidates(table = {}) {
 function buildAnalysisRecipeCandidates(normalizedQueryTables = []) {
   if (!Array.isArray(normalizedQueryTables)) return [];
 
+  const candidates = normalizedQueryTables.flatMap(buildTableCandidates);
+
   console.log(
     "[analysisRecipeCandidates]",
     candidates.map((c) => ({
       recipeType: c.recipeType,
       title: c.title,
-      groupHeader: c.groupHeader,
-      metricHeader: c.metricHeader,
       tableId: c.tableId,
     })),
   );
 
-  return normalizedQueryTables.flatMap(buildTableCandidates);
+  return candidates;
 }
 
 module.exports = {
