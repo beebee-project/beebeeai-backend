@@ -141,7 +141,7 @@ function getRecipeType(candidate = {}) {
   return candidate.recipeType || candidate.type || candidate.recipeId || "";
 }
 
-function isRecipeType(candidate, types = []) {
+function isRecipeType(candidate = {}, types = []) {
   return types.includes(getRecipeType(candidate));
 }
 
@@ -165,15 +165,15 @@ function buildAutomationCategoryCandidates(analysisRecipeCandidates = []) {
     "growthRate",
   ];
 
-  const listTypes = ["top_bottom", "list"];
+  const rankingTypes = ["top_bottom", "list"];
   const pivotTypes = ["pivot"];
-
-  const categories = [];
 
   const groupCandidates = list.filter((c) => isRecipeType(c, groupTypes));
   const trendCandidates = list.filter((c) => isRecipeType(c, trendTypes));
-  const listCandidates = list.filter((c) => isRecipeType(c, listTypes));
+  const rankingCandidates = list.filter((c) => isRecipeType(c, rankingTypes));
   const pivotCandidates = list.filter((c) => isRecipeType(c, pivotTypes));
+
+  const categories = [];
 
   if (groupCandidates.length) {
     categories.push({
@@ -197,13 +197,13 @@ function buildAutomationCategoryCandidates(analysisRecipeCandidates = []) {
     });
   }
 
-  if (listCandidates.length) {
+  if (rankingCandidates.length) {
     categories.push({
       categoryId: "ranking",
       title: "순위 / TOP 분석",
       description: "상위 N개 항목이나 높은 값 순위를 자동화합니다.",
       examples: ["상위 고객", "연봉 TOP", "제품별 매출 순위"],
-      candidates: listCandidates,
+      candidates: rankingCandidates,
     });
   }
 
