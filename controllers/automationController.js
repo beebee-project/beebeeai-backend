@@ -141,47 +141,81 @@ function getRecipeType(candidate = {}) {
   return candidate.recipeType || candidate.type || candidate.recipeId || "";
 }
 
+function isRecipeType(candidate, types = []) {
+  return types.includes(getRecipeType(candidate));
+}
+
 function buildAutomationCategoryCandidates(analysisRecipeCandidates = []) {
-  const list = analysisRecipeCandidates || [];
+  const list = Array.isArray(analysisRecipeCandidates)
+    ? analysisRecipeCandidates
+    : [];
 
-  const hasGroup = list.some((c) =>
-    ["groupAggregate", "multiAggregate", "pipelineCombine"].includes(
-      c.recipeType || c.type,
-    ),
-  );
+  const groupTypes = [
+    "group_summary",
+    "category_count",
+    "groupAggregate",
+    "multiAggregate",
+    "pipelineCombine",
+  ];
 
-  const hasTrend = list.some((c) =>
-    ["cumulativeSum", "rollingAverage", "growthRate"].includes(
-      c.recipeType || c.type,
-    ),
-  );
+  const trendTypes = [
+    "time_trend",
+    "cumulativeSum",
+    "rollingAverage",
+    "growthRate",
+  ];
 
-  const hasList = list.some((c) => (c.recipeType || c.type) === "list");
-  const hasPivot = list.some((c) => (c.recipeType || c.type) === "pivot");
+  const listTypes = ["top_bottom", "list"];
+  const pivotTypes = ["pivot"];
 
   const categories = [];
 
-  const hasGroup = list.some((c) =>
-    [
-      "group_summary",
-      "category_count",
-      "groupAggregate",
-      "multiAggregate",
-      "pipelineCombine",
-    ].includes(getRecipeType(c)),
-  );
+  const groupCandidates = list.filter((c) => isRecipeType(c, groupTypes));
+  const trendCandidates = list.filter((c) => isRecipeType(c, trendTypes));
+  const listCandidates = list.filter((c) => isRecipeType(c, listTypes));
+  const pivotCandidates = list.filter((c) => isRecipeType(c, pivotTypes));
 
-  const hasTrend = list.some((c) =>
-    ["time_trend", "cumulativeSum", "rollingAverage", "growthRate"].includes(
-      getRecipeType(c),
-    ),
-  );
+  if (groupCandidates.length) {
+    categories.push({
+      categoryId: "workforce_or_summary",
+      title: "재직 현황 / 요약 집계",
+      description:
+        "부서, 직급, 상태 등 기준별 인원수·평균·합계를 자동화합니다.",
+      examples: ["재직 현황", "평균 연봉", "부서별 집계", "건수 요약"],
+      candidates: groupCandidates,
+    });
+  }
 
-  const hasList = list.some((c) =>
-    ["top_bottom", "list"].includes(getRecipeType(c)),
-  );
+  if (trendCandidates.length) {
+    categories.push({
+      categoryId: "trend",
+      title: "추이 분석",
+      description:
+        "월별·연도별 변화, 누적합계, 이동평균, 성장률을 자동화합니다.",
+      examples: ["입사 추이", "매출 추이", "누적 합계", "성장률"],
+      candidates: trendCandidates,
+    });
+  }
 
-  const hasPivot = list.some((c) => ["pivot"].includes(getRecipeType(c)));
+  if (listCandidates.length) {
+    categories.push({
+      categoryId: "ranking",
+      title: "순위 / TOP 분석",
+      description: "상위 N개 항목이나 높은 값 순위를 자동화합니다.",
+      examples: ["상위 고객", "연봉 TOP", "제품별 매출 순위"],
+      candidates: listCandidates,
+    });
+  }
+
+  if (pivotCandidates.length) {
+    categories.push({
+      categoryId: "cross_summary",
+      title: "교차 분석",
+      description: "연도×부서, 월×제품처럼 두 기준의 교차표를 자동화합니다.",
+      examples: ["연도별 부서별 평균", "월별 제품별 매출"],
+      candidates: pivotCandidates,
+    });
+  }
 
   return categories;
 }
