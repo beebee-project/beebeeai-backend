@@ -129,6 +129,17 @@ function buildTableCandidates(table = {}) {
 function buildAnalysisRecipeCandidates(normalizedQueryTables = []) {
   if (!Array.isArray(normalizedQueryTables)) return [];
 
+  console.log(
+    "[analysisRecipeCandidates]",
+    candidates.map((c) => ({
+      recipeType: c.recipeType,
+      title: c.title,
+      groupHeader: c.groupHeader,
+      metricHeader: c.metricHeader,
+      tableId: c.tableId,
+    })),
+  );
+
   return normalizedQueryTables.flatMap(buildTableCandidates);
 }
 

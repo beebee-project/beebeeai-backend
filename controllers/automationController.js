@@ -687,6 +687,11 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       saved.analysisRecipeCandidates ||
       buildAnalysisRecipeCandidates(normalizedQueryTables);
 
+    console.log(
+      "[candidate-types]",
+      analysisRecipeCandidates.map((c) => c.recipeType),
+    );
+
     const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
     const categoryCandidates = buildAutomationCategoryCandidates(
       analysisRecipeCandidates,
