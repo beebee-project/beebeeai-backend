@@ -519,7 +519,8 @@ exports.exportXlsx = async (req, res) => {
 
 exports.exportReportJson = async (req, res) => {
   try {
-    const { queryTablesKey, message } = req.body || {};
+    const { queryTablesKey, message, candidate, executionResult } =
+      req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -532,18 +533,40 @@ exports.exportReportJson = async (req, res) => {
     const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
 
-    const intent = parseQueryIntent(message, tables);
+    let intent = null;
+    let result = executionResult || null;
 
-    if (!intent.ok) {
-      return res.status(400).json({
-        ok: false,
-        intent,
-        code: intent.code,
-        error: intent.error || "query intent 생성 실패",
+    if (!result && candidate) {
+      result = executeAnalysisRecipeCandidate({
+        normalizedQueryTables:
+          saved.normalizedQueryTables ||
+          buildNormalizedQueryTables(saved.tables || []),
+        candidate,
       });
+
+      intent = {
+        ok: true,
+        operation:
+          candidate.recipeType || candidate.type || "analysisCandidate",
+        source: "analysis-candidate",
+        candidate,
+      };
     }
 
-    const result = executeQueryIntent(tables, intent);
+    if (!result) {
+      intent = parseQueryIntent(message, tables);
+
+      if (!intent.ok) {
+        return res.status(400).json({
+          ok: false,
+          intent,
+          code: intent.code,
+          error: intent.error || "query intent 생성 실패",
+        });
+      }
+
+      result = executeQueryIntent(tables, intent);
+    }
 
     if (!result.ok) {
       return res.status(400).json({
@@ -578,7 +601,8 @@ exports.exportReportJson = async (req, res) => {
 
 exports.exportPptx = async (req, res) => {
   try {
-    const { queryTablesKey, message, template } = req.body || {};
+    const { queryTablesKey, message, template, candidate, executionResult } =
+      req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -591,18 +615,40 @@ exports.exportPptx = async (req, res) => {
     const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
 
-    const intent = parseQueryIntent(message, tables);
+    let intent = null;
+    let result = executionResult || null;
 
-    if (!intent.ok) {
-      return res.status(400).json({
-        ok: false,
-        intent,
-        code: intent.code,
-        error: intent.error || "query intent 생성 실패",
+    if (!result && candidate) {
+      result = executeAnalysisRecipeCandidate({
+        normalizedQueryTables:
+          saved.normalizedQueryTables ||
+          buildNormalizedQueryTables(saved.tables || []),
+        candidate,
       });
+
+      intent = {
+        ok: true,
+        operation:
+          candidate.recipeType || candidate.type || "analysisCandidate",
+        source: "analysis-candidate",
+        candidate,
+      };
     }
 
-    const result = executeQueryIntent(tables, intent);
+    if (!result) {
+      intent = parseQueryIntent(message, tables);
+
+      if (!intent.ok) {
+        return res.status(400).json({
+          ok: false,
+          intent,
+          code: intent.code,
+          error: intent.error || "query intent 생성 실패",
+        });
+      }
+
+      result = executeQueryIntent(tables, intent);
+    }
 
     if (!result.ok) {
       return res.status(400).json({
