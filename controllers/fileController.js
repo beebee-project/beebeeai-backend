@@ -3,7 +3,6 @@ const {
   uploadBufferToGCS,
   downloadToBuffer,
   deleteObject,
-  deletePrefix,
   isStorageEnabled,
 } = require("../utils/storage");
 const XLSX = require("xlsx");
@@ -237,16 +236,6 @@ exports.deleteFile = async (req, res, next) => {
     }
 
     await deleteObject(fileInfo.localName || fileInfo.gcsName);
-
-    const userId = String(user._id);
-    const fileHash = fileInfo.gcsName?.split("/").pop()?.split("-")[0];
-
-    if (fileHash) {
-      await deletePrefix(`summary-sheets/${userId}/${fileHash}/`);
-      await deletePrefix(`query-tables/${userId}/${fileHash}/`);
-      await deletePrefix(`generated/reports/${userId}/${fileHash}/`);
-      await deletePrefix(`generated/ppt/${userId}/${fileHash}/`);
-    }
 
     if (fileInfo.queryJsonKey) {
       await deleteEncryptedQueryJson(fileInfo.queryJsonKey);

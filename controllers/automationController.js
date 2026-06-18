@@ -5,6 +5,7 @@ const XLSX = require("xlsx");
 const User = require("../models/User");
 const {
   downloadToBuffer,
+  saveJsonObject,
   readJsonObject,
   saveBufferObject,
 } = require("../utils/storage");
@@ -88,29 +89,11 @@ async function saveQueryJsonForFile({ user, fileInfo, fileName, payload }) {
   return meta.queryJsonKey;
 }
 
-async function readQueryTablesPayload(queryTablesKey) {
-  if (!queryTablesKey) return null;
-
-  if (String(queryTablesKey).startsWith("query-json/encrypted/")) {
-    return readEncryptedQueryJson(queryTablesKey);
-  }
-
-  return readJsonObject(queryTablesKey);
-}
-
 async function buildQueryTablesForFile(req, fileName) {
   let buffer;
   const savedQueryJson = await loadSavedQueryJsonForFile(req, fileName);
 
-  const cachedPayload = savedQueryJson?.payload;
-  const hasUsableCachedQueryJson =
-    cachedPayload &&
-    Array.isArray(cachedPayload.tables) &&
-    cachedPayload.tables.length > 0 &&
-    Array.isArray(cachedPayload.analysisRecipeCandidates) &&
-    cachedPayload.analysisRecipeCandidates.length > 0;
-
-  if (hasUsableCachedQueryJson) {
+  if (savedQueryJson?.payload) {
     return {
       fileHash: savedQueryJson.payload.fileHash,
       sheetStateSig: savedQueryJson.payload.sheetStateSig,
@@ -120,7 +103,6 @@ async function buildQueryTablesForFile(req, fileName) {
         savedQueryJson.payload.analysisRecipeCandidates || [],
       categoryCandidates: savedQueryJson.payload.categoryCandidates || [],
       source: "encrypted-query-json",
-      queryJsonKey: savedQueryJson.fileInfo?.queryJsonKey || null,
     };
   }
 
@@ -188,10 +170,8 @@ async function buildQueryTablesForFile(req, fileName) {
     analysisRecipeCandidates,
   );
 
-  let queryJsonKey = savedQueryJson?.fileInfo?.queryJsonKey || null;
-
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
-    queryJsonKey = await saveQueryJsonForFile({
+    await saveQueryJsonForFile({
       user: savedQueryJson.user,
       fileInfo: savedQueryJson.fileInfo,
       fileName,
@@ -217,7 +197,6 @@ async function buildQueryTablesForFile(req, fileName) {
     normalizedQueryTables,
     analysisRecipeCandidates,
     categoryCandidates,
-    queryJsonKey,
     source: "rebuilt-from-xlsx",
   };
 }
@@ -346,7 +325,7 @@ async function executeAnalysisCandidate(req, res) {
     let tablesForExecution = normalizedQueryTables;
 
     if (!Array.isArray(tablesForExecution) && queryTablesKey) {
-      const saved = await readQueryTablesPayload(queryTablesKey);
+      const saved = await readJsonObject(queryTablesKey);
       tablesForExecution =
         saved.normalizedQueryTables ||
         buildNormalizedQueryTables(saved.tables || []);
@@ -399,7 +378,7 @@ exports.createSummarySheet = async (req, res, next) => {
       });
     }
 
-    const saved = await readQueryTablesPayload(queryTablesKey);
+    const saved = await readJsonObject(queryTablesKey);
     const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
 
     if (!queryIntent?.ok) {
@@ -538,7 +517,7 @@ exports.exportXlsx = async (req, res) => {
       });
     }
 
-    const saved = await readQueryTablesPayload(queryTablesKey);
+    const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -635,7 +614,7 @@ exports.exportReportJson = async (req, res) => {
       });
     }
 
-    const saved = await readQueryTablesPayload(queryTablesKey);
+    const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -717,7 +696,7 @@ exports.exportPptx = async (req, res) => {
       });
     }
 
-    const saved = await readQueryTablesPayload(queryTablesKey);
+    const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -876,7 +855,7 @@ exports.executeQuery = async (req, res, next) => {
       });
     }
 
-    const saved = await readQueryTablesPayload(queryTablesKey);
+    const saved = await readJsonObject(queryTablesKey);
     const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
 
     if (!queryIntent?.ok) {
@@ -914,7 +893,7 @@ exports.analyzeQueryIntent = async (req, res, next) => {
       });
     }
 
-    const saved = await readQueryTablesPayload(queryTablesKey);
+    const saved = await readJsonObject(queryTablesKey);
     const intent = parseQueryIntent(message, saved.tables || []);
 
     return res.json({
@@ -957,8 +936,12 @@ exports.previewQueryTables = async (req, res, next) => {
       fileHash,
       sheetStateSig,
       tableCount: tables.length,
+      queryTablesKey: key,
       normalizedQueryTables,
       analysisRecipeCandidates,
+      categoryCandidates,
+      localName: saved.localName,
+      gcsName: saved.gcsName,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
@@ -967,18 +950,8 @@ exports.previewQueryTables = async (req, res, next) => {
         tableName: t.tableName,
         sheetName: t.sheetName,
         isFallback: !!t.isFallback,
-        range: t.range,
-        dataRange: t.dataRange,
         rowCount: t.rowCount,
-        columns: t.columns.map((c) => ({
-          key: c.key,
-          header: c.header,
-          type: c.type,
-          sampleValues: c.sampleValues,
-          uniqueCount: c.uniqueCount,
-          uniqueRatio: c.uniqueRatio,
-        })),
-        previewRows: t.rows.slice(0, 10),
+        columnCount: t.columns.length,
       })),
     });
   } catch (e) {
@@ -1012,16 +985,38 @@ exports.saveQueryTables = async (req, res, next) => {
       built.categoryCandidates ||
       buildAutomationCategoryCandidates(analysisRecipeCandidates);
 
+    const now = new Date();
+    const userId = req.user?.id || "local-dev";
+    const rand = crypto.randomBytes(6).toString("hex");
+
+    const key = `query-tables/${userId}/${fileHash}/${Date.now()}_${rand}.json`;
+
+    const payload = {
+      version: "query_tables_v1",
+      fileName,
+      fileHash,
+      sheetStateSig,
+      tableCount: tables.length,
+      createdAt: now.toISOString(),
+      tables,
+      normalizedQueryTables,
+      analysisRecipeCandidates,
+      categoryCandidates,
+    };
+
+    const saved = await saveJsonObject(key, payload);
+
     return res.json({
       ok: true,
       fileName,
       fileHash,
       sheetStateSig,
       tableCount: tables.length,
-      queryTablesKey: built.queryJsonKey || null,
+      queryTablesKey: key,
       normalizedQueryTables,
       analysisRecipeCandidates,
-      categoryCandidates,
+      localName: saved.localName,
+      gcsName: saved.gcsName,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
@@ -1032,6 +1027,7 @@ exports.saveQueryTables = async (req, res, next) => {
         isFallback: !!t.isFallback,
         rowCount: t.rowCount,
         columnCount: t.columns.length,
+        categoryCandidates,
       })),
     });
   } catch (e) {
