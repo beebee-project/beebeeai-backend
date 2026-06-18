@@ -37,6 +37,9 @@ const {
   readEncryptedQueryJson,
   saveEncryptedQueryJson,
 } = require("../services/encryptedJsonStorageService");
+const {
+  buildBusinessTemplateCandidates,
+} = require("../automation/businessTemplateConfig");
 
 const REPORT_DIR = path.join(
   process.cwd(),
@@ -94,14 +97,19 @@ async function buildQueryTablesForFile(req, fileName) {
   const savedQueryJson = await loadSavedQueryJsonForFile(req, fileName);
 
   if (savedQueryJson?.payload) {
+    const analysisRecipeCandidates =
+      savedQueryJson.payload.analysisRecipeCandidates || [];
+
     return {
       fileHash: savedQueryJson.payload.fileHash,
       sheetStateSig: savedQueryJson.payload.sheetStateSig,
       tables: savedQueryJson.payload.tables || [],
       normalizedQueryTables: savedQueryJson.payload.normalizedQueryTables || [],
-      analysisRecipeCandidates:
-        savedQueryJson.payload.analysisRecipeCandidates || [],
+      analysisRecipeCandidates,
       categoryCandidates: savedQueryJson.payload.categoryCandidates || [],
+      businessTemplateCandidates:
+        savedQueryJson.payload.businessTemplateCandidates ||
+        buildBusinessTemplateCandidates(analysisRecipeCandidates),
       source: "encrypted-query-json",
     };
   }
@@ -169,6 +177,9 @@ async function buildQueryTablesForFile(req, fileName) {
   const categoryCandidates = buildAutomationCategoryCandidates(
     analysisRecipeCandidates,
   );
+  const businessTemplateCandidates = buildBusinessTemplateCandidates(
+    analysisRecipeCandidates,
+  );
 
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
     await saveQueryJsonForFile({
@@ -186,6 +197,7 @@ async function buildQueryTablesForFile(req, fileName) {
         normalizedQueryTables,
         analysisRecipeCandidates,
         categoryCandidates,
+        businessTemplateCandidates,
       },
     });
   }
@@ -197,6 +209,7 @@ async function buildQueryTablesForFile(req, fileName) {
     normalizedQueryTables,
     analysisRecipeCandidates,
     categoryCandidates,
+    businessTemplateCandidates,
     source: "rebuilt-from-xlsx",
   };
 }
@@ -792,6 +805,18 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         built.categoryCandidates ||
         buildAutomationCategoryCandidates(analysisRecipeCandidates);
 
+      const businessTemplateCandidates =
+        built.businessTemplateCandidates ||
+        buildBusinessTemplateCandidates(analysisRecipeCandidates);
+
+      console.log("[analysis-candidates]", {
+        source: "file",
+        fileName,
+        analysisRecipeCandidates: analysisRecipeCandidates.length,
+        categoryCandidates: categoryCandidates.length,
+        businessTemplateCandidates: businessTemplateCandidates.length,
+      });
+
       return res.json({
         ok: true,
         source: "file",
@@ -802,6 +827,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         analysisRecipeCandidates,
         candidates,
         categoryCandidates,
+        businessTemplateCandidates,
       });
     }
 
@@ -826,6 +852,18 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       analysisRecipeCandidates,
     );
 
+    const businessTemplateCandidates =
+      saved.businessTemplateCandidates ||
+      buildBusinessTemplateCandidates(analysisRecipeCandidates);
+
+    console.log("[analysis-candidates]", {
+      source: "query-tables",
+      fileName: saved.fileName,
+      analysisRecipeCandidates: analysisRecipeCandidates.length,
+      categoryCandidates: categoryCandidates.length,
+      businessTemplateCandidates: businessTemplateCandidates.length,
+    });
+
     return res.json({
       ok: true,
       source: "query-tables",
@@ -837,6 +875,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       analysisRecipeCandidates,
       candidates,
       categoryCandidates,
+      businessTemplateCandidates,
     });
   } catch (e) {
     console.error("[automation.getAnalysisCandidates]", e);
@@ -985,6 +1024,10 @@ exports.saveQueryTables = async (req, res, next) => {
       built.categoryCandidates ||
       buildAutomationCategoryCandidates(analysisRecipeCandidates);
 
+    const businessTemplateCandidates = buildBusinessTemplateCandidates(
+      analysisRecipeCandidates,
+    );
+
     const now = new Date();
     const userId = req.user?.id || "local-dev";
     const rand = crypto.randomBytes(6).toString("hex");
@@ -1002,6 +1045,7 @@ exports.saveQueryTables = async (req, res, next) => {
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
+      businessTemplateCandidates,
     };
 
     const saved = await saveJsonObject(key, payload);
@@ -1015,6 +1059,8 @@ exports.saveQueryTables = async (req, res, next) => {
       queryTablesKey: key,
       normalizedQueryTables,
       analysisRecipeCandidates,
+      categoryCandidates,
+      businessTemplateCandidates,
       localName: saved.localName,
       gcsName: saved.gcsName,
       tables: tables.map((t) => ({
@@ -1027,7 +1073,6 @@ exports.saveQueryTables = async (req, res, next) => {
         isFallback: !!t.isFallback,
         rowCount: t.rowCount,
         columnCount: t.columns.length,
-        categoryCandidates,
       })),
     });
   } catch (e) {
