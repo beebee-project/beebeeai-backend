@@ -213,13 +213,6 @@ exports.downloadFile = async (req, res, next) => {
   }
 };
 
-function extractFileHashFromStorageName(name = "") {
-  const base = String(name).split("/").pop() || "";
-  const idx = base.indexOf("-");
-  if (idx <= 0) return null;
-  return base.slice(0, idx);
-}
-
 // 4. 파일 삭제 API
 exports.deleteFile = async (req, res, next) => {
   try {
@@ -243,14 +236,6 @@ exports.deleteFile = async (req, res, next) => {
     }
 
     await deleteObject(fileInfo.localName || fileInfo.gcsName);
-    const userId = String(user._id);
-    const storageName = fileInfo.localName || fileInfo.gcsName || "";
-    const fileHash = extractFileHashFromStorageName(storageName);
-
-    if (fileHash) {
-      await deletePrefix(`query-tables/${userId}/${fileHash}/`);
-      await deletePrefix(`summary-sheets/${userId}/${fileHash}/`);
-    }
 
     if (fileInfo.queryJsonKey) {
       await deleteEncryptedQueryJson(fileInfo.queryJsonKey);
