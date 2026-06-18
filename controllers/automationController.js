@@ -88,11 +88,29 @@ async function saveQueryJsonForFile({ user, fileInfo, fileName, payload }) {
   return meta.queryJsonKey;
 }
 
+async function readQueryTablesPayload(queryTablesKey) {
+  if (!queryTablesKey) return null;
+
+  if (String(queryTablesKey).startsWith("query-json/encrypted/")) {
+    return readEncryptedQueryJson(queryTablesKey);
+  }
+
+  return readJsonObject(queryTablesKey);
+}
+
 async function buildQueryTablesForFile(req, fileName) {
   let buffer;
   const savedQueryJson = await loadSavedQueryJsonForFile(req, fileName);
 
-  if (savedQueryJson?.payload) {
+  const cachedPayload = savedQueryJson?.payload;
+  const hasUsableCachedQueryJson =
+    cachedPayload &&
+    Array.isArray(cachedPayload.tables) &&
+    cachedPayload.tables.length > 0 &&
+    Array.isArray(cachedPayload.analysisRecipeCandidates) &&
+    cachedPayload.analysisRecipeCandidates.length > 0;
+
+  if (hasUsableCachedQueryJson) {
     return {
       fileHash: savedQueryJson.payload.fileHash,
       sheetStateSig: savedQueryJson.payload.sheetStateSig,
@@ -328,7 +346,7 @@ async function executeAnalysisCandidate(req, res) {
     let tablesForExecution = normalizedQueryTables;
 
     if (!Array.isArray(tablesForExecution) && queryTablesKey) {
-      const saved = await readJsonObject(queryTablesKey);
+      const saved = await readQueryTablesPayload(queryTablesKey);
       tablesForExecution =
         saved.normalizedQueryTables ||
         buildNormalizedQueryTables(saved.tables || []);
@@ -381,7 +399,7 @@ exports.createSummarySheet = async (req, res, next) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
 
     if (!queryIntent?.ok) {
@@ -520,7 +538,7 @@ exports.exportXlsx = async (req, res) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -617,7 +635,7 @@ exports.exportReportJson = async (req, res) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -699,7 +717,7 @@ exports.exportPptx = async (req, res) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -858,7 +876,7 @@ exports.executeQuery = async (req, res, next) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
 
     if (!queryIntent?.ok) {
@@ -896,7 +914,7 @@ exports.analyzeQueryIntent = async (req, res, next) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const intent = parseQueryIntent(message, saved.tables || []);
 
     return res.json({
