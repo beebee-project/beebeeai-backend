@@ -4,10 +4,11 @@ const crypto = require("crypto");
 const XLSX = require("xlsx");
 const User = require("../models/User");
 const {
+  uploadBufferToGCS,
   downloadToBuffer,
-  saveJsonObject,
-  readJsonObject,
-  saveBufferObject,
+  deleteObject,
+  deletePrefix,
+  isStorageEnabled,
 } = require("../utils/storage");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const {

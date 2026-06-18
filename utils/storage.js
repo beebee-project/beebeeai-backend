@@ -149,6 +149,25 @@ async function deleteObject(name) {
   await bucket.file(name).delete({ ignoreNotFound: true });
 }
 
+async function deletePrefix(prefix) {
+  if (!prefix) return;
+
+  if (IS_LOCAL_STORAGE) {
+    const abs = localAbsPath(prefix);
+    if (fs.existsSync(abs)) {
+      fs.rmSync(abs, { recursive: true, force: true });
+    }
+    return;
+  }
+
+  if (!GCS_ENABLED || !bucket) return;
+
+  await bucket.deleteFiles({
+    prefix,
+    force: true,
+  });
+}
+
 async function getSignedUrl(gcsName, { minutes = 5, dispositionName } = {}) {
   const [url] = await bucket.file(gcsName).getSignedUrl({
     version: "v4",
@@ -295,4 +314,5 @@ module.exports = {
   saveJsonObject,
   readJsonObject,
   saveBufferObject,
+  deletePrefix,
 };
