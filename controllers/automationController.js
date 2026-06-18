@@ -5,7 +5,6 @@ const XLSX = require("xlsx");
 const User = require("../models/User");
 const {
   downloadToBuffer,
-  saveJsonObject,
   readJsonObject,
   saveBufferObject,
 } = require("../utils/storage");
@@ -103,6 +102,7 @@ async function buildQueryTablesForFile(req, fileName) {
         savedQueryJson.payload.analysisRecipeCandidates || [],
       categoryCandidates: savedQueryJson.payload.categoryCandidates || [],
       source: "encrypted-query-json",
+      queryJsonKey: savedQueryJson.fileInfo?.queryJsonKey || null,
     };
   }
 
@@ -170,8 +170,10 @@ async function buildQueryTablesForFile(req, fileName) {
     analysisRecipeCandidates,
   );
 
+  let queryJsonKey = savedQueryJson?.fileInfo?.queryJsonKey || null;
+
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
-    await saveQueryJsonForFile({
+    queryJsonKey = await saveQueryJsonForFile({
       user: savedQueryJson.user,
       fileInfo: savedQueryJson.fileInfo,
       fileName,
@@ -197,6 +199,7 @@ async function buildQueryTablesForFile(req, fileName) {
     normalizedQueryTables,
     analysisRecipeCandidates,
     categoryCandidates,
+    queryJsonKey,
     source: "rebuilt-from-xlsx",
   };
 }
@@ -991,39 +994,16 @@ exports.saveQueryTables = async (req, res, next) => {
       built.categoryCandidates ||
       buildAutomationCategoryCandidates(analysisRecipeCandidates);
 
-    const now = new Date();
-    const userId = req.user?.id || "local-dev";
-    const rand = crypto.randomBytes(6).toString("hex");
-
-    const key = `query-tables/${userId}/${fileHash}/${Date.now()}_${rand}.json`;
-
-    const payload = {
-      version: "query_tables_v1",
-      fileName,
-      fileHash,
-      sheetStateSig,
-      tableCount: tables.length,
-      createdAt: now.toISOString(),
-      tables,
-      normalizedQueryTables,
-      analysisRecipeCandidates,
-      categoryCandidates,
-    };
-
-    const saved = await saveJsonObject(key, payload);
-
     return res.json({
       ok: true,
       fileName,
       fileHash,
       sheetStateSig,
       tableCount: tables.length,
-      queryTablesKey: key,
+      queryTablesKey: built.queryJsonKey || null,
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
-      localName: saved.localName,
-      gcsName: saved.gcsName,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,

@@ -280,6 +280,25 @@ async function saveBufferObject(name, buffer, contentType) {
   return { localName: null, gcsName: name };
 }
 
+async function deletePrefix(prefix) {
+  if (!prefix) return;
+
+  if (IS_LOCAL_STORAGE) {
+    const abs = localAbsPath(prefix);
+    if (fs.existsSync(abs)) {
+      fs.rmSync(abs, { recursive: true, force: true });
+    }
+    return;
+  }
+
+  if (!GCS_ENABLED || !bucket) return;
+
+  await bucket.deleteFiles({
+    prefix,
+    force: true,
+  });
+}
+
 module.exports = {
   uploadBufferToGCS,
   downloadToBuffer,
@@ -295,4 +314,5 @@ module.exports = {
   saveJsonObject,
   readJsonObject,
   saveBufferObject,
+  deletePrefix,
 };
