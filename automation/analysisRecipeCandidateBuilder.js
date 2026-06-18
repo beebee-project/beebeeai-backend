@@ -88,6 +88,16 @@ function makeCandidate({
   };
 }
 
+function uniqueColumns(columns = []) {
+  const seen = new Set();
+  return columns.filter((column) => {
+    const key = column.key || column.header;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildTableCandidates(table = {}) {
   const candidates = [];
 
@@ -96,7 +106,14 @@ function buildTableCandidates(table = {}) {
   const columns = Array.isArray(table.columns) ? table.columns : [];
 
   const metrics = getColumnsByRole(columns, "metric");
-  const dimensions = getColumnsByRole(columns, "dimension");
+  const dimensions = uniqueColumns([
+    ...getColumnsByRole(columns, "dimension"),
+    ...columns.filter(
+      (column) =>
+        column.type === "category" &&
+        !["metric", "date", "id"].includes(column.role),
+    ),
+  ]);
   const dates = getColumnsByRole(columns, "date");
   const statuses = getColumnsByRole(columns, "status");
 
