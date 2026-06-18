@@ -4,36 +4,6 @@ const BUSINESS_TEMPLATE_DEFS = [
     title: "월간 인사 보고서",
     description:
       "인원 현황, 부서별 집계, 추이, 상위/하위 항목을 보고서 형태로 생성합니다.",
-    requiredRecipeTypes: ["category_count", "group_summary"],
-    optionalRecipeTypes: ["time_trend", "top_bottom"],
-    outputTypes: ["summarySheet", "ppt", "reportJson"],
-    priority: 100,
-  },
-  {
-    templateId: "research_budget_report",
-    title: "연구비 집행 현황",
-    description:
-      "예산·집행액·항목별 집계와 집행 추이를 보고서 형태로 생성합니다.",
-    requiredRecipeTypes: ["group_summary"],
-    optionalRecipeTypes: ["time_trend", "top_bottom"],
-    outputTypes: ["summarySheet", "ppt", "reportJson"],
-    priority: 90,
-  },
-  {
-    templateId: "sales_report",
-    title: "매출 분석 보고서",
-    description:
-      "매출 합계, 기간별 추이, 상위 항목을 보고서 형태로 생성합니다.",
-    requiredRecipeTypes: ["group_summary"],
-    optionalRecipeTypes: ["time_trend", "top_bottom"],
-    outputTypes: ["summarySheet", "ppt", "reportJson"],
-    priority: 80,
-  },
-  {
-    templateId: "hr_monthly_report",
-    title: "월간 인사 보고서",
-    description:
-      "인원 현황, 부서별 집계, 추이, 상위/하위 항목을 보고서 형태로 생성합니다.",
     requiredRecipeTypes: ["category_count"],
     optionalRecipeTypes: ["group_summary", "time_trend", "top_bottom"],
     requiredHeaderHints: ["부서"],
@@ -108,7 +78,7 @@ function hasHeaderHint(headers = [], hint = "") {
 
   return headers.some((header) => {
     const target = normalizeText(header);
-    return target.includes(h) || h.includes(target);
+    return target.includes(h);
   });
 }
 
