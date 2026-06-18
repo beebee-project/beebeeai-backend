@@ -100,6 +100,21 @@ function buildTableCandidates(table = {}) {
   const dates = getColumnsByRole(columns, "date");
   const statuses = getColumnsByRole(columns, "status");
 
+  console.log("[recipe-column-roles]", {
+    tableId: table.tableId,
+    columns: columns.map((c) => ({
+      header: c.header,
+      type: c.type,
+      role: c.role,
+      uniqueCount: c.uniqueCount,
+      uniqueRatio: c.uniqueRatio,
+    })),
+    metrics: metrics.map((c) => c.header),
+    dimensions: dimensions.map((c) => c.header),
+    dates: dates.map((c) => c.header),
+    statuses: statuses.map((c) => c.header),
+  });
+
   const primaryMetric = metrics[0];
   const primaryDimension = dimensions[0] || statuses[0];
   const primaryDate = dates[0];
