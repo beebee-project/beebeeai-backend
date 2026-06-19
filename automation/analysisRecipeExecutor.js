@@ -33,6 +33,22 @@ function normalizeHeader(value = "") {
     .trim();
 }
 
+function resolveCandidateColumn(candidate = {}, key = "") {
+  const pluralMap = {
+    metric: "metrics",
+    dimension: "dimensions",
+    date: "dates",
+  };
+
+  return (
+    candidate.columns?.[key] ||
+    candidate[key] ||
+    candidate[`${key}Header`] ||
+    candidate[pluralMap[key]]?.[0] ||
+    ""
+  );
+}
+
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
 
@@ -89,7 +105,7 @@ function categoryCount({ rows = [], dimension = "" }) {
 
   rows.forEach((row) => {
     const label =
-      normalizeText(getValue(row, dimension)) ||
+      normalizeText(getRowValue(row, dimension)) ||
       ANALYSIS_OUTPUT_LABELS.emptyLabel;
     map.set(label, (map.get(label) || 0) + 1);
   });
@@ -192,7 +208,10 @@ function executeAnalysisRecipeCandidate({
   }
 
   const rows = Array.isArray(table.rows) ? table.rows : [];
-  const { metric, dimension, date } = candidate.columns || {};
+
+  const metric = resolveCandidateColumn(candidate, "metric");
+  const dimension = resolveCandidateColumn(candidate, "dimension");
+  const date = resolveCandidateColumn(candidate, "date");
 
   let resultRows = [];
 
