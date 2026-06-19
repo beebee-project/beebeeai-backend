@@ -435,7 +435,14 @@ exports.executeAnalysisCandidate = executeAnalysisCandidate;
 
 exports.createSummarySheet = async (req, res, next) => {
   try {
-    const { queryTablesKey, message, intent } = req.body || {};
+    const {
+      queryTablesKey,
+      message,
+      intent,
+      candidate,
+      templateCandidate,
+      executionResult,
+    } = req.body || {};
 
     if (!queryTablesKey) {
       return res.status(400).json({
@@ -445,34 +452,74 @@ exports.createSummarySheet = async (req, res, next) => {
     }
 
     const saved = await readJsonObject(queryTablesKey);
-    const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
+    const normalizedQueryTables =
+      saved.normalizedQueryTables ||
+      buildNormalizedQueryTables(saved.tables || []);
 
-    if (!queryIntent?.ok) {
-      return res.status(400).json({
-        ok: false,
-        error: queryIntent?.error || "query intent 생성 실패",
-        intent: queryIntent,
+    let queryIntent = intent || null;
+    let result = executionResult || null;
+
+    if (!result && templateCandidate?.templateId) {
+      result = executeBusinessTemplate({
+        normalizedQueryTables,
+        templateCandidate,
       });
+
+      queryIntent = {
+        ok: true,
+        operation: templateCandidate.templateId,
+        source: "business-template",
+        templateCandidate,
+      };
     }
 
-    const result = executeQueryIntent(saved.tables || [], queryIntent);
-    const chartSpec = buildChartSpec(result);
+    if (!result && candidate) {
+      result = executeAnalysisRecipeCandidate({
+        normalizedQueryTables,
+        candidate,
+      });
+
+      queryIntent = {
+        ok: true,
+        operation:
+          candidate.recipeType || candidate.type || "analysisCandidate",
+        source: "analysis-candidate",
+        candidate,
+      };
+    }
+
+    if (!result) {
+      queryIntent = intent || parseQueryIntent(message, saved.tables || []);
+
+      if (!queryIntent?.ok) {
+        return res.status(400).json({
+          ok: false,
+          error: queryIntent?.error || "query intent 생성 실패",
+          intent: queryIntent,
+        });
+      }
+
+      result = executeQueryIntent(saved.tables || [], queryIntent);
+    }
 
     if (!result?.ok) {
       return res.status(400).json({
         ok: false,
-        error: result?.error || "query 실행 실패",
+        error: result?.error || result?.message || "query 실행 실패",
         intent: queryIntent,
         result,
       });
     }
 
-    const workbook = buildAutomationTemplateWorkbook({
+    const chartSpec = Array.isArray(result.sections)
+      ? null
+      : buildChartSpec(result);
+
+    const workbook = buildSummaryWorkbook({
       fileName: saved.fileName,
       message,
       intent: queryIntent,
       result,
-      tables: saved.tables || [],
     });
 
     const buffer = workbookToBuffer(workbook);
