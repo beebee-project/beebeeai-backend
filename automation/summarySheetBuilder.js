@@ -40,8 +40,18 @@ function buildChartDataRows(result = {}) {
   return [];
 }
 
+function sanitizeSheetName(name) {
+  return (
+    String(name || "Sheet")
+      .replace(/[:\\/?*\[\]]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 31) || "Sheet"
+  );
+}
+
 function appendSheetSafe(wb, ws, name) {
-  let safeName = String(name || "Sheet").slice(0, 31);
+  let safeName = sanitizeSheetName(name);
   const existing = new Set(wb.SheetNames || []);
 
   if (!existing.has(safeName)) {
