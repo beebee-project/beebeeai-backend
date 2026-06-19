@@ -4,20 +4,50 @@ function normalizeText(value = "") {
   return String(value || "").trim();
 }
 
-function toNumber(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  const num = Number(
-    String(value ?? "")
-      .replace(/,/g, "")
-      .trim(),
-  );
-  return Number.isFinite(num) ? num : null;
-}
-
 function getValue(row = {}, key = "") {
   if (!row || !key) return undefined;
   return row[key];
+}
+
+function getRowValue(row = {}, header = "") {
+  if (!row || !header) return undefined;
+
+  if (Object.prototype.hasOwnProperty.call(row, header)) {
+    return row[header];
+  }
+
+  const normalizedHeader = normalizeHeader(header);
+
+  const matchedKey = Object.keys(row).find(
+    (key) => normalizeHeader(key) === normalizedHeader,
+  );
+
+  return matchedKey ? row[matchedKey] : undefined;
+}
+
+function normalizeHeader(value = "") {
+  return String(value)
+    .replace(/\s+/g, "")
+    .replace(/[()\[\]{}]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function toNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (value == null || value === "") return null;
+
+  const cleaned = String(value)
+    .replace(/,/g, "")
+    .replace(/[^\d.-]/g, "");
+
+  if (!cleaned || cleaned === "-" || cleaned === "." || cleaned === "-.") {
+    return null;
+  }
+
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 }
 
 function groupSummary({ rows = [], dimension = "", metric = "" }) {
@@ -25,9 +55,11 @@ function groupSummary({ rows = [], dimension = "", metric = "" }) {
 
   rows.forEach((row) => {
     const label =
-      normalizeText(getValue(row, dimension)) ||
+      normalizeText(getRowValue(row, dimension)) ||
       ANALYSIS_OUTPUT_LABELS.emptyLabel;
-    const value = toNumber(getValue(row, metric));
+
+    const rawValue = getRowValue(row, metric);
+    const value = toNumber(rawValue);
 
     if (!map.has(label)) {
       map.set(label, {
@@ -72,9 +104,9 @@ function topBottom({ rows = [], metric = "", dimension = "" }) {
   const values = rows
     .map((row) => ({
       label:
-        normalizeText(getValue(row, dimension)) ||
+        normalizeText(getRowValue(row, dimension)) ||
         ANALYSIS_OUTPUT_LABELS.itemLabel,
-      value: toNumber(getValue(row, metric)),
+      value: toNumber(getRowValue(row, metric)),
       row,
     }))
     .filter((item) => item.value != null)
@@ -114,8 +146,8 @@ function timeTrend({ rows = [], date = "", metric = "" }) {
   const map = new Map();
 
   rows.forEach((row) => {
-    const month = normalizeMonth(getValue(row, date));
-    const value = toNumber(getValue(row, metric));
+    const month = normalizeMonth(getRowValue(row, date));
+    const value = toNumber(getRowValue(row, metric));
 
     if (!month || value == null) return;
 
