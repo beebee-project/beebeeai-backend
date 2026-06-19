@@ -261,6 +261,33 @@ function rowNonEmptyIndexes(row = []) {
   return out;
 }
 
+function firstNonEmptyCell(row = []) {
+  const idx = row.findIndex((cell) => isNonEmptyCell(cell));
+  return idx >= 0 ? row[idx] : null;
+}
+
+function isLikelyDataRow(row = []) {
+  const nonEmpty = nonEmptyCount(row);
+  if (!nonEmpty) return false;
+
+  const first = firstNonEmptyCell(row);
+  const firstLooksData = isNumericLike(first) || isDateLike(first);
+
+  const numericLike = row.filter(
+    (cell) => cell != null && String(cell).trim() !== "" && isNumericLike(cell),
+  ).length;
+
+  const dateLike = row.filter(
+    (cell) => cell != null && String(cell).trim() !== "" && isDateLike(cell),
+  ).length;
+
+  const textLike = textLikeCount(row);
+  const numericDateRatio = (numericLike + dateLike) / nonEmpty;
+  const textRatio = textLike / nonEmpty;
+
+  return firstLooksData && numericDateRatio > 0 && textRatio < 0.75;
+}
+
 function normalizeHeaderText(v) {
   return String(v ?? "").trim();
 }
@@ -503,6 +530,10 @@ function buildAllSheetsData(workbook) {
       ).length;
 
       const numericDateRatio = (numericLike + dateLike) / nonEmpty;
+
+      if (isLikelyDataRow(row)) {
+        continue;
+      }
 
       if (
         nonEmpty >= 2 &&
