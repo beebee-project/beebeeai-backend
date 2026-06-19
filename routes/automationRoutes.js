@@ -17,5 +17,9 @@ router.post(
   "/execute-analysis-candidate",
   automationController.executeAnalysisCandidate,
 );
+router.post(
+  "/execute-business-template",
+  automationController.executeBusinessTemplateCandidate,
+);
 
 module.exports = router;

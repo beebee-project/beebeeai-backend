@@ -40,6 +40,9 @@ const {
 const {
   buildBusinessTemplateCandidates,
 } = require("../automation/businessTemplateConfig");
+const {
+  executeBusinessTemplate,
+} = require("../automation/businessTemplateExecutor");
 
 const REPORT_DIR = path.join(
   process.cwd(),
@@ -378,6 +381,56 @@ async function executeAnalysisCandidate(req, res) {
   }
 }
 
+async function executeBusinessTemplateCandidate(req, res) {
+  try {
+    const { queryTablesKey, normalizedQueryTables, templateCandidate } =
+      req.body || {};
+
+    let tablesForExecution = normalizedQueryTables;
+
+    if (!Array.isArray(tablesForExecution) && queryTablesKey) {
+      const saved = await readJsonObject(queryTablesKey);
+      tablesForExecution =
+        saved.normalizedQueryTables ||
+        buildNormalizedQueryTables(saved.tables || []);
+    }
+
+    if (!Array.isArray(tablesForExecution)) {
+      return res.status(400).json({
+        ok: false,
+        code: "NORMALIZED_QUERY_TABLES_REQUIRED",
+        message: "normalizedQueryTables 또는 queryTablesKey가 필요합니다.",
+      });
+    }
+
+    if (!templateCandidate || !templateCandidate.templateId) {
+      return res.status(400).json({
+        ok: false,
+        code: "BUSINESS_TEMPLATE_REQUIRED",
+        message: "실행할 업무 템플릿 후보가 필요합니다.",
+      });
+    }
+
+    const result = executeBusinessTemplate({
+      normalizedQueryTables: tablesForExecution,
+      templateCandidate,
+    });
+
+    const status = result.ok ? 200 : 400;
+    return res.status(status).json(result);
+  } catch (error) {
+    console.error("executeBusinessTemplateCandidate error:", error);
+
+    return res.status(500).json({
+      ok: false,
+      code: "BUSINESS_TEMPLATE_EXECUTE_FAILED",
+      message: "업무 템플릿 실행 중 오류가 발생했습니다.",
+    });
+  }
+}
+
+exports.executeBusinessTemplateCandidate = executeBusinessTemplateCandidate;
+
 exports.executeAnalysisCandidate = executeAnalysisCandidate;
 
 exports.createSummarySheet = async (req, res, next) => {
@@ -473,7 +526,16 @@ function writeReportJson({ fileName, message, result }) {
     result: {
       operation: result?.operation || "",
       resultType: result?.resultType || "",
-      rowCount: Array.isArray(result?.rows) ? result.rows.length : 0,
+      rowCount: Array.isArray(result?.rows)
+        ? result.rows.length
+        : Array.isArray(result?.sections)
+          ? result.sections.reduce(
+              (sum, s) =>
+                sum +
+                (Array.isArray(s.result?.rows) ? s.result.rows.length : 0),
+              0,
+            )
+          : 0,
     },
     report,
   };
@@ -519,8 +581,13 @@ async function writeReportPpt({ fileName, message, result, template }) {
 
 exports.exportXlsx = async (req, res) => {
   try {
-    const { queryTablesKey, message, candidate, executionResult } =
-      req.body || {};
+    const {
+      queryTablesKey,
+      message,
+      candidate,
+      templateCandidate,
+      executionResult,
+    } = req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -535,6 +602,22 @@ exports.exportXlsx = async (req, res) => {
 
     let intent = null;
     let result = executionResult || null;
+
+    if (!result && templateCandidate?.templateId) {
+      result = executeBusinessTemplate({
+        normalizedQueryTables:
+          saved.normalizedQueryTables ||
+          buildNormalizedQueryTables(saved.tables || []),
+        templateCandidate,
+      });
+
+      intent = {
+        ok: true,
+        operation: templateCandidate.templateId,
+        source: "business-template",
+        templateCandidate,
+      };
+    }
 
     if (!result && candidate) {
       result = executeAnalysisRecipeCandidate({
@@ -616,8 +699,13 @@ exports.exportXlsx = async (req, res) => {
 
 exports.exportReportJson = async (req, res) => {
   try {
-    const { queryTablesKey, message, candidate, executionResult } =
-      req.body || {};
+    const {
+      queryTablesKey,
+      message,
+      candidate,
+      templateCandidate,
+      executionResult,
+    } = req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -632,6 +720,22 @@ exports.exportReportJson = async (req, res) => {
 
     let intent = null;
     let result = executionResult || null;
+
+    if (!result && templateCandidate?.templateId) {
+      result = executeBusinessTemplate({
+        normalizedQueryTables:
+          saved.normalizedQueryTables ||
+          buildNormalizedQueryTables(saved.tables || []),
+        templateCandidate,
+      });
+
+      intent = {
+        ok: true,
+        operation: templateCandidate.templateId,
+        source: "business-template",
+        templateCandidate,
+      };
+    }
 
     if (!result && candidate) {
       result = executeAnalysisRecipeCandidate({
@@ -698,8 +802,14 @@ exports.exportReportJson = async (req, res) => {
 
 exports.exportPptx = async (req, res) => {
   try {
-    const { queryTablesKey, message, template, candidate, executionResult } =
-      req.body || {};
+    const {
+      queryTablesKey,
+      message,
+      template,
+      candidate,
+      templateCandidate,
+      executionResult,
+    } = req.body || {};
 
     if (!queryTablesKey || !message) {
       return res.status(400).json({
@@ -714,6 +824,22 @@ exports.exportPptx = async (req, res) => {
 
     let intent = null;
     let result = executionResult || null;
+
+    if (!result && templateCandidate?.templateId) {
+      result = executeBusinessTemplate({
+        normalizedQueryTables:
+          saved.normalizedQueryTables ||
+          buildNormalizedQueryTables(saved.tables || []),
+        templateCandidate,
+      });
+
+      intent = {
+        ok: true,
+        operation: templateCandidate.templateId,
+        source: "business-template",
+        templateCandidate,
+      };
+    }
 
     if (!result && candidate) {
       result = executeAnalysisRecipeCandidate({

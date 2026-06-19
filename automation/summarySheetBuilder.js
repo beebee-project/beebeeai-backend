@@ -327,6 +327,51 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
     [],
   ];
 
+  const businessSections = Array.isArray(result?.sections)
+    ? result.sections
+    : [];
+
+  if (businessSections.length) {
+    const wb = XLSX.utils.book_new();
+
+    const summaryRows = [
+      ["요청", message || ""],
+      ["원본 파일", fileName || ""],
+      ["템플릿", result.title || result.templateId || ""],
+      ["결과 유형", result.resultType || ""],
+      ["섹션 수", businessSections.length],
+      ["생성일시", new Date().toISOString()],
+    ];
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+    setAoaColumnWidths(wsSummary, summaryRows);
+    styleHeaderRow(wsSummary);
+    applyDefaultSheetOptions(wsSummary);
+    appendSheetSafe(wb, wsSummary, "요약");
+
+    businessSections.forEach((section, index) => {
+      const sectionResult = section.result || {};
+      const rows = resultToRows(sectionResult);
+      const ws = XLSX.utils.json_to_sheet(
+        rows.length ? rows : [{ 결과: "데이터 없음" }],
+      );
+
+      setColumnWidths(ws, rows);
+      formatNumberCells(ws, sectionResult);
+      styleHeaderRow(ws);
+      applyDefaultSheetOptions(ws);
+      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+      appendSheetSafe(
+        wb,
+        ws,
+        section.title || section.sectionId || `섹션_${index + 1}`,
+      );
+    });
+
+    return wb;
+  }
+
   const rows = resultToRows(result);
 
   const narrative = buildNarrativeSections(result, {

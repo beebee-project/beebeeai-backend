@@ -11,6 +11,72 @@ function buildReportSections({ fileName, message, result } = {}) {
     fileName,
   });
 
+  const businessSections = Array.isArray(result?.sections)
+    ? result.sections
+    : [];
+
+  if (businessSections.length) {
+    const sections = [
+      {
+        type: "cover",
+        title: result.title || "업무 템플릿 보고서",
+        subtitle: fileName || "",
+      },
+      {
+        type: "summary",
+        title: "핵심 요약",
+        summary: `${businessSections.length}개 분석 섹션이 생성되었습니다.`,
+        bullets: businessSections.map(
+          (s) => s.title || s.sectionId || "분석 섹션",
+        ),
+      },
+    ];
+
+    for (const section of businessSections) {
+      const sectionResult = section.result || {};
+      const rows = Array.isArray(sectionResult.rows) ? sectionResult.rows : [];
+      const chartSpec = recommendChartSpec(sectionResult);
+
+      if (chartSpec) {
+        sections.push({
+          type: "chart",
+          title: section.title || chartSpec.title || "차트",
+          chartSpec,
+          rows: takeRows(rows, 50),
+        });
+      }
+
+      if (rows.length) {
+        sections.push({
+          type: "table",
+          title: section.title || "분석 결과",
+          rows: takeRows(rows, 12),
+          rowCount: rows.length,
+        });
+      }
+    }
+
+    sections.push({
+      type: "insight",
+      title: "분석 인사이트",
+      bullets: businessSections.map(
+        (s) => `${s.title || s.sectionId || "섹션"} 결과가 생성되었습니다.`,
+      ),
+    });
+
+    return {
+      version: "report_sections_v1",
+      title: result.title || "업무 템플릿 보고서",
+      source: {
+        fileName: fileName || "",
+        message: message || "",
+      },
+      resultType: result.resultType || "",
+      operation: result.templateId || "",
+      sections,
+    };
+  }
+
   const chartSpec = recommendChartSpec(result);
   const rows = Array.isArray(result?.rows) ? result.rows : [];
 
