@@ -281,11 +281,9 @@ function isLikelyDataRow(row = []) {
     (cell) => cell != null && String(cell).trim() !== "" && isDateLike(cell),
   ).length;
 
-  const textLike = textLikeCount(row);
   const numericDateRatio = (numericLike + dateLike) / nonEmpty;
-  const textRatio = textLike / nonEmpty;
 
-  return firstLooksData && numericDateRatio > 0 && textRatio < 0.75;
+  return firstLooksData && numericDateRatio > 0;
 }
 
 function normalizeHeaderText(v) {
