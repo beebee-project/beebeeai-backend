@@ -15,10 +15,17 @@ function nonEmptyCount(row = []) {
 
 function textLikeCount(row = []) {
   let n = 0;
+
   for (const cell of row) {
-    if (cell != null && String(cell).trim() !== "" && typeof cell === "string")
-      n++;
+    if (cell == null || String(cell).trim() === "") continue;
+
+    if (isNumericLike(cell)) continue;
+    if (isDateLike(cell)) continue;
+    if (isBooleanLike(cell)) continue;
+
+    n += 1;
   }
+
   return n;
 }
 
@@ -490,7 +497,23 @@ function buildAllSheetsData(workbook) {
         }
       }
 
-      if (nonEmpty >= 2 && textLike / nonEmpty >= 0.6) {
+      const numericLike = row.filter(
+        (cell) =>
+          cell != null && String(cell).trim() !== "" && isNumericLike(cell),
+      ).length;
+
+      const dateLike = row.filter(
+        (cell) =>
+          cell != null && String(cell).trim() !== "" && isDateLike(cell),
+      ).length;
+
+      const numericDateRatio = (numericLike + dateLike) / nonEmpty;
+
+      if (
+        nonEmpty >= 2 &&
+        textLike / nonEmpty >= 0.6 &&
+        numericDateRatio <= 0.4
+      ) {
         headerRowIndexes.push(i);
       }
     }

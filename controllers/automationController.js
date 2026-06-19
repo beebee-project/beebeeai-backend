@@ -173,6 +173,20 @@ async function buildQueryTablesForFile(req, fileName) {
   });
 
   const tables = buildQueryTablesFromWorkbook(workbook, allSheetsData);
+
+  console.log("[query-table-debug]", {
+    fileName,
+    tableCount: tables.length,
+    tables: tables.map((t) => ({
+      tableId: t.tableId,
+      rowCount: t.rowCount,
+      headerRow: t.headerRow,
+      dataStartRow: t.dataStartRow,
+      dataEndRow: t.dataEndRow,
+      range: t.range,
+    })),
+  });
+
   const normalizedQueryTables = buildNormalizedQueryTables(tables);
   const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
     normalizedQueryTables,
