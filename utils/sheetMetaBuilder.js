@@ -487,15 +487,10 @@ function buildAllSheetsData(workbook) {
     const headerRowIndexes = [];
     for (let i = firstNonEmpty; i <= lastNonEmpty; i++) {
       const row = json[i] || [];
-      let nonEmpty = 0;
-      let textLike = 0;
+      const nonEmpty = nonEmptyCount(row);
+      const textLike = textLikeCount(row);
 
-      for (const cell of row) {
-        if (cell != null && String(cell).trim() !== "") {
-          nonEmpty++;
-          if (typeof cell === "string") textLike++;
-        }
-      }
+      if (!nonEmpty) continue;
 
       const numericLike = row.filter(
         (cell) =>
