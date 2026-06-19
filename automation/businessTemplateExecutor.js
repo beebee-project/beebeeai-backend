@@ -1,4 +1,7 @@
 const { executeAnalysisRecipeCandidate } = require("./analysisRecipeExecutor");
+const {
+  executeResearchBudgetReport,
+} = require("./businessTemplates/researchBudgetReportBuilder");
 
 function executeTemplateSections({
   normalizedQueryTables = [],
@@ -299,6 +302,13 @@ function executeBusinessTemplate({
   switch (templateId) {
     case "hr_monthly_report":
       sections = executeHrMonthlyReport({
+        normalizedQueryTables,
+        templateCandidate,
+      });
+      break;
+
+    case "research_budget_report":
+      sections = executeResearchBudgetReport({
         normalizedQueryTables,
         templateCandidate,
       });
