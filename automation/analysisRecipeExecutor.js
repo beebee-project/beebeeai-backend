@@ -27,9 +27,9 @@ function getRowValue(row = {}, header = "") {
 
 function normalizeHeader(value = "") {
   return String(value)
-    .replace(/\s+/g, "")
-    .replace(/[()\[\]{}]/g, "")
     .toLowerCase()
+    .replace(/[\s_]+/g, "")
+    .replace(/[^\p{Letter}\p{Number}]/gu, "")
     .trim();
 }
 
