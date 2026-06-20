@@ -55,6 +55,25 @@ function sameHeader(a = "", b = "") {
   return String(a || "").trim() === String(b || "").trim();
 }
 
+function normalizeHeaderLocal(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "")
+    .replace(/[^\p{Letter}\p{Number}]/gu, "")
+    .trim();
+}
+
+function findExactColumnHeader(table = {}, headers = []) {
+  const targets = headers.map(normalizeHeaderLocal).filter(Boolean);
+
+  const matched = getColumns(table).find((col) => {
+    const header = getColumnHeader(col);
+    return targets.includes(normalizeHeaderLocal(header));
+  });
+
+  return matched ? getColumnHeader(matched) : "";
+}
+
 function isExcludedHeader(header = "", excludedHeaders = []) {
   return excludedHeaders
     .filter(Boolean)
@@ -394,13 +413,9 @@ function buildLongSalesCandidates({ table }) {
     "month",
   ]);
 
-  const periodHeader = findColumnHeader(table, [
-    "연월",
-    "기간",
-    "기준년월",
-    "매출년월",
-    "period",
-  ]);
+  const periodHeader =
+    findExactColumnHeader(table, ["연월", "기준년월", "매출년월"]) ||
+    findColumnHeader(table, ["연월", "기간", "기준년월", "매출년월", "period"]);
 
   const excludedDimensionHeaders = [
     yearHeader,
@@ -555,13 +570,7 @@ function buildLongSalesCandidates({ table }) {
 
   const rankingDimension =
     periodHeader ||
-    findColumnHeader(table, [
-      "연월",
-      "기간",
-      "기준년월",
-      "매출년월",
-      "period",
-    ]) ||
+    findExactColumnHeader(table, ["연월", "기준년월", "매출년월"]) ||
     productHeader ||
     categoryHeader ||
     regionHeader ||
