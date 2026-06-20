@@ -136,7 +136,7 @@ exports.uploadFile = async (req, res, next) => {
         userId: String(user._id),
         fileName: originalName,
         payload: {
-          version: "query_tables_v2",
+          version: "query_tables_v4_text_csv_encoding",
           fileName: originalName,
           fileHash,
           sheetStateSig,

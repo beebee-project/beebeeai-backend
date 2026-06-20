@@ -12,7 +12,7 @@ function md5Buffer(buf) {
 
 async function getOrBuildAllSheetsData(fileBuffer) {
   const hash = md5Buffer(fileBuffer);
-  const META_CACHE_VERSION = "v3_csv_encoding";
+  const META_CACHE_VERSION = "v4_text_csv_encoding";
   const cacheKey = `sheetsMeta_${META_CACHE_VERSION}_${hash}`;
 
   // meta-cache logging (prod: sampling via META_CACHE_LOG)

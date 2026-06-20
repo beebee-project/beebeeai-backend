@@ -1008,6 +1008,34 @@ exports.getAnalysisCandidates = async (req, res, next) => {
 
     if (key) {
       saved = await readJsonObject(key);
+
+      if (saved && hasMojibakeQueryPayload(saved) && saved.fileName) {
+        console.warn(
+          "[query-tables] mojibake detected. Rebuilding saved key.",
+          {
+            queryTablesKey: key,
+            fileName: saved.fileName,
+          },
+        );
+
+        const rebuilt = await buildQueryTablesForFile(req, saved.fileName);
+
+        saved = {
+          version: "query_tables_v4_text_csv_encoding",
+          fileName: saved.fileName,
+          fileHash: rebuilt.fileHash,
+          sheetStateSig: rebuilt.sheetStateSig,
+          tableCount: rebuilt.tables.length,
+          createdAt: new Date().toISOString(),
+          tables: rebuilt.tables,
+          normalizedQueryTables: rebuilt.normalizedQueryTables,
+          analysisRecipeCandidates: rebuilt.analysisRecipeCandidates,
+          categoryCandidates: rebuilt.categoryCandidates,
+          businessTemplateCandidates: rebuilt.businessTemplateCandidates,
+        };
+
+        await saveJsonObject(key, saved);
+      }
     } else if (fileName) {
       const built = await buildQueryTablesForFile(req, fileName);
       const normalizedQueryTables =
@@ -1253,7 +1281,7 @@ exports.saveQueryTables = async (req, res, next) => {
     const key = `query-tables/${userId}/${fileHash}/${Date.now()}_${rand}.json`;
 
     const payload = {
-      version: "query_tables_v1",
+      version: "query_tables_v4_text_csv_encoding",
       fileName,
       fileHash,
       sheetStateSig,
