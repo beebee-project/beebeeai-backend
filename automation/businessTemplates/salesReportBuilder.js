@@ -9,6 +9,8 @@ const {
   getRowValue,
   createVirtualTable,
   toNumber,
+  headerMatches,
+  getColumnHeader,
 } = require("./commonTemplateHelpers");
 
 function isYearHeader(header = "") {
@@ -28,6 +30,104 @@ function normalizeMonth(header = "") {
   const match = String(header || "").match(/(0?[1-9]|1[0-2])\s*월/);
   if (!match) return "";
   return String(Number(match[1])).padStart(2, "0");
+}
+
+function normalizeYearValue(value = "") {
+  const match = String(value ?? "").match(/(19|20)\d{2}/);
+  return match ? match[0] : "";
+}
+
+function normalizeMonthValue(value = "") {
+  const raw = String(value ?? "").trim();
+
+  if (/^(0?[1-9]|1[0-2])$/.test(raw)) {
+    return String(Number(raw)).padStart(2, "0");
+  }
+
+  const fromHeader = normalizeMonth(raw);
+  if (fromHeader) return fromHeader;
+
+  const match = raw.match(/(0?[1-9]|1[0-2])/);
+  return match ? String(Number(match[1])).padStart(2, "0") : "";
+}
+
+function sameHeader(a = "", b = "") {
+  return String(a || "").trim() === String(b || "").trim();
+}
+
+function isExcludedHeader(header = "", excludedHeaders = []) {
+  return excludedHeaders
+    .filter(Boolean)
+    .some((target) => sameHeader(header, target));
+}
+
+function isTemporalSalesHeader(header = "") {
+  const value = String(header || "").trim();
+
+  return /(연도|년도|년\s*구분|월\s*구분|기준월|매출월|연월|년월|기간|일자|날짜|date|year|month|period)/i.test(
+    value,
+  );
+}
+
+function findNonTemporalColumnHeader(
+  table = {},
+  hints = [],
+  excludedHeaders = [],
+) {
+  const matched = getColumns(table).find((col) => {
+    const header = getColumnHeader(col);
+    if (!header) return false;
+    if (isExcludedHeader(header, excludedHeaders)) return false;
+    if (isTemporalSalesHeader(header)) return false;
+
+    return headerMatches(header, hints);
+  });
+
+  return matched ? getColumnHeader(matched) : "";
+}
+
+function findSalesQuantityHeader(table = {}) {
+  return findColumnHeader(
+    table,
+    ["매출수량", "판매수량", "수량", "quantity", "qty"],
+    { type: "number" },
+  );
+}
+
+function findSalesAmountHeader(table = {}) {
+  return findColumnHeader(
+    table,
+    [
+      "순매출액",
+      "매출액",
+      "판매금액",
+      "매출금액",
+      "카드매출액",
+      "sales",
+      "revenue",
+    ],
+    { type: "number" },
+  );
+}
+
+function uniqueTemplateCandidates(candidates = []) {
+  const seen = new Set();
+
+  return candidates.filter((candidate) => {
+    const columns = candidate.columns || {};
+    const key = [
+      candidate.recipeType || "",
+      candidate.tableId || "",
+      columns.dimension || "",
+      columns.date || "",
+      columns.metric || "",
+      candidate.title || "",
+    ].join("|");
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function findWideYearHeaders(table = {}) {
@@ -158,20 +258,71 @@ function buildMonthWideVirtualTable({ table, monthHeaders = [] }) {
   });
 }
 
+function buildLongYearMonthVirtualTable({ table, yearHeader, monthHeader }) {
+  const quantityHeader = findSalesQuantityHeader(table);
+  const amountHeader = findSalesAmountHeader(table);
+
+  if (!yearHeader || !monthHeader || (!quantityHeader && !amountHeader)) {
+    return null;
+  }
+
+  const rows = [];
+
+  getRows(table).forEach((row) => {
+    const year = normalizeYearValue(getRowValue(row, yearHeader));
+    const month = normalizeMonthValue(getRowValue(row, monthHeader));
+
+    if (!year || !month) return;
+
+    const item = {
+      연도: Number(year),
+      월: month,
+      연월: `${year}-${month}`,
+    };
+
+    if (quantityHeader) {
+      const quantity = toNumber(getRowValue(row, quantityHeader));
+      if (quantity != null) item.매출수량 = quantity;
+    }
+
+    if (amountHeader) {
+      const amount = toNumber(getRowValue(row, amountHeader));
+      if (amount != null) item.순매출액 = amount;
+    }
+
+    rows.push(item);
+  });
+
+  if (!rows.length) return null;
+
+  const columns = [
+    { header: "연도", type: "number", role: "dimension" },
+    { header: "월", type: "category", role: "dimension" },
+    { header: "연월", type: "category", role: "dimension" },
+  ];
+
+  if (quantityHeader) {
+    columns.push({ header: "매출수량", type: "number", role: "metric" });
+  }
+
+  if (amountHeader) {
+    columns.push({ header: "순매출액", type: "number", role: "metric" });
+  }
+
+  return createVirtualTable({
+    sourceTable: table,
+    tableId: `${table.tableId}_sales_year_month`,
+    tableName: `${table.tableName || table.sheetName || "매출"}_연월변환`,
+    columns,
+    rows,
+  });
+}
+
 function createAverageSalesSection({ table }) {
   const rows = getRows(table);
 
-  const quantityHeader = findColumnHeader(
-    table,
-    ["매출수량", "판매수량", "수량", "quantity", "qty"],
-    { type: "number" },
-  );
-
-  const amountHeader = findColumnHeader(
-    table,
-    ["순매출액", "매출액", "판매금액", "매출금액", "sales", "revenue"],
-    { type: "number" },
-  );
+  const quantityHeader = findSalesQuantityHeader(table);
+  const amountHeader = findSalesAmountHeader(table);
 
   if (!quantityHeader || !amountHeader) return null;
 
@@ -251,53 +402,35 @@ function buildLongSalesCandidates({ table }) {
     "period",
   ]);
 
-  const productHeader = findColumnHeader(table, [
-    "제품명",
-    "상품명",
-    "품목",
-    "세부사업명",
-    "제품류",
-    "product",
-    "item",
-  ]);
+  const excludedDimensionHeaders = [
+    yearHeader,
+    monthHeader,
+    periodHeader,
+    "연도",
+    "월",
+    "연월",
+  ];
 
-  const categoryHeader = findColumnHeader(table, [
-    "제품분류",
-    "상품분류",
-    "업종",
-    "업태",
-    "구분",
-    "분류",
-    "category",
-  ]);
-
-  const regionHeader = findColumnHeader(table, [
-    "지역",
-    "구",
-    "자치구",
-    "시군구",
-    "region",
-  ]);
-
-  const quantityHeader = findColumnHeader(
+  const productHeader = findNonTemporalColumnHeader(
     table,
-    ["매출수량", "판매수량", "수량", "quantity", "qty"],
-    { type: "number" },
+    ["제품명", "상품명", "품목", "세부사업명", "제품류", "product", "item"],
+    excludedDimensionHeaders,
   );
 
-  const amountHeader = findColumnHeader(
+  const categoryHeader = findNonTemporalColumnHeader(
     table,
-    [
-      "순매출액",
-      "매출액",
-      "판매금액",
-      "매출금액",
-      "카드매출액",
-      "sales",
-      "revenue",
-    ],
-    { type: "number" },
+    ["제품분류", "상품분류", "업종", "업태", "구분", "분류", "category"],
+    excludedDimensionHeaders,
   );
+
+  const regionHeader = findNonTemporalColumnHeader(
+    table,
+    ["지역", "구", "자치구", "시군구", "region"],
+    excludedDimensionHeaders,
+  );
+
+  const quantityHeader = findSalesQuantityHeader(table);
+  const amountHeader = findSalesAmountHeader(table);
 
   const candidates = [];
 
@@ -333,7 +466,9 @@ function buildLongSalesCandidates({ table }) {
         },
       }),
     );
-  } else if (monthHeader && amountHeader) {
+  }
+
+  if (monthHeader && amountHeader) {
     candidates.push(
       makeTemplateCandidate({
         recipeType: "group_summary",
@@ -418,18 +553,29 @@ function buildLongSalesCandidates({ table }) {
     );
   }
 
-  if (
-    (periodHeader || monthHeader || productHeader || categoryHeader) &&
-    amountHeader
-  ) {
+  const rankingDimension =
+    periodHeader ||
+    findColumnHeader(table, [
+      "연월",
+      "기간",
+      "기준년월",
+      "매출년월",
+      "period",
+    ]) ||
+    productHeader ||
+    categoryHeader ||
+    regionHeader ||
+    monthHeader ||
+    yearHeader;
+
+  if (rankingDimension && amountHeader) {
     candidates.push(
       makeTemplateCandidate({
         recipeType: "top_bottom",
         title: `${amountHeader} 상위/하위 항목`,
         tableId,
         columns: {
-          dimension:
-            periodHeader || monthHeader || productHeader || categoryHeader,
+          dimension: rankingDimension,
           metric: amountHeader,
         },
         meta: {
@@ -439,7 +585,7 @@ function buildLongSalesCandidates({ table }) {
     );
   }
 
-  return candidates;
+  return uniqueTemplateCandidates(candidates);
 }
 
 function executeSalesReport({
@@ -471,6 +617,29 @@ function executeSalesReport({
     monthHeaders: monthWideHeaders,
   });
 
+  const longYearHeader = findColumnHeader(table, [
+    "연도 구분",
+    "기준년도",
+    "매출연도",
+    "연도",
+    "년도",
+    "year",
+  ]);
+
+  const longMonthHeader = findColumnHeader(table, [
+    "월 구분",
+    "기준월",
+    "매출월",
+    "월",
+    "month",
+  ]);
+
+  const longYearMonthVirtualTable = buildLongYearMonthVirtualTable({
+    table,
+    yearHeader: longYearHeader,
+    monthHeader: longMonthHeader,
+  });
+
   if (monthWideVirtualTable) {
     selectedTable = monthWideVirtualTable;
     executionTables = [
@@ -487,13 +656,20 @@ function executeSalesReport({
       ),
       selectedTable,
     ];
+  } else if (longYearMonthVirtualTable) {
+    selectedTable = longYearMonthVirtualTable;
+    executionTables = [
+      ...normalizedQueryTables.filter(
+        (t) => t.tableId !== selectedTable.tableId,
+      ),
+      selectedTable,
+    ];
   }
 
   const candidates = buildLongSalesCandidates({ table: selectedTable });
-  const customSections =
-    selectedTable === table
-      ? [createAverageSalesSection({ table })].filter(Boolean)
-      : [];
+  const customSections = [
+    createAverageSalesSection({ table: selectedTable }),
+  ].filter(Boolean);
 
   if (!candidates.length && !customSections.length) {
     return executeTemplateSections({
