@@ -2,6 +2,9 @@ const { executeAnalysisRecipeCandidate } = require("./analysisRecipeExecutor");
 const {
   executeResearchBudgetReport,
 } = require("./businessTemplates/researchBudgetReportBuilder");
+const {
+  executeSalesReport,
+} = require("./businessTemplates/salesReportBuilder");
 
 function executeTemplateSections({
   normalizedQueryTables = [],
@@ -309,6 +312,13 @@ function executeBusinessTemplate({
 
     case "research_budget_report":
       sections = executeResearchBudgetReport({
+        normalizedQueryTables,
+        templateCandidate,
+      });
+      break;
+
+    case "sales_report":
+      sections = executeSalesReport({
         normalizedQueryTables,
         templateCandidate,
       });

@@ -1,0 +1,518 @@
+const {
+  findTableForTemplate,
+  findColumnHeader,
+  findNumericHeaders,
+  makeTemplateCandidate,
+  executeTemplateSections,
+  getColumns,
+  getRows,
+  getRowValue,
+  createVirtualTable,
+  toNumber,
+} = require("./commonTemplateHelpers");
+
+function isYearHeader(header = "") {
+  return /^(19|20)\d{2}\s*년?$/.test(String(header || "").trim());
+}
+
+function isMonthHeader(header = "") {
+  return /^(0?[1-9]|1[0-2])\s*월/.test(String(header || "").trim());
+}
+
+function normalizeYear(header = "") {
+  const match = String(header || "").match(/(19|20)\d{2}/);
+  return match ? match[0] : "";
+}
+
+function normalizeMonth(header = "") {
+  const match = String(header || "").match(/(0?[1-9]|1[0-2])\s*월/);
+  if (!match) return "";
+  return String(Number(match[1])).padStart(2, "0");
+}
+
+function findWideYearHeaders(table = {}) {
+  return getColumns(table)
+    .map((col) => col.header || col.key || "")
+    .filter(isYearHeader);
+}
+
+function findWideMonthHeaders(table = {}) {
+  return getColumns(table)
+    .map((col) => col.header || col.key || "")
+    .filter(isMonthHeader);
+}
+
+function buildYearWideVirtualTable({ table, yearHeaders = [] }) {
+  const baseCategoryHeader =
+    findColumnHeader(table, [
+      "세부사업명",
+      "제품명",
+      "상품명",
+      "품목",
+      "업종",
+      "구분",
+    ]) || findColumnHeader(table, ["분류", "카테고리", "category"]);
+
+  const groupHeader =
+    findColumnHeader(table, ["구분", "제품류", "제품분류", "대분류"]) ||
+    baseCategoryHeader;
+
+  if (!yearHeaders.length || !baseCategoryHeader) return null;
+
+  const rows = [];
+
+  getRows(table).forEach((row) => {
+    yearHeaders.forEach((yearHeader) => {
+      const amount = toNumber(getRowValue(row, yearHeader));
+      if (amount == null) return;
+
+      rows.push({
+        구분: groupHeader ? getRowValue(row, groupHeader) : "",
+        항목: getRowValue(row, baseCategoryHeader),
+        연도: normalizeYear(yearHeader),
+        매출액: amount,
+      });
+    });
+  });
+
+  if (!rows.length) return null;
+
+  return createVirtualTable({
+    sourceTable: table,
+    tableId: `${table.tableId}_sales_year_wide`,
+    tableName: `${table.tableName || table.sheetName || "매출"}_연도별변환`,
+    columns: [
+      { header: "구분", type: "category", role: "dimension" },
+      { header: "항목", type: "category", role: "dimension" },
+      { header: "연도", type: "number", role: "dimension" },
+      { header: "매출액", type: "number", role: "metric" },
+    ],
+    rows,
+  });
+}
+
+function buildMonthWideVirtualTable({ table, monthHeaders = [] }) {
+  const yearHeader = findColumnHeader(table, [
+    "기준년도",
+    "연도",
+    "년도",
+    "year",
+  ]);
+
+  const regionHeader = findColumnHeader(table, [
+    "구",
+    "자치구",
+    "지역",
+    "시군구",
+    "행정구",
+    "region",
+  ]);
+
+  const categoryHeader = findColumnHeader(table, [
+    "업종",
+    "업태",
+    "분류",
+    "카테고리",
+    "category",
+  ]);
+
+  if (!monthHeaders.length) return null;
+
+  const rows = [];
+
+  getRows(table).forEach((row) => {
+    monthHeaders.forEach((monthHeader) => {
+      const amount = toNumber(getRowValue(row, monthHeader));
+      if (amount == null) return;
+
+      const year = yearHeader ? getRowValue(row, yearHeader) : "";
+      const month = normalizeMonth(monthHeader);
+      const period = year && month ? `${year}-${month}` : month;
+
+      rows.push({
+        연도: year,
+        월: month,
+        연월: period,
+        지역: regionHeader ? getRowValue(row, regionHeader) : "",
+        업종: categoryHeader ? getRowValue(row, categoryHeader) : "",
+        매출액: amount,
+      });
+    });
+  });
+
+  if (!rows.length) return null;
+
+  return createVirtualTable({
+    sourceTable: table,
+    tableId: `${table.tableId}_sales_month_wide`,
+    tableName: `${table.tableName || table.sheetName || "매출"}_월별변환`,
+    columns: [
+      { header: "연도", type: "number", role: "dimension" },
+      { header: "월", type: "category", role: "dimension" },
+      { header: "연월", type: "category", role: "dimension" },
+      { header: "지역", type: "category", role: "dimension" },
+      { header: "업종", type: "category", role: "dimension" },
+      { header: "매출액", type: "number", role: "metric" },
+    ],
+    rows,
+  });
+}
+
+function createAverageSalesSection({ table }) {
+  const rows = getRows(table);
+
+  const quantityHeader = findColumnHeader(
+    table,
+    ["매출수량", "판매수량", "수량", "quantity", "qty"],
+    { type: "number" },
+  );
+
+  const amountHeader = findColumnHeader(
+    table,
+    ["순매출액", "매출액", "판매금액", "매출금액", "sales", "revenue"],
+    { type: "number" },
+  );
+
+  if (!quantityHeader || !amountHeader) return null;
+
+  let totalQuantity = 0;
+  let totalAmount = 0;
+
+  rows.forEach((row) => {
+    const quantity = toNumber(getRowValue(row, quantityHeader));
+    const amount = toNumber(getRowValue(row, amountHeader));
+
+    if (quantity != null) totalQuantity += quantity;
+    if (amount != null) totalAmount += amount;
+  });
+
+  if (!totalQuantity || !totalAmount) return null;
+
+  return {
+    sectionId: "average_sales_amount",
+    title: "평균 판매금액",
+    candidate: {
+      recipeType: "custom_metric",
+      title: "평균 판매금액",
+      tableId: table.tableId,
+      columns: {
+        quantity: quantityHeader,
+        metric: amountHeader,
+      },
+    },
+    result: {
+      ok: true,
+      recipeType: "custom_metric",
+      title: "평균 판매금액",
+      tableId: table.tableId,
+      sheetName: table.sheetName,
+      columns: {
+        quantity: quantityHeader,
+        metric: amountHeader,
+      },
+      rows: [
+        {
+          지표: "평균 판매금액",
+          매출수량합계: totalQuantity,
+          매출액합계: totalAmount,
+          값: totalAmount / totalQuantity,
+        },
+      ],
+      rowCount: 1,
+    },
+  };
+}
+
+function buildLongSalesCandidates({ table }) {
+  const tableId = table.tableId;
+
+  const yearHeader = findColumnHeader(table, [
+    "연도 구분",
+    "기준년도",
+    "매출연도",
+    "연도",
+    "년도",
+    "year",
+  ]);
+
+  const monthHeader = findColumnHeader(table, [
+    "월 구분",
+    "기준월",
+    "매출월",
+    "월",
+    "month",
+  ]);
+
+  const periodHeader = findColumnHeader(table, [
+    "연월",
+    "기간",
+    "기준년월",
+    "매출년월",
+    "period",
+  ]);
+
+  const productHeader = findColumnHeader(table, [
+    "제품명",
+    "상품명",
+    "품목",
+    "세부사업명",
+    "제품류",
+    "product",
+    "item",
+  ]);
+
+  const categoryHeader = findColumnHeader(table, [
+    "제품분류",
+    "상품분류",
+    "업종",
+    "업태",
+    "구분",
+    "분류",
+    "category",
+  ]);
+
+  const regionHeader = findColumnHeader(table, [
+    "지역",
+    "구",
+    "자치구",
+    "시군구",
+    "region",
+  ]);
+
+  const quantityHeader = findColumnHeader(
+    table,
+    ["매출수량", "판매수량", "수량", "quantity", "qty"],
+    { type: "number" },
+  );
+
+  const amountHeader = findColumnHeader(
+    table,
+    [
+      "순매출액",
+      "매출액",
+      "판매금액",
+      "매출금액",
+      "카드매출액",
+      "sales",
+      "revenue",
+    ],
+    { type: "number" },
+  );
+
+  const candidates = [];
+
+  if (yearHeader && amountHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${yearHeader}별 ${amountHeader} 요약`,
+        tableId,
+        columns: {
+          dimension: yearHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "yearly_sales",
+        },
+      }),
+    );
+  }
+
+  if (periodHeader && amountHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${periodHeader}별 ${amountHeader} 추이`,
+        tableId,
+        columns: {
+          dimension: periodHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "period_sales",
+        },
+      }),
+    );
+  } else if (monthHeader && amountHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${monthHeader}별 ${amountHeader} 추이`,
+        tableId,
+        columns: {
+          dimension: monthHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "monthly_sales",
+        },
+      }),
+    );
+  }
+
+  if (monthHeader && quantityHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${monthHeader}별 ${quantityHeader} 추이`,
+        tableId,
+        columns: {
+          dimension: monthHeader,
+          metric: quantityHeader,
+        },
+        meta: {
+          sectionType: "monthly_quantity",
+        },
+      }),
+    );
+  }
+
+  if (productHeader && amountHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${productHeader}별 ${amountHeader} 요약`,
+        tableId,
+        columns: {
+          dimension: productHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "product_sales",
+        },
+      }),
+    );
+  }
+
+  if (categoryHeader && amountHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${categoryHeader}별 ${amountHeader} 요약`,
+        tableId,
+        columns: {
+          dimension: categoryHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "category_sales",
+        },
+      }),
+    );
+  }
+
+  if (regionHeader && amountHeader) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "group_summary",
+        title: `${regionHeader}별 ${amountHeader} 요약`,
+        tableId,
+        columns: {
+          dimension: regionHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "region_sales",
+        },
+      }),
+    );
+  }
+
+  if (
+    (periodHeader || monthHeader || productHeader || categoryHeader) &&
+    amountHeader
+  ) {
+    candidates.push(
+      makeTemplateCandidate({
+        recipeType: "top_bottom",
+        title: `${amountHeader} 상위/하위 항목`,
+        tableId,
+        columns: {
+          dimension:
+            periodHeader || monthHeader || productHeader || categoryHeader,
+          metric: amountHeader,
+        },
+        meta: {
+          sectionType: "top_bottom_sales",
+        },
+      }),
+    );
+  }
+
+  return candidates;
+}
+
+function executeSalesReport({
+  normalizedQueryTables = [],
+  templateCandidate = {},
+}) {
+  const table = findTableForTemplate(normalizedQueryTables, templateCandidate);
+
+  if (!table?.tableId) {
+    return executeTemplateSections({
+      normalizedQueryTables,
+      templateCandidate,
+    });
+  }
+
+  const yearWideHeaders = findWideYearHeaders(table);
+  const monthWideHeaders = findWideMonthHeaders(table);
+
+  let executionTables = normalizedQueryTables;
+  let selectedTable = table;
+
+  const yearWideVirtualTable = buildYearWideVirtualTable({
+    table,
+    yearHeaders: yearWideHeaders,
+  });
+
+  const monthWideVirtualTable = buildMonthWideVirtualTable({
+    table,
+    monthHeaders: monthWideHeaders,
+  });
+
+  if (monthWideVirtualTable) {
+    selectedTable = monthWideVirtualTable;
+    executionTables = [
+      ...normalizedQueryTables.filter(
+        (t) => t.tableId !== selectedTable.tableId,
+      ),
+      selectedTable,
+    ];
+  } else if (yearWideVirtualTable) {
+    selectedTable = yearWideVirtualTable;
+    executionTables = [
+      ...normalizedQueryTables.filter(
+        (t) => t.tableId !== selectedTable.tableId,
+      ),
+      selectedTable,
+    ];
+  }
+
+  const candidates = buildLongSalesCandidates({ table: selectedTable });
+  const customSections =
+    selectedTable === table
+      ? [createAverageSalesSection({ table })].filter(Boolean)
+      : [];
+
+  if (!candidates.length && !customSections.length) {
+    return executeTemplateSections({
+      normalizedQueryTables,
+      templateCandidate,
+    });
+  }
+
+  const recipeSections = executeTemplateSections({
+    normalizedQueryTables: executionTables,
+    templateCandidate: {
+      ...templateCandidate,
+      candidates,
+    },
+  });
+
+  return [...recipeSections, ...customSections];
+}
+
+module.exports = {
+  executeSalesReport,
+};
