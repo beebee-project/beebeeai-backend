@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const XLSX = require("xlsx");
+const { readWorkbookFromBuffer } = require("./workbookReader");
 const { readMetaCache, writeMetaCache } = require("./storage");
 const { buildAllSheetsData } = require("./sheetMetaBuilder");
 const { shouldLogCache } = require("./cacheLog");
@@ -48,12 +49,7 @@ async function getOrBuildAllSheetsData(fileBuffer) {
     console.log("[metaCache] MISS", hash.slice(0, 8));
   }
 
-  const workbook = XLSX.read(fileBuffer, {
-    type: "buffer",
-    cellDates: true,
-    cellNF: true,
-    cellText: false,
-  });
+  const workbook = readWorkbookFromBuffer(fileBuffer);
   const allSheetsData = buildAllSheetsData(workbook);
   const sheetStateSig = makeSheetStateSig(allSheetsData);
 

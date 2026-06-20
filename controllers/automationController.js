@@ -9,6 +9,7 @@ const {
   readJsonObject,
   saveBufferObject,
 } = require("../utils/storage");
+const { readWorkbookFromBuffer } = require("../utils/workbookReader");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const {
   buildQueryTablesFromWorkbook,
@@ -165,13 +166,7 @@ async function buildQueryTablesForFile(req, fileName) {
   const { fileHash, allSheetsData, sheetStateSig } =
     await getOrBuildAllSheetsData(buffer);
 
-  const workbook = XLSX.read(buffer, {
-    type: "buffer",
-    cellDates: true,
-    cellNF: true,
-    cellText: false,
-  });
-
+  const workbook = readWorkbookFromBuffer(buffer);
   const tables = buildQueryTablesFromWorkbook(workbook, allSheetsData);
 
   console.log("[query-table-debug]", {

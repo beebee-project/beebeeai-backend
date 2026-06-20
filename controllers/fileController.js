@@ -6,6 +6,7 @@ const {
   isStorageEnabled,
 } = require("../utils/storage");
 const XLSX = require("xlsx");
+const { readWorkbookFromBuffer } = require("../utils/workbookReader");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const {
   buildQueryTablesFromWorkbook,
@@ -117,12 +118,7 @@ exports.uploadFile = async (req, res, next) => {
       const { fileHash, allSheetsData, sheetStateSig } =
         await getOrBuildAllSheetsData(req.file.buffer);
 
-      const workbook = XLSX.read(req.file.buffer, {
-        type: "buffer",
-        cellDates: true,
-        cellNF: true,
-        cellText: false,
-      });
+      const workbook = readWorkbookFromBuffer(req.file.buffer);
 
       const tables = buildQueryTablesFromWorkbook(workbook, allSheetsData);
       const normalizedQueryTables = buildNormalizedQueryTables(tables);
