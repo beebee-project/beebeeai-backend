@@ -12,7 +12,8 @@ function md5Buffer(buf) {
 
 async function getOrBuildAllSheetsData(fileBuffer) {
   const hash = md5Buffer(fileBuffer);
-  const cacheKey = `sheetsMeta_${hash}`;
+  const META_CACHE_VERSION = "v3_csv_encoding";
+  const cacheKey = `sheetsMeta_${META_CACHE_VERSION}_${hash}`;
 
   // meta-cache logging (prod: sampling via META_CACHE_LOG)
   // - dev: always log
@@ -56,7 +57,7 @@ async function getOrBuildAllSheetsData(fileBuffer) {
   await writeMetaCache(cacheKey, {
     allSheetsData,
     sheetStateSig,
-    metaVersion: "v2",
+    metaVersion: META_CACHE_VERSION,
     builtAt: Date.now(),
   });
 
@@ -64,7 +65,7 @@ async function getOrBuildAllSheetsData(fileBuffer) {
     fileHash: hash,
     allSheetsData,
     sheetStateSig,
-    metaVersion: "v2",
+    metaVersion: META_CACHE_VERSION,
   };
 }
 

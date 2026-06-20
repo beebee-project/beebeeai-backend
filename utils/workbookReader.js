@@ -1,4 +1,5 @@
 const XLSX = require("xlsx");
+const iconv = require("iconv-lite");
 
 const DEFAULT_XLSX_READ_OPTIONS = {
   type: "buffer",
@@ -12,7 +13,11 @@ const MOJIBAKE_PATTERN =
 
 function safeDecode(buffer, encoding) {
   try {
-    return new TextDecoder(encoding, { fatal: false }).decode(buffer);
+    if (encoding === "utf8" || encoding === "utf-8") {
+      return Buffer.from(buffer).toString("utf8");
+    }
+
+    return iconv.decode(Buffer.from(buffer), encoding);
   } catch (error) {
     return null;
   }
@@ -63,9 +68,9 @@ function readWorkbookFromBuffer(buffer, options = {}) {
   }
 
   const decodedText =
+    safeDecode(buffer, "cp949") ||
     safeDecode(buffer, "euc-kr") ||
-    safeDecode(buffer, "windows-949") ||
-    safeDecode(buffer, "cp949");
+    safeDecode(buffer, "utf8");
 
   if (!decodedText) {
     return workbook;

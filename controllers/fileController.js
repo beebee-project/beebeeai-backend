@@ -18,6 +18,9 @@ const {
   buildAnalysisRecipeCandidates,
 } = require("../automation/analysisRecipeCandidateBuilder");
 const {
+  buildBusinessTemplateCandidates,
+} = require("../automation/businessTemplateConfig");
+const {
   saveEncryptedQueryJson,
   deleteEncryptedQueryJson,
   deleteEncryptedQueryJsonByFileName,
@@ -125,6 +128,9 @@ exports.uploadFile = async (req, res, next) => {
       const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
         normalizedQueryTables,
       );
+      const businessTemplateCandidates = buildBusinessTemplateCandidates(
+        analysisRecipeCandidates,
+      );
 
       queryJsonMeta = await saveEncryptedQueryJson({
         userId: String(user._id),
@@ -139,6 +145,7 @@ exports.uploadFile = async (req, res, next) => {
           tables,
           normalizedQueryTables,
           analysisRecipeCandidates,
+          businessTemplateCandidates,
         },
       });
     } catch (error) {

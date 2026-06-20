@@ -59,6 +59,26 @@ function findUserFile(user, fileName) {
   return user.uploadedFiles?.find((f) => f.originalName === fileName) || null;
 }
 
+const MOJIBAKE_PATTERN =
+  /[¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ¸¼½¾±ºµ]/;
+
+function hasMojibakeQueryPayload(payload = {}) {
+  const tables = payload.tables || payload.normalizedQueryTables || [];
+
+  const headers = [];
+
+  for (const table of tables) {
+    for (const col of table.columns || []) {
+      headers.push(col.header || col.originalHeader || "");
+    }
+  }
+
+  const text = headers.join(" ");
+  const suspiciousCount = (text.match(MOJIBAKE_PATTERN) || []).length;
+
+  return suspiciousCount >= 2;
+}
+
 async function loadSavedQueryJsonForFile(req, fileName) {
   if (!req.user?.id || !fileName) return null;
 
@@ -100,7 +120,10 @@ async function buildQueryTablesForFile(req, fileName) {
   let buffer;
   const savedQueryJson = await loadSavedQueryJsonForFile(req, fileName);
 
-  if (savedQueryJson?.payload) {
+  if (
+    savedQueryJson?.payload &&
+    !hasMojibakeQueryPayload(savedQueryJson.payload)
+  ) {
     const analysisRecipeCandidates =
       savedQueryJson.payload.analysisRecipeCandidates || [];
 
@@ -116,6 +139,19 @@ async function buildQueryTablesForFile(req, fileName) {
         buildBusinessTemplateCandidates(analysisRecipeCandidates),
       source: "encrypted-query-json",
     };
+  }
+
+  if (
+    savedQueryJson?.payload &&
+    hasMojibakeQueryPayload(savedQueryJson.payload)
+  ) {
+    console.warn(
+      "[query-json] mojibake detected. Rebuilding from source file.",
+      {
+        fileName,
+        fileHash: savedQueryJson.payload.fileHash,
+      },
+    );
   }
 
   if (process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1") {
