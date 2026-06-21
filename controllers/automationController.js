@@ -28,9 +28,6 @@ const {
   buildNormalizedQueryTables,
 } = require("../automation/normalizedQueryTableBuilder");
 const {
-  buildAnalysisRecipeCandidates,
-} = require("../automation/analysisRecipeCandidateBuilder");
-const {
   executeAnalysisRecipeCandidate,
 } = require("../automation/analysisRecipeExecutor");
 const { decryptBuffer } = require("../services/encryptedFileService");
@@ -39,14 +36,78 @@ const {
   saveEncryptedQueryJson,
 } = require("../services/encryptedJsonStorageService");
 const {
-  buildBusinessTemplateCandidates,
-} = require("../automation/businessTemplateConfig");
-const {
   executeBusinessTemplate,
 } = require("../automation/businessTemplateExecutor");
+let candidateGenerationModule = {};
+
+try {
+  candidateGenerationModule = require("../automation/candidateGeneration");
+} catch (error) {
+  console.warn(
+    "[candidateGeneration] module load failed. Falling back to deterministic builder:",
+    error?.message || error,
+  );
+}
+
 const {
-  generateCandidateBundle,
-} = require("../automation/candidateGeneration");
+  buildDeterministicCandidateBundle,
+} = require("../automation/candidateGeneration/deterministicCandidateBuilder");
+const {
+  validateCandidateBundle,
+} = require("../automation/candidateGeneration/candidateValidator");
+
+function resolveGenerateCandidateBundle() {
+  const direct = candidateGenerationModule;
+
+  const fn =
+    (typeof direct === "function" && direct) ||
+    (typeof direct?.generateCandidateBundle === "function" &&
+      direct.generateCandidateBundle) ||
+    (typeof direct?.default === "function" && direct.default);
+
+  if (fn) return fn;
+
+  console.warn(
+    "[candidateGeneration] generateCandidateBundle export missing. Using deterministic fallback.",
+  );
+
+  return async function generateCandidateBundleFallback({
+    normalizedQueryTables = [],
+    fileName = "",
+    source = "candidate-generation-fallback",
+  } = {}) {
+    const deterministic = buildDeterministicCandidateBundle({
+      normalizedQueryTables,
+      fileName,
+      source,
+    });
+
+    const validated = validateCandidateBundle(
+      deterministic,
+      normalizedQueryTables,
+    );
+
+    return {
+      ...validated,
+      candidateGeneration: {
+        ...(validated.candidateGeneration || {}),
+        version:
+          validated.candidateGeneration?.version || "candidate_generation_v1",
+        source,
+        fallbackUsed: true,
+        fileName,
+        aiReranker: {
+          enabled: false,
+          used: false,
+          skippedReason: "INVALID_CANDIDATE_GENERATION_EXPORT",
+        },
+        generatedAt: new Date().toISOString(),
+      },
+    };
+  };
+}
+
+const generateCandidateBundle = resolveGenerateCandidateBundle();
 const {
   isBusinessTemplateResult,
   normalizeBusinessTemplateResult,
@@ -179,6 +240,31 @@ async function buildQueryTablesForFile(req, fileName) {
     const normalizedQueryTables =
       savedQueryJson.payload.normalizedQueryTables || [];
 
+    let analysisRecipeCandidates =
+      savedQueryJson.payload.analysisRecipeCandidates || [];
+    let categoryCandidates = savedQueryJson.payload.categoryCandidates || [];
+    let businessTemplateCandidates =
+      savedQueryJson.payload.businessTemplateCandidates || [];
+    let candidateGeneration =
+      savedQueryJson.payload.candidateGeneration || null;
+
+    if (
+      normalizedQueryTables.length &&
+      (!analysisRecipeCandidates.length || !businessTemplateCandidates.length)
+    ) {
+      const candidateBundle = await generateCandidateBundle({
+        normalizedQueryTables,
+        fileName,
+        source: "encrypted-query-json",
+      });
+
+      analysisRecipeCandidates = candidateBundle.analysisRecipeCandidates || [];
+      categoryCandidates = candidateBundle.categoryCandidates || [];
+      businessTemplateCandidates =
+        candidateBundle.businessTemplateCandidates || [];
+      candidateGeneration = candidateBundle.candidateGeneration || null;
+    }
+
     let candidateBundle = {
       analysisRecipeCandidates:
         savedQueryJson.payload.analysisRecipeCandidates || [],
@@ -299,6 +385,7 @@ async function buildQueryTablesForFile(req, fileName) {
     fileName,
     source: "rebuilt-from-xlsx",
   });
+
   const analysisRecipeCandidates =
     candidateBundle.analysisRecipeCandidates || [];
   const categoryCandidates = candidateBundle.categoryCandidates || [];

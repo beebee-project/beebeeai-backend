@@ -1,8 +1,10 @@
 const { stableCandidateId } = require("./candidateValidator");
 
 function isEnabled() {
-  return String(process.env.USE_AI_CANDIDATE_RERANKER || "") === "true" ||
-    process.env.USE_AI_CANDIDATE_RERANKER === "1";
+  return (
+    String(process.env.USE_AI_CANDIDATE_RERANKER || "") === "true" ||
+    process.env.USE_AI_CANDIDATE_RERANKER === "1"
+  );
 }
 
 function getModelName() {
@@ -132,7 +134,8 @@ function applyAiSuggestions(bundle = {}, ai = {}) {
     })
     .sort(
       (a, b) =>
-        (b.priority + (b._aiPriorityBoost || 0)) -
+        b.priority +
+          (b._aiPriorityBoost || 0) -
           (a.priority + (a._aiPriorityBoost || 0)) ||
         (b.confidence || 0) - (a.confidence || 0),
     );
@@ -200,8 +203,7 @@ async function rerankCandidateBundle({
         {
           role: "user",
           content: JSON.stringify({
-            task:
-              "Rerank and explain existing candidates. Keep ids/templateIds unchanged. priorityBoost must be an integer from -5 to 5.",
+            task: "Rerank and explain existing candidates. Keep ids/templateIds unchanged. priorityBoost must be an integer from -5 to 5.",
             schema: {
               businessTemplates: [
                 {
@@ -257,7 +259,10 @@ async function rerankCandidateBundle({
       },
     };
   } catch (error) {
-    console.warn("[aiCandidateReranker] fallback deterministic:", error.message);
+    console.warn(
+      "[aiCandidateReranker] fallback deterministic:",
+      error.message,
+    );
     return {
       bundle,
       meta: {
@@ -270,6 +275,188 @@ async function rerankCandidateBundle({
   }
 }
 
-module.exports = {
-  rerankCandidateBundle,
-};
+function resolveExportedFunction(mod, names = []) {
+  if (typeof mod === "function") return mod;
+
+  for (const name of names) {
+    if (typeof mod?.[name] === "function") return mod[name];
+  }
+
+  if (typeof mod?.default === "function") return mod.default;
+  return null;
+}
+
+function buildMinimalCandidateBundle({
+  normalizedQueryTables = [],
+  source = "candidate-generation-minimal-fallback",
+} = {}) {
+  const {
+    buildAnalysisRecipeCandidates,
+  } = require("../analysisRecipeCandidateBuilder");
+  const {
+    buildBusinessTemplateCandidates,
+  } = require("../businessTemplateConfig");
+
+  const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
+    normalizedQueryTables,
+  );
+
+  const businessTemplateCandidates = buildBusinessTemplateCandidates(
+    analysisRecipeCandidates,
+  );
+
+  return {
+    analysisRecipeCandidates,
+    categoryCandidates: [],
+    businessTemplateCandidates,
+    candidateGeneration: {
+      version: "candidate_generation_v1",
+      source,
+      deterministic: {
+        used: true,
+        fallback: true,
+      },
+      aiReranker: {
+        enabled: false,
+        used: false,
+        skippedReason: "MINIMAL_FALLBACK",
+      },
+      validation: {
+        used: false,
+        skippedReason: "VALIDATOR_NOT_AVAILABLE_IN_MINIMAL_FALLBACK",
+      },
+      generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+async function generateCandidateBundle({
+  normalizedQueryTables = [],
+  fileName = "",
+  source = "candidate-generation",
+} = {}) {
+  let bundle = null;
+
+  try {
+    const deterministicModule = require("./deterministicCandidateBuilder");
+    const buildDeterministicCandidateBundle = resolveExportedFunction(
+      deterministicModule,
+      [
+        "buildDeterministicCandidateBundle",
+        "generateDeterministicCandidateBundle",
+        "buildCandidateBundle",
+      ],
+    );
+
+    if (buildDeterministicCandidateBundle) {
+      bundle = await buildDeterministicCandidateBundle({
+        normalizedQueryTables,
+        fileName,
+        source,
+      });
+    }
+  } catch (error) {
+    console.warn(
+      "[candidateGeneration] deterministic builder failed:",
+      error?.message || error,
+    );
+  }
+
+  if (!bundle) {
+    bundle = buildMinimalCandidateBundle({
+      normalizedQueryTables,
+      source,
+    });
+  }
+
+  try {
+    const rerankerModule = require("./aiCandidateReranker");
+    const rerankCandidateBundle = resolveExportedFunction(rerankerModule, [
+      "rerankCandidateBundle",
+      "aiCandidateReranker",
+      "rerank",
+    ]);
+
+    if (rerankCandidateBundle) {
+      const reranked = await rerankCandidateBundle({
+        normalizedQueryTables,
+        bundle,
+        fileName,
+      });
+
+      if (reranked?.bundle) {
+        bundle = {
+          ...reranked.bundle,
+          candidateGeneration: {
+            ...(reranked.bundle.candidateGeneration || {}),
+            aiReranker: reranked.meta ||
+              reranked.bundle.candidateGeneration?.aiReranker || {
+                enabled: true,
+                used: true,
+              },
+          },
+        };
+      }
+    }
+  } catch (error) {
+    bundle = {
+      ...bundle,
+      candidateGeneration: {
+        ...(bundle.candidateGeneration || {}),
+        aiReranker: {
+          enabled: process.env.USE_AI_CANDIDATE_RERANKER === "true",
+          used: false,
+          error: error?.message || String(error),
+        },
+      },
+    };
+  }
+
+  try {
+    const validatorModule = require("./candidateValidator");
+    const validateCandidateBundle = resolveExportedFunction(validatorModule, [
+      "validateCandidateBundle",
+      "validate",
+    ]);
+
+    if (validateCandidateBundle) {
+      bundle = await validateCandidateBundle(bundle, normalizedQueryTables);
+    }
+  } catch (error) {
+    bundle = {
+      ...bundle,
+      candidateGeneration: {
+        ...(bundle.candidateGeneration || {}),
+        validation: {
+          used: false,
+          error: error?.message || String(error),
+        },
+      },
+    };
+  }
+
+  return {
+    ...bundle,
+    analysisRecipeCandidates: Array.isArray(bundle.analysisRecipeCandidates)
+      ? bundle.analysisRecipeCandidates
+      : [],
+    categoryCandidates: Array.isArray(bundle.categoryCandidates)
+      ? bundle.categoryCandidates
+      : [],
+    businessTemplateCandidates: Array.isArray(bundle.businessTemplateCandidates)
+      ? bundle.businessTemplateCandidates
+      : [],
+    candidateGeneration: {
+      ...(bundle.candidateGeneration || {}),
+      version: bundle.candidateGeneration?.version || "candidate_generation_v1",
+      fileName,
+      source,
+      generatedAt:
+        bundle.candidateGeneration?.generatedAt || new Date().toISOString(),
+    },
+  };
+}
+
+module.exports = generateCandidateBundle;
+module.exports.generateCandidateBundle = generateCandidateBundle;
+module.exports.default = generateCandidateBundle;
