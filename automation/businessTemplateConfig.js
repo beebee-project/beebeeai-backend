@@ -1,3 +1,5 @@
+const { normalizeOutputTypes } = require("./businessTemplateContract");
+
 const BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "sales_report",
@@ -24,7 +26,7 @@ const BUSINESS_TEMPLATE_DEFS = [
       "업종",
       "거래처",
     ],
-    outputTypes: ["summarySheet", "ppt", "reportJson"],
+    outputTypes: ["summarySheet", "analysisReport", "ppt"],
     priority: 100,
   },
   {
@@ -52,7 +54,7 @@ const BUSINESS_TEMPLATE_DEFS = [
       "진행년도",
       "예산년도",
     ],
-    outputTypes: ["summarySheet", "ppt", "reportJson"],
+    outputTypes: ["summarySheet", "analysisReport", "ppt"],
     priority: 90,
   },
   {
@@ -84,7 +86,7 @@ const BUSINESS_TEMPLATE_DEFS = [
       "근무",
       "퇴사",
     ],
-    outputTypes: ["summarySheet", "ppt", "reportJson"],
+    outputTypes: ["summarySheet", "analysisReport", "ppt"],
     priority: 80,
   },
 ];
@@ -250,7 +252,7 @@ function buildBusinessTemplateCandidate(def, analysisCandidates = []) {
     templateId: def.templateId,
     title: def.title,
     description: def.description,
-    outputTypes: def.outputTypes,
+    outputTypes: normalizeOutputTypes(def.outputTypes),
     priority: def.priority,
     confidence: Math.min(1, recipeScore * 0.55 + headerScore * 0.45),
     matchedHeaders: headers.filter((h) =>

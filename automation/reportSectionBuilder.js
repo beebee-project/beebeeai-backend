@@ -1,5 +1,9 @@
 const { buildNarrativeSections } = require("./reportNarrativeBuilder");
 const { recommendChartSpec } = require("./chartRecommendationBuilder");
+const {
+  isBusinessTemplateResult,
+  normalizeBusinessTemplateResult,
+} = require("./businessTemplateContract");
 
 function takeRows(rows = [], limit = 12) {
   return Array.isArray(rows) ? rows.slice(0, limit) : [];
@@ -11,8 +15,12 @@ function buildReportSections({ fileName, message, result } = {}) {
     fileName,
   });
 
-  const businessSections = Array.isArray(result?.sections)
-    ? result.sections
+  const normalizedBusinessResult = isBusinessTemplateResult(result)
+    ? normalizeBusinessTemplateResult(result)
+    : null;
+
+  const businessSections = Array.isArray(normalizedBusinessResult?.sections)
+    ? normalizedBusinessResult.sections
     : [];
 
   if (businessSections.length) {
@@ -66,13 +74,14 @@ function buildReportSections({ fileName, message, result } = {}) {
 
     return {
       version: "report_sections_v1",
-      title: result.title || "업무 템플릿 보고서",
+      reportType: "analysisReport",
+      title: normalizedBusinessResult.title || "업무 템플릿 보고서",
       source: {
         fileName: fileName || "",
         message: message || "",
       },
-      resultType: result.resultType || "",
-      operation: result.templateId || "",
+      resultType: normalizedBusinessResult.resultType || "",
+      operation: normalizedBusinessResult.templateId || "",
       sections,
     };
   }
@@ -120,6 +129,7 @@ function buildReportSections({ fileName, message, result } = {}) {
 
   return {
     version: "report_sections_v1",
+    reportType: "analysisReport",
     title: narrative.title,
     source: {
       fileName: fileName || "",

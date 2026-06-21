@@ -44,6 +44,15 @@ const {
 const {
   executeBusinessTemplate,
 } = require("../automation/businessTemplateExecutor");
+const {
+  generateCandidateBundle,
+} = require("../automation/candidateGeneration");
+const {
+  isBusinessTemplateResult,
+  normalizeBusinessTemplateResult,
+  outputTypeLabel,
+} = require("../automation/businessTemplateContract");
+const { buildDownloadFileName } = require("../utils/downloadFileNameBuilder");
 
 const REPORT_DIR = path.join(
   process.cwd(),
@@ -53,6 +62,49 @@ const REPORT_DIR = path.join(
 );
 
 const PPT_DIR = path.join(process.cwd(), ".local_uploads", "generated", "ppt");
+
+const AUTOMATION_DIR = path.join(
+  process.cwd(),
+  ".local_uploads",
+  "generated",
+  "automation",
+);
+
+function normalizeExecutedResult(result, templateCandidate = null) {
+  if (isBusinessTemplateResult(result)) {
+    return normalizeBusinessTemplateResult(result, templateCandidate || {});
+  }
+  return result;
+}
+
+function resultTemplateTitle(
+  result = {},
+  templateCandidate = null,
+  fallback = "보고서",
+) {
+  return (
+    result?.title ||
+    templateCandidate?.title ||
+    result?.templateId ||
+    templateCandidate?.templateId ||
+    result?.operation ||
+    fallback
+  );
+}
+
+function buildGeneratedFileName({
+  sourceFileName,
+  templateTitle,
+  outputType,
+  extension,
+}) {
+  return buildDownloadFileName({
+    sourceFileName,
+    templateTitle,
+    outputType,
+    extension,
+  });
+}
 
 function findUserFile(user, fileName) {
   if (!user || !fileName) return null;
@@ -124,19 +176,42 @@ async function buildQueryTablesForFile(req, fileName) {
     savedQueryJson?.payload &&
     !hasMojibakeQueryPayload(savedQueryJson.payload)
   ) {
-    const analysisRecipeCandidates =
-      savedQueryJson.payload.analysisRecipeCandidates || [];
+    const normalizedQueryTables =
+      savedQueryJson.payload.normalizedQueryTables || [];
+
+    let candidateBundle = {
+      analysisRecipeCandidates:
+        savedQueryJson.payload.analysisRecipeCandidates || [],
+      categoryCandidates: savedQueryJson.payload.categoryCandidates || [],
+      businessTemplateCandidates:
+        savedQueryJson.payload.businessTemplateCandidates || [],
+      candidateGeneration: savedQueryJson.payload.candidateGeneration || null,
+    };
+
+    // 구버전 query-json에는 candidateGeneration 메타 또는 business 후보가 없을 수 있다.
+    // 이 경우에도 AI 실패와 무관하게 deterministic 후보를 다시 만든다.
+    if (
+      !candidateBundle.candidateGeneration ||
+      !candidateBundle.analysisRecipeCandidates.length ||
+      !candidateBundle.businessTemplateCandidates.length
+    ) {
+      candidateBundle = await generateCandidateBundle({
+        normalizedQueryTables,
+        fileName,
+        source: "encrypted-query-json",
+      });
+    }
 
     return {
       fileHash: savedQueryJson.payload.fileHash,
       sheetStateSig: savedQueryJson.payload.sheetStateSig,
       tables: savedQueryJson.payload.tables || [],
-      normalizedQueryTables: savedQueryJson.payload.normalizedQueryTables || [],
-      analysisRecipeCandidates,
-      categoryCandidates: savedQueryJson.payload.categoryCandidates || [],
+      normalizedQueryTables,
+      analysisRecipeCandidates: candidateBundle.analysisRecipeCandidates || [],
+      categoryCandidates: candidateBundle.categoryCandidates || [],
       businessTemplateCandidates:
-        savedQueryJson.payload.businessTemplateCandidates ||
-        buildBusinessTemplateCandidates(analysisRecipeCandidates),
+        candidateBundle.businessTemplateCandidates || [],
+      candidateGeneration: candidateBundle.candidateGeneration || null,
       source: "encrypted-query-json",
     };
   }
@@ -219,15 +294,17 @@ async function buildQueryTablesForFile(req, fileName) {
   });
 
   const normalizedQueryTables = buildNormalizedQueryTables(tables);
-  const analysisRecipeCandidates = buildAnalysisRecipeCandidates(
+  const candidateBundle = await generateCandidateBundle({
     normalizedQueryTables,
-  );
-  const categoryCandidates = buildAutomationCategoryCandidates(
-    analysisRecipeCandidates,
-  );
-  const businessTemplateCandidates = buildBusinessTemplateCandidates(
-    analysisRecipeCandidates,
-  );
+    fileName,
+    source: "rebuilt-from-xlsx",
+  });
+  const analysisRecipeCandidates =
+    candidateBundle.analysisRecipeCandidates || [];
+  const categoryCandidates = candidateBundle.categoryCandidates || [];
+  const businessTemplateCandidates =
+    candidateBundle.businessTemplateCandidates || [];
+  const candidateGeneration = candidateBundle.candidateGeneration || null;
 
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
     await saveQueryJsonForFile({
@@ -246,6 +323,7 @@ async function buildQueryTablesForFile(req, fileName) {
         analysisRecipeCandidates,
         categoryCandidates,
         businessTemplateCandidates,
+        candidateGeneration,
       },
     });
   }
@@ -258,6 +336,7 @@ async function buildQueryTablesForFile(req, fileName) {
     analysisRecipeCandidates,
     categoryCandidates,
     businessTemplateCandidates,
+    candidateGeneration,
     source: "rebuilt-from-xlsx",
   };
 }
@@ -547,6 +626,8 @@ exports.createSummarySheet = async (req, res, next) => {
       result = executeQueryIntent(saved.tables || [], queryIntent);
     }
 
+    result = normalizeExecutedResult(result, templateCandidate);
+
     if (!result?.ok) {
       return res.status(400).json({
         ok: false,
@@ -570,8 +651,17 @@ exports.createSummarySheet = async (req, res, next) => {
     const buffer = workbookToBuffer(workbook);
 
     const userId = req.user?.id || "local-dev";
-    const rand = crypto.randomBytes(6).toString("hex");
-    const key = `summary-sheets/${userId}/${saved.fileHash}/${Date.now()}_${rand}.xlsx`;
+    const outputFileName = buildGeneratedFileName({
+      sourceFileName: saved.fileName,
+      templateTitle: resultTemplateTitle(
+        result,
+        templateCandidate,
+        "자동화 시트",
+      ),
+      outputType: "summarySheet",
+      extension: "xlsx",
+    });
+    const key = `summary-sheets/${userId}/${saved.fileHash}/${outputFileName}`;
 
     const stored = await saveBufferObject(
       key,
@@ -581,7 +671,10 @@ exports.createSummarySheet = async (req, res, next) => {
 
     return res.json({
       ok: true,
-      fileName: saved.fileName,
+      fileName: outputFileName,
+      sourceFileName: saved.fileName,
+      outputType: "summarySheet",
+      outputLabel: outputTypeLabel("summarySheet"),
       fileHash: saved.fileHash,
       queryTablesKey,
       summarySheetKey: key,
@@ -598,7 +691,12 @@ exports.createSummarySheet = async (req, res, next) => {
   }
 };
 
-function writeReportJson({ fileName, message, result }) {
+function writeReportJson({
+  fileName,
+  message,
+  result,
+  templateCandidate = null,
+}) {
   fs.mkdirSync(REPORT_DIR, { recursive: true });
 
   const report = buildReportSections({
@@ -609,7 +707,9 @@ function writeReportJson({ fileName, message, result }) {
 
   const output = {
     ok: true,
-    version: "report_export_v1",
+    version: "analysis_report_export_v1",
+    outputType: "analysisReport",
+    outputLabel: outputTypeLabel("analysisReport"),
     generatedAt: new Date().toISOString(),
     source: {
       fileName: fileName || "",
@@ -632,7 +732,16 @@ function writeReportJson({ fileName, message, result }) {
     report,
   };
 
-  const outputName = `report_${Date.now()}.json`;
+  const outputName = buildGeneratedFileName({
+    sourceFileName: fileName,
+    templateTitle: resultTemplateTitle(
+      result,
+      templateCandidate,
+      "데이터 분석",
+    ),
+    outputType: "analysisReport",
+    extension: "json",
+  });
   const filePath = path.join(REPORT_DIR, outputName);
 
   fs.writeFileSync(filePath, JSON.stringify(output, null, 2), "utf-8");
@@ -641,11 +750,19 @@ function writeReportJson({ fileName, message, result }) {
     ok: true,
     fileName: outputName,
     filePath,
+    outputType: "analysisReport",
+    outputLabel: outputTypeLabel("analysisReport"),
     report,
   };
 }
 
-async function writeReportPpt({ fileName, message, result, template }) {
+async function writeReportPpt({
+  fileName,
+  message,
+  result,
+  template,
+  templateCandidate = null,
+}) {
   fs.mkdirSync(PPT_DIR, { recursive: true });
 
   const report = buildReportSections({
@@ -656,7 +773,12 @@ async function writeReportPpt({ fileName, message, result, template }) {
 
   const pptx = renderReportPpt(report, { template });
 
-  const outputName = `report_${Date.now()}.pptx`;
+  const outputName = buildGeneratedFileName({
+    sourceFileName: fileName,
+    templateTitle: resultTemplateTitle(result, templateCandidate, "PPT"),
+    outputType: "ppt",
+    extension: "pptx",
+  });
   const filePath = path.join(PPT_DIR, outputName);
 
   await pptx.writeFile({ fileName: filePath });
@@ -665,6 +787,8 @@ async function writeReportPpt({ fileName, message, result, template }) {
     ok: true,
     fileName: outputName,
     filePath,
+    outputType: "ppt",
+    outputLabel: outputTypeLabel("ppt"),
     template: template || "default",
     report,
     slideCount: Array.isArray(report.sections) ? report.sections.length : 0,
@@ -743,6 +867,8 @@ exports.exportXlsx = async (req, res) => {
       result = executeQueryIntent(tables, intent);
     }
 
+    result = normalizeExecutedResult(result, templateCandidate);
+
     if (!result.ok) {
       return res.status(400).json({
         ok: false,
@@ -761,13 +887,17 @@ exports.exportXlsx = async (req, res) => {
 
     const buffer = workbookToBuffer(workbook);
 
-    const fileName = `automation_${Date.now()}.xlsx`;
-    const outputDir = path.join(
-      process.cwd(),
-      ".local_uploads",
-      "generated",
-      "automation",
-    );
+    const fileName = buildGeneratedFileName({
+      sourceFileName: saved.fileName || "",
+      templateTitle: resultTemplateTitle(
+        result,
+        templateCandidate,
+        "자동화 시트",
+      ),
+      outputType: "summarySheet",
+      extension: "xlsx",
+    });
+    const outputDir = AUTOMATION_DIR;
     fs.mkdirSync(outputDir, { recursive: true });
 
     const filePath = path.join(outputDir, fileName);
@@ -777,6 +907,8 @@ exports.exportXlsx = async (req, res) => {
       ok: true,
       fileName,
       filePath,
+      outputType: "summarySheet",
+      outputLabel: outputTypeLabel("summarySheet"),
       sheetNames: workbook.SheetNames || [],
       result,
     });
@@ -861,6 +993,8 @@ exports.exportReportJson = async (req, res) => {
       result = executeQueryIntent(tables, intent);
     }
 
+    result = normalizeExecutedResult(result, templateCandidate);
+
     if (!result.ok) {
       return res.status(400).json({
         ok: false,
@@ -874,12 +1008,16 @@ exports.exportReportJson = async (req, res) => {
       fileName: saved.fileName || "",
       message,
       result,
+      templateCandidate,
     });
 
     return res.json({
       ok: true,
       fileName: exported.fileName,
       filePath: exported.filePath,
+      outputType: "analysisReport",
+      outputLabel: outputTypeLabel("analysisReport"),
+      analysisReport: exported.report,
       report: exported.report,
       result,
     });
@@ -891,6 +1029,8 @@ exports.exportReportJson = async (req, res) => {
     });
   }
 };
+
+exports.exportAnalysisReport = exports.exportReportJson;
 
 exports.exportPptx = async (req, res) => {
   try {
@@ -965,6 +1105,8 @@ exports.exportPptx = async (req, res) => {
       result = executeQueryIntent(tables, intent);
     }
 
+    result = normalizeExecutedResult(result, templateCandidate);
+
     if (!result.ok) {
       return res.status(400).json({
         ok: false,
@@ -979,12 +1121,15 @@ exports.exportPptx = async (req, res) => {
       message,
       result,
       template,
+      templateCandidate,
     });
 
     return res.json({
       ok: true,
       fileName: exported.fileName,
       filePath: exported.filePath,
+      outputType: "ppt",
+      outputLabel: outputTypeLabel("ppt"),
       template: exported.template,
       slideCount: exported.slideCount,
       report: exported.report,
@@ -1041,19 +1186,24 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       const normalizedQueryTables =
         built.normalizedQueryTables || buildNormalizedQueryTables(built.tables);
 
+      const candidateBundle = built.candidateGeneration
+        ? built
+        : await generateCandidateBundle({
+            normalizedQueryTables,
+            fileName,
+            source: "analysis-candidates-file",
+          });
+
       const analysisRecipeCandidates =
-        built.analysisRecipeCandidates ||
-        buildAnalysisRecipeCandidates(normalizedQueryTables);
+        candidateBundle.analysisRecipeCandidates || [];
 
       const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
 
-      const categoryCandidates =
-        built.categoryCandidates ||
-        buildAutomationCategoryCandidates(analysisRecipeCandidates);
+      const categoryCandidates = candidateBundle.categoryCandidates || [];
 
       const businessTemplateCandidates =
-        built.businessTemplateCandidates ||
-        buildBusinessTemplateCandidates(analysisRecipeCandidates);
+        candidateBundle.businessTemplateCandidates || [];
+      const candidateGeneration = candidateBundle.candidateGeneration || null;
 
       console.log("[analysis-candidates]", {
         source: "file",
@@ -1074,6 +1224,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         candidates,
         categoryCandidates,
         businessTemplateCandidates,
+        candidateGeneration,
       });
     }
 
@@ -1089,18 +1240,28 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       saved.normalizedQueryTables ||
       buildNormalizedQueryTables(saved.tables || []);
 
+    const candidateBundle = saved.candidateGeneration
+      ? {
+          analysisRecipeCandidates: saved.analysisRecipeCandidates || [],
+          categoryCandidates: saved.categoryCandidates || [],
+          businessTemplateCandidates: saved.businessTemplateCandidates || [],
+          candidateGeneration: saved.candidateGeneration,
+        }
+      : await generateCandidateBundle({
+          normalizedQueryTables,
+          fileName: saved.fileName,
+          source: "analysis-candidates-query-tables",
+        });
+
     const analysisRecipeCandidates =
-      saved.analysisRecipeCandidates ||
-      buildAnalysisRecipeCandidates(normalizedQueryTables);
+      candidateBundle.analysisRecipeCandidates || [];
 
     const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
-    const categoryCandidates = buildAutomationCategoryCandidates(
-      analysisRecipeCandidates,
-    );
+    const categoryCandidates = candidateBundle.categoryCandidates || [];
 
     const businessTemplateCandidates =
-      saved.businessTemplateCandidates ||
-      buildBusinessTemplateCandidates(analysisRecipeCandidates);
+      candidateBundle.businessTemplateCandidates || [];
+    const candidateGeneration = candidateBundle.candidateGeneration || null;
 
     console.log("[analysis-candidates]", {
       source: "query-tables",
@@ -1122,6 +1283,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       candidates,
       categoryCandidates,
       businessTemplateCandidates,
+      candidateGeneration,
     });
   } catch (e) {
     console.error("[automation.getAnalysisCandidates]", e);
@@ -1211,9 +1373,20 @@ exports.previewQueryTables = async (req, res, next) => {
     const normalizedQueryTables =
       built.normalizedQueryTables || buildNormalizedQueryTables(tables);
 
+    const candidateBundle = built.candidateGeneration
+      ? built
+      : await generateCandidateBundle({
+          normalizedQueryTables,
+          fileName,
+          source: "preview-query-tables",
+        });
+
     const analysisRecipeCandidates =
-      built.analysisRecipeCandidates ||
-      buildAnalysisRecipeCandidates(normalizedQueryTables);
+      candidateBundle.analysisRecipeCandidates || [];
+    const categoryCandidates = candidateBundle.categoryCandidates || [];
+    const businessTemplateCandidates =
+      candidateBundle.businessTemplateCandidates || [];
+    const candidateGeneration = candidateBundle.candidateGeneration || null;
 
     return res.json({
       ok: true,
@@ -1221,12 +1394,11 @@ exports.previewQueryTables = async (req, res, next) => {
       fileHash,
       sheetStateSig,
       tableCount: tables.length,
-      queryTablesKey: key,
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
-      localName: saved.localName,
-      gcsName: saved.gcsName,
+      businessTemplateCandidates,
+      candidateGeneration,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
@@ -1262,17 +1434,22 @@ exports.saveQueryTables = async (req, res, next) => {
     const normalizedQueryTables =
       built.normalizedQueryTables || buildNormalizedQueryTables(tables);
 
+    const candidateBundle = built.candidateGeneration
+      ? built
+      : await generateCandidateBundle({
+          normalizedQueryTables,
+          fileName,
+          source: "save-query-tables",
+        });
+
     const analysisRecipeCandidates =
-      built.analysisRecipeCandidates ||
-      buildAnalysisRecipeCandidates(normalizedQueryTables);
+      candidateBundle.analysisRecipeCandidates || [];
 
-    const categoryCandidates =
-      built.categoryCandidates ||
-      buildAutomationCategoryCandidates(analysisRecipeCandidates);
+    const categoryCandidates = candidateBundle.categoryCandidates || [];
 
-    const businessTemplateCandidates = buildBusinessTemplateCandidates(
-      analysisRecipeCandidates,
-    );
+    const businessTemplateCandidates =
+      candidateBundle.businessTemplateCandidates || [];
+    const candidateGeneration = candidateBundle.candidateGeneration || null;
 
     const now = new Date();
     const userId = req.user?.id || "local-dev";
@@ -1292,6 +1469,7 @@ exports.saveQueryTables = async (req, res, next) => {
       analysisRecipeCandidates,
       categoryCandidates,
       businessTemplateCandidates,
+      candidateGeneration,
     };
 
     const saved = await saveJsonObject(key, payload);
@@ -1307,6 +1485,7 @@ exports.saveQueryTables = async (req, res, next) => {
       analysisRecipeCandidates,
       categoryCandidates,
       businessTemplateCandidates,
+      candidateGeneration,
       localName: saved.localName,
       gcsName: saved.gcsName,
       tables: tables.map((t) => ({

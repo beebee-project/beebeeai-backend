@@ -1,4 +1,7 @@
 const { executeAnalysisRecipeCandidate } = require("../analysisRecipeExecutor");
+const {
+  normalizeBusinessTemplateSection,
+} = require("../businessTemplateContract");
 
 function normalizeHeader(value = "") {
   return String(value || "")
@@ -14,10 +17,9 @@ function normalizeText(value = "") {
 
 function headerMatches(header = "", hints = []) {
   const h = normalizeHeader(header);
-
   if (!h) return false;
 
-  return hints.some((hint) => {
+  return (hints || []).some((hint) => {
     const normalizedHint = normalizeHeader(hint);
     return (
       normalizedHint &&
@@ -53,7 +55,6 @@ function findTableForTemplate(
     const matched = normalizedQueryTables.find(
       (table) => table.tableId === firstCandidate.tableId,
     );
-
     if (matched) return matched;
   }
 
@@ -70,7 +71,6 @@ function findColumn(table = {}, hints = [], options = {}) {
   const matchedByHint = columns.find((col) =>
     headerMatches(getColumnHeader(col), hints),
   );
-
   if (matchedByHint) return matchedByHint;
 
   if (options.type) {
@@ -80,7 +80,6 @@ function findColumn(table = {}, hints = [], options = {}) {
         col.dominantType === options.type ||
         col.semanticType === options.type,
     );
-
     if (matchedByType) return matchedByType;
   }
 
@@ -91,7 +90,6 @@ function findColumn(table = {}, hints = [], options = {}) {
         col.inferredRole === options.role ||
         col.semanticRole === options.role,
     );
-
     if (matchedByRole) return matchedByRole;
   }
 
@@ -109,15 +107,12 @@ function findNumericHeaders(table = {}, hints = []) {
   return columns
     .filter((col) => {
       const header = getColumnHeader(col);
-
       const isNumber =
         col.type === "number" ||
         col.dominantType === "number" ||
         col.role === "metric" ||
         col.inferredRole === "metric";
-
       const matchedHint = hints.length ? headerMatches(header, hints) : true;
-
       return isNumber && matchedHint;
     })
     .map(getColumnHeader)
@@ -125,19 +120,50 @@ function findNumericHeaders(table = {}, hints = []) {
 }
 
 function makeTemplateCandidate({
+  sectionId,
+  sectionType,
   recipeType,
   title,
   tableId,
   columns = {},
   meta = {},
+  chartHint = {},
+  narrativeHint = {},
 }) {
   return {
+    sectionId,
+    sectionType: sectionType || meta.sectionType || recipeType,
     recipeType,
     title,
     tableId,
     columns,
-    meta,
+    chartHint,
+    narrativeHint,
+    meta: {
+      ...meta,
+      sectionType: sectionType || meta.sectionType || recipeType,
+    },
   };
+}
+
+function makeTemplateSection({
+  sectionId,
+  sectionType,
+  title,
+  candidate = {},
+  result = {},
+  chartHint = {},
+  narrativeHint = {},
+}) {
+  return normalizeBusinessTemplateSection({
+    sectionId,
+    sectionType,
+    title,
+    candidate,
+    result,
+    chartHint,
+    narrativeHint,
+  });
 }
 
 function executeTemplateSections({
@@ -157,28 +183,21 @@ function executeTemplateSections({
 
       if (!result?.ok) return null;
 
-      return {
-        sectionId:
-          candidate.sectionId ||
-          candidate.recipeType ||
-          candidate.type ||
-          candidate.recipeId ||
-          `section_${index + 1}`,
-        title:
-          candidate.title ||
-          candidate.name ||
-          candidate.label ||
-          `섹션 ${index + 1}`,
+      return makeTemplateSection({
+        sectionId: candidate.sectionId || `section_${index + 1}`,
+        sectionType: candidate.sectionType || candidate.meta?.sectionType,
+        title: candidate.title || `섹션 ${index + 1}`,
         candidate,
         result,
-      };
+        chartHint: candidate.chartHint || {},
+        narrativeHint: candidate.narrativeHint || {},
+      });
     })
     .filter(Boolean);
 }
 
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-
   if (value == null || value === "") return null;
 
   const cleaned = String(value)
@@ -201,7 +220,6 @@ function getRowValue(row = {}, header = "") {
   }
 
   const normalizedHeader = normalizeHeader(header);
-
   const matchedKey = Object.keys(row).find(
     (key) => normalizeHeader(key) === normalizedHeader,
   );
@@ -243,6 +261,7 @@ module.exports = {
   findColumnHeader,
   findNumericHeaders,
   makeTemplateCandidate,
+  makeTemplateSection,
   executeTemplateSections,
   toNumber,
   getRowValue,

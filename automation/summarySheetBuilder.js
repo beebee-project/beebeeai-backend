@@ -3,6 +3,10 @@ const { buildNarrativeSections } = require("./reportNarrativeBuilder");
 const { recommendChartSpec } = require("./chartRecommendationBuilder");
 const { buildReportSections } = require("./reportSectionBuilder");
 const {
+  isBusinessTemplateResult,
+  normalizeBusinessTemplateResult,
+} = require("./businessTemplateContract");
+const {
   buildColumnRange,
   buildGroupAggregateFormula,
   buildRankValueFormula,
@@ -337,19 +341,36 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
     [],
   ];
 
-  const businessSections = Array.isArray(result?.sections)
-    ? result.sections
+  const normalizedBusinessResult = isBusinessTemplateResult(result)
+    ? normalizeBusinessTemplateResult(result)
+    : null;
+
+  const businessSections = Array.isArray(normalizedBusinessResult?.sections)
+    ? normalizedBusinessResult.sections
     : [];
 
   if (businessSections.length) {
     const wb = XLSX.utils.book_new();
 
+    const totalRowCount = businessSections.reduce(
+      (sum, section) => sum + Number(section.result?.rowCount || 0),
+      0,
+    );
+
     const summaryRows = [
       ["요청", message || ""],
       ["원본 파일", fileName || ""],
-      ["템플릿", result.title || result.templateId || ""],
-      ["결과 유형", result.resultType || ""],
+      [
+        "템플릿",
+        normalizedBusinessResult.title ||
+          normalizedBusinessResult.templateId ||
+          "",
+      ],
+      ["결과 유형", normalizedBusinessResult.resultType || ""],
+      ["계약 버전", normalizedBusinessResult.contractVersion || ""],
+      ["출력 타입", (normalizedBusinessResult.outputTypes || []).join(", ")],
       ["섹션 수", businessSections.length],
+      ["전체 결과 행 수", totalRowCount],
       ["생성일시", new Date().toISOString()],
     ];
 

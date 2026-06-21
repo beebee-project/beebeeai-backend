@@ -1,18 +1,19 @@
 const {
   executeTemplateSections,
 } = require("./businessTemplates/commonTemplateHelpers");
-
 const {
   executeSalesReport,
 } = require("./businessTemplates/salesReportBuilder");
-
 const {
   executeResearchBudgetReport,
 } = require("./businessTemplates/researchBudgetReportBuilder");
-
 const {
   executeHrMonthlyReport,
 } = require("./businessTemplates/hrMonthlyReportBuilder");
+const {
+  normalizeBusinessTemplateResult,
+  validateBusinessTemplateResultContract,
+} = require("./businessTemplateContract");
 
 function executeBusinessTemplate({
   normalizedQueryTables = [],
@@ -37,21 +38,18 @@ function executeBusinessTemplate({
         templateCandidate,
       });
       break;
-
     case "research_budget_report":
       sections = executeResearchBudgetReport({
         normalizedQueryTables,
         templateCandidate,
       });
       break;
-
     case "hr_monthly_report":
       sections = executeHrMonthlyReport({
         normalizedQueryTables,
         templateCandidate,
       });
       break;
-
     default:
       sections = executeTemplateSections({
         normalizedQueryTables,
@@ -68,13 +66,24 @@ function executeBusinessTemplate({
     };
   }
 
+  const normalized = normalizeBusinessTemplateResult(
+    {
+      ok: true,
+      resultType: "businessTemplate",
+      templateId,
+      title: templateCandidate.title || templateId,
+      description: templateCandidate.description || "",
+      outputTypes: templateCandidate.outputTypes,
+      sections,
+    },
+    templateCandidate,
+  );
+
+  const contract = validateBusinessTemplateResultContract(normalized);
+
   return {
-    ok: true,
-    resultType: "businessTemplate",
-    templateId,
-    title: templateCandidate.title || templateId,
-    description: templateCandidate.description || "",
-    sections,
+    ...normalized,
+    contract,
   };
 }
 
