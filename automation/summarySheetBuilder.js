@@ -3,10 +3,7 @@ const { buildNarrativeSections } = require("./reportNarrativeBuilder");
 const { recommendChartSpec } = require("./chartRecommendationBuilder");
 const { buildReportSections } = require("./reportSectionBuilder");
 const {
-  isBusinessTemplateResult,
-  normalizeBusinessTemplateResult,
-} = require("./businessTemplateContract");
-const {
+  SOURCE_SHEET_NAME,
   buildColumnRange,
   buildGroupAggregateFormula,
   buildRankValueFormula,
@@ -16,7 +13,9 @@ const {
   buildMaxIfFormula,
   buildCountIfsFormula,
   buildPivotAverageFormula,
-} = require("../builders/automationFormulaBuilder");
+  buildFormulaFromSpec,
+  createFormulaCellFromSpec,
+} = require("./formulaEngine/internalFormulaEngine");
 
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
@@ -341,36 +340,19 @@ function buildSummaryWorkbook({ fileName, message, intent, result }) {
     [],
   ];
 
-  const normalizedBusinessResult = isBusinessTemplateResult(result)
-    ? normalizeBusinessTemplateResult(result)
-    : null;
-
-  const businessSections = Array.isArray(normalizedBusinessResult?.sections)
-    ? normalizedBusinessResult.sections
+  const businessSections = Array.isArray(result?.sections)
+    ? result.sections
     : [];
 
   if (businessSections.length) {
     const wb = XLSX.utils.book_new();
 
-    const totalRowCount = businessSections.reduce(
-      (sum, section) => sum + Number(section.result?.rowCount || 0),
-      0,
-    );
-
     const summaryRows = [
       ["요청", message || ""],
       ["원본 파일", fileName || ""],
-      [
-        "템플릿",
-        normalizedBusinessResult.title ||
-          normalizedBusinessResult.templateId ||
-          "",
-      ],
-      ["결과 유형", normalizedBusinessResult.resultType || ""],
-      ["계약 버전", normalizedBusinessResult.contractVersion || ""],
-      ["출력 타입", (normalizedBusinessResult.outputTypes || []).join(", ")],
+      ["템플릿", result.title || result.templateId || ""],
+      ["결과 유형", result.resultType || ""],
       ["섹션 수", businessSections.length],
-      ["전체 결과 행 수", totalRowCount],
       ["생성일시", new Date().toISOString()],
     ];
 
@@ -736,7 +718,7 @@ function buildAutomationTemplateWorkbook({
     wb,
     XLSX.utils.aoa_to_sheet([
       ["항목", "값", "설명"],
-      ["원본시트명", "원본데이터", "데이터가 들어있는 시트명"],
+      ["원본시트명", SOURCE_SHEET_NAME, "데이터가 들어있는 시트명"],
       ["기준열", groupLetter, "부서/월/분류 등 그룹 기준 열"],
       ["값열", metricLetter, "합계/평균 계산 대상 열"],
       ["집계방식", operation, "average, sum, count 중 선택"],
@@ -752,8 +734,8 @@ function buildAutomationTemplateWorkbook({
     .map((row) => row[autoGroupHeader])
     .filter((v) => v !== undefined && v !== null && v !== "");
 
-  const labelRange = buildColumnRange("원본데이터", groupLetter);
-  const valueRange = buildColumnRange("원본데이터", metricLetter);
+  const labelRange = buildColumnRange(SOURCE_SHEET_NAME, groupLetter);
+  const valueRange = buildColumnRange(SOURCE_SHEET_NAME, metricLetter);
 
   const isListTemplate = rawOperation === "list";
   const isCumulativeTemplate = rawOperation === "cumulativeSum";
@@ -819,8 +801,8 @@ function buildAutomationTemplateWorkbook({
       derivedGroupLetter || rowCol.columnLetter || rowCol.letter || groupLetter;
     const colLetter = colCol.columnLetter || colCol.letter || groupLetter;
 
-    const rowRange = buildColumnRange("원본데이터", rowLetter);
-    const colRange = buildColumnRange("원본데이터", colLetter);
+    const rowRange = buildColumnRange(SOURCE_SHEET_NAME, rowLetter);
+    const colRange = buildColumnRange(SOURCE_SHEET_NAME, colLetter);
 
     for (let r = 0; r < uniqueValues.length; r += 1) {
       const rowNum = r + 5;
@@ -857,7 +839,7 @@ function buildAutomationTemplateWorkbook({
         t: "n",
         f: buildGroupAggregateFormula({
           operation: "average",
-          sheetName: "원본데이터",
+          sheetName: SOURCE_SHEET_NAME,
           groupLetter,
           metricLetter,
           criteriaCell: `A${rowNum}`,
@@ -913,7 +895,7 @@ function buildAutomationTemplateWorkbook({
 
       const baseFormula = buildGroupAggregateFormula({
         operation,
-        sheetName: "원본데이터",
+        sheetName: SOURCE_SHEET_NAME,
         groupLetter,
         metricLetter,
         criteriaCell: `A${rowNum}`,
@@ -971,7 +953,7 @@ function buildAutomationTemplateWorkbook({
   XLSX.utils.book_append_sheet(
     wb,
     XLSX.utils.aoa_to_sheet(sourceRows.length ? sourceRows : [["데이터 없음"]]),
-    "원본데이터",
+    SOURCE_SHEET_NAME,
   );
 
   XLSX.utils.book_append_sheet(

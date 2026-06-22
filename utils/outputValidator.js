@@ -42,38 +42,6 @@ function validateFormula(output) {
   return { ok: issues.length === 0, kind: "formula", issues };
 }
 
-function validateOfficeScripts(code) {
-  const issues = [];
-  const t = String(code ?? "").trim();
-  if (!t) issues.push("EMPTY_CODE");
-  if (t && !/function\s+main\s*\(/i.test(t)) issues.push("MISSING_MAIN");
-  if (t && !/ExcelScript\./.test(t)) issues.push("MISSING_EXCELSCRIPT_API");
-  return { ok: issues.length === 0, kind: "officescripts", issues };
-}
-
-function validateAppScript(code) {
-  const issues = [];
-  const t = String(code ?? "").trim();
-  if (!t) issues.push("EMPTY_CODE");
-  if (t && !/SpreadsheetApp\./.test(t))
-    issues.push("MISSING_SPREADSHEETAPP_API");
-  if (t && !/function\s+\w+\s*\(/.test(t)) issues.push("MISSING_FUNCTION");
-  return { ok: issues.length === 0, kind: "appscript", issues };
-}
-
-function validateMacroResult(target, result) {
-  const t = String(target || "").toLowerCase();
-  const code = result?.code ?? result?.script ?? result?.result ?? "";
-  if (t.includes("office")) return validateOfficeScripts(code);
-  if (t.includes("appscript") || t.includes("gas"))
-    return validateAppScript(code);
-  // target이 애매하면 “코드가 비었는지” 정도만
-  const issues = [];
-  if (!String(code ?? "").trim()) issues.push("EMPTY_CODE");
-  return { ok: issues.length === 0, kind: "macro", issues };
-}
-
 module.exports = {
   validateFormula,
-  validateMacroResult,
 };
