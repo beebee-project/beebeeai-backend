@@ -362,8 +362,53 @@ function isPeriodLikeHeader(header = "") {
   );
 }
 
-function firstExistingHeader(table = {}, hints = [], excludedHeaders = []) {
-  return findNonTemporalColumnHeader(table, hints, excludedHeaders);
+function normalizeCellValue(value) {
+  return String(value ?? "").trim();
+}
+
+function distinctNonEmptyCount(table = {}, header = "", limit = 2) {
+  if (!table?.tableId || !header) return 0;
+
+  const values = new Set();
+
+  for (const row of getRows(table)) {
+    const value = normalizeCellValue(getRowValue(row, header));
+    if (!value) continue;
+
+    values.add(value);
+    if (values.size >= limit) return values.size;
+  }
+
+  return values.size;
+}
+
+function hasUsefulDistinctValues(table = {}, header = "") {
+  return distinctNonEmptyCount(table, header, 2) >= 2;
+}
+
+function findUsefulNonTemporalColumnHeader(
+  table = {},
+  hints = [],
+  excludedHeaders = [],
+) {
+  const columns = getColumns(table);
+  const normalizedHints = (hints || []).filter(Boolean);
+
+  for (const hint of normalizedHints) {
+    for (const column of columns) {
+      const header = getColumnHeader(column);
+
+      if (!header) continue;
+      if (isExcludedHeader(header, excludedHeaders)) continue;
+      if (isTemporalHeader(header)) continue;
+      if (!headerMatches(header, [hint])) continue;
+      if (!hasUsefulDistinctValues(table, header)) continue;
+
+      return header;
+    }
+  }
+
+  return "";
 }
 
 function resolveRankingDimension({
@@ -374,7 +419,7 @@ function resolveRankingDimension({
   monthHeader,
   yearHeader,
 }) {
-  const explicit = firstExistingHeader(
+  const explicit = findUsefulNonTemporalColumnHeader(
     table,
     config.rankingDimensionHints || [],
     excluded,
@@ -382,7 +427,7 @@ function resolveRankingDimension({
 
   if (explicit) return explicit;
 
-  const businessLabel = firstExistingHeader(
+  const businessLabel = findUsefulNonTemporalColumnHeader(
     table,
     [
       "항목명",
@@ -457,30 +502,97 @@ function sortRowsByPeriod(rows = [], dimensionHeader = "") {
   });
 }
 
-function normalizeTemporalSectionRows(section = {}) {
-  const sectionType = String(
-    section.sectionType ||
-      section.candidate?.sectionType ||
-      section.candidate?.meta?.sectionType ||
-      "",
-  );
+function isTopBottomSection(section = {}) {
+  const text = [
+    section.sectionId,
+    section.sectionType,
+    section.title,
+    section.candidate?.recipeType,
+    section.candidate?.sectionType,
+    section.candidate?.meta?.sectionType,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  if (/top|bottom|상위|하위/i.test(sectionType)) {
-    return section;
+  return /top|bottom|상위|하위/i.test(text);
+}
+
+function looksTemporalValue(value, header = "") {
+  const raw = String(value ?? "").trim();
+  if (!raw) return false;
+
+  return (
+    /(?:19|20)\d{2}[.\-/년]?\s*(?:0?[1-9]|1[0-2])?/.test(raw) ||
+    /^(0?[1-9]|1[0-2])\s*월?$/.test(raw) ||
+    /연도|년도|연월|년월|월|기간|date|year|month|period/i.test(
+      String(header || ""),
+    )
+  );
+}
+
+function firstRowSortHeader(section = {}) {
+  const rows = section.result?.rows || [];
+  const first = rows[0] || {};
+
+  const preferredHeaders = [
+    section.chartHint?.categoryField,
+    section.candidate?.columns?.dimension,
+    section.result?.columns?.dimension,
+    section.result?.groupBy?.header,
+  ].filter(Boolean);
+
+  for (const header of preferredHeaders) {
+    if (Object.prototype.hasOwnProperty.call(first, header)) {
+      return header;
+    }
   }
 
-  const dimensionHeader =
-    section.chartHint?.categoryField ||
-    section.candidate?.columns?.dimension ||
-    section.result?.groupBy?.header ||
-    "";
+  const keys = Object.keys(first);
+  if (!keys.length) return "";
 
-  const shouldSort =
-    /year|month|period|trend|연도|년도|월|연월|년월|기간|추이/i.test(
-      sectionType,
-    ) || isPeriodLikeHeader(dimensionHeader);
+  return (
+    keys.find((key) =>
+      /연도|년도|연월|년월|월|기간|date|year|month|period|label/i.test(key),
+    ) || keys[0]
+  );
+}
 
-  if (!shouldSort || !Array.isArray(section.result?.rows)) {
+function shouldSortSectionRows(section = {}, sortHeader = "") {
+  if (!Array.isArray(section.result?.rows) || section.result.rows.length < 2) {
+    return false;
+  }
+
+  if (isTopBottomSection(section)) return false;
+
+  const sectionText = [
+    section.sectionId,
+    section.sectionType,
+    section.title,
+    section.candidate?.sectionType,
+    section.candidate?.meta?.sectionType,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    /연도|년도|연월|년월|월|기간|추이|trend|date|year|month|period/i.test(
+      sectionText,
+    )
+  ) {
+    return true;
+  }
+
+  const sampleRows = section.result.rows.slice(0, 10);
+  return sampleRows.some((row) =>
+    looksTemporalValue(row?.[sortHeader], sortHeader),
+  );
+}
+
+function sortSectionRowsByFirstColumn(section = {}) {
+  const rows = section.result?.rows || [];
+  const sortHeader = firstRowSortHeader(section);
+
+  if (!sortHeader || !shouldSortSectionRows(section, sortHeader)) {
     return section;
   }
 
@@ -488,13 +600,22 @@ function normalizeTemporalSectionRows(section = {}) {
     ...section,
     result: {
       ...section.result,
-      rows: sortRowsByPeriod(section.result.rows, dimensionHeader),
+      rows: [...rows].sort((a, b) => {
+        const av = periodSortValue(a?.[sortHeader], sortHeader);
+        const bv = periodSortValue(b?.[sortHeader], sortHeader);
+
+        if (typeof av === "number" && typeof bv === "number") {
+          return av - bv;
+        }
+
+        return String(av).localeCompare(String(bv), "ko");
+      }),
     },
   };
 }
 
 function normalizePeriodMetricSections(sections = []) {
-  return (sections || []).map(normalizeTemporalSectionRows);
+  return (sections || []).map(sortSectionRowsByFirstColumn);
 }
 
 function buildPeriodMetricCandidates({ table, config = {} }) {
