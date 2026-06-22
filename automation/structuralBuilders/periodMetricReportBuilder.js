@@ -219,7 +219,9 @@ function buildMonthWideVirtualTable({ table, monthHeaders = [], hints = {} }) {
       const value = toNumber(getRowValue(row, monthHeader));
       if (value == null) return;
 
-      const year = yearHeader ? normalizeYearValue(getRowValue(row, yearHeader)) : "";
+      const year = yearHeader
+        ? normalizeYearValue(getRowValue(row, yearHeader))
+        : "";
       const month = normalizeMonth(monthHeader);
 
       rows.push({
@@ -282,7 +284,11 @@ function buildLongYearMonthVirtualTable({ table, yearHeader, monthHeader }) {
   });
 }
 
-function selectExecutionTable({ normalizedQueryTables = [], table, hints = {} }) {
+function selectExecutionTable({
+  normalizedQueryTables = [],
+  table,
+  hints = {},
+}) {
   const yearWideVirtualTable = buildYearWideVirtualTable({
     table,
     yearHeaders: findWideYearHeaders(table),
@@ -323,7 +329,10 @@ function selectExecutionTable({ normalizedQueryTables = [], table, hints = {} })
   });
 
   const selectedTable =
-    monthWideVirtualTable || yearWideVirtualTable || longYearMonthVirtualTable || table;
+    monthWideVirtualTable ||
+    yearWideVirtualTable ||
+    longYearMonthVirtualTable ||
+    table;
 
   if (selectedTable === table) {
     return { selectedTable, executionTables: normalizedQueryTables };
@@ -332,21 +341,167 @@ function selectExecutionTable({ normalizedQueryTables = [], table, hints = {} })
   return {
     selectedTable,
     executionTables: [
-      ...normalizedQueryTables.filter((t) => t.tableId !== selectedTable.tableId),
+      ...normalizedQueryTables.filter(
+        (t) => t.tableId !== selectedTable.tableId,
+      ),
       selectedTable,
     ],
   };
 }
 
 function findMetricHeader(table = {}, hints = []) {
-  return findColumnHeader(table, hints, { type: "number" }) ||
-    findColumnHeader(table, ["지표값"], { type: "number" });
+  return (
+    findColumnHeader(table, hints, { type: "number" }) ||
+    findColumnHeader(table, ["지표값"], { type: "number" })
+  );
+}
+
+function isPeriodLikeHeader(header = "") {
+  return /(연도|년도|월|연월|년월|기간|일자|날짜|date|year|month|period)/i.test(
+    String(header || ""),
+  );
+}
+
+function firstExistingHeader(table = {}, hints = [], excludedHeaders = []) {
+  return findNonTemporalColumnHeader(table, hints, excludedHeaders);
+}
+
+function resolveRankingDimension({
+  table,
+  config = {},
+  excluded = [],
+  periodHeader,
+  monthHeader,
+  yearHeader,
+}) {
+  const explicit = firstExistingHeader(
+    table,
+    config.rankingDimensionHints || [],
+    excluded,
+  );
+
+  if (explicit) return explicit;
+
+  const businessLabel = firstExistingHeader(
+    table,
+    [
+      "항목명",
+      "세부사업명",
+      "과제명",
+      "사업명",
+      "전문기관명",
+      "기관명",
+      "기관분류",
+      "수행기관",
+      "연구기관",
+      "제품명",
+      "상품명",
+      "품목",
+      "업종",
+      "지역",
+      "구분",
+      "분류",
+      "카테고리",
+      "category",
+      "item",
+      "name",
+    ],
+    excluded,
+  );
+
+  if (businessLabel) return businessLabel;
+
+  return periodHeader || monthHeader || yearHeader || "";
+}
+
+function periodSortValue(value, header = "") {
+  const raw = String(value ?? "").trim();
+  if (!raw) return Number.MAX_SAFE_INTEGER;
+
+  const normalized = raw.replace(/\s+/g, "");
+
+  const yearMonthDay = normalized.match(
+    /((?:19|20)\d{2})[.\-/년]?(0?[1-9]|1[0-2])?[.\-/월]?(0?[1-9]|[12]\d|3[01])?/,
+  );
+
+  if (yearMonthDay) {
+    const year = Number(yearMonthDay[1]);
+    const month = yearMonthDay[2] ? Number(yearMonthDay[2]) : 0;
+    const day = yearMonthDay[3] ? Number(yearMonthDay[3]) : 0;
+    return year * 10000 + month * 100 + day;
+  }
+
+  if (/월|month/i.test(String(header || ""))) {
+    const month = normalizeMonthValue(raw);
+    if (month) return Number(month);
+  }
+
+  const n = Number(raw.replace(/,/g, ""));
+  if (Number.isFinite(n)) return n;
+
+  return raw;
+}
+
+function sortRowsByPeriod(rows = [], dimensionHeader = "") {
+  if (!Array.isArray(rows) || !dimensionHeader) return rows;
+
+  return [...rows].sort((a, b) => {
+    const av = periodSortValue(a?.[dimensionHeader], dimensionHeader);
+    const bv = periodSortValue(b?.[dimensionHeader], dimensionHeader);
+
+    if (typeof av === "number" && typeof bv === "number") {
+      return av - bv;
+    }
+
+    return String(av).localeCompare(String(bv), "ko");
+  });
+}
+
+function normalizeTemporalSectionRows(section = {}) {
+  const sectionType = String(
+    section.sectionType ||
+      section.candidate?.sectionType ||
+      section.candidate?.meta?.sectionType ||
+      "",
+  );
+
+  if (/top|bottom|상위|하위/i.test(sectionType)) {
+    return section;
+  }
+
+  const dimensionHeader =
+    section.chartHint?.categoryField ||
+    section.candidate?.columns?.dimension ||
+    section.result?.groupBy?.header ||
+    "";
+
+  const shouldSort =
+    /year|month|period|trend|연도|년도|월|연월|년월|기간|추이/i.test(
+      sectionType,
+    ) || isPeriodLikeHeader(dimensionHeader);
+
+  if (!shouldSort || !Array.isArray(section.result?.rows)) {
+    return section;
+  }
+
+  return {
+    ...section,
+    result: {
+      ...section.result,
+      rows: sortRowsByPeriod(section.result.rows, dimensionHeader),
+    },
+  };
+}
+
+function normalizePeriodMetricSections(sections = []) {
+  return (sections || []).map(normalizeTemporalSectionRows);
 }
 
 function buildPeriodMetricCandidates({ table, config = {} }) {
   const tableId = table.tableId;
   const hints = config.hints || {};
-  const metricHeader = config.metricHeader || findMetricHeader(table, hints.metric || []);
+  const metricHeader =
+    config.metricHeader || findMetricHeader(table, hints.metric || []);
   const quantityHeader = config.quantityHeader
     ? config.quantityHeader
     : hints.quantity
@@ -378,10 +533,24 @@ function buildPeriodMetricCandidates({ table, config = {} }) {
       "period",
     ]);
 
-  const excluded = [yearHeader, monthHeader, periodHeader, "연도", "월", "연월"];
+  const excluded = [
+    yearHeader,
+    monthHeader,
+    periodHeader,
+    "연도",
+    "월",
+    "연월",
+  ];
   const candidates = [];
 
-  const pushGroup = ({ sectionId, sectionType, title, dimension, metric, chartType = "bar" }) => {
+  const pushGroup = ({
+    sectionId,
+    sectionType,
+    title,
+    dimension,
+    metric,
+    chartType = "bar",
+  }) => {
     if (!dimension || !metric) return;
     candidates.push(
       makeTemplateCandidate({
@@ -442,7 +611,9 @@ function buildPeriodMetricCandidates({ table, config = {} }) {
     pushGroup({
       sectionId: config.sectionIds?.quantityMonth || "monthly_quantity",
       sectionType: config.sectionTypes?.quantityMonth || "monthly_quantity",
-      title: config.titles?.quantityMonth || `${monthHeader}별 ${quantityHeader} 추이`,
+      title:
+        config.titles?.quantityMonth ||
+        `${monthHeader}별 ${quantityHeader} 추이`,
       dimension: monthHeader,
       metric: quantityHeader,
       chartType: "line",
@@ -470,14 +641,14 @@ function buildPeriodMetricCandidates({ table, config = {} }) {
     });
   }
 
-  const rankingDimension =
-    periodHeader ||
-    (config.rankingDimensionHints
-      ? findNonTemporalColumnHeader(table, config.rankingDimensionHints, excluded)
-      : "") ||
-    findNonTemporalColumnHeader(table, ["항목", "제품", "상품", "과제", "기관", "분류"], excluded) ||
-    monthHeader ||
-    yearHeader;
+  const rankingDimension = resolveRankingDimension({
+    table,
+    config,
+    excluded,
+    periodHeader,
+    monthHeader,
+    yearHeader,
+  });
 
   if (rankingDimension && metricHeader && config.includeTopBottom !== false) {
     candidates.push(
@@ -512,8 +683,11 @@ function createAveragePerUnitSection({ table, config = {} }) {
   if (!config.averagePerUnit) return null;
 
   const hints = config.hints || {};
-  const quantityHeader = config.quantityHeader || findColumnHeader(table, hints.quantity || [], { type: "number" });
-  const metricHeader = config.metricHeader || findMetricHeader(table, hints.metric || []);
+  const quantityHeader =
+    config.quantityHeader ||
+    findColumnHeader(table, hints.quantity || [], { type: "number" });
+  const metricHeader =
+    config.metricHeader || findMetricHeader(table, hints.metric || []);
 
   if (!quantityHeader || !metricHeader) return null;
 
@@ -607,7 +781,7 @@ function buildPeriodMetricReportSections({
     },
   });
 
-  return [...recipeSections, ...customSections];
+  return normalizePeriodMetricSections([...recipeSections, ...customSections]);
 }
 
 module.exports = {

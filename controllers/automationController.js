@@ -759,12 +759,15 @@ exports.createSummarySheet = async (req, res, next) => {
     return res.json({
       ok: true,
       fileName: outputFileName,
+      displayName: outputFileName,
       sourceFileName: saved.fileName,
       outputType: "summarySheet",
       outputLabel: outputTypeLabel("summarySheet"),
       fileHash: saved.fileHash,
       queryTablesKey,
       summarySheetKey: key,
+      storageKey: key,
+      internalFileKey: key,
       localName: stored.localName,
       gcsName: stored.gcsName,
       sheetNames: workbook.SheetNames || [],
@@ -836,6 +839,7 @@ function writeReportJson({
   return {
     ok: true,
     fileName: outputName,
+    displayName: outputName,
     filePath,
     outputType: "analysisReport",
     outputLabel: outputTypeLabel("analysisReport"),
@@ -873,6 +877,7 @@ async function writeReportPpt({
   return {
     ok: true,
     fileName: outputName,
+    displayName: outputName,
     filePath,
     outputType: "ppt",
     outputLabel: outputTypeLabel("ppt"),
@@ -993,6 +998,7 @@ exports.exportXlsx = async (req, res) => {
     return res.json({
       ok: true,
       fileName,
+      displayName: fileName,
       filePath,
       outputType: "summarySheet",
       outputLabel: outputTypeLabel("summarySheet"),
@@ -1101,6 +1107,7 @@ exports.exportReportJson = async (req, res) => {
     return res.json({
       ok: true,
       fileName: exported.fileName,
+      displayName: exported.displayName || exported.fileName,
       filePath: exported.filePath,
       outputType: "analysisReport",
       outputLabel: outputTypeLabel("analysisReport"),
@@ -1214,6 +1221,7 @@ exports.exportPptx = async (req, res) => {
     return res.json({
       ok: true,
       fileName: exported.fileName,
+      displayName: exported.displayName || exported.fileName,
       filePath: exported.filePath,
       outputType: "ppt",
       outputLabel: outputTypeLabel("ppt"),
