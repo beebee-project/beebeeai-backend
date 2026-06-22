@@ -466,7 +466,7 @@ function periodSortValue(value, header = "") {
   const normalized = raw.replace(/\s+/g, "");
 
   const yearMonthDay = normalized.match(
-    /((?:19|20)\d{2})[.\-/년]?(0?[1-9]|1[0-2])?[.\-/월]?(0?[1-9]|[12]\d|3[01])?/,
+    /^((?:19|20)\d{2})(?:[.\-/년])?(1[0-2]|0?[1-9])?(?:[.\-/월])?(0?[1-9]|[12]\d|3[01])?(?:일)?$/,
   );
 
   if (yearMonthDay) {
