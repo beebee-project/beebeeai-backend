@@ -11,6 +11,13 @@ const {
 } = require("../utils/storage");
 const { readWorkbookFromBuffer } = require("../utils/workbookReader");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
+const { buildDownloadFileName } = require("../utils/downloadFileNameBuilder");
+const { decryptBuffer } = require("../services/encryptedFileService");
+const {
+  readEncryptedQueryJson,
+  saveEncryptedQueryJson,
+} = require("../services/encryptedJsonStorageService");
+const { assertCanUse, bumpUsage } = require("../services/usageService");
 const {
   buildQueryTablesFromWorkbook,
 } = require("../automation/queryTableBuilder");
@@ -30,11 +37,6 @@ const {
 const {
   executeAnalysisRecipeCandidate,
 } = require("../automation/analysisRecipeExecutor");
-const { decryptBuffer } = require("../services/encryptedFileService");
-const {
-  readEncryptedQueryJson,
-  saveEncryptedQueryJson,
-} = require("../services/encryptedJsonStorageService");
 const {
   executeBusinessTemplate,
 } = require("../automation/businessTemplateExecutor");
@@ -48,7 +50,6 @@ try {
     error?.message || error,
   );
 }
-
 const {
   buildDeterministicCandidateBundle,
 } = require("../automation/candidateGeneration/deterministicCandidateBuilder");
@@ -113,7 +114,6 @@ const {
   normalizeBusinessTemplateResult,
   outputTypeLabel,
 } = require("../automation/businessTemplateContract");
-const { buildDownloadFileName } = require("../utils/downloadFileNameBuilder");
 
 const REPORT_DIR = path.join(
   process.cwd(),
@@ -130,6 +130,28 @@ const AUTOMATION_DIR = path.join(
   "generated",
   "automation",
 );
+
+async function assertTemplateGenerationUsage(req, res) {
+  if (!req.user?.id) return true;
+
+  try {
+    await assertCanUse(req.user.id, "templateGenerations", 1);
+    return true;
+  } catch (e) {
+    res.status(e.status || 429).json({
+      ok: false,
+      error: "Usage limit exceeded",
+      code: e.code || "LIMIT_EXCEEDED",
+      ...(e.meta || {}),
+    });
+    return false;
+  }
+}
+
+async function bumpTemplateGenerationUsage(req) {
+  if (!req.user?.id) return;
+  await bumpUsage(req.user.id, "templateGenerations", 1);
+}
 
 function normalizeExecutedResult(result, templateCandidate = null) {
   if (isBusinessTemplateResult(result)) {
@@ -661,6 +683,7 @@ exports.createSummarySheet = async (req, res, next) => {
         error: "queryTablesKey가 필요합니다.",
       });
     }
+    if (!(await assertTemplateGenerationUsage(req, res))) return;
 
     const saved = await readJsonObject(queryTablesKey);
     const normalizedQueryTables =
@@ -755,6 +778,7 @@ exports.createSummarySheet = async (req, res, next) => {
       buffer,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
+    await bumpTemplateGenerationUsage(req);
 
     return res.json({
       ok: true,
@@ -1031,6 +1055,7 @@ exports.exportReportJson = async (req, res) => {
         error: "queryTablesKey와 message가 필요합니다.",
       });
     }
+    if (!(await assertTemplateGenerationUsage(req, res))) return;
 
     const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
@@ -1103,6 +1128,7 @@ exports.exportReportJson = async (req, res) => {
       result,
       templateCandidate,
     });
+    await bumpTemplateGenerationUsage(req);
 
     return res.json({
       ok: true,
@@ -1144,6 +1170,7 @@ exports.exportPptx = async (req, res) => {
         error: "queryTablesKey와 message가 필요합니다.",
       });
     }
+    if (!(await assertTemplateGenerationUsage(req, res))) return;
 
     const saved = await readJsonObject(queryTablesKey);
     const tables = saved.tables || [];
@@ -1217,6 +1244,7 @@ exports.exportPptx = async (req, res) => {
       template,
       templateCandidate,
     });
+    await bumpTemplateGenerationUsage(req);
 
     return res.json({
       ok: true,

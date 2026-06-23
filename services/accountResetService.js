@@ -25,7 +25,7 @@ async function resetUserToFreeState(userId, subscriptionPatch = {}) {
   user.plan = "FREE";
   user.uploadedFiles = [];
   user.usage = {
-    formulaConversions: 0,
+    templateGenerations: 0,
     fileUploads: 0,
     lastReset: new Date(),
   };

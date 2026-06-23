@@ -8,7 +8,7 @@ const protect = async (req, res, next) => {
       email: "dev@local.test",
       plan: "PRO",
       usage: {
-        formulaConversions: 0,
+        templateGenerations: 0,
         fileUploads: 0,
       },
       uploadedFiles: [],

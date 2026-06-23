@@ -54,7 +54,10 @@ exports.getUsage = async (req, res) => {
       betaMode: paymentService.isBetaMode(),
       isSubscribed,
       usage: {
-        formulaConversions: user?.usage?.formulaConversions ?? 0,
+        templateGenerations:
+          user?.usage?.templateGenerations ??
+          user?.usage?.formulaConversions ??
+          0,
         fileUploads: user?.usage?.fileUploads ?? 0,
       },
       limits,

@@ -41,12 +41,51 @@ function needMonthlyReset(lastReset, now = new Date()) {
   );
 }
 
+function ensureUsageShape(user) {
+  if (!user.usage) {
+    user.usage = {
+      templateGenerations: 0,
+      fileUploads: 0,
+      lastReset: new Date(),
+    };
+    return true;
+  }
+
+  let changed = false;
+
+  if (typeof user.usage.templateGenerations !== "number") {
+    user.usage.templateGenerations =
+      typeof user.usage.formulaConversions === "number"
+        ? user.usage.formulaConversions
+        : 0;
+    changed = true;
+  }
+
+  if (typeof user.usage.fileUploads !== "number") {
+    user.usage.fileUploads = 0;
+    changed = true;
+  }
+
+  if (!user.usage.lastReset) {
+    user.usage.lastReset = new Date();
+    changed = true;
+  }
+
+  return changed;
+}
+
+function resetMonthlyUsage(user) {
+  user.usage.templateGenerations = 0;
+  user.usage.fileUploads = 0;
+  user.usage.lastReset = new Date();
+}
+
 async function getUsageSummary(userId) {
   if (isLocalBypassMode()) {
     return {
       plan: "PRO",
       usage: {
-        formulaConversions: 0,
+        templateGenerations: 0,
         fileUploads: 0,
       },
       limits: getLimits("PRO"),
@@ -57,18 +96,9 @@ async function getUsageSummary(userId) {
   if (!user) throw new Error("User not found");
 
   let changed = false;
-  if (!user.usage) {
-    user.usage = {
-      formulaConversions: 0,
-      fileUploads: 0,
-      lastReset: new Date(),
-    };
-    changed = true;
-  }
+  changed = ensureUsageShape(user) || changed;
   if (needMonthlyReset(user.usage.lastReset)) {
-    user.usage.formulaConversions = 0;
-    user.usage.fileUploads = 0;
-    user.usage.lastReset = new Date();
+    resetMonthlyUsage(user);
     changed = true;
   }
   if (changed) await user.save();
@@ -77,7 +107,7 @@ async function getUsageSummary(userId) {
   return {
     plan,
     usage: {
-      formulaConversions: user.usage.formulaConversions,
+      templateGenerations: user.usage.templateGenerations,
       fileUploads: user.usage.fileUploads,
     },
     limits: getLimits(plan),
@@ -89,7 +119,7 @@ async function bumpUsage(userId, field, delta) {
     return {
       skipped: true,
       usage: {
-        formulaConversions: 0,
+        templateGenerations: 0,
         fileUploads: 0,
       },
       limits: getLimits("PRO"),
@@ -103,16 +133,9 @@ async function bumpUsage(userId, field, delta) {
   if (!user) throw new Error("User not found");
 
   if (user.isDeleted) return { skipped: true };
-  if (!user.usage)
-    user.usage = {
-      formulaConversions: 0,
-      fileUploads: 0,
-      lastReset: new Date(),
-    };
+  ensureUsageShape(user);
   if (needMonthlyReset(user.usage.lastReset)) {
-    user.usage.formulaConversions = 0;
-    user.usage.fileUploads = 0;
-    user.usage.lastReset = new Date();
+    resetMonthlyUsage(user);
   }
   user.usage[field] = Math.max(0, (user.usage[field] || 0) + delta);
   await user.save();
@@ -142,19 +165,12 @@ async function assertCanUse(userId, field, amount = 1) {
   }
 
   // 월 리셋 동일 로직
-  if (!user.usage) {
-    user.usage = {
-      formulaConversions: 0,
-      fileUploads: 0,
-      lastReset: new Date(),
-    };
-  }
+  let changed = ensureUsageShape(user);
   if (needMonthlyReset(user.usage.lastReset)) {
-    user.usage.formulaConversions = 0;
-    user.usage.fileUploads = 0;
-    user.usage.lastReset = new Date();
-    await user.save();
+    resetMonthlyUsage(user);
+    changed = true;
   }
+  if (changed) await user.save();
 
   const plan = getEffectivePlanFromUser(user);
   const limits = getLimits(plan);

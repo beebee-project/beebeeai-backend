@@ -69,7 +69,7 @@ const userSchema = new mongoose.Schema({
   ],
 
   usage: {
-    formulaConversions: { type: Number, default: 0 },
+    templateGenerations: { type: Number, default: 0 },
     fileUploads: { type: Number, default: 0 },
     lastReset: { type: Date, default: Date.now },
   },

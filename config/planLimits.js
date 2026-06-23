@@ -1,10 +1,10 @@
 const PLAN_LIMITS = {
   FREE: {
-    formulaConversions: 10,
+    templateGenerations: 5,
     fileUploads: 1,
   },
   PRO: {
-    formulaConversions: null,
+    templateGenerations: null,
     fileUploads: null,
   },
 };
