@@ -8,7 +8,6 @@ const errorHandler = require("./middleware/errorHandler");
 // 라우터 모듈
 const authRoutes = require("./routes/authRoutes");
 const fileRoutes = require("./routes/fileRoutes");
-const convertRoutes = require("./routes/convertRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const cronRoutes = require("./routes/cronRoutes");
@@ -101,7 +100,6 @@ app.get("/", (req, res) => {
 // 라우트
 app.use("/api/auth", authRoutes);
 app.use("/api/files", fileRoutes);
-app.use("/api/convert", convertRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/automation", automationRoutes);
 app.use("/admin", adminRoutes);
