@@ -11,6 +11,7 @@ router.post("/query-analyze", automationController.analyzeQueryIntent);
 router.post("/query-execute", automationController.executeQuery);
 router.post("/export-xlsx", automationController.exportXlsx);
 router.post("/summary-sheet", automationController.createSummarySheet);
+router.get("/download", automationController.downloadGeneratedFile);
 router.post("/export-report-json", automationController.exportReportJson); // legacy alias
 router.post(
   "/export-analysis-report",

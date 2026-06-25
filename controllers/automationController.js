@@ -189,6 +189,72 @@ function buildGeneratedFileName({
   });
 }
 
+function encodeDownloadName(fileName = "download") {
+  return encodeURIComponent(String(fileName || "download").trim());
+}
+
+function contentTypeForGeneratedFile(fileName = "", outputType = "") {
+  const lower = String(fileName || "").toLowerCase();
+  const type = String(outputType || "").toLowerCase();
+
+  if (lower.endsWith(".xlsx") || type === "summarysheet") {
+    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  }
+
+  if (lower.endsWith(".pptx") || type === "ppt") {
+    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  }
+
+  if (lower.endsWith(".json") || type === "analysisreport") {
+    return "application/json; charset=utf-8";
+  }
+
+  return "application/octet-stream";
+}
+
+function buildGeneratedDownloadUrl({
+  storageKey = "",
+  filePath = "",
+  displayName = "",
+  outputType = "",
+} = {}) {
+  const params = new URLSearchParams();
+
+  if (storageKey) params.set("storageKey", storageKey);
+  if (filePath) params.set("filePath", filePath);
+  if (displayName) params.set("displayName", displayName);
+  if (outputType) params.set("outputType", outputType);
+
+  return `/api/automation/download?${params.toString()}`;
+}
+
+function assertGeneratedStorageKeyAccess(req, storageKey = "") {
+  const key = String(storageKey || "");
+  if (!key) return false;
+
+  const userId = req.user?.id ? String(req.user.id) : "local-dev";
+
+  return (
+    key.startsWith(`summary-sheets/${userId}/`) ||
+    key.startsWith(`summary-sheets/local-dev/`)
+  );
+}
+
+function resolveSafeGeneratedLocalPath(filePath = "") {
+  if (!filePath) return null;
+
+  const resolved = path.resolve(filePath);
+  const allowedDirs = [REPORT_DIR, PPT_DIR, AUTOMATION_DIR].map((dir) =>
+    path.resolve(dir),
+  );
+
+  const allowed = allowedDirs.some(
+    (dir) => resolved === dir || resolved.startsWith(`${dir}${path.sep}`),
+  );
+
+  return allowed ? resolved : null;
+}
+
 function findUserFile(user, fileName) {
   if (!user || !fileName) return null;
   return user.uploadedFiles?.find((f) => f.originalName === fileName) || null;
@@ -666,6 +732,67 @@ exports.executeBusinessTemplateCandidate = executeBusinessTemplateCandidate;
 
 exports.executeAnalysisCandidate = executeAnalysisCandidate;
 
+exports.downloadGeneratedFile = async (req, res, next) => {
+  try {
+    const {
+      storageKey = "",
+      filePath = "",
+      displayName = "",
+      outputType = "",
+    } = req.query || {};
+
+    const safeDisplayName =
+      String(displayName || "").trim() ||
+      path.basename(String(storageKey || filePath || "download"));
+
+    let buffer = null;
+
+    if (storageKey) {
+      if (!assertGeneratedStorageKeyAccess(req, storageKey)) {
+        return res.status(403).json({
+          ok: false,
+          code: "GENERATED_FILE_FORBIDDEN",
+          error: "다운로드 권한이 없습니다.",
+        });
+      }
+
+      buffer = await downloadToBuffer(storageKey);
+    } else if (filePath) {
+      const safePath = resolveSafeGeneratedLocalPath(filePath);
+
+      if (!safePath || !fs.existsSync(safePath)) {
+        return res.status(404).json({
+          ok: false,
+          code: "GENERATED_FILE_NOT_FOUND",
+          error: "생성 파일을 찾을 수 없습니다.",
+        });
+      }
+
+      buffer = fs.readFileSync(safePath);
+    } else {
+      return res.status(400).json({
+        ok: false,
+        code: "DOWNLOAD_TARGET_REQUIRED",
+        error: "storageKey 또는 filePath가 필요합니다.",
+      });
+    }
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename*=UTF-8''${encodeDownloadName(safeDisplayName)}`,
+    );
+    res.setHeader(
+      "Content-Type",
+      contentTypeForGeneratedFile(safeDisplayName, outputType),
+    );
+
+    return res.end(buffer);
+  } catch (error) {
+    console.error("[automation.downloadGeneratedFile]", error);
+    next(error);
+  }
+};
+
 exports.createSummarySheet = async (req, res, next) => {
   try {
     const {
@@ -797,6 +924,11 @@ exports.createSummarySheet = async (req, res, next) => {
       ok: true,
       fileName: outputFileName,
       displayName: outputFileName,
+      downloadUrl: buildGeneratedDownloadUrl({
+        storageKey: key,
+        displayName: outputFileName,
+        outputType: "summarySheet",
+      }),
       sourceFileName: saved.fileName,
       outputType: "summarySheet",
       outputLabel: outputTypeLabel("summarySheet"),
@@ -1045,6 +1177,11 @@ exports.exportXlsx = async (req, res) => {
       ok: true,
       fileName,
       displayName: fileName,
+      downloadUrl: buildGeneratedDownloadUrl({
+        filePath,
+        displayName: fileName,
+        outputType: "summarySheet",
+      }),
       filePath,
       outputType: "summarySheet",
       outputLabel: outputTypeLabel("summarySheet"),
@@ -1162,6 +1299,11 @@ exports.exportReportJson = async (req, res) => {
       ok: true,
       fileName: exported.fileName,
       displayName: exported.displayName || exported.fileName,
+      downloadUrl: buildGeneratedDownloadUrl({
+        filePath: exported.filePath,
+        displayName: exported.displayName || exported.fileName,
+        outputType: "analysisReport",
+      }),
       filePath: exported.filePath,
       outputType: "analysisReport",
       outputLabel: outputTypeLabel("analysisReport"),
@@ -1278,6 +1420,11 @@ exports.exportPptx = async (req, res) => {
       ok: true,
       fileName: exported.fileName,
       displayName: exported.displayName || exported.fileName,
+      downloadUrl: buildGeneratedDownloadUrl({
+        filePath: exported.filePath,
+        displayName: exported.displayName || exported.fileName,
+        outputType: "ppt",
+      }),
       filePath: exported.filePath,
       outputType: "ppt",
       outputLabel: outputTypeLabel("ppt"),
