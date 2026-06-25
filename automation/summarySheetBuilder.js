@@ -689,6 +689,78 @@ function getSourceColumnHeader(column = {}) {
   );
 }
 
+function stripHeaderUnitSuffix(value = "") {
+  return String(value || "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/（[^）]*）/g, "")
+    .trim();
+}
+
+function normalizeHeaderForMatch(value = "") {
+  return stripHeaderUnitSuffix(value)
+    .toLowerCase()
+    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>]+/g, "")
+    .trim();
+}
+
+function normalizeHeaderLoose(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>]+/g, "")
+    .trim();
+}
+
+function isNumericSourceColumn(column = {}) {
+  const text = [
+    column.type,
+    column.dominantType,
+    column.role,
+    column.inferredRole,
+    column.semanticType,
+    column.header,
+    column.originalHeader,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return /number|numeric|amount|metric|value|금액|합계|평균|수량|매출|집행|연봉|건수|count|sum|average/.test(
+    text,
+  );
+}
+
+function scoreHeaderMatch(queryHeader = "", sourceHeader = "") {
+  const queryRaw = String(queryHeader || "").trim();
+  const sourceRaw = String(sourceHeader || "").trim();
+
+  if (!queryRaw || !sourceRaw) return 0;
+
+  if (queryRaw === sourceRaw) return 100;
+  if (queryRaw.toLowerCase() === sourceRaw.toLowerCase()) return 98;
+
+  const queryBase = normalizeHeaderForMatch(queryRaw);
+  const sourceBase = normalizeHeaderForMatch(sourceRaw);
+
+  if (!queryBase || !sourceBase) return 0;
+  if (queryBase === sourceBase) return 94;
+
+  const queryLoose = normalizeHeaderLoose(queryRaw);
+  const sourceLoose = normalizeHeaderLoose(sourceRaw);
+
+  if (queryLoose && sourceLoose && queryLoose === sourceLoose) return 90;
+
+  // 너무 짧은 키워드는 오탐 위험이 높으므로 exact/normalized match까지만 허용
+  if (queryBase.length < 2 || sourceBase.length < 2) return 0;
+
+  if (sourceBase.startsWith(queryBase)) return 78;
+  if (queryBase.startsWith(sourceBase)) return 72;
+  if (sourceBase.includes(queryBase)) return 66;
+  if (queryBase.includes(sourceBase)) return 60;
+
+  return 0;
+}
+
 function getSourceColumnLetter(column = {}, index = 0) {
   return (
     column.columnLetter ||
@@ -704,25 +776,68 @@ function getSourceColumnLetter(column = {}, index = 0) {
 function buildSourceColumnMap(table = {}) {
   const columns = getSourceTableColumns(table);
   const map = new Map();
+  const entries = [];
 
   columns.forEach((column, index) => {
     const header = getSourceColumnHeader(column);
     if (!header) return;
 
-    map.set(header, {
+    const entry = {
       header,
       column,
       index,
       letter: getSourceColumnLetter(column, index),
-    });
+      normalizedHeader: normalizeHeaderForMatch(header),
+      looseHeader: normalizeHeaderLoose(header),
+      isNumeric: isNumericSourceColumn(column),
+    };
+
+    map.set(header, entry);
+    entries.push(entry);
   });
+  map.__entries = entries;
 
   return map;
 }
 
-function resolveSourceColumn(columnMap, header = "") {
+function resolveSourceColumn(columnMap, header = "", options = {}) {
   if (!columnMap || !header) return null;
-  return columnMap.get(header) || null;
+
+  const exact = columnMap.get(header);
+  if (exact) return exact;
+
+  const entries = columnMap.__entries || Array.from(columnMap.values());
+  if (!entries.length) return null;
+
+  const scored = entries
+    .map((entry) => {
+      const baseScore = scoreHeaderMatch(header, entry.header);
+      const numericBonus = options.preferNumeric && entry.isNumeric ? 5 : 0;
+
+      return {
+        entry,
+        score: baseScore > 0 ? baseScore + numericBonus : 0,
+        baseScore,
+      };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (!scored.length) return null;
+
+  const [best, second] = scored;
+
+  // 동점이면 오탐 가능성이 있으므로 fallback하지 않는다.
+  if (second && second.score === best.score) {
+    return null;
+  }
+
+  // 너무 약한 부분 일치는 적용하지 않는다.
+  if (best.baseScore < 60) {
+    return null;
+  }
+
+  return best.entry;
 }
 
 function buildFormulaEngineContext({
@@ -802,10 +917,16 @@ function buildSectionFormulaPlan({
   const groupColumn = resolveSourceColumn(
     formulaContext.columnMap,
     groupHeader,
+    {
+      preferNumeric: false,
+    },
   );
   const metricColumn = resolveSourceColumn(
     formulaContext.columnMap,
     metricHeader,
+    {
+      preferNumeric: true,
+    },
   );
 
   const operation = String(
