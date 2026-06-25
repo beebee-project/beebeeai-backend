@@ -3,9 +3,7 @@ const { buildNarrativeSections } = require("./reportNarrativeBuilder");
 const { recommendChartSpec } = require("./chartRecommendationBuilder");
 const { buildReportSections } = require("./reportSectionBuilder");
 const {
-  DEFAULT_SOURCE_SHEET_NAME,
   FORMULA_SPEC_TYPES,
-  SOURCE_SHEET_NAME,
   buildColumnRange,
   buildGroupAggregateFormula,
   buildRankValueFormula,
@@ -18,6 +16,24 @@ const {
   buildFormulaFromSpec,
   createFormulaCellFromSpec,
 } = require("./formulaEngine/internalFormulaEngine");
+const {
+  SHEET_NAMES,
+  normalizeSummarySheetMode,
+  isFormulaEnabledMode,
+  sourceSheetNameForTableIndex,
+} = require("./config/automationSheetConfig");
+const {
+  getSourceColumnHeader,
+  createSourceColumnMap,
+  resolveSourceColumn,
+} = require("./utils/headerMatcher");
+const {
+  isRankingLikeSection,
+  normalizeAggregateOperation,
+  isSimpleAggregateOperation,
+  resolveCriteriaColumnIndex,
+  resolveAggregateFormulaTargets,
+} = require("./utils/aggregateResolver");
 
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
@@ -326,57 +342,6 @@ function resultToRows(result = {}) {
   return result.rows || [];
 }
 
-const SUMMARY_SHEET_MODES = new Set(["static", "formula", "hybrid"]);
-
-function normalizeSummarySheetMode(mode = "static") {
-  const normalized = String(mode || "static").trim();
-  return SUMMARY_SHEET_MODES.has(normalized) ? normalized : "static";
-}
-
-function isFormulaEnabledMode(mode = "static") {
-  return mode === "formula" || mode === "hybrid";
-}
-
-function isRankingLikeSection(section = {}) {
-  const text = [
-    section.sectionId,
-    section.sectionType,
-    section.title,
-    section.result?.operation,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return /top|bottom|ranking|rank|상위|하위|순위/i.test(text);
-}
-
-function normalizeAggregateOperation(operation = "", section = {}) {
-  const text = [
-    operation,
-    section.sectionId,
-    section.sectionType,
-    section.title,
-    section.result?.operation,
-    section.result?.metric?.aggregation,
-    section.result?.metric?.aggregate,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (/average|avg|mean|평균/.test(text)) return "average";
-  if (/count|건수|개수|인원|대상 수|전체 대상 수/.test(text)) return "count";
-  if (/sum|total|amount|금액|합계|매출|집행|수량/.test(text)) return "sum";
-
-  return "sum";
-}
-
-function isSimpleAggregateOperation(operation = "sum") {
-  return ["sum", "count", "average"].includes(
-    String(operation || "").toLowerCase(),
-  );
-}
-
 function getWorksheetHeaderInfo(ws) {
   if (!ws?.["!ref"]) return { headers: [], headerRow: 0, range: null };
 
@@ -390,158 +355,6 @@ function getWorksheetHeaderInfo(ws) {
   }
 
   return { headers, headerRow, range };
-}
-
-function findHeaderIndex(headers = [], candidates = []) {
-  const normalizedHeaders = headers.map((h) => String(h || "").trim());
-  const normalizedCandidates = candidates
-    .filter(Boolean)
-    .map((h) => String(h || "").trim());
-
-  for (const candidate of normalizedCandidates) {
-    const exact = normalizedHeaders.findIndex((h) => h === candidate);
-    if (exact >= 0) return exact;
-  }
-
-  for (const candidate of normalizedCandidates) {
-    const partial = normalizedHeaders.findIndex(
-      (h) => h && candidate && (h.includes(candidate) || candidate.includes(h)),
-    );
-    if (partial >= 0) return partial;
-  }
-
-  return -1;
-}
-
-function findNumericValueColumnIndex({
-  headers = [],
-  rows = [],
-  exclude = [],
-}) {
-  const excluded = new Set(exclude);
-
-  const preferred = findHeaderIndex(headers, [
-    "값",
-    "합계",
-    "평균",
-    "금액",
-    "집행금액",
-    "순매출액",
-    "매출수량",
-    "인원수",
-    "건수",
-  ]);
-
-  if (preferred >= 0 && !excluded.has(preferred)) return preferred;
-
-  for (let c = 0; c < headers.length; c += 1) {
-    if (excluded.has(c)) continue;
-
-    const header = headers[c];
-    if (/행수|rowCount|작업|지표/i.test(String(header || ""))) continue;
-
-    const numericCount = rows.filter((row) => {
-      const value = row?.[header];
-      return value !== "" && value != null && Number.isFinite(Number(value));
-    }).length;
-
-    if (numericCount > 0) return c;
-  }
-
-  return -1;
-}
-
-function findExactAggregateHeaderIndex(headers = [], candidates = []) {
-  const normalizedHeaders = headers.map((h) => String(h || "").trim());
-  const normalizedCandidates = candidates
-    .filter(Boolean)
-    .map((h) => String(h || "").trim());
-
-  for (const candidate of normalizedCandidates) {
-    const index = normalizedHeaders.findIndex((header) => header === candidate);
-    if (index >= 0) return index;
-  }
-
-  return -1;
-}
-
-function resolveAggregateFormulaTargets({
-  headers = [],
-  operation = "sum",
-  formulaPlan = {},
-  criteriaColIndex = -1,
-} = {}) {
-  const targets = [];
-  const used = new Set([criteriaColIndex]);
-
-  function pushTarget(op, index) {
-    if (index < 0 || used.has(index)) return;
-    targets.push({ operation: op, columnIndex: index });
-    used.add(index);
-  }
-
-  const countIndex = findExactAggregateHeaderIndex(headers, [
-    "count",
-    "COUNT",
-    "건수",
-    "개수",
-    "인원수",
-    "대상 수",
-    "행수",
-  ]);
-
-  const sumIndex = findExactAggregateHeaderIndex(headers, [
-    "sum",
-    "SUM",
-    "합계",
-    "총합",
-    "금액합계",
-    "수량합계",
-  ]);
-
-  const averageIndex = findExactAggregateHeaderIndex(headers, [
-    "average",
-    "avg",
-    "AVG",
-    "평균",
-  ]);
-
-  const hasMultiAggregateColumns =
-    countIndex >= 0 || sumIndex >= 0 || averageIndex >= 0;
-
-  if (hasMultiAggregateColumns) {
-    pushTarget("count", countIndex);
-
-    if (formulaPlan.metric?.letter) {
-      pushTarget("sum", sumIndex);
-      pushTarget("average", averageIndex);
-    }
-
-    return targets;
-  }
-
-  const normalizedOperation = normalizeAggregateOperation(
-    operation,
-    formulaPlan,
-  );
-
-  const singleValueIndex = findExactAggregateHeaderIndex(headers, [
-    "값",
-    normalizedOperation,
-    formulaPlan.metric?.header,
-  ]);
-
-  if (singleValueIndex < 0) {
-    return [];
-  }
-
-  if (normalizedOperation !== "count" && !formulaPlan.metric?.letter) {
-    return [];
-  }
-
-  pushTarget(normalizedOperation, singleValueIndex);
-
-  return targets;
 }
 
 function applySimpleAggregateFormulaSection({
@@ -565,13 +378,10 @@ function applySimpleAggregateFormulaSection({
   const { headers, headerRow, range } = getWorksheetHeaderInfo(ws);
   if (!range || !headers.length) return 0;
 
-  const criteriaColIndex = findHeaderIndex(headers, [
-    formulaPlan.group?.header,
-    "기준",
-    "그룹",
-    "구분",
-    "분류",
-  ]);
+  const criteriaColIndex = resolveCriteriaColumnIndex({
+    headers,
+    formulaPlan,
+  });
 
   if (criteriaColIndex < 0) return 0;
 
@@ -592,7 +402,7 @@ function applySimpleAggregateFormulaSection({
   const sourceSheetName =
     formulaPlan.sourceSheetName ||
     formulaContext.sourceSheetName ||
-    DEFAULT_SOURCE_SHEET_NAME;
+    SHEET_NAMES.SOURCE_DATA;
 
   let appliedCount = 0;
 
@@ -670,180 +480,10 @@ function attachWorkbookFormulaEngineMeta(wb, meta) {
   return wb;
 }
 
-function getColumnLetterByIndex(index = 0) {
-  return XLSX.utils.encode_col(Math.max(0, Number(index) || 0));
-}
-
-function getSourceTableColumns(table = {}) {
-  return Array.isArray(table.columns) ? table.columns : [];
-}
-
-function getSourceColumnHeader(column = {}) {
-  return (
-    column.header ||
-    column.originalHeader ||
-    column.name ||
-    column.key ||
-    column.accessor ||
-    ""
-  );
-}
-
-function stripHeaderUnitSuffix(value = "") {
-  return String(value || "")
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\[[^\]]*\]/g, "")
-    .replace(/（[^）]*）/g, "")
-    .trim();
-}
-
-function normalizeHeaderForMatch(value = "") {
-  return stripHeaderUnitSuffix(value)
-    .toLowerCase()
-    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>]+/g, "")
-    .trim();
-}
-
-function normalizeHeaderLoose(value = "") {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>]+/g, "")
-    .trim();
-}
-
-function isNumericSourceColumn(column = {}) {
-  const text = [
-    column.type,
-    column.dominantType,
-    column.role,
-    column.inferredRole,
-    column.semanticType,
-    column.header,
-    column.originalHeader,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return /number|numeric|amount|metric|value|금액|합계|평균|수량|매출|집행|연봉|건수|count|sum|average/.test(
-    text,
-  );
-}
-
-function scoreHeaderMatch(queryHeader = "", sourceHeader = "") {
-  const queryRaw = String(queryHeader || "").trim();
-  const sourceRaw = String(sourceHeader || "").trim();
-
-  if (!queryRaw || !sourceRaw) return 0;
-
-  if (queryRaw === sourceRaw) return 100;
-  if (queryRaw.toLowerCase() === sourceRaw.toLowerCase()) return 98;
-
-  const queryBase = normalizeHeaderForMatch(queryRaw);
-  const sourceBase = normalizeHeaderForMatch(sourceRaw);
-
-  if (!queryBase || !sourceBase) return 0;
-  if (queryBase === sourceBase) return 94;
-
-  const queryLoose = normalizeHeaderLoose(queryRaw);
-  const sourceLoose = normalizeHeaderLoose(sourceRaw);
-
-  if (queryLoose && sourceLoose && queryLoose === sourceLoose) return 90;
-
-  // 너무 짧은 키워드는 오탐 위험이 높으므로 exact/normalized match까지만 허용
-  if (queryBase.length < 2 || sourceBase.length < 2) return 0;
-
-  if (sourceBase.startsWith(queryBase)) return 78;
-  if (queryBase.startsWith(sourceBase)) return 72;
-  if (sourceBase.includes(queryBase)) return 66;
-  if (queryBase.includes(sourceBase)) return 60;
-
-  return 0;
-}
-
-function getSourceColumnLetter(column = {}, index = 0) {
-  return (
-    column.columnLetter ||
-    column.letter ||
-    getColumnLetterByIndex(
-      Number.isFinite(Number(column.columnIndex))
-        ? Number(column.columnIndex) - 1
-        : index,
-    )
-  );
-}
-
-function buildSourceColumnMap(table = {}) {
-  const columns = getSourceTableColumns(table);
-  const map = new Map();
-  const entries = [];
-
-  columns.forEach((column, index) => {
-    const header = getSourceColumnHeader(column);
-    if (!header) return;
-
-    const entry = {
-      header,
-      column,
-      index,
-      letter: getSourceColumnLetter(column, index),
-      normalizedHeader: normalizeHeaderForMatch(header),
-      looseHeader: normalizeHeaderLoose(header),
-      isNumeric: isNumericSourceColumn(column),
-    };
-
-    map.set(header, entry);
-    entries.push(entry);
-  });
-  map.__entries = entries;
-
-  return map;
-}
-
-function resolveSourceColumn(columnMap, header = "", options = {}) {
-  if (!columnMap || !header) return null;
-
-  const exact = columnMap.get(header);
-  if (exact) return exact;
-
-  const entries = columnMap.__entries || Array.from(columnMap.values());
-  if (!entries.length) return null;
-
-  const scored = entries
-    .map((entry) => {
-      const baseScore = scoreHeaderMatch(header, entry.header);
-      const numericBonus = options.preferNumeric && entry.isNumeric ? 5 : 0;
-
-      return {
-        entry,
-        score: baseScore > 0 ? baseScore + numericBonus : 0,
-        baseScore,
-      };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  if (!scored.length) return null;
-
-  const [best, second] = scored;
-
-  // 동점이면 오탐 가능성이 있으므로 fallback하지 않는다.
-  if (second && second.score === best.score) {
-    return null;
-  }
-
-  // 너무 약한 부분 일치는 적용하지 않는다.
-  if (best.baseScore < 60) {
-    return null;
-  }
-
-  return best.entry;
-}
-
 function buildFormulaEngineContext({
   sourceTables = [],
   summarySheetMode = "static",
-  sourceSheetName = DEFAULT_SOURCE_SHEET_NAME,
+  sourceSheetName = SHEET_NAMES.SOURCE_DATA,
   formulaOptions = {},
 } = {}) {
   const mode = normalizeSummarySheetMode(summarySheetMode);
@@ -858,10 +498,10 @@ function buildFormulaEngineContext({
     : -1;
   const resolvedSourceSheetName =
     tables.length > 1 && primaryTableIndex >= 0
-      ? `${DEFAULT_SOURCE_SHEET_NAME}_${primaryTableIndex + 1}`
+      ? sourceSheetNameForTableIndex(primaryTableIndex, tables.length)
       : sourceSheetName;
 
-  const columnMap = primaryTable ? buildSourceColumnMap(primaryTable) : null;
+  const columnMap = primaryTable ? createSourceColumnMap(primaryTable) : null;
   const rows = primaryTable ? getSourceTableRows(primaryTable) : [];
 
   return {
@@ -991,14 +631,7 @@ function getSourceTableRows(table = {}) {
 }
 
 function getSourceColumnLabel(column = {}, index = 0) {
-  return (
-    column.header ||
-    column.originalHeader ||
-    column.name ||
-    column.key ||
-    column.accessor ||
-    `컬럼_${index + 1}`
-  );
+  return getSourceColumnHeader(column) || `컬럼_${index + 1}`;
 }
 
 function getSourceRowValue(row = {}, column = {}, index = 0) {
@@ -1071,11 +704,7 @@ function appendSourceDataSheets(
     styleHeaderRow(ws);
     applyDefaultSheetOptions(ws);
 
-    appendSheetSafe(
-      wb,
-      ws,
-      tables.length === 1 ? "원본데이터" : `원본데이터_${index + 1}`,
-    );
+    appendSheetSafe(wb, ws, sourceSheetNameForTableIndex(index, tables.length));
   });
 }
 
@@ -1132,7 +761,7 @@ function buildSummaryWorkbook({
     setAoaColumnWidths(wsSummary, summaryRows);
     styleHeaderRow(wsSummary);
     applyDefaultSheetOptions(wsSummary);
-    appendSheetSafe(wb, wsSummary, "요약");
+    appendSheetSafe(wb, wsSummary, SHEET_NAMES.SUMMARY);
 
     appendSourceDataSheets(wb, sourceTables, {
       includeSourceDataSheet,
@@ -1193,7 +822,7 @@ function buildSummaryWorkbook({
   setAoaColumnWidths(wsSummary, summaryRows);
   styleHeaderRow(wsSummary);
   applyDefaultSheetOptions(wsSummary);
-  appendSheetSafe(wb, wsSummary, "요약");
+  appendSheetSafe(wb, wsSummary, SHEET_NAMES.SUMMARY);
 
   appendSourceDataSheets(wb, sourceTables, {
     includeSourceDataSheet,
@@ -1224,7 +853,7 @@ function buildSummaryWorkbook({
   });
   recordFormulaApplication(formulaEngineMeta, resultFormulaCount);
   attachFormulaPlan(wsResult, resultFormulaPlan);
-  appendSheetSafe(wb, wsResult, "분석결과");
+  appendSheetSafe(wb, wsResult, SHEET_NAMES.ANALYSIS_RESULT);
 
   if (result?.plan) {
     const planRows = objectToAoa(result.plan);
@@ -1232,7 +861,7 @@ function buildSummaryWorkbook({
     setAoaColumnWidths(wsPlan, [["항목", "값"], ...planRows]);
     styleHeaderRow(wsPlan);
     applyDefaultSheetOptions(wsPlan);
-    XLSX.utils.book_append_sheet(wb, wsPlan, "실행계획");
+    XLSX.utils.book_append_sheet(wb, wsPlan, SHEET_NAMES.EXECUTION_PLAN);
   }
 
   if (result?.executionMeta) {
@@ -1241,7 +870,7 @@ function buildSummaryWorkbook({
     setAoaColumnWidths(wsMeta, [["항목", "값"], ...metaRows]);
     styleHeaderRow(wsMeta);
     applyDefaultSheetOptions(wsMeta);
-    XLSX.utils.book_append_sheet(wb, wsMeta, "실행메타");
+    XLSX.utils.book_append_sheet(wb, wsMeta, SHEET_NAMES.EXECUTION_META);
   }
 
   const chartDataRows = buildChartDataRows(result);
@@ -1252,7 +881,7 @@ function buildSummaryWorkbook({
     styleHeaderRow(wsChartData);
     applyDefaultSheetOptions(wsChartData);
     wsChartData["!freeze"] = { xSplit: 0, ySplit: 1 };
-    appendSheetSafe(wb, wsChartData, "차트데이터");
+    appendSheetSafe(wb, wsChartData, SHEET_NAMES.CHART_DATA);
   }
 
   const chartSpec = buildChartSpec(result);
@@ -1268,7 +897,7 @@ function buildSummaryWorkbook({
     setAoaColumnWidths(wsChartSpec, [["항목", "값"], ...chartSpecRows]);
     styleHeaderRow(wsChartSpec);
     applyDefaultSheetOptions(wsChartSpec);
-    appendSheetSafe(wb, wsChartSpec, "차트설정");
+    appendSheetSafe(wb, wsChartSpec, SHEET_NAMES.CHART_CONFIG);
   }
 
   const narrativeRows = [
@@ -1288,7 +917,7 @@ function buildSummaryWorkbook({
     setAoaColumnWidths(wsInsight, [["항목", "내용"], ...insightRows]);
     styleHeaderRow(wsInsight);
     applyDefaultSheetOptions(wsInsight);
-    appendSheetSafe(wb, wsInsight, "인사이트");
+    appendSheetSafe(wb, wsInsight, SHEET_NAMES.INSIGHTS);
   }
 
   const reportSectionRows = objectToAoa(reportSections);
@@ -1305,7 +934,7 @@ function buildSummaryWorkbook({
     ]);
     styleHeaderRow(wsReportSections);
     applyDefaultSheetOptions(wsReportSections);
-    appendSheetSafe(wb, wsReportSections, "보고서구성");
+    appendSheetSafe(wb, wsReportSections, SHEET_NAMES.REPORT_SECTIONS);
   }
 
   attachWorkbookFormulaEngineMeta(wb, formulaEngineMeta);
@@ -1468,7 +1097,7 @@ function buildAutomationTemplateWorkbook({
       ["요청", message],
       ["작업", result?.operation || intent?.operation || ""],
     ]),
-    "사용방법",
+    SHEET_NAMES.AUTOMATION_GUIDE,
   );
 
   const resultDimensionHeader = getFirstResultDimensionHeader(result);
@@ -1533,13 +1162,13 @@ function buildAutomationTemplateWorkbook({
     wb,
     XLSX.utils.aoa_to_sheet([
       ["항목", "값", "설명"],
-      ["원본시트명", SOURCE_SHEET_NAME, "데이터가 들어있는 시트명"],
+      ["원본시트명", SHEET_NAMES.SOURCE_DATA, "데이터가 들어있는 시트명"],
       ["기준열", groupLetter, "부서/월/분류 등 그룹 기준 열"],
       ["값열", metricLetter, "합계/평균 계산 대상 열"],
       ["집계방식", operation, "average, sum, count 중 선택"],
       ["요청문", message, "자동 생성 기준 요청"],
     ]),
-    "자동화설정",
+    SHEET_NAMES.AUTOMATION_SETTINGS,
   );
 
   const resultRows = Array.isArray(result?.rows) ? result.rows : [];
@@ -1549,8 +1178,8 @@ function buildAutomationTemplateWorkbook({
     .map((row) => row[autoGroupHeader])
     .filter((v) => v !== undefined && v !== null && v !== "");
 
-  const labelRange = buildColumnRange(SOURCE_SHEET_NAME, groupLetter);
-  const valueRange = buildColumnRange(SOURCE_SHEET_NAME, metricLetter);
+  const labelRange = buildColumnRange(SHEET_NAMES.SOURCE_DATA, groupLetter);
+  const valueRange = buildColumnRange(SHEET_NAMES.SOURCE_DATA, metricLetter);
 
   const isListTemplate = rawOperation === "list";
   const isCumulativeTemplate = rawOperation === "cumulativeSum";
@@ -1616,8 +1245,8 @@ function buildAutomationTemplateWorkbook({
       derivedGroupLetter || rowCol.columnLetter || rowCol.letter || groupLetter;
     const colLetter = colCol.columnLetter || colCol.letter || groupLetter;
 
-    const rowRange = buildColumnRange(SOURCE_SHEET_NAME, rowLetter);
-    const colRange = buildColumnRange(SOURCE_SHEET_NAME, colLetter);
+    const rowRange = buildColumnRange(SHEET_NAMES.SOURCE_DATA, rowLetter);
+    const colRange = buildColumnRange(SHEET_NAMES.SOURCE_DATA, colLetter);
 
     for (let r = 0; r < uniqueValues.length; r += 1) {
       const rowNum = r + 5;
@@ -1654,7 +1283,7 @@ function buildAutomationTemplateWorkbook({
         t: "n",
         f: buildGroupAggregateFormula({
           operation: "average",
-          sheetName: SOURCE_SHEET_NAME,
+          sheetName: SHEET_NAMES.SOURCE_DATA,
           groupLetter,
           metricLetter,
           criteriaCell: `A${rowNum}`,
@@ -1710,7 +1339,7 @@ function buildAutomationTemplateWorkbook({
 
       const baseFormula = buildGroupAggregateFormula({
         operation,
-        sheetName: SOURCE_SHEET_NAME,
+        sheetName: SHEET_NAMES.SOURCE_DATA,
         groupLetter,
         metricLetter,
         criteriaCell: `A${rowNum}`,
@@ -1763,18 +1392,18 @@ function buildAutomationTemplateWorkbook({
 
   autoSheet["!ref"] = `A1:C${Math.max(5, autoRows.length)}`;
 
-  XLSX.utils.book_append_sheet(wb, autoSheet, "자동화시트");
+  XLSX.utils.book_append_sheet(wb, autoSheet, SHEET_NAMES.AUTOMATION_TEMPLATE);
 
   XLSX.utils.book_append_sheet(
     wb,
     XLSX.utils.aoa_to_sheet(sourceRows.length ? sourceRows : [["데이터 없음"]]),
-    SOURCE_SHEET_NAME,
+    SHEET_NAMES.SOURCE_DATA,
   );
 
   XLSX.utils.book_append_sheet(
     wb,
     XLSX.utils.json_to_sheet(result?.rows || []),
-    "실행결과_미리보기",
+    SHEET_NAMES.EXECUTION_PREVIEW,
   );
 
   return wb;

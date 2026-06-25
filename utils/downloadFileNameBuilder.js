@@ -1,19 +1,9 @@
 const path = require("path");
-
-const OUTPUT_TYPE_LABELS = {
-  summarySheet: "자동화시트",
-  analysisReport: "데이터분석",
-  ppt: "PPT",
-};
-
-const OUTPUT_TYPE_ALIASES = {
-  reportJson: "analysisReport",
-  reportJSON: "analysisReport",
-  report_json: "analysisReport",
-  json: "analysisReport",
-  pptx: "ppt",
-  xlsx: "summarySheet",
-};
+const {
+  normalizeOutputType,
+  getOutputTypeLabel,
+  getOutputExtension,
+} = require("../automation/config/outputArtifactConfig");
 
 function stripExtension(fileName = "") {
   const base = path.basename(String(fileName || ""));
@@ -41,7 +31,10 @@ function formatKstTimestamp(date = new Date()) {
 }
 
 function normalizeExtension(extension = "") {
-  const ext = String(extension || "").trim().replace(/^\./, "").toLowerCase();
+  const ext = String(extension || "")
+    .trim()
+    .replace(/^\./, "")
+    .toLowerCase();
   return ext || "xlsx";
 }
 
@@ -54,17 +47,18 @@ function buildDownloadFileName({
 }) {
   const source = sanitizePart(stripExtension(sourceFileName), "원본파일");
   const template = sanitizePart(templateTitle, "보고서");
-  const normalizedOutputType = OUTPUT_TYPE_ALIASES[outputType] || outputType;
+  const normalizedOutputType = normalizeOutputType(outputType) || outputType;
   const output =
-    OUTPUT_TYPE_LABELS[normalizedOutputType] ||
+    getOutputTypeLabel(normalizedOutputType) ||
     sanitizePart(normalizedOutputType, "결과");
   const timestamp = formatKstTimestamp(date);
-  const ext = normalizeExtension(extension);
+  const ext = normalizeExtension(
+    extension || getOutputExtension(normalizedOutputType),
+  );
 
   return `${source}_${template}_${output}_${timestamp}.${ext}`;
 }
 
 module.exports = {
-  OUTPUT_TYPE_LABELS,
   buildDownloadFileName,
 };

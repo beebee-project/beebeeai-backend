@@ -1,7 +1,8 @@
 const {
   COLUMN_ROLE_PATTERNS,
   BOOLEAN_VALUES,
-} = require("./columnInferenceConfig");
+  COLUMN_INFERENCE_THRESHOLDS,
+} = require("./config/columnRoleConfig");
 
 function isBlank(value) {
   return value == null || String(value).trim() === "";
@@ -34,7 +35,9 @@ function isDateLike(value) {
 }
 
 function inferColumnType(values = []) {
-  const sample = values.filter((v) => !isBlank(v)).slice(0, 50);
+  const sample = values
+    .filter((v) => !isBlank(v))
+    .slice(0, COLUMN_INFERENCE_THRESHOLDS.sampleSize);
   if (!sample.length) return "unknown";
 
   const numberCount = sample.filter((v) => toNumberOrNull(v) != null).length;
@@ -47,9 +50,11 @@ function inferColumnType(values = []) {
 
   const ratio = (count) => count / sample.length;
 
-  if (ratio(dateCount) >= 0.7) return "date";
-  if (ratio(numberCount) >= 0.7) return "number";
-  if (ratio(booleanCount) >= 0.7) return "boolean";
+  if (ratio(dateCount) >= COLUMN_INFERENCE_THRESHOLDS.dateRatio) return "date";
+  if (ratio(numberCount) >= COLUMN_INFERENCE_THRESHOLDS.numberRatio)
+    return "number";
+  if (ratio(booleanCount) >= COLUMN_INFERENCE_THRESHOLDS.booleanRatio)
+    return "boolean";
 
   return "string";
 }
@@ -139,15 +144,15 @@ function buildWarnings({
     warnings.push("EMPTY_TABLE");
   }
 
-  if (emptyRatio >= 0.45) {
+  if (emptyRatio >= COLUMN_INFERENCE_THRESHOLDS.emptyRatioWarning) {
     warnings.push("MANY_EMPTY_CELLS");
   }
 
-  if (headerConfidence < 0.6) {
+  if (headerConfidence < COLUMN_INFERENCE_THRESHOLDS.headerConfidenceWarning) {
     warnings.push("LOW_CONFIDENCE_HEADER");
   }
 
-  if (typeConsistency < 0.5) {
+  if (typeConsistency < COLUMN_INFERENCE_THRESHOLDS.typeConsistencyWarning) {
     warnings.push("LOW_TYPE_CONSISTENCY");
   }
 
@@ -163,8 +168,11 @@ function calculateConfidence({
   headerConfidence = 0,
   typeConsistency = 0,
 }) {
+  const weights = COLUMN_INFERENCE_THRESHOLDS.confidenceWeights;
   const score =
-    headerConfidence * 0.45 + typeConsistency * 0.35 + (1 - emptyRatio) * 0.2;
+    headerConfidence * weights.headerConfidence +
+    typeConsistency * weights.typeConsistency +
+    (1 - emptyRatio) * weights.nonEmptyRatio;
 
   return Number(score.toFixed(2));
 }

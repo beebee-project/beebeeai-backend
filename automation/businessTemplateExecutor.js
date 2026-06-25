@@ -1,15 +1,7 @@
 const {
-  executeTemplateSections,
-} = require("./businessTemplates/commonTemplateHelpers");
-const {
-  executeSalesReport,
-} = require("./businessTemplates/salesReportBuilder");
-const {
-  executeResearchBudgetReport,
-} = require("./businessTemplates/researchBudgetReportBuilder");
-const {
-  executeHrMonthlyReport,
-} = require("./businessTemplates/hrMonthlyReportBuilder");
+  getBusinessTemplateExecutor,
+  findBusinessTemplateDefinition,
+} = require("./businessTemplates/templateRegistry");
 const {
   normalizeBusinessTemplateResult,
   validateBusinessTemplateResultContract,
@@ -29,34 +21,14 @@ function executeBusinessTemplate({
     };
   }
 
-  let sections = [];
+  const definition = findBusinessTemplateDefinition(templateId);
+  const executeTemplate = getBusinessTemplateExecutor(templateId);
 
-  switch (templateId) {
-    case "sales_report":
-      sections = executeSalesReport({
-        normalizedQueryTables,
-        templateCandidate,
-      });
-      break;
-    case "research_budget_report":
-      sections = executeResearchBudgetReport({
-        normalizedQueryTables,
-        templateCandidate,
-      });
-      break;
-    case "hr_monthly_report":
-      sections = executeHrMonthlyReport({
-        normalizedQueryTables,
-        templateCandidate,
-      });
-      break;
-    default:
-      sections = executeTemplateSections({
-        normalizedQueryTables,
-        templateCandidate,
-      });
-      break;
-  }
+  const sections = executeTemplate({
+    normalizedQueryTables,
+    templateCandidate,
+    definition,
+  });
 
   if (!sections.length) {
     return {
@@ -71,9 +43,10 @@ function executeBusinessTemplate({
       ok: true,
       resultType: "businessTemplate",
       templateId,
-      title: templateCandidate.title || templateId,
-      description: templateCandidate.description || "",
-      outputTypes: templateCandidate.outputTypes,
+      title: templateCandidate.title || definition?.title || templateId,
+      description:
+        templateCandidate.description || definition?.description || "",
+      outputTypes: templateCandidate.outputTypes || definition?.outputTypes,
       sections,
     },
     templateCandidate,

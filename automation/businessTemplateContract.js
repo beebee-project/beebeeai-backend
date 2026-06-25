@@ -1,45 +1,23 @@
 const BUSINESS_TEMPLATE_RESULT_TYPE = "businessTemplate";
 const BUSINESS_TEMPLATE_CONTRACT_VERSION = "business_template_result_v1";
+const {
+  ALLOWED_OUTPUT_TYPES,
+  OUTPUT_TYPE_ALIASES,
+  normalizeOutputType,
+  normalizeOutputTypes,
+  getOutputTypeLabel,
+} = require("./config/outputArtifactConfig");
+const { OUTPUT_ARTIFACTS } = require("./config/outputArtifactConfig");
 
-const ALLOWED_OUTPUT_TYPES = ["summarySheet", "analysisReport", "ppt"];
-
-const OUTPUT_TYPE_ALIASES = {
-  reportJson: "analysisReport",
-  reportJSON: "analysisReport",
-  report_json: "analysisReport",
-  json: "analysisReport",
-  analysis: "analysisReport",
-  analysisJson: "analysisReport",
-  template: "summarySheet",
-  workbook: "summarySheet",
-  xlsx: "summarySheet",
-  powerpoint: "ppt",
-  pptx: "ppt",
-};
-
-const OUTPUT_TYPE_LABELS = {
-  summarySheet: "자동화시트",
-  analysisReport: "데이터분석",
-  ppt: "PPT",
-};
-
-function normalizeOutputType(outputType) {
-  const raw = String(outputType || "").trim();
-  if (!raw) return null;
-  const aliased = OUTPUT_TYPE_ALIASES[raw] || raw;
-  return ALLOWED_OUTPUT_TYPES.includes(aliased) ? aliased : null;
-}
-
-function normalizeOutputTypes(outputTypes = []) {
-  const source = Array.isArray(outputTypes) ? outputTypes : [outputTypes];
-  const normalized = source.map(normalizeOutputType).filter(Boolean);
-  const deduped = [...new Set(normalized)];
-  return deduped.length ? deduped : [...ALLOWED_OUTPUT_TYPES];
-}
+const OUTPUT_TYPE_LABELS = Object.fromEntries(
+  Object.entries(OUTPUT_ARTIFACTS).map(([type, artifact]) => [
+    type,
+    artifact.label,
+  ]),
+);
 
 function outputTypeLabel(outputType) {
-  const normalized = normalizeOutputType(outputType);
-  return normalized ? OUTPUT_TYPE_LABELS[normalized] : String(outputType || "");
+  return getOutputTypeLabel(outputType);
 }
 
 function isPlainObject(value) {

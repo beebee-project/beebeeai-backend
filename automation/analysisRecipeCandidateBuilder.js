@@ -1,62 +1,8 @@
-const ANALYSIS_RECIPE_RULES = [
-  {
-    recipeType: "group_summary",
-    canBuild: ({ primaryDimension, primaryMetric }) =>
-      !!primaryDimension && !!primaryMetric,
-    build: ({ table, primaryDimension, primaryMetric, makeCandidate }) =>
-      makeCandidate({
-        id: `${table.tableId}_group_summary`,
-        title: `${primaryDimension.header}별 ${primaryMetric.header} 요약`,
-        description: `${primaryDimension.header} 기준으로 ${primaryMetric.header}의 합계, 평균, 건수를 분석합니다.`,
-        recipeType: "group_summary",
-        table,
-        metric: primaryMetric,
-        dimension: primaryDimension,
-      }),
-  },
-  {
-    recipeType: "time_trend",
-    canBuild: ({ primaryDate, primaryMetric }) =>
-      !!primaryDate && !!primaryMetric,
-    build: ({ table, primaryDate, primaryMetric, makeCandidate }) =>
-      makeCandidate({
-        id: `${table.tableId}_time_trend`,
-        title: `${primaryDate.header} 기준 ${primaryMetric.header} 추이`,
-        description: `${primaryDate.header}를 기준으로 ${primaryMetric.header}의 기간별 흐름을 분석합니다.`,
-        recipeType: "time_trend",
-        table,
-        metric: primaryMetric,
-        date: primaryDate,
-      }),
-  },
-  {
-    recipeType: "category_count",
-    canBuild: ({ primaryDimension }) => !!primaryDimension,
-    build: ({ table, primaryDimension, makeCandidate }) =>
-      makeCandidate({
-        id: `${table.tableId}_category_count`,
-        title: `${primaryDimension.header}별 건수`,
-        description: `${primaryDimension.header} 기준으로 데이터 건수를 집계합니다.`,
-        recipeType: "category_count",
-        table,
-        dimension: primaryDimension,
-      }),
-  },
-  {
-    recipeType: "top_bottom",
-    canBuild: ({ primaryMetric }) => !!primaryMetric,
-    build: ({ table, primaryDimension, primaryMetric, makeCandidate }) =>
-      makeCandidate({
-        id: `${table.tableId}_top_bottom`,
-        title: `${primaryMetric.header} 상위/하위 항목`,
-        description: `${primaryMetric.header} 기준으로 높은 항목과 낮은 항목을 확인합니다.`,
-        recipeType: "top_bottom",
-        table,
-        metric: primaryMetric,
-        dimension: primaryDimension,
-      }),
-  },
-];
+const {
+  ANALYSIS_RECIPE_RULES,
+  ANALYSIS_RECIPE_OPTIONS,
+  hasRequiredRecipeContext,
+} = require("./config/analysisRecipeConfig");
 
 function getColumnsByRole(columns = [], role = "") {
   return columns.filter((column) => column.role === role);
@@ -101,7 +47,9 @@ function uniqueColumns(columns = []) {
 function buildTableCandidates(table = {}) {
   const candidates = [];
 
-  if (Number(table.confidence) < 0.45) return candidates;
+  if (Number(table.confidence) < ANALYSIS_RECIPE_OPTIONS.minTableConfidence) {
+    return candidates;
+  }
 
   const columns = Array.isArray(table.columns) ? table.columns : [];
 
@@ -110,8 +58,12 @@ function buildTableCandidates(table = {}) {
     ...getColumnsByRole(columns, "dimension"),
     ...columns.filter(
       (column) =>
-        column.type === "category" &&
-        !["metric", "date", "id"].includes(column.role),
+        ANALYSIS_RECIPE_OPTIONS.categoryTypesForDimensionFallback.includes(
+          column.type,
+        ) &&
+        !ANALYSIS_RECIPE_OPTIONS.excludedRolesForDimensionFallback.includes(
+          column.role,
+        ),
     ),
   ]);
   const dates = getColumnsByRole(columns, "date");
@@ -150,7 +102,7 @@ function buildTableCandidates(table = {}) {
       makeCandidate,
     };
 
-    if (rule.canBuild(context)) {
+    if (hasRequiredRecipeContext(rule, context)) {
       candidates.push(rule.build(context));
     }
   });

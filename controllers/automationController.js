@@ -12,6 +12,15 @@ const {
 const { readWorkbookFromBuffer } = require("../utils/workbookReader");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const { buildDownloadFileName } = require("../utils/downloadFileNameBuilder");
+const {
+  OUTPUT_TYPES,
+  getOutputArtifact,
+  getOutputExtension,
+  getOutputMimeType,
+  getOutputDefaultTitle,
+  getOutputVersion,
+  inferOutputArtifact,
+} = require("../automation/config/outputArtifactConfig");
 const { decryptBuffer } = require("../services/encryptedFileService");
 const {
   readEncryptedQueryJson,
@@ -115,20 +124,23 @@ const {
   outputTypeLabel,
 } = require("../automation/businessTemplateContract");
 
-const REPORT_DIR = path.join(
-  process.cwd(),
-  ".local_uploads",
-  "generated",
-  "reports",
-);
+function getGeneratedLocalDir(outputType) {
+  const artifact = getOutputArtifact(outputType);
+  const dirName = artifact?.localDirName || String(outputType || "generated");
 
-const PPT_DIR = path.join(process.cwd(), ".local_uploads", "generated", "ppt");
+  return path.join(process.cwd(), ".local_uploads", "generated", dirName);
+}
 
-const AUTOMATION_DIR = path.join(
-  process.cwd(),
-  ".local_uploads",
-  "generated",
-  "automation",
+function getGeneratedStoragePrefix(outputType) {
+  const artifact = getOutputArtifact(outputType);
+  return artifact?.storagePrefix || String(outputType || "generated");
+}
+
+const REPORT_DIR = getGeneratedLocalDir(OUTPUT_TYPES.ANALYSIS_REPORT);
+const PPT_DIR = getGeneratedLocalDir(OUTPUT_TYPES.PPT);
+const AUTOMATION_DIR = getGeneratedLocalDir(OUTPUT_TYPES.SUMMARY_SHEET);
+const SUMMARY_SHEET_STORAGE_PREFIX = getGeneratedStoragePrefix(
+  OUTPUT_TYPES.SUMMARY_SHEET,
 );
 
 async function assertTemplateGenerationUsage(req, res) {
@@ -185,7 +197,7 @@ function buildGeneratedFileName({
     sourceFileName,
     templateTitle,
     outputType,
-    extension,
+    extension: extension || getOutputExtension(outputType),
   });
 }
 
@@ -194,22 +206,8 @@ function encodeDownloadName(fileName = "download") {
 }
 
 function contentTypeForGeneratedFile(fileName = "", outputType = "") {
-  const lower = String(fileName || "").toLowerCase();
-  const type = String(outputType || "").toLowerCase();
-
-  if (lower.endsWith(".xlsx") || type === "summarysheet") {
-    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  }
-
-  if (lower.endsWith(".pptx") || type === "ppt") {
-    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-  }
-
-  if (lower.endsWith(".json") || type === "analysisreport") {
-    return "application/json; charset=utf-8";
-  }
-
-  return "application/octet-stream";
+  const artifact = inferOutputArtifact({ outputType, fileName });
+  return artifact?.mimeType || "application/octet-stream";
 }
 
 function buildGeneratedDownloadUrl({
@@ -235,8 +233,8 @@ function assertGeneratedStorageKeyAccess(req, storageKey = "") {
   const userId = req.user?.id ? String(req.user.id) : "local-dev";
 
   return (
-    key.startsWith(`summary-sheets/${userId}/`) ||
-    key.startsWith(`summary-sheets/local-dev/`)
+    key.startsWith(`${SUMMARY_SHEET_STORAGE_PREFIX}/${userId}/`) ||
+    key.startsWith(`${SUMMARY_SHEET_STORAGE_PREFIX}/local-dev/`)
   );
 }
 
@@ -516,6 +514,8 @@ async function buildQueryTablesForFile(req, fileName) {
   };
 }
 
+const DEFAULT_ANALYSIS_CANDIDATE_CATEGORY = "automation";
+
 function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
   return (analysisRecipeCandidates || []).map((candidate, index) => {
     const id =
@@ -541,96 +541,13 @@ function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
         candidate.category ||
         candidate.type ||
         candidate.recipeId ||
-        "automation",
+        DEFAULT_ANALYSIS_CANDIDATE_CATEGORY,
       priority: Number.isFinite(candidate.priority)
         ? candidate.priority
         : index + 1,
       candidate,
     };
   });
-}
-
-function getRecipeType(candidate = {}) {
-  return candidate.recipeType || candidate.type || candidate.recipeId || "";
-}
-
-function isRecipeType(candidate = {}, types = []) {
-  return types.includes(getRecipeType(candidate));
-}
-
-function buildAutomationCategoryCandidates(analysisRecipeCandidates = []) {
-  const list = Array.isArray(analysisRecipeCandidates)
-    ? analysisRecipeCandidates
-    : [];
-
-  const groupTypes = [
-    "group_summary",
-    "category_count",
-    "groupAggregate",
-    "multiAggregate",
-    "pipelineCombine",
-  ];
-
-  const trendTypes = [
-    "time_trend",
-    "cumulativeSum",
-    "rollingAverage",
-    "growthRate",
-  ];
-
-  const rankingTypes = ["top_bottom", "list"];
-  const pivotTypes = ["pivot"];
-
-  const groupCandidates = list.filter((c) => isRecipeType(c, groupTypes));
-  const trendCandidates = list.filter((c) => isRecipeType(c, trendTypes));
-  const rankingCandidates = list.filter((c) => isRecipeType(c, rankingTypes));
-  const pivotCandidates = list.filter((c) => isRecipeType(c, pivotTypes));
-
-  const categories = [];
-
-  if (groupCandidates.length) {
-    categories.push({
-      categoryId: "workforce_or_summary",
-      title: "재직 현황 / 요약 집계",
-      description:
-        "부서, 직급, 상태 등 기준별 인원수·평균·합계를 자동화합니다.",
-      examples: ["재직 현황", "평균 연봉", "부서별 집계", "건수 요약"],
-      candidates: groupCandidates,
-    });
-  }
-
-  if (trendCandidates.length) {
-    categories.push({
-      categoryId: "trend",
-      title: "추이 분석",
-      description:
-        "월별·연도별 변화, 누적합계, 이동평균, 성장률을 자동화합니다.",
-      examples: ["입사 추이", "매출 추이", "누적 합계", "성장률"],
-      candidates: trendCandidates,
-    });
-  }
-
-  if (rankingCandidates.length) {
-    categories.push({
-      categoryId: "ranking",
-      title: "순위 / TOP 분석",
-      description: "상위 N개 항목이나 높은 값 순위를 자동화합니다.",
-      examples: ["상위 고객", "연봉 TOP", "제품별 매출 순위"],
-      candidates: rankingCandidates,
-    });
-  }
-
-  if (pivotCandidates.length) {
-    categories.push({
-      categoryId: "cross_summary",
-      title: "교차 분석",
-      description: "연도×부서, 월×제품처럼 두 기준의 교차표를 자동화합니다.",
-      examples: ["연도별 부서별 평균", "월별 제품별 매출"],
-      candidates: pivotCandidates,
-    });
-  }
-
-  return categories;
 }
 
 async function executeAnalysisCandidate(req, res) {
@@ -901,22 +818,22 @@ exports.createSummarySheet = async (req, res, next) => {
     };
 
     const userId = req.user?.id || "local-dev";
+    const outputType = OUTPUT_TYPES.SUMMARY_SHEET;
     const outputFileName = buildGeneratedFileName({
       sourceFileName: saved.fileName,
       templateTitle: resultTemplateTitle(
         result,
         templateCandidate,
-        "자동화 시트",
+        getOutputDefaultTitle(outputType),
       ),
-      outputType: "summarySheet",
-      extension: "xlsx",
+      outputType,
     });
-    const key = `summary-sheets/${userId}/${saved.fileHash}/${outputFileName}`;
+    const key = `${SUMMARY_SHEET_STORAGE_PREFIX}/${userId}/${saved.fileHash}/${outputFileName}`;
 
     const stored = await saveBufferObject(
       key,
       buffer,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      getOutputMimeType(outputType),
     );
     await bumpTemplateGenerationUsage(req);
 
@@ -927,11 +844,11 @@ exports.createSummarySheet = async (req, res, next) => {
       downloadUrl: buildGeneratedDownloadUrl({
         storageKey: key,
         displayName: outputFileName,
-        outputType: "summarySheet",
+        outputType,
       }),
       sourceFileName: saved.fileName,
-      outputType: "summarySheet",
-      outputLabel: outputTypeLabel("summarySheet"),
+      outputType,
+      outputLabel: outputTypeLabel(outputType),
       fileHash: saved.fileHash,
       queryTablesKey,
       summarySheetKey: key,
@@ -959,6 +876,7 @@ function writeReportJson({
   result,
   templateCandidate = null,
 }) {
+  const outputType = OUTPUT_TYPES.ANALYSIS_REPORT;
   fs.mkdirSync(REPORT_DIR, { recursive: true });
 
   const report = buildReportSections({
@@ -969,9 +887,9 @@ function writeReportJson({
 
   const output = {
     ok: true,
-    version: "analysis_report_export_v1",
-    outputType: "analysisReport",
-    outputLabel: outputTypeLabel("analysisReport"),
+    version: getOutputVersion(outputType),
+    outputType,
+    outputLabel: outputTypeLabel(outputType),
     generatedAt: new Date().toISOString(),
     source: {
       fileName: fileName || "",
@@ -999,10 +917,9 @@ function writeReportJson({
     templateTitle: resultTemplateTitle(
       result,
       templateCandidate,
-      "데이터 분석",
+      getOutputDefaultTitle(outputType),
     ),
-    outputType: "analysisReport",
-    extension: "json",
+    outputType,
   });
   const filePath = path.join(REPORT_DIR, outputName);
 
@@ -1013,8 +930,8 @@ function writeReportJson({
     fileName: outputName,
     displayName: outputName,
     filePath,
-    outputType: "analysisReport",
-    outputLabel: outputTypeLabel("analysisReport"),
+    outputType,
+    outputLabel: outputTypeLabel(outputType),
     report,
   };
 }
@@ -1026,6 +943,7 @@ async function writeReportPpt({
   template,
   templateCandidate = null,
 }) {
+  const outputType = OUTPUT_TYPES.PPT;
   fs.mkdirSync(PPT_DIR, { recursive: true });
 
   const report = buildReportSections({
@@ -1038,9 +956,12 @@ async function writeReportPpt({
 
   const outputName = buildGeneratedFileName({
     sourceFileName: fileName,
-    templateTitle: resultTemplateTitle(result, templateCandidate, "PPT"),
-    outputType: "ppt",
-    extension: "pptx",
+    templateTitle: resultTemplateTitle(
+      result,
+      templateCandidate,
+      getOutputDefaultTitle(outputType),
+    ),
+    outputType,
   });
   const filePath = path.join(PPT_DIR, outputName);
 
@@ -1051,8 +972,8 @@ async function writeReportPpt({
     fileName: outputName,
     displayName: outputName,
     filePath,
-    outputType: "ppt",
-    outputLabel: outputTypeLabel("ppt"),
+    outputType,
+    outputLabel: outputTypeLabel(outputType),
     template: template || "default",
     report,
     slideCount: Array.isArray(report.sections) ? report.sections.length : 0,
@@ -1157,15 +1078,15 @@ exports.exportXlsx = async (req, res) => {
 
     const buffer = workbookToBuffer(workbook);
 
+    const outputType = OUTPUT_TYPES.SUMMARY_SHEET;
     const fileName = buildGeneratedFileName({
       sourceFileName: saved.fileName || "",
       templateTitle: resultTemplateTitle(
         result,
         templateCandidate,
-        "자동화 시트",
+        getOutputDefaultTitle(outputType),
       ),
-      outputType: "summarySheet",
-      extension: "xlsx",
+      outputType,
     });
     const outputDir = AUTOMATION_DIR;
     fs.mkdirSync(outputDir, { recursive: true });
@@ -1180,11 +1101,11 @@ exports.exportXlsx = async (req, res) => {
       downloadUrl: buildGeneratedDownloadUrl({
         filePath,
         displayName: fileName,
-        outputType: "summarySheet",
+        outputType,
       }),
       filePath,
-      outputType: "summarySheet",
-      outputLabel: outputTypeLabel("summarySheet"),
+      outputType,
+      outputLabel: outputTypeLabel(outputType),
       sheetNames: workbook.SheetNames || [],
       formulaEngine: workbook["!beebeeFormulaEngine"] || {
         prepared: true,
@@ -1293,6 +1214,7 @@ exports.exportReportJson = async (req, res) => {
       result,
       templateCandidate,
     });
+    const outputType = exported.outputType || OUTPUT_TYPES.ANALYSIS_REPORT;
     await bumpTemplateGenerationUsage(req);
 
     return res.json({
@@ -1302,11 +1224,11 @@ exports.exportReportJson = async (req, res) => {
       downloadUrl: buildGeneratedDownloadUrl({
         filePath: exported.filePath,
         displayName: exported.displayName || exported.fileName,
-        outputType: "analysisReport",
+        outputType,
       }),
       filePath: exported.filePath,
-      outputType: "analysisReport",
-      outputLabel: outputTypeLabel("analysisReport"),
+      outputType,
+      outputLabel: outputTypeLabel(outputType),
       analysisReport: exported.report,
       report: exported.report,
       result,
@@ -1414,6 +1336,7 @@ exports.exportPptx = async (req, res) => {
       template,
       templateCandidate,
     });
+    const outputType = exported.outputType || OUTPUT_TYPES.PPT;
     await bumpTemplateGenerationUsage(req);
 
     return res.json({
@@ -1423,11 +1346,11 @@ exports.exportPptx = async (req, res) => {
       downloadUrl: buildGeneratedDownloadUrl({
         filePath: exported.filePath,
         displayName: exported.displayName || exported.fileName,
-        outputType: "ppt",
+        outputType,
       }),
       filePath: exported.filePath,
-      outputType: "ppt",
-      outputLabel: outputTypeLabel("ppt"),
+      outputType,
+      outputLabel: outputTypeLabel(outputType),
       template: exported.template,
       slideCount: exported.slideCount,
       report: exported.report,
