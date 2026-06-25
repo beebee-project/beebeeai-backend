@@ -675,6 +675,9 @@ exports.createSummarySheet = async (req, res, next) => {
       candidate,
       templateCandidate,
       executionResult,
+      summarySheetMode = "hybrid",
+      includeSourceDataSheet = true,
+      formulaOptions = {},
     } = req.body || {};
 
     if (!queryTablesKey) {
@@ -756,9 +759,19 @@ exports.createSummarySheet = async (req, res, next) => {
       message,
       intent: queryIntent,
       result,
+      sourceTables: normalizedQueryTables,
+      summarySheetMode,
+      includeSourceDataSheet,
+      formulaOptions,
     });
 
     const buffer = workbookToBuffer(workbook);
+    const formulaEngineMeta = workbook["!beebeeFormulaEngine"] || {
+      prepared: true,
+      applied: false,
+      mode: summarySheetMode,
+      formulaCount: 0,
+    };
 
     const userId = req.user?.id || "local-dev";
     const outputFileName = buildGeneratedFileName({
@@ -795,6 +808,9 @@ exports.createSummarySheet = async (req, res, next) => {
       localName: stored.localName,
       gcsName: stored.gcsName,
       sheetNames: workbook.SheetNames || [],
+      summarySheetMode,
+      includeSourceDataSheet,
+      formulaEngine: formulaEngineMeta,
       chartSpec,
       intent: queryIntent,
       result,
@@ -999,6 +1015,12 @@ exports.exportXlsx = async (req, res) => {
       message,
       intent,
       result,
+      sourceTables:
+        saved.normalizedQueryTables ||
+        buildNormalizedQueryTables(saved.tables || []),
+      summarySheetMode: req.body?.summarySheetMode || "hybrid",
+      includeSourceDataSheet: req.body?.includeSourceDataSheet !== false,
+      formulaOptions: req.body?.formulaOptions || {},
     });
 
     const buffer = workbookToBuffer(workbook);
@@ -1027,6 +1049,12 @@ exports.exportXlsx = async (req, res) => {
       outputType: "summarySheet",
       outputLabel: outputTypeLabel("summarySheet"),
       sheetNames: workbook.SheetNames || [],
+      formulaEngine: workbook["!beebeeFormulaEngine"] || {
+        prepared: true,
+        applied: false,
+        mode: req.body?.summarySheetMode || "hybrid",
+        formulaCount: 0,
+      },
       result,
     });
   } catch (err) {
