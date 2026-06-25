@@ -451,6 +451,99 @@ function findNumericValueColumnIndex({
   return -1;
 }
 
+function findExactAggregateHeaderIndex(headers = [], candidates = []) {
+  const normalizedHeaders = headers.map((h) => String(h || "").trim());
+  const normalizedCandidates = candidates
+    .filter(Boolean)
+    .map((h) => String(h || "").trim());
+
+  for (const candidate of normalizedCandidates) {
+    const index = normalizedHeaders.findIndex((header) => header === candidate);
+    if (index >= 0) return index;
+  }
+
+  return -1;
+}
+
+function resolveAggregateFormulaTargets({
+  headers = [],
+  operation = "sum",
+  formulaPlan = {},
+  criteriaColIndex = -1,
+} = {}) {
+  const targets = [];
+  const used = new Set([criteriaColIndex]);
+
+  function pushTarget(op, index) {
+    if (index < 0 || used.has(index)) return;
+    targets.push({ operation: op, columnIndex: index });
+    used.add(index);
+  }
+
+  const countIndex = findExactAggregateHeaderIndex(headers, [
+    "count",
+    "COUNT",
+    "건수",
+    "개수",
+    "인원수",
+    "대상 수",
+    "행수",
+  ]);
+
+  const sumIndex = findExactAggregateHeaderIndex(headers, [
+    "sum",
+    "SUM",
+    "합계",
+    "총합",
+    "금액합계",
+    "수량합계",
+  ]);
+
+  const averageIndex = findExactAggregateHeaderIndex(headers, [
+    "average",
+    "avg",
+    "AVG",
+    "평균",
+  ]);
+
+  const hasMultiAggregateColumns =
+    countIndex >= 0 || sumIndex >= 0 || averageIndex >= 0;
+
+  if (hasMultiAggregateColumns) {
+    pushTarget("count", countIndex);
+
+    if (formulaPlan.metric?.letter) {
+      pushTarget("sum", sumIndex);
+      pushTarget("average", averageIndex);
+    }
+
+    return targets;
+  }
+
+  const normalizedOperation = normalizeAggregateOperation(
+    operation,
+    formulaPlan,
+  );
+
+  const singleValueIndex = findExactAggregateHeaderIndex(headers, [
+    "값",
+    normalizedOperation,
+    formulaPlan.metric?.header,
+  ]);
+
+  if (singleValueIndex < 0) {
+    return [];
+  }
+
+  if (normalizedOperation !== "count" && !formulaPlan.metric?.letter) {
+    return [];
+  }
+
+  pushTarget(normalizedOperation, singleValueIndex);
+
+  return targets;
+}
+
 function applySimpleAggregateFormulaSection({
   ws,
   rows = [],
@@ -482,22 +575,19 @@ function applySimpleAggregateFormulaSection({
 
   if (criteriaColIndex < 0) return 0;
 
-  const valueColIndex = findHeaderIndex(headers, [
-    formulaPlan.metric?.header,
-    operation === "count" ? "값" : "",
-    "값",
-  ]);
+  const targets = resolveAggregateFormulaTargets({
+    headers,
+    operation,
+    formulaPlan,
+    criteriaColIndex,
+  });
 
-  const resolvedValueColIndex =
-    valueColIndex >= 0
-      ? valueColIndex
-      : findNumericValueColumnIndex({
-          headers,
-          rows,
-          exclude: [criteriaColIndex],
-        });
-
-  if (resolvedValueColIndex < 0) return 0;
+  if (!targets.length) {
+    formulaPlan.applied = false;
+    formulaPlan.formulaCount = 0;
+    formulaPlan.reason = "NO_PRECISE_FORMULA_TARGET_COLUMN";
+    return 0;
+  }
 
   const sourceSheetName =
     formulaPlan.sourceSheetName ||
@@ -511,36 +601,48 @@ function applySimpleAggregateFormulaSection({
       r,
       c: criteriaColIndex,
     });
-    const targetAddr = XLSX.utils.encode_cell({
-      r,
-      c: resolvedValueColIndex,
-    });
 
     const criteriaValue = ws[criteriaAddr]?.v;
     if (criteriaValue == null || criteriaValue === "") continue;
 
-    const previousCell = ws[targetAddr] || {};
-    const formulaCell = createFormulaCellFromSpec({
-      type: FORMULA_SPEC_TYPES.GROUP_AGGREGATE,
-      operation,
-      sheetName: sourceSheetName,
-      groupLetter: formulaPlan.group.letter,
-      metricLetter: formulaPlan.metric?.letter,
-      criteriaCell: criteriaAddr,
-      value: Number.isFinite(Number(previousCell.v))
-        ? Number(previousCell.v)
-        : 0,
-      cellType: "n",
-    });
+    for (const target of targets) {
+      if (target.operation !== "count" && !formulaPlan.metric?.letter) {
+        continue;
+      }
 
-    if (previousCell.z) formulaCell.z = previousCell.z;
-    ws[targetAddr] = formulaCell;
-    appliedCount += 1;
+      const targetAddr = XLSX.utils.encode_cell({
+        r,
+        c: target.columnIndex,
+      });
+
+      const previousCell = ws[targetAddr] || {};
+      const formulaCell = createFormulaCellFromSpec({
+        type: FORMULA_SPEC_TYPES.GROUP_AGGREGATE,
+        operation: target.operation,
+        sheetName: sourceSheetName,
+        groupLetter: formulaPlan.group.letter,
+        metricLetter: formulaPlan.metric?.letter,
+        criteriaCell: criteriaAddr,
+        value: Number.isFinite(Number(previousCell.v))
+          ? Number(previousCell.v)
+          : 0,
+        cellType: "n",
+      });
+
+      if (previousCell.z) formulaCell.z = previousCell.z;
+      ws[targetAddr] = formulaCell;
+      appliedCount += 1;
+    }
   }
 
   formulaPlan.applied = appliedCount > 0;
   formulaPlan.formulaCount = appliedCount;
   formulaPlan.aggregateOperation = operation;
+  formulaPlan.targets = targets.map((target) => ({
+    operation: target.operation,
+    columnIndex: target.columnIndex,
+    header: headers[target.columnIndex],
+  }));
   formulaPlan.reason =
     appliedCount > 0 ? "SIMPLE_AGGREGATE_FORMULA_APPLIED" : "NO_ELIGIBLE_ROWS";
 
