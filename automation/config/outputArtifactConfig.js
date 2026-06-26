@@ -13,8 +13,8 @@ const OUTPUT_ARTIFACTS = Object.freeze({
     mimeType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     defaultTitle: "자동화 시트",
-    storagePrefix: "summary-sheets",
-    localDirName: "automation",
+    storagePrefix: "generated/summary-sheets",
+    localDirName: "summary-sheets",
   }),
 
   [OUTPUT_TYPES.ANALYSIS_REPORT]: Object.freeze({

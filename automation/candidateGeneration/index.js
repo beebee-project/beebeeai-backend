@@ -370,6 +370,52 @@ async function generateCandidateBundle({
   }
 
   try {
+    const matcherModule = require("./aiTemplateMatcher");
+    const matchBusinessTemplatesWithAi = resolveExportedFunction(
+      matcherModule,
+      ["matchBusinessTemplatesWithAi", "aiTemplateMatcher", "match"],
+    );
+
+    if (matchBusinessTemplatesWithAi) {
+      const matched = await matchBusinessTemplatesWithAi({
+        normalizedQueryTables,
+        bundle,
+        fileName,
+      });
+
+      if (matched?.bundle) {
+        bundle = {
+          ...matched.bundle,
+          candidateGeneration: {
+            ...(matched.bundle.candidateGeneration || {}),
+            aiTemplateMatcher: matched.meta ||
+              matched.bundle.candidateGeneration?.aiTemplateMatcher || {
+                enabled: true,
+                used: true,
+              },
+          },
+        };
+      }
+    }
+  } catch (error) {
+    const enabled = ["true", "1"].includes(
+      String(process.env.USE_AI_TEMPLATE_MATCHER || "").toLowerCase(),
+    );
+
+    bundle = {
+      ...bundle,
+      candidateGeneration: {
+        ...(bundle.candidateGeneration || {}),
+        aiTemplateMatcher: {
+          enabled,
+          used: false,
+          error: error?.message || String(error),
+        },
+      },
+    };
+  }
+
+  try {
     const rerankerModule = require("./aiCandidateReranker");
     const rerankCandidateBundle = resolveExportedFunction(rerankerModule, [
       "rerankCandidateBundle",

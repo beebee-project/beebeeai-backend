@@ -253,6 +253,14 @@ function resolveSafeGeneratedLocalPath(filePath = "") {
   return allowed ? resolved : null;
 }
 
+function isLocalDevBypassMode() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.LOCAL_DEV === "1" &&
+    process.env.DEV_BYPASS_AUTH === "1"
+  );
+}
+
 function findUserFile(user, fileName) {
   if (!user || !fileName) return null;
   return user.uploadedFiles?.find((f) => f.originalName === fileName) || null;
@@ -279,6 +287,12 @@ function hasMojibakeQueryPayload(payload = {}) {
 }
 
 async function loadSavedQueryJsonForFile(req, fileName) {
+  // 로컬 회귀 테스트/개발 인증 우회 모드에서는 MongoDB 연결 없이
+  // .local_uploads의 원본 파일을 직접 읽는다.
+  // 이 가드가 없으면 MONGO_URI 없이 실행한 로컬 서버에서
+  // User.findById()가 buffering timeout을 발생시킨다.
+  if (isLocalDevBypassMode()) return null;
+
   if (!req.user?.id || !fileName) return null;
 
   const user = await User.findById(req.user.id).select("uploadedFiles");
@@ -401,7 +415,7 @@ async function buildQueryTablesForFile(req, fileName) {
     );
   }
 
-  if (process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1") {
+  if (isLocalDevBypassMode()) {
     const path = require("path");
     const fs = require("fs");
 
