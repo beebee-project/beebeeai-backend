@@ -30,54 +30,6 @@ const {
   decryptBuffer,
 } = require("../services/encryptedFileService");
 
-function collectUploadedFileStorageKeys(fileInfo = {}) {
-  return Array.from(
-    new Set(
-      [
-        fileInfo.gcsName,
-        fileInfo.localName,
-        fileInfo.storageName,
-        fileInfo.storageKey,
-      ]
-        .map((value) => String(value || "").trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-async function deleteUploadedFileStorageObjects(fileInfo = {}, context = {}) {
-  const keys = collectUploadedFileStorageKeys(fileInfo);
-  const deleted = [];
-  const errors = [];
-
-  for (const key of keys) {
-    try {
-      await deleteObject(key);
-      deleted.push(key);
-    } catch (error) {
-      errors.push({ key, message: error?.message || String(error) });
-    }
-  }
-
-  console.log("[file.storage.delete]", {
-    reason: context.reason || "delete",
-    userId: context.userId || "",
-    originalName: fileInfo.originalName || "",
-    keys,
-    deleted,
-    errors,
-  });
-
-  if (errors.length) {
-    const error = new Error("업로드 파일 저장소 삭제 중 오류가 발생했습니다.");
-    error.code = "FILE_STORAGE_DELETE_FAILED";
-    error.storageDeleteErrors = errors;
-    throw error;
-  }
-
-  return { keys, deleted };
-}
-
 exports.upload = async (req, res) => {
   const saved = await saveToStorage(req);
   if (!saved) return res.status(500).json({ error: "업로드 실패" });
@@ -138,10 +90,7 @@ exports.uploadFile = async (req, res, next) => {
     );
 
     if (existingFile) {
-      await deleteUploadedFileStorageObjects(existingFile, {
-        reason: "replace-existing-upload",
-        userId: String(user._id),
-      });
+      await deleteObject(existingFile.localName || existingFile.gcsName);
 
       if (existingFile.queryJsonKey) {
         await deleteEncryptedQueryJson(existingFile.queryJsonKey);
@@ -289,10 +238,7 @@ exports.deleteFile = async (req, res, next) => {
         .json({ message: "파일을 찾을 수 없거나 접근 권한이 없습니다." });
     }
 
-    await deleteUploadedFileStorageObjects(fileInfo, {
-      reason: "delete-uploaded-file",
-      userId: String(user._id),
-    });
+    await deleteObject(fileInfo.localName || fileInfo.gcsName);
 
     if (fileInfo.queryJsonKey) {
       await deleteEncryptedQueryJson(fileInfo.queryJsonKey);
