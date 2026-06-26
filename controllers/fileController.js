@@ -30,7 +30,6 @@ const {
   decryptBuffer,
 } = require("../services/encryptedFileService");
 
-
 function collectUploadedFileStorageKeys(fileInfo = {}) {
   return Array.from(
     new Set(
@@ -40,7 +39,7 @@ function collectUploadedFileStorageKeys(fileInfo = {}) {
         fileInfo.storageName,
         fileInfo.storageKey,
       ]
-        .map((value) => String(value || '').trim())
+        .map((value) => String(value || "").trim())
         .filter(Boolean),
     ),
   );
@@ -60,18 +59,18 @@ async function deleteUploadedFileStorageObjects(fileInfo = {}, context = {}) {
     }
   }
 
-  console.log('[file.storage.delete]', {
-    reason: context.reason || 'delete',
-    userId: context.userId || '',
-    originalName: fileInfo.originalName || '',
+  console.log("[file.storage.delete]", {
+    reason: context.reason || "delete",
+    userId: context.userId || "",
+    originalName: fileInfo.originalName || "",
     keys,
     deleted,
     errors,
   });
 
   if (errors.length) {
-    const error = new Error('업로드 파일 저장소 삭제 중 오류가 발생했습니다.');
-    error.code = 'FILE_STORAGE_DELETE_FAILED';
+    const error = new Error("업로드 파일 저장소 삭제 중 오류가 발생했습니다.");
+    error.code = "FILE_STORAGE_DELETE_FAILED";
     error.storageDeleteErrors = errors;
     throw error;
   }
@@ -140,7 +139,7 @@ exports.uploadFile = async (req, res, next) => {
 
     if (existingFile) {
       await deleteUploadedFileStorageObjects(existingFile, {
-        reason: 'replace-existing-upload',
+        reason: "replace-existing-upload",
         userId: String(user._id),
       });
 
@@ -291,7 +290,7 @@ exports.deleteFile = async (req, res, next) => {
     }
 
     await deleteUploadedFileStorageObjects(fileInfo, {
-      reason: 'delete-uploaded-file',
+      reason: "delete-uploaded-file",
       userId: String(user._id),
     });
 
