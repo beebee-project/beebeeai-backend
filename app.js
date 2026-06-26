@@ -12,8 +12,6 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const cronRoutes = require("./routes/cronRoutes");
 const automationRoutes = require("./routes/automationRoutes");
-const { startDailySummaryCron } = require("./cron/dailySummaryCron");
-
 // 앱 초기화
 const app = express();
 app.set("trust proxy", 1);
@@ -64,7 +62,6 @@ app.use(corsMiddleware);
 // ✅ 웹 서버에서는 내부 cron을 기본 OFF
 // ✅ DB 비활성 상태에서는 cron 시작 금지
 if (process.env.RUN_INTERNAL_CRON === "1" && !DB_DISABLED) {
-  startDailySummaryCron();
 }
 
 // 바디 파서
