@@ -1,12 +1,15 @@
 const paymentService = require("../services/paymentService");
 const User = require("../models/User");
 const tossClient = require("../config/tossClient");
-const { resetUserToFreeState } = require("../services/accountResetService");
 const {
   isSubscriptionActive,
   getEffectivePlan,
 } = require("../utils/subscriptionStatus");
 const { getPlanLimits } = require("../config/planLimits");
+const {
+  applyUsageResetPolicies,
+  applyUsageStateTransitions,
+} = require("../services/usageResetService");
 
 function ensureAbsoluteUrl(url, fallbackOrigin) {
   // url이 "www.xxx" 같이 스킴 없이 들어오면 fallbackOrigin 붙여서 보정
@@ -36,9 +39,17 @@ exports.getUsage = async (req, res) => {
     );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
+    const now = new Date();
+    const betaMode = paymentService.isBetaMode();
+    const usageReset = applyUsageResetPolicies(user, { now });
+
+    if (usageReset.changed) {
+      await user.save();
+    }
+
     const isSubscribed = isSubscriptionActive(user);
 
-    const plan = paymentService.isBetaMode()
+    const plan = betaMode
       ? paymentService.getEffectivePlan(user.plan || "FREE")
       : getEffectivePlan(user);
 
@@ -51,7 +62,7 @@ exports.getUsage = async (req, res) => {
     res.json({
       plan,
       subscriptionStatus: isSubscribed ? status : "INACTIVE",
-      betaMode: paymentService.isBetaMode(),
+      betaMode,
       isSubscribed,
       usage: {
         templateGenerations:
@@ -121,7 +132,9 @@ exports.startSubscription = async (req, res) => {
     }
 
     // ✅ [추가] 1) 유저/구독 상태 확인 (중복 구독 방지 + 해지 후 기간 종료 시 재구독 허용)
-    const user = await User.findById(req.user.id).select("plan subscription");
+    const user = await User.findById(req.user.id).select(
+      "plan usage subscription",
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const now = new Date();
@@ -155,13 +168,9 @@ exports.startSubscription = async (req, res) => {
         });
       }
 
-      // ✅ 기간이 끝났으면 만료 확정 (billingKey는 유지)
-      await resetUserToFreeState(user._id, {
-        status: "CANCELED",
-        cancelAtPeriodEnd: false,
-        endedAt: now,
-        nextChargeAt: null,
-      });
+      // ✅ 기간이 끝났으면 만료 확정 (billingKey/customerKey는 유지, 사용량만 리셋)
+      const transition = applyUsageStateTransitions(user, { now });
+      if (transition.changed) await user.save();
     }
 
     // ✅ [기존] 2) customerKey 생성
@@ -278,6 +287,14 @@ exports.completeSubscription = async (req, res) => {
       lastChargeKey: `init-${now.getTime()}`,
     };
 
+    user.usage = {
+      ...(user.usage || {}),
+      templateGenerations: 0,
+      formulaConversions: 0,
+      fileUploads: 0,
+      lastReset: now,
+    };
+
     await user.save();
 
     return res.json({
@@ -354,20 +371,18 @@ exports.cronCharge = async (req, res) => {
           },
         ],
       },
-      "_id",
-    ).lean();
+      "plan usage subscription",
+    );
 
     let betaDowngradedCount = 0;
 
     for (const u of orphanProUsers) {
-      const r = await resetUserToFreeState(u._id, {
-        status: "INACTIVE",
-        nextChargeAt: null,
-        cancelAtPeriodEnd: false,
-        endedAt: now,
-      });
+      const transition = applyUsageStateTransitions(u, { now });
 
-      if (r.ok) betaDowngradedCount += 1;
+      if (transition.changed) {
+        await u.save();
+        betaDowngradedCount += 1;
+      }
     }
 
     // 1) 만료 확정 처리 (✅ 중복 제거 + 보안검증 이후 실행)
@@ -379,20 +394,18 @@ exports.cronCharge = async (req, res) => {
         "subscription.cancelAtPeriodEnd": true,
         "subscription.nextChargeAt": { $ne: null, $lte: now },
       },
-      "_id",
-    ).lean();
+      "plan usage subscription",
+    );
 
     let expiredCanceledCount = 0;
 
     for (const u of expiredCanceledUsers) {
-      const r = await resetUserToFreeState(u._id, {
-        status: "CANCELED",
-        cancelAtPeriodEnd: false,
-        endedAt: now,
-        nextChargeAt: null,
-      });
+      const transition = applyUsageStateTransitions(u, { now });
 
-      if (r.ok) expiredCanceledCount += 1;
+      if (transition.changed) {
+        await u.save();
+        expiredCanceledCount += 1;
+      }
     }
 
     // 2) 구독 청구 금액/상품명
@@ -528,7 +541,9 @@ exports.cronCharge = async (req, res) => {
 
 exports.cancelSubscription = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("plan subscription");
+    const user = await User.findById(req.user.id).select(
+      "plan usage subscription",
+    );
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
     const sub = user.subscription || {};

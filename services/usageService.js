@@ -5,6 +5,7 @@ const {
   isSubscriptionActive,
 } = require("../utils/subscriptionStatus");
 const { getPlanLimits } = require("../config/planLimits");
+const { applyUsageResetPolicies } = require("./usageResetService");
 
 function isLocalBypassMode() {
   return process.env.LOCAL_DEV === "1" && process.env.DEV_BYPASS_AUTH === "1";
@@ -74,10 +75,15 @@ function ensureUsageShape(user) {
   return changed;
 }
 
-function resetMonthlyUsage(user) {
+function resetMonthlyUsage(user, now = new Date()) {
   user.usage.templateGenerations = 0;
   user.usage.fileUploads = 0;
-  user.usage.lastReset = new Date();
+  user.usage.lastReset = now;
+}
+
+function applyUsageMaintenance(user, now = new Date()) {
+  const result = applyUsageResetPolicies(user, { now });
+  return Boolean(result.changed);
 }
 
 async function getUsageSummary(userId) {
@@ -95,12 +101,7 @@ async function getUsageSummary(userId) {
   const user = await User.findById(userId).select("plan usage subscription");
   if (!user) throw new Error("User not found");
 
-  let changed = false;
-  changed = ensureUsageShape(user) || changed;
-  if (needMonthlyReset(user.usage.lastReset)) {
-    resetMonthlyUsage(user);
-    changed = true;
-  }
+  const changed = applyUsageMaintenance(user);
   if (changed) await user.save();
 
   const plan = getEffectivePlanFromUser(user);
@@ -133,10 +134,8 @@ async function bumpUsage(userId, field, delta) {
   if (!user) throw new Error("User not found");
 
   if (user.isDeleted) return { skipped: true };
-  ensureUsageShape(user);
-  if (needMonthlyReset(user.usage.lastReset)) {
-    resetMonthlyUsage(user);
-  }
+
+  applyUsageMaintenance(user);
   user.usage[field] = Math.max(0, (user.usage[field] || 0) + delta);
   await user.save();
   const plan = getEffectivePlanFromUser(user);
@@ -164,12 +163,8 @@ async function assertCanUse(userId, field, amount = 1) {
     throw err;
   }
 
-  // 월 리셋 동일 로직
-  let changed = ensureUsageShape(user);
-  if (needMonthlyReset(user.usage.lastReset)) {
-    resetMonthlyUsage(user);
-    changed = true;
-  }
+  // 월 리셋 + 베타모드 종료 후 초과 사용량 리셋 동일 로직
+  const changed = applyUsageMaintenance(user);
   if (changed) await user.save();
 
   const plan = getEffectivePlanFromUser(user);
