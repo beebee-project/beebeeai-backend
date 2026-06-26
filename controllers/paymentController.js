@@ -415,14 +415,15 @@ exports.cronCharge = async (req, res) => {
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
     // 3) 청구 대상 조회: ACTIVE/PAST_DUE + nextChargeAt 도래 + billingKey 존재
+    //    plan은 배지/표시용 상태와 동기화가 늦을 수 있으므로 결제 대상 조건에서 제외한다.
+    //    실제 자동결제 대상 여부는 billingKey + subscription.status + nextChargeAt으로 판단한다.
     const targets = await User.find(
       {
-        plan: "PRO",
         "subscription.billingKey": { $exists: true, $ne: null },
         "subscription.nextChargeAt": { $ne: null, $lte: now },
         "subscription.status": { $in: ["ACTIVE", "PAST_DUE"] },
       },
-      "_id subscription",
+      "_id plan subscription",
     ).lean();
 
     console.log("[cronCharge] targets", targets.length);
@@ -489,6 +490,7 @@ exports.cronCharge = async (req, res) => {
           { _id: u._id },
           {
             $set: {
+              plan: "PRO",
               "subscription.status": "ACTIVE",
               "subscription.lastChargedAt": now,
               "subscription.nextChargeAt": nextChargeAt,
