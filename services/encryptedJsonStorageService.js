@@ -118,29 +118,84 @@ async function deleteEncryptedQueryJson(queryJsonKey) {
   await bucket.file(queryJsonKey).delete({ ignoreNotFound: true });
 }
 
+function normalizeFileNameForCompare(value = "") {
+  return String(value || "").trim();
+}
+
+function extractEncryptedQueryFileName(body = {}) {
+  if (!body || typeof body !== "object") return "";
+
+  if (body.fileName) return body.fileName;
+
+  try {
+    const payload = body.encrypted ? decryptJson(body.encrypted) : null;
+    return payload?.fileName || "";
+  } catch (error) {
+    return "";
+  }
+}
+
 async function deleteEncryptedQueryJsonByFileName({ userId, fileName }) {
-  if (!storage || !BUCKET_NAME || !userId || !fileName) return;
+  if (!storage || !BUCKET_NAME || !userId || !fileName) return null;
 
   const safeUserId = String(userId).replace(/[^\w.-]/g, "_");
-  const prefix = `${QUERY_JSON_PREFIX}/${safeUserId}/`;
+  const prefix = QUERY_JSON_PREFIX + "/" + safeUserId + "/";
+  const targetFileName = normalizeFileNameForCompare(fileName);
 
   const bucket = storage.bucket(BUCKET_NAME);
   const [files] = await bucket.getFiles({ prefix });
 
-  await Promise.all(
-    files.map(async (file) => {
-      try {
-        const [metadata] = await file.getMetadata();
-        const metaFileName = metadata?.metadata?.fileName;
+  const deleted = [];
+  const errors = [];
+  let scanned = 0;
 
-        if (metaFileName === fileName) {
-          await file.delete({ ignoreNotFound: true });
-        }
-      } catch (error) {
-        console.error("[queryJson.deleteByFileName]", error.message);
+  for (const file of files) {
+    scanned += 1;
+
+    try {
+      let matched = false;
+      const [metadata] = await file.getMetadata();
+      const metaFileName = normalizeFileNameForCompare(
+        metadata?.metadata?.fileName,
+      );
+
+      if (metaFileName && metaFileName === targetFileName) {
+        matched = true;
       }
-    }),
-  );
+
+      if (!matched) {
+        const [buffer] = await file.download();
+        const body = JSON.parse(buffer.toString("utf8"));
+        const bodyFileName = normalizeFileNameForCompare(
+          extractEncryptedQueryFileName(body),
+        );
+
+        matched = bodyFileName === targetFileName;
+      }
+
+      if (matched) {
+        await file.delete({ ignoreNotFound: true });
+        deleted.push(file.name);
+      }
+    } catch (error) {
+      errors.push({
+        key: file.name,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  const result = {
+    prefix,
+    fileName: targetFileName,
+    scanned,
+    deleted,
+    errors,
+  };
+
+  console.log("[queryJson.deleteByFileName]", result);
+
+  return result;
 }
 
 module.exports = {
