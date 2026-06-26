@@ -253,6 +253,11 @@ function resolveSafeGeneratedLocalPath(filePath = "") {
   return allowed ? resolved : null;
 }
 
+function findUserFile(user, fileName) {
+  if (!user || !fileName) return null;
+  return user.uploadedFiles?.find((f) => f.originalName === fileName) || null;
+}
+
 function isLocalDevBypassMode() {
   return (
     process.env.NODE_ENV !== "production" &&
@@ -261,9 +266,21 @@ function isLocalDevBypassMode() {
   );
 }
 
-function findUserFile(user, fileName) {
-  if (!user || !fileName) return null;
-  return user.uploadedFiles?.find((f) => f.originalName === fileName) || null;
+function isMissingStorageObjectError(error) {
+  const message = String(error?.message || "");
+  const statusCode = Number(
+    error?.code ||
+      error?.status ||
+      error?.statusCode ||
+      error?.response?.statusCode ||
+      error?.response?.status,
+  );
+
+  return (
+    statusCode === 404 ||
+    /No such object/i.test(message) ||
+    /not found/i.test(message)
+  );
 }
 
 const MOJIBAKE_PATTERN =
@@ -287,12 +304,7 @@ function hasMojibakeQueryPayload(payload = {}) {
 }
 
 async function loadSavedQueryJsonForFile(req, fileName) {
-  // 로컬 회귀 테스트/개발 인증 우회 모드에서는 MongoDB 연결 없이
-  // .local_uploads의 원본 파일을 직접 읽는다.
-  // 이 가드가 없으면 MONGO_URI 없이 실행한 로컬 서버에서
-  // User.findById()가 buffering timeout을 발생시킨다.
   if (isLocalDevBypassMode()) return null;
-
   if (!req.user?.id || !fileName) return null;
 
   const user = await User.findById(req.user.id).select("uploadedFiles");
@@ -303,7 +315,32 @@ async function loadSavedQueryJsonForFile(req, fileName) {
     return { user, fileInfo, payload: null };
   }
 
-  const payload = await readEncryptedQueryJson(fileInfo.queryJsonKey);
+  const staleQueryJsonKey = fileInfo.queryJsonKey;
+  let payload = null;
+
+  try {
+    payload = await readEncryptedQueryJson(staleQueryJsonKey);
+  } catch (error) {
+    if (!isMissingStorageObjectError(error)) throw error;
+
+    console.warn(
+      "[query-json] cached object missing. Rebuilding from source file.",
+      {
+        fileName,
+        queryJsonKey: staleQueryJsonKey,
+      },
+    );
+
+    fileInfo.queryJsonKey = undefined;
+    await user.save().catch((saveError) => {
+      console.warn(
+        "[query-json] failed to clear stale queryJsonKey:",
+        saveError?.message || saveError,
+      );
+    });
+
+    return { user, fileInfo, payload: null, staleQueryJsonKey };
+  }
 
   if (!payload) {
     return { user, fileInfo, payload: null };
@@ -416,9 +453,6 @@ async function buildQueryTablesForFile(req, fileName) {
   }
 
   if (isLocalDevBypassMode()) {
-    const path = require("path");
-    const fs = require("fs");
-
     const localPath = path.join(__dirname, "..", ".local_uploads", fileName);
 
     if (!fs.existsSync(localPath)) {
