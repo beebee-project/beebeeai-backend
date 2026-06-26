@@ -41,9 +41,9 @@ exports.getUsage = async (req, res) => {
 
     const now = new Date();
     const betaMode = paymentService.isBetaMode();
-    const usageReset = applyUsageResetPolicies(user, { now });
+    const usageResetResult = applyUsageResetPolicies(user, { now });
 
-    if (usageReset.changed) {
+    if (usageResetResult.changed) {
       await user.save();
     }
 
@@ -168,9 +168,11 @@ exports.startSubscription = async (req, res) => {
         });
       }
 
-      // ✅ 기간이 끝났으면 만료 확정 (billingKey/customerKey는 유지, 사용량만 리셋)
+      // ✅ 기간이 끝났으면 만료 확정 (업로드 파일은 유지)
       const transition = applyUsageStateTransitions(user, { now });
-      if (transition.changed) await user.save();
+      if (transition.changed) {
+        await user.save();
+      }
     }
 
     // ✅ [기존] 2) customerKey 생성
@@ -378,8 +380,9 @@ exports.cronCharge = async (req, res) => {
 
     for (const u of orphanProUsers) {
       const transition = applyUsageStateTransitions(u, { now });
+      const changed = transition.changed;
 
-      if (transition.changed) {
+      if (changed) {
         await u.save();
         betaDowngradedCount += 1;
       }
@@ -401,7 +404,6 @@ exports.cronCharge = async (req, res) => {
 
     for (const u of expiredCanceledUsers) {
       const transition = applyUsageStateTransitions(u, { now });
-
       if (transition.changed) {
         await u.save();
         expiredCanceledCount += 1;
@@ -541,9 +543,7 @@ exports.cronCharge = async (req, res) => {
 
 exports.cancelSubscription = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select(
-      "plan usage subscription",
-    );
+    const user = await User.findById(req.user.id).select("plan subscription");
     if (!user) return res.status(404).json({ error: "사용자 없음" });
 
     const sub = user.subscription || {};

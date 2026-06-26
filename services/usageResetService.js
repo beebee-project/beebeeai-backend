@@ -164,6 +164,29 @@ function applyUsageStateTransitions(user, options = {}) {
   return { changed: false, reason: "NOOP" };
 }
 
+function applyBetaUsageResetAfterRealMode(user, options = {}) {
+  if (!user) return false;
+  const betaMode = Object.prototype.hasOwnProperty.call(options, "betaMode")
+    ? Boolean(options.betaMode)
+    : paymentService.isBetaMode();
+
+  if (betaMode) return false;
+  if (normalizeStatus(user.plan) !== "PRO") return false;
+  if (hasRealSubscriptionSignal(user)) return false;
+
+  resetPlanToFreeWithoutDeletingFiles(
+    user,
+    {
+      status: "INACTIVE",
+      cancelAtPeriodEnd: false,
+      nextChargeAt: null,
+      endedAt: nowDate(options.now),
+    },
+    nowDate(options.now),
+  );
+  return true;
+}
+
 function applyUsageResetPolicies(user, options = {}) {
   const now = nowDate(options.now);
 
@@ -178,38 +201,11 @@ function applyUsageResetPolicies(user, options = {}) {
   };
 }
 
-function applyBetaUsageResetAfterRealMode(user, options = {}) {
-  const betaMode =
-    typeof options.betaMode === "boolean"
-      ? options.betaMode
-      : paymentService.isBetaMode();
-
-  if (betaMode) return false;
-
-  const now = nowDate(options.now);
-  const changed = Boolean(options.force) || isBetaModeTurnedOffOrphanPro(user);
-
-  if (!changed) return false;
-
-  resetPlanToFreeWithoutDeletingFiles(
-    user,
-    {
-      status: "INACTIVE",
-      cancelAtPeriodEnd: false,
-      nextChargeAt: null,
-      endedAt: now,
-    },
-    now,
-  );
-
-  return true;
-}
-
 module.exports = {
-  applyBetaUsageResetAfterRealMode,
   applyMonthlyUsageReset,
   applyUsageResetPolicies,
   applyUsageStateTransitions,
+  applyBetaUsageResetAfterRealMode,
   ensureUsageShape,
   hasRealSubscriptionSignal,
   isBetaModeTurnedOffOrphanPro,
