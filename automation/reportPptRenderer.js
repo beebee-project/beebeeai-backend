@@ -4,27 +4,47 @@ function text(v) {
   return String(v ?? "");
 }
 
+function truncate(v, max = 140) {
+  const s = text(v).replace(/\s+/g, " ").trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+function formatDateKst(value = null) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(kst.getUTCDate()).padStart(2, "0");
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${y}.${m}.${d} ${hh}:${mm}`;
+}
+
 const PPT_TEMPLATES = {
   default: {
     name: "default",
-    fontFace: "Arial",
+    fontFace: "Malgun Gothic",
     titleFontSize: 22,
     bodyFontSize: 14,
     tableFontSize: 9,
-    coverTitleFontSize: 28,
-    titleX: 0.5,
-    titleY: 0.4,
-    titleW: 9,
-    titleH: 0.5,
-    contentX: 0.7,
-    contentY: 1.2,
-    contentW: 8.6,
-    chartY: 1.25,
-    chartH: 3.4,
-    tableY: 1.1,
-    tableH: 4.2,
+    coverTitleFontSize: 30,
+    titleX: 0.55,
+    titleY: 0.35,
+    titleW: 9.0,
+    titleH: 0.55,
+    contentX: 0.75,
+    contentY: 1.15,
+    contentW: 8.8,
+    chartY: 1.35,
+    chartH: 3.25,
+    tableY: 1.15,
+    tableH: 4.05,
+    footerY: 5.35,
     maxTableRowsPerSlide: 8,
     maxTableCols: 6,
+    maxSummaryBullets: 5,
     chartValueAxisFontSize: 9,
     chartCategoryAxisFontSize: 9,
     chartLegendFontSize: 9,
@@ -35,24 +55,26 @@ const PPT_TEMPLATES = {
   },
   minimal: {
     name: "minimal",
-    fontFace: "Arial",
+    fontFace: "Malgun Gothic",
     titleFontSize: 20,
     bodyFontSize: 13,
     tableFontSize: 8,
-    coverTitleFontSize: 26,
+    coverTitleFontSize: 28,
     titleX: 0.6,
-    titleY: 0.45,
+    titleY: 0.4,
     titleW: 8.8,
-    titleH: 0.5,
-    contentX: 0.75,
-    contentY: 1.2,
-    contentW: 8.4,
-    chartY: 1.25,
-    chartH: 3.3,
-    tableY: 1.1,
-    tableH: 4.1,
+    titleH: 0.55,
+    contentX: 0.8,
+    contentY: 1.15,
+    contentW: 8.5,
+    chartY: 1.35,
+    chartH: 3.2,
+    tableY: 1.15,
+    tableH: 4.0,
+    footerY: 5.35,
     maxTableRowsPerSlide: 9,
     maxTableCols: 6,
+    maxSummaryBullets: 5,
     chartValueAxisFontSize: 9,
     chartCategoryAxisFontSize: 9,
     chartLegendFontSize: 9,
@@ -68,8 +90,39 @@ function getTemplate(options = {}) {
   return PPT_TEMPLATES[key] || PPT_TEMPLATES.default;
 }
 
+function addFooter(
+  slide,
+  report = {},
+  pageNo = 1,
+  template = PPT_TEMPLATES.default,
+) {
+  const sourceFile = report.source?.fileName
+    ? ` | ${report.source.fileName}`
+    : "";
+  slide.addText(`BeeBee AI${sourceFile}`, {
+    x: 0.55,
+    y: template.footerY,
+    w: 6.8,
+    h: 0.25,
+    fontFace: template.fontFace,
+    fontSize: 8,
+    color: "666666",
+  });
+
+  slide.addText(String(pageNo), {
+    x: 9.2,
+    y: template.footerY,
+    w: 0.45,
+    h: 0.25,
+    fontFace: template.fontFace,
+    fontSize: 8,
+    color: "666666",
+    align: "right",
+  });
+}
+
 function addTitle(slide, title, y = null, template = PPT_TEMPLATES.default) {
-  slide.addText(text(title), {
+  slide.addText(truncate(title, 70), {
     x: template.titleX,
     y: y ?? template.titleY,
     w: template.titleW,
@@ -77,6 +130,7 @@ function addTitle(slide, title, y = null, template = PPT_TEMPLATES.default) {
     fontFace: template.fontFace,
     fontSize: template.titleFontSize,
     bold: true,
+    fit: "shrink",
   });
 }
 
@@ -86,10 +140,13 @@ function addBullets(
   y = null,
   template = PPT_TEMPLATES.default,
 ) {
-  const safe = Array.isArray(bullets) ? bullets.slice(0, 6) : [];
+  const safe = Array.isArray(bullets)
+    ? bullets.filter(Boolean).slice(0, template.maxSummaryBullets || 5)
+    : [];
 
   slide.addText(
-    safe.map((b) => `• ${text(b)}`).join("\n") || "요약 내용이 없습니다.",
+    safe.map((b) => `• ${truncate(b, 110)}`).join("\n") ||
+      "요약 내용이 없습니다.",
     {
       x: template.contentX,
       y: y ?? template.contentY,
@@ -99,6 +156,7 @@ function addBullets(
       fontSize: template.bodyFontSize,
       breakLine: false,
       fit: "shrink",
+      valign: "top",
     },
   );
 }
@@ -122,39 +180,45 @@ function tableColumnKeys(rows = [], maxCols = 6) {
 function rowsToTableWithKeys(rows = [], keys = []) {
   if (!rows.length || !keys.length) return [["결과 없음"]];
 
-  const body = rows.map((row) => keys.map((h) => text(row[h])));
+  const body = rows.map((row) => keys.map((h) => truncate(row[h], 80)));
   return [keys, ...body];
 }
 
-function rowsToTable(rows = [], limit = 8) {
+function rowsToTable(rows = [], limit = 8, maxCols = 6) {
   const safeRows = Array.isArray(rows) ? rows.slice(0, limit) : [];
-  const keys = tableColumnKeys(safeRows);
+  const keys = tableColumnKeys(safeRows, maxCols);
 
   return rowsToTableWithKeys(safeRows, keys);
 }
 
 function addTable(slide, rows = [], template = PPT_TEMPLATES.default) {
-  slide.addTable(rowsToTable(rows, template.maxTableRowsPerSlide), {
-    x: 0.5,
-    y: template.tableY,
-    w: 9,
-    h: template.tableH,
-    fontFace: template.fontFace,
-    fontSize: template.tableFontSize,
-    border: { type: "solid", pt: 0.5 },
-    fit: "shrink",
-  });
+  slide.addTable(
+    rowsToTable(rows, template.maxTableRowsPerSlide, template.maxTableCols),
+    {
+      x: 0.55,
+      y: template.tableY,
+      w: 9.1,
+      h: template.tableH,
+      fontFace: template.fontFace,
+      fontSize: template.tableFontSize,
+      border: { type: "solid", pt: 0.5 },
+      fit: "shrink",
+    },
+  );
 }
 
 function addPagedTableSlides(
   pptx,
   section = {},
   template = PPT_TEMPLATES.default,
+  report = {},
+  pageNo = 1,
 ) {
   const rows = Array.isArray(section.rows) ? section.rows : [];
   const keys = tableColumnKeys(rows, template.maxTableCols);
   const chunks = chunkRows(rows, template.maxTableRowsPerSlide);
   const totalPages = chunks.length;
+  let currentPage = pageNo;
 
   chunks.forEach((chunk, idx) => {
     const slide = pptx.addSlide();
@@ -165,9 +229,9 @@ function addPagedTableSlides(
 
     addTitle(slide, title, null, template);
     slide.addTable(rowsToTableWithKeys(chunk, keys), {
-      x: 0.5,
+      x: 0.55,
       y: template.tableY,
-      w: 9,
+      w: 9.1,
       h: template.tableH,
       fontFace: template.fontFace,
       fontSize: template.tableFontSize,
@@ -175,15 +239,25 @@ function addPagedTableSlides(
       fit: "shrink",
     });
 
-    slide.addText(`전체 행 수: ${rows.length}`, {
-      x: 0.5,
-      y: 5.35,
-      w: 4,
-      h: 0.3,
+    const note =
+      section.note ||
+      `전체 행 수: ${Number(section.rowCount || rows.length).toLocaleString()}`;
+    slide.addText(note, {
+      x: 0.55,
+      y: 5.05,
+      w: 8.8,
+      h: 0.25,
       fontFace: template.fontFace,
       fontSize: 9,
+      color: "666666",
+      fit: "shrink",
     });
+
+    addFooter(slide, report, currentPage, template);
+    currentPage += 1;
   });
+
+  return currentPage;
 }
 
 function renderReportPpt(report = {}, options = {}) {
@@ -191,12 +265,17 @@ function renderReportPpt(report = {}, options = {}) {
   const pptx = new pptxgen();
   pptx.layout = "LAYOUT_WIDE";
   pptx.author = "BeeBeeAI";
+  pptx.subject = report.title || "분석 보고서";
+  pptx.title = report.title || "분석 보고서";
+  pptx.company = "BeeBee AI";
+  pptx.lang = "ko-KR";
 
   const sections = Array.isArray(report.sections) ? report.sections : [];
+  let pageNo = 1;
 
   for (const section of sections) {
     if (section.type === "table") {
-      addPagedTableSlides(pptx, section, template);
+      pageNo = addPagedTableSlides(pptx, section, template, report, pageNo);
       continue;
     }
 
@@ -205,23 +284,34 @@ function renderReportPpt(report = {}, options = {}) {
     if (section.type === "cover") {
       slide.addText(text(section.title || report.title || "분석 보고서"), {
         x: template.contentX,
-        y: 1.6,
+        y: 1.35,
         w: template.contentW,
-        h: 0.8,
+        h: 0.85,
         fontFace: template.fontFace,
         fontSize: template.coverTitleFontSize,
         bold: true,
+        fit: "shrink",
       });
 
-      slide.addText(text(section.subtitle || ""), {
+      const metaLines = [
+        section.subtitle || report.source?.fileName || "",
+        report.source?.message || "",
+        `생성일시: ${formatDateKst(section.generatedAt || report.generatedAt)}`,
+      ].filter(Boolean);
+
+      slide.addText(metaLines.map((line) => truncate(line, 100)).join("\n"), {
         x: template.contentX,
-        y: 2.6,
+        y: 2.45,
         w: template.contentW,
-        h: 0.4,
+        h: 1.0,
         fontFace: template.fontFace,
         fontSize: template.bodyFontSize,
+        color: "555555",
+        fit: "shrink",
       });
 
+      addFooter(slide, report, pageNo, template);
+      pageNo += 1;
       continue;
     }
 
@@ -233,35 +323,45 @@ function renderReportPpt(report = {}, options = {}) {
         null,
         template,
       );
+      addFooter(slide, report, pageNo, template);
+      pageNo += 1;
       continue;
     }
 
     if (section.type === "chart") {
       addTitle(slide, section.title || "차트", null, template);
+      addChart(slide, section, template);
 
-      slide.addText(
-        `차트 유형: ${section.chartSpec?.recommendedType || "chart"}`,
-        {
+      const insight = section.insight || section.chartSpec?.insight || "";
+      if (insight) {
+        slide.addText(truncate(insight, 120), {
           x: template.contentX,
-          y: 0.95,
+          y: 4.85,
           w: template.contentW,
           h: 0.3,
           fontFace: template.fontFace,
-          fontSize: 11,
-        },
-      );
+          fontSize: 10,
+          color: "555555",
+          fit: "shrink",
+        });
+      }
 
-      addChart(slide, section, template);
+      addFooter(slide, report, pageNo, template);
+      pageNo += 1;
       continue;
     }
 
     if (section.type === "insight") {
       addTitle(slide, section.title || "분석 인사이트", null, template);
       addBullets(slide, section.bullets || [], null, template);
+      addFooter(slide, report, pageNo, template);
+      pageNo += 1;
       continue;
     }
 
     addTitle(slide, section.title || section.type || "섹션", null, template);
+    addFooter(slide, report, pageNo, template);
+    pageNo += 1;
   }
 
   if (!sections.length) {
@@ -275,6 +375,7 @@ function renderReportPpt(report = {}, options = {}) {
       fontFace: template.fontFace,
       fontSize: template.bodyFontSize,
     });
+    addFooter(slide, report, pageNo, template);
   }
 
   return pptx;
@@ -326,7 +427,7 @@ function buildChartOptions(
 
   const opts = {
     x: template.contentX,
-    y: template.chartY + template.chartH + 0.2,
+    y: template.chartY,
     w: template.contentW,
     h: template.chartH,
     showLegend: shouldShowLegend(series, type),
@@ -381,7 +482,7 @@ function buildChartSeries(section = {}) {
 
   if (!categoryField || !seriesFields.length) return null;
 
-  const labels = rows.map((r) => String(r[categoryField] ?? ""));
+  const labels = rows.map((r) => truncate(r[categoryField] ?? "", 30));
 
   const series = seriesFields.map((field) => ({
     name: String(field),
@@ -389,8 +490,7 @@ function buildChartSeries(section = {}) {
     values: rows.map((r) => {
       const raw =
         r[field] ?? (r.metric === field ? r.value : undefined) ?? r.value;
-
-      const n = Number(raw);
+      const n = Number(String(raw ?? "").replace(/,/g, ""));
       return Number.isFinite(n) ? n : 0;
     }),
   }));
@@ -419,13 +519,14 @@ function addChart(slide, section = {}, template = PPT_TEMPLATES.default) {
   );
 
   if (section.rows?.length) {
-    slide.addText(`데이터 행 수: ${section.rows.length}`, {
+    slide.addText(`차트 데이터: ${section.rows.length.toLocaleString()}건`, {
       x: template.contentX,
-      y: 4.85,
-      w: 8,
-      h: 0.3,
+      y: 4.6,
+      w: template.contentW,
+      h: 0.25,
       fontFace: template.fontFace,
-      fontSize: 10,
+      fontSize: 9,
+      color: "666666",
     });
   }
 }

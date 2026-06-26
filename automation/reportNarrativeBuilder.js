@@ -1,5 +1,7 @@
 function toNumber(v) {
-  const n = Number(v);
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (v == null || v === "") return null;
+  const n = Number(String(v).replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : null;
 }
 
@@ -7,7 +9,11 @@ function inferLabelKey(row = {}) {
   const keys = Object.keys(row || {});
 
   return (
-    keys.find((key) => /name|이름|title|제목|label|항목|id$/i.test(key)) ||
+    keys.find((key) =>
+      /name|이름|성명|title|제목|label|항목|부서|팀|구분|분류|연월|월|일자|date|id$/i.test(
+        key,
+      ),
+    ) ||
     keys.find((key) => typeof row[key] === "string" && row[key].trim()) ||
     keys[0] ||
     "항목"
@@ -33,8 +39,26 @@ function numericKeys(row = {}, exclude = []) {
   });
 }
 
+function getRows(result = {}) {
+  return Array.isArray(result.rows) ? result.rows : [];
+}
+
+function getGroupHeader(result = {}) {
+  if (result.groupBy?.header) return result.groupBy.header;
+  if (result.pivot?.rowGroup?.header) return result.pivot.rowGroup.header;
+
+  return inferLabelKey(result.rows?.[0] || {});
+}
+
+function getMetricHeader(result = {}) {
+  if (result.metric?.header) return result.metric.header;
+  const rows = getRows(result);
+  const first = rows[0] || {};
+  return numericKeys(first, [getGroupHeader(result), "rowCount"])[0] || "값";
+}
+
 function getPrimaryNumericKey(result = {}) {
-  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const rows = getRows(result);
   if (!rows.length) return null;
 
   const groupHeader = getGroupHeader(result);
@@ -42,7 +66,8 @@ function getPrimaryNumericKey(result = {}) {
   if (
     result.resultType === "grouped" &&
     result.operation !== "multiAggregate" &&
-    result.operation !== "pipelineCombine"
+    result.operation !== "pipelineCombine" &&
+    Object.prototype.hasOwnProperty.call(rows[0], "value")
   ) {
     return "value";
   }
@@ -64,7 +89,7 @@ function topBottomHighlight(
       label: r[labelKey],
       value: toNumber(r[valueKey]),
     }))
-    .filter((r) => r.value != null);
+    .filter((r) => r.value != null && r.label != null && r.label !== "");
 
   const label = valueLabel || valueKey || "값";
 
@@ -84,7 +109,7 @@ function topBottomHighlight(
 }
 
 function growthHighlight(result = {}) {
-  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const rows = getRows(result);
   const groupHeader = getGroupHeader(result);
 
   const growthRows = rows
@@ -106,7 +131,7 @@ function growthHighlight(result = {}) {
 }
 
 function windowHighlight(result = {}) {
-  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const rows = getRows(result);
   if (!rows.length) return [];
 
   const groupHeader = getGroupHeader(result);
@@ -125,7 +150,7 @@ function windowHighlight(result = {}) {
 }
 
 function pivotHighlight(result = {}) {
-  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const rows = getRows(result);
   const columns = result.pivot?.columns || [];
 
   if (!rows.length || !columns.length) return [];
@@ -149,44 +174,30 @@ function pivotHighlight(result = {}) {
   ];
 }
 
-function getGroupHeader(result = {}) {
-  if (result.groupBy?.header) return result.groupBy.header;
-  if (result.pivot?.rowGroup?.header) return result.pivot.rowGroup.header;
-
-  if (result.resultType === "rows") {
-    return inferLabelKey(result.rows?.[0] || {});
-  }
-
-  return "그룹";
-}
-
-function getMetricHeader(result = {}) {
-  return result.metric?.header || "값";
-}
-
 function buildTitle(result = {}, context = {}) {
-  const message = context.message || "";
-  if (message) return `${message} 분석 결과`;
+  const message = String(context.message || "").trim();
+  if (message) return `${message} 분석 보고서`;
 
   const groupHeader = getGroupHeader(result);
   const metricHeader = getMetricHeader(result);
 
   if (result.resultType === "pivot") {
-    return `${groupHeader} 기준 교차 분석 결과`;
+    return `${groupHeader} 기준 교차 분석 보고서`;
   }
 
-  return `${groupHeader}별 ${metricHeader} 분석 결과`;
+  return `${groupHeader}별 ${metricHeader} 분석 보고서`;
 }
 
 function buildSummary(result = {}) {
-  const rowCount = Array.isArray(result.rows) ? result.rows.length : 0;
-  const operation = result.operation || "분석";
+  const rows = getRows(result);
+  const rowCount = rows.length;
+  const operation = result.operation || result.resultType || "분석";
 
-  return `${operation} 결과 ${rowCount}건이 생성되었습니다.`;
+  return `${operation} 결과를 ${rowCount.toLocaleString()}건의 행으로 정리했습니다.`;
 }
 
 function buildHighlights(result = {}) {
-  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const rows = getRows(result);
   if (!rows.length) return [];
 
   const groupHeader = getGroupHeader(result);
@@ -204,10 +215,12 @@ function buildHighlights(result = {}) {
     const metricKeys = numericKeys(rows[0], [groupHeader, "rowCount"]);
 
     highlights.push(
-      `${groupHeader} 기준으로 ${rows.length}개 그룹이 생성되었습니다.`,
+      `${groupHeader} 기준으로 ${rows.length.toLocaleString()}개 그룹이 생성되었습니다.`,
     );
 
-    highlights.push(`${metricKeys.length}개 지표가 함께 계산되었습니다.`);
+    highlights.push(
+      `${metricKeys.length.toLocaleString()}개 지표가 함께 계산되었습니다.`,
+    );
 
     const primaryKey = metricKeys[0];
     if (primaryKey) {
@@ -220,7 +233,7 @@ function buildHighlights(result = {}) {
   }
 
   highlights.push(
-    `${groupHeader} 기준으로 ${rows.length}개 결과가 생성되었습니다.`,
+    `${groupHeader} 기준으로 ${rows.length.toLocaleString()}개 결과가 생성되었습니다.`,
   );
 
   highlights.push(...growthHighlight(result));
@@ -230,7 +243,6 @@ function buildHighlights(result = {}) {
   if (primaryKey) {
     const valueLabel =
       primaryKey === "value" ? result.metric?.header || "값" : primaryKey;
-
     highlights.push(
       ...topBottomHighlight(rows, groupHeader, primaryKey, valueLabel),
     );
@@ -241,7 +253,7 @@ function buildHighlights(result = {}) {
 
 function buildNarrativeSections(result = {}, context = {}) {
   return {
-    version: "report_narrative_v1",
+    version: "report_narrative_v2",
     title: buildTitle(result, context),
     summary: buildSummary(result),
     highlights: buildHighlights(result),

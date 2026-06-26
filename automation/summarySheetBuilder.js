@@ -176,6 +176,73 @@ function buildInsightRows(result = {}) {
   return rows;
 }
 
+function formatKstTimestamp(date = new Date()) {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const y = kst.getUTCFullYear();
+  const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(kst.getUTCDate()).padStart(2, "0");
+  const hh = String(kst.getUTCHours()).padStart(2, "0");
+  const mm = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d} ${hh}:${mm} KST`;
+}
+
+function sectionRowsForSummary(section = {}) {
+  const rows = resultToRows(section.result || {});
+  return Array.isArray(rows) ? rows : [];
+}
+
+function buildBusinessWorkbookSummaryRows({
+  fileName,
+  message,
+  result,
+  businessSections = [],
+  summarySheetMode = "static",
+  includeSourceDataSheet = true,
+  sourceTables = [],
+} = {}) {
+  const sectionRows = businessSections.map((section, index) => {
+    const rows = sectionRowsForSummary(section);
+    const chartSpec = buildChartSpec(section.result || {});
+    return {
+      no: index + 1,
+      title: section.title || section.sectionId || `섹션_${index + 1}`,
+      rowCount: rows.length,
+      chart: chartSpec?.recommendedType || "-",
+      type: section.sectionType || section.result?.resultType || "-",
+    };
+  });
+
+  const totalRows = sectionRows.reduce((sum, row) => sum + row.rowCount, 0);
+  const chartCount = sectionRows.filter(
+    (row) => row.chart && row.chart !== "-",
+  ).length;
+
+  return [
+    ["항목", "내용", "비고"],
+    ["요청", message || "", ""],
+    ["원본 파일", fileName || "", ""],
+    ["템플릿", result?.title || result?.templateId || "", ""],
+    ["결과 유형", result?.resultType || "businessTemplate", ""],
+    ["섹션 수", businessSections.length, ""],
+    ["결과 행 수", totalRows, "전체 섹션 합산"],
+    ["차트 후보", chartCount, "추천 가능한 섹션 수"],
+    ["수식 모드", summarySheetMode, "static/formula/hybrid"],
+    [
+      "원본데이터 포함",
+      includeSourceDataSheet ? "예" : "아니오",
+      `${sourceTables.length || 0}개 테이블`,
+    ],
+    ["생성일시", formatKstTimestamp(), ""],
+    [],
+    ["섹션", "행 수", "차트/유형"],
+    ...sectionRows.map((row) => [
+      row.title,
+      row.rowCount,
+      `${row.chart} / ${row.type}`,
+    ]),
+  ];
+}
+
 function setColumnWidths(ws, rows = []) {
   if (!rows.length) return;
 
@@ -737,7 +804,7 @@ function buildSummaryWorkbook({
     ["지표", result?.metric?.header || intent?.metric?.header || ""],
     ["그룹 기준", result?.groupBy?.header || intent?.groupBy?.header || ""],
     ["결과 행 수", Array.isArray(result?.rows) ? result.rows.length : 0],
-    ["생성일시", new Date().toISOString()],
+    ["생성일시", formatKstTimestamp()],
     [],
   ];
 
@@ -748,14 +815,15 @@ function buildSummaryWorkbook({
   if (businessSections.length) {
     const wb = XLSX.utils.book_new();
 
-    const summaryRows = [
-      ["요청", message || ""],
-      ["원본 파일", fileName || ""],
-      ["템플릿", result.title || result.templateId || ""],
-      ["결과 유형", result.resultType || ""],
-      ["섹션 수", businessSections.length],
-      ["생성일시", new Date().toISOString()],
-    ];
+    const summaryRows = buildBusinessWorkbookSummaryRows({
+      fileName,
+      message,
+      result,
+      businessSections,
+      summarySheetMode: normalizedSummarySheetMode,
+      includeSourceDataSheet,
+      sourceTables,
+    });
 
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
     setAoaColumnWidths(wsSummary, summaryRows);
@@ -771,16 +839,22 @@ function buildSummaryWorkbook({
     businessSections.forEach((section, index) => {
       const sectionResult = section.result || {};
       const rows = resultToRows(sectionResult);
-      const ws = XLSX.utils.json_to_sheet(
-        rows.length ? rows : [{ 결과: "데이터 없음" }],
-      );
+      const outputRows = rows.length
+        ? rows
+        : [
+            {
+              섹션: section.title || section.sectionId || `섹션_${index + 1}`,
+              결과: "데이터 없음",
+            },
+          ];
+      const ws = XLSX.utils.json_to_sheet(outputRows);
       const formulaPlan = buildSectionFormulaPlan({
         section,
         rows,
         formulaContext,
       });
 
-      setColumnWidths(ws, rows);
+      setColumnWidths(ws, outputRows);
       formatNumberCells(ws, sectionResult);
       styleHeaderRow(ws);
       applyDefaultSheetOptions(ws);
