@@ -19,11 +19,11 @@ const OUTPUT_ARTIFACTS = Object.freeze({
 
   [OUTPUT_TYPES.ANALYSIS_REPORT]: Object.freeze({
     outputType: OUTPUT_TYPES.ANALYSIS_REPORT,
-    label: "데이터분석",
-    uiLabel: "데이터 분석",
+    label: "분석보고서",
+    uiLabel: "분석 보고서",
     extension: "json",
     mimeType: "application/json; charset=utf-8",
-    defaultTitle: "데이터 분석",
+    defaultTitle: "분석 보고서",
     storagePrefix: "reports",
     localDirName: "reports",
     version: "analysis_report_export_v1",
