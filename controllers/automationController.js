@@ -8,6 +8,7 @@ const {
   saveJsonObject,
   readJsonObject,
   saveBufferObject,
+  deleteObject,
 } = require("../utils/storage");
 const { readWorkbookFromBuffer } = require("../utils/workbookReader");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
@@ -215,6 +216,8 @@ function buildGeneratedDownloadUrl({
   filePath = "",
   displayName = "",
   outputType = "",
+  queryTablesKey = "",
+  deleteAfterDownload = true,
 } = {}) {
   const params = new URLSearchParams();
 
@@ -222,6 +225,8 @@ function buildGeneratedDownloadUrl({
   if (filePath) params.set("filePath", filePath);
   if (displayName) params.set("displayName", displayName);
   if (outputType) params.set("outputType", outputType);
+  if (queryTablesKey) params.set("queryTablesKey", queryTablesKey);
+  if (deleteAfterDownload) params.set("deleteAfterDownload", "1");
 
   return `/api/automation/download?${params.toString()}`;
 }
@@ -238,6 +243,81 @@ function assertGeneratedStorageKeyAccess(req, storageKey = "") {
   );
 }
 
+
+function assertQueryTablesKeyAccess(req, queryTablesKey = "") {
+  const key = String(queryTablesKey || "");
+  if (!key) return false;
+
+  const userId = req.user?.id ? String(req.user.id) : "local-dev";
+
+  return (
+    key.startsWith("query-tables/" + userId + "/") ||
+    key.startsWith("query-tables/local-dev/")
+  );
+}
+
+function shouldDeleteAfterDownload(value = "1") {
+  const normalized = String(value ?? "1").trim().toLowerCase();
+  return !["0", "false", "no", "off"].includes(normalized);
+}
+
+async function cleanupGeneratedDownloadArtifacts({
+  req,
+  storageKey = "",
+  filePath = "",
+  queryTablesKey = "",
+} = {}) {
+  const deleted = [];
+  const errors = [];
+
+  async function tryDelete(label, fn) {
+    try {
+      await fn();
+      deleted.push(label);
+    } catch (error) {
+      errors.push({ label, message: error?.message || String(error) });
+    }
+  }
+
+  if (storageKey && assertGeneratedStorageKeyAccess(req, storageKey)) {
+    await tryDelete("storage:" + storageKey, () => deleteObject(storageKey));
+  }
+
+  if (filePath) {
+    const safePath = resolveSafeGeneratedLocalPath(filePath);
+    if (safePath && fs.existsSync(safePath)) {
+      await tryDelete("file:" + safePath, async () => {
+        fs.unlinkSync(safePath);
+      });
+    }
+  }
+
+  if (queryTablesKey && assertQueryTablesKeyAccess(req, queryTablesKey)) {
+    await tryDelete("queryTables:" + queryTablesKey, () => deleteObject(queryTablesKey));
+  }
+
+  if (deleted.length || errors.length) {
+    console.log("[automation.download.cleanup]", { deleted, errors });
+  }
+}
+
+function scheduleGeneratedDownloadCleanup(res, cleanupFn) {
+  let done = false;
+
+  async function run() {
+    if (done) return;
+    done = true;
+
+    try {
+      await cleanupFn();
+    } catch (error) {
+      console.error("[automation.download.cleanup] failed", error);
+    }
+  }
+
+  res.once("finish", run);
+  res.once("close", run);
+}
 function resolveSafeGeneratedLocalPath(filePath = "") {
   if (!filePath) return null;
 
@@ -704,6 +784,8 @@ exports.downloadGeneratedFile = async (req, res, next) => {
       filePath = "",
       displayName = "",
       outputType = "",
+      queryTablesKey = "",
+      deleteAfterDownload = "1",
     } = req.query || {};
 
     const safeDisplayName =
@@ -750,6 +832,17 @@ exports.downloadGeneratedFile = async (req, res, next) => {
       "Content-Type",
       contentTypeForGeneratedFile(safeDisplayName, outputType),
     );
+
+    if (shouldDeleteAfterDownload(deleteAfterDownload)) {
+      scheduleGeneratedDownloadCleanup(res, () =>
+        cleanupGeneratedDownloadArtifacts({
+          req,
+          storageKey,
+          filePath,
+          queryTablesKey,
+        }),
+      );
+    }
 
     return res.end(buffer);
   } catch (error) {
@@ -893,6 +986,7 @@ exports.createSummarySheet = async (req, res, next) => {
         storageKey: key,
         displayName: outputFileName,
         outputType,
+        queryTablesKey,
       }),
       sourceFileName: saved.fileName,
       outputType,
@@ -1150,6 +1244,7 @@ exports.exportXlsx = async (req, res) => {
         filePath,
         displayName: fileName,
         outputType,
+        queryTablesKey,
       }),
       filePath,
       outputType,
@@ -1273,6 +1368,7 @@ exports.exportReportJson = async (req, res) => {
         filePath: exported.filePath,
         displayName: exported.displayName || exported.fileName,
         outputType,
+        queryTablesKey,
       }),
       filePath: exported.filePath,
       outputType,
@@ -1395,6 +1491,7 @@ exports.exportPptx = async (req, res) => {
         filePath: exported.filePath,
         displayName: exported.displayName || exported.fileName,
         outputType,
+        queryTablesKey,
       }),
       filePath: exported.filePath,
       outputType,
