@@ -70,8 +70,16 @@ const userSchema = new mongoose.Schema({
 
   usage: {
     templateGenerations: { type: Number, default: 0 },
+    // 기존 수식/매크로 시절 필드와의 호환용
+    formulaConversions: { type: Number, default: 0 },
     fileUploads: { type: Number, default: 0 },
     lastReset: { type: Date, default: Date.now },
+
+    // BETA_MODE=true -> false 전환 후 사용자별 1회 사용량 리셋 여부
+    betaModeOffResetAt: { type: Date, default: null },
+
+    // 구독 해지 예약 기간 종료 후 사용량 리셋 이력
+    subscriptionPeriodEndedResetAt: { type: Date, default: null },
   },
 
   plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },

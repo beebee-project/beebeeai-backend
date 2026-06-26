@@ -9,6 +9,10 @@ function normalizeStatus(status = "") {
   return String(status || "INACTIVE").toUpperCase();
 }
 
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+
 function ensureUsageShape(user) {
   if (!user) return false;
 
@@ -105,8 +109,35 @@ function isExpiredCanceledPending(user = {}, now = new Date()) {
   return endAt <= now;
 }
 
-function isBetaModeTurnedOffOrphanPro(user = {}) {
-  if (paymentService.isBetaMode()) return false;
+function getBetaMode(options = {}) {
+  return hasOwn(options, "betaMode")
+    ? Boolean(options.betaMode)
+    : paymentService.isBetaMode();
+}
+
+function hasBetaModeOffResetMarker(user = {}) {
+  return Boolean(user?.usage?.betaModeOffResetAt);
+}
+
+/**
+ * BETA_MODE=true에서는 DB plan이 FREE인 사용자도 paymentService/getEffectivePlan
+ * 흐름에서 PRO처럼 사용할 수 있다. 따라서 true -> false 전환 후 리셋 조건을
+ * plan=PRO에만 걸면 실제 베타 사용량이 남는다.
+ *
+ * 이 전환 리셋은 사용자별 1회만 수행한다.
+ * - 실제 구독 신호가 있으면 리셋하지 않는다.
+ * - 이미 betaModeOffResetAt이 있으면 다시 리셋하지 않는다.
+ * - 최초 실서비스 모드 진입 시 marker를 저장해 이후 FREE 사용량은 정상 누적된다.
+ */
+function isBetaModeTurnedOffUsageResetTarget(user = {}, options = {}) {
+  if (getBetaMode(options)) return false;
+  if (hasRealSubscriptionSignal(user)) return false;
+  if (hasBetaModeOffResetMarker(user)) return false;
+  return true;
+}
+
+function isBetaModeTurnedOffOrphanPro(user = {}, options = {}) {
+  if (getBetaMode(options)) return false;
   if (normalizeStatus(user.plan) !== "PRO") return false;
   return !hasRealSubscriptionSignal(user);
 }
@@ -123,6 +154,27 @@ function resetPlanToFreeWithoutDeletingFiles(
     ...subscriptionPatch,
   };
   return true;
+}
+
+function applyBetaModeOffUsageReset(user, options = {}) {
+  if (!isBetaModeTurnedOffUsageResetTarget(user, options)) {
+    return { changed: false, reason: "NOOP" };
+  }
+
+  const now = nowDate(options.now);
+  resetPlanToFreeWithoutDeletingFiles(
+    user,
+    {
+      status: "INACTIVE",
+      cancelAtPeriodEnd: false,
+      nextChargeAt: null,
+      endedAt: now,
+    },
+    now,
+  );
+
+  user.usage.betaModeOffResetAt = now;
+  return { changed: true, reason: "BETA_MODE_OFF_USAGE_RESET" };
 }
 
 function applyUsageStateTransitions(user, options = {}) {
@@ -143,55 +195,28 @@ function applyUsageStateTransitions(user, options = {}) {
       },
       now,
     );
+
+    user.usage.subscriptionPeriodEndedResetAt = now;
     return { changed: true, reason: "SUBSCRIPTION_PERIOD_ENDED" };
   }
 
-  // 2) BETA_MODE=true 때 PRO였던 유저가 BETA_MODE=false에서 실제 구독 신호가 없는 경우
-  if (isBetaModeTurnedOffOrphanPro(user)) {
-    resetPlanToFreeWithoutDeletingFiles(
-      user,
-      {
-        status: "INACTIVE",
-        cancelAtPeriodEnd: false,
-        nextChargeAt: null,
-        endedAt: now,
-      },
-      now,
-    );
-    return { changed: true, reason: "BETA_MODE_OFF_ORPHAN_PRO" };
-  }
+  // 2) BETA_MODE=true -> false 전환 후 실제 구독 신호가 없는 사용자 1회 리셋
+  const betaReset = applyBetaModeOffUsageReset(user, { ...options, now });
+  if (betaReset.changed) return betaReset;
 
   return { changed: false, reason: "NOOP" };
 }
 
 function applyBetaUsageResetAfterRealMode(user, options = {}) {
-  if (!user) return false;
-  const betaMode = Object.prototype.hasOwnProperty.call(options, "betaMode")
-    ? Boolean(options.betaMode)
-    : paymentService.isBetaMode();
-
-  if (betaMode) return false;
-  if (normalizeStatus(user.plan) !== "PRO") return false;
-  if (hasRealSubscriptionSignal(user)) return false;
-
-  resetPlanToFreeWithoutDeletingFiles(
-    user,
-    {
-      status: "INACTIVE",
-      cancelAtPeriodEnd: false,
-      nextChargeAt: null,
-      endedAt: nowDate(options.now),
-    },
-    nowDate(options.now),
-  );
-  return true;
+  const result = applyBetaModeOffUsageReset(user, options);
+  return Boolean(result.changed);
 }
 
 function applyUsageResetPolicies(user, options = {}) {
   const now = nowDate(options.now);
 
   const monthly = applyMonthlyUsageReset(user, { now });
-  const transition = applyUsageStateTransitions(user, { now });
+  const transition = applyUsageStateTransitions(user, { ...options, now });
 
   return {
     changed: Boolean(monthly.changed || transition.changed),
@@ -202,13 +227,15 @@ function applyUsageResetPolicies(user, options = {}) {
 }
 
 module.exports = {
+  applyBetaModeOffUsageReset,
+  applyBetaUsageResetAfterRealMode,
   applyMonthlyUsageReset,
   applyUsageResetPolicies,
   applyUsageStateTransitions,
-  applyBetaUsageResetAfterRealMode,
   ensureUsageShape,
   hasRealSubscriptionSignal,
   isBetaModeTurnedOffOrphanPro,
+  isBetaModeTurnedOffUsageResetTarget,
   isExpiredCanceledPending,
   needMonthlyReset,
   resetUsageCounters,
