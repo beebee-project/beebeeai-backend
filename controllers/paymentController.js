@@ -236,7 +236,7 @@ exports.completeSubscription = async (req, res) => {
 
     // billingKey 발급 후 첫 결제를 먼저 수행
     const now = new Date();
-    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 5900);
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 12900);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
     const orderId = `sub-init-${req.user.id}-${now.getTime()}`;
 
@@ -396,7 +396,7 @@ exports.cronCharge = async (req, res) => {
     }
 
     // 2) 구독 청구 금액/상품명
-    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 5900);
+    const amount = Number(process.env.SUBSCRIPTION_AMOUNT || 12900);
     const orderName = process.env.SUBSCRIPTION_ORDER_NAME || "BeeBee AI PRO";
 
     // 3) 청구 대상 조회: ACTIVE/PAST_DUE + nextChargeAt 도래 + billingKey 존재
