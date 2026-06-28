@@ -23,7 +23,6 @@ const {
 const {
   saveEncryptedQueryJson,
   deleteEncryptedQueryJson,
-  deleteEncryptedQueryJsonByFileName,
 } = require("../services/encryptedJsonStorageService");
 const {
   encryptBuffer,
@@ -90,16 +89,13 @@ exports.uploadFile = async (req, res, next) => {
     );
 
     if (existingFile) {
-      await deleteObject(existingFile.localName || existingFile.gcsName);
-
       if (existingFile.queryJsonKey) {
         await deleteEncryptedQueryJson(existingFile.queryJsonKey);
       }
 
-      await deleteEncryptedQueryJsonByFileName({
-        userId: String(user._id),
-        fileName: existingFile.originalName,
-      });
+      if (existingFile.gcsName) {
+        await deleteObject(existingFile.gcsName);
+      }
 
       user.uploadedFiles = user.uploadedFiles.filter(
         (f) => f.originalName !== originalName,
@@ -238,16 +234,13 @@ exports.deleteFile = async (req, res, next) => {
         .json({ message: "파일을 찾을 수 없거나 접근 권한이 없습니다." });
     }
 
-    await deleteObject(fileInfo.localName || fileInfo.gcsName);
-
     if (fileInfo.queryJsonKey) {
       await deleteEncryptedQueryJson(fileInfo.queryJsonKey);
     }
 
-    await deleteEncryptedQueryJsonByFileName({
-      userId: String(user._id),
-      fileName: fileInfo.originalName,
-    });
+    if (fileInfo.gcsName) {
+      await deleteObject(fileInfo.gcsName);
+    }
 
     user.uploadedFiles = user.uploadedFiles.filter(
       (f) => f.originalName !== originalName,
