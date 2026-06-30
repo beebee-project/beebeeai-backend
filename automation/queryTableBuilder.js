@@ -229,8 +229,14 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
 
       const columns = uniqueKeys(safeRawColumns);
       const data = [];
+      const excludedRowSet = new Set(
+        (Array.isArray(block.excludedRows) ? block.excludedRows : [])
+          .map((row) => Number(row?.row || row))
+          .filter((row) => Number.isFinite(row)),
+      );
 
       for (let r = block.dataStartRow; r <= block.dataEndRow; r += 1) {
+        if (excludedRowSet.has(r)) continue;
         const row = rows[r - 1] || [];
         const obj = {};
 
@@ -251,13 +257,31 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
         isFallback: !!block.isFallback,
         source: block.isFallback ? "fallback" : "tableBlock",
         tableName: normalizeKey(block.tableId.replace("#", "_"), "table"),
+        tableTitle: block.tableTitle || "",
         sheetName,
         range: block.range,
         dataRange: block.dataRange,
         headerRow: block.headerRow,
+        headerRows: Array.isArray(block.headerRows)
+          ? block.headerRows
+          : block.headerRow
+            ? [block.headerRow]
+            : [],
+        hasMergedHeader: Boolean(block.hasMergedHeader),
         dataStartRow: block.dataStartRow,
         dataEndRow: block.dataEndRow,
         rowCount: data.length,
+        rawDataRowCount: Math.max(
+          0,
+          Number(block.dataEndRow || 0) - Number(block.dataStartRow || 0) + 1,
+        ),
+        excludedRows: Array.isArray(block.excludedRows)
+          ? block.excludedRows
+          : [],
+        dataQuality: block.dataQuality || null,
+        tableSegmentation: block.tableSegmentation || null,
+        headerQuality: block.headerQuality || null,
+        blockScore: block.score ?? null,
         columns,
         rows: data,
       };
