@@ -226,9 +226,11 @@ function looksLikeRepeatedHeaderRow(row = [], headerRow = [], headerCols = []) {
     const right = normalizeHeaderCompare(headerRow?.[col]);
     if (!left || !right) continue;
     comparable += 1;
-    if (left === right || left.includes(right) || right.includes(left)) {
-      matched += 1;
-    }
+
+    // 반복 헤더는 같은 위치의 헤더 토큰이 다시 등장하는 경우만 본다.
+    // 기존의 includes 비교는 숫자 데이터(예: 1, 2)가 2021/2022 헤더에 포함된다고
+    // 오인해 실제 데이터 행을 REPEATED_HEADER_ROW로 제외하는 문제가 있었다.
+    if (left === right) matched += 1;
   }
 
   if (comparable < Math.min(2, headerCols.length)) return false;
@@ -1138,15 +1140,25 @@ function rowLooksLikeDataLayerAboveHeader(row = [], lowerRow = []) {
   const numericDate = numericDateCount(row);
   const sameWidthAsLower =
     nonEmpty >= Math.max(2, Math.ceil(lowerNonEmpty * 0.6));
+  const lowerHeaderLikeRatio = countHeaderLikeTokens(lowerRow) / lowerNonEmpty;
+  const lowerTemporalCount = countTemporalHeaderTokens(lowerRow);
+  const lowerHeaderKeywordCount = nonEmptyCells(lowerRow).filter((cell) => {
+    const token = normalizeHeaderCompare(cell);
+    return (
+      /^(19|20)\d{2}$/.test(token) ||
+      /^(계|합계|총계|소계|남자|여자|구분|분류|항목|전체)$/.test(token)
+    );
+  }).length;
   const lowerLooksHeaderish =
-    countHeaderLikeTokens(lowerRow) / lowerNonEmpty >= 0.5 ||
-    countTemporalHeaderTokens(lowerRow) >= 2 ||
+    lowerHeaderLikeRatio >= 0.35 ||
+    lowerTemporalCount >= 1 ||
+    lowerHeaderKeywordCount >= Math.min(2, lowerNonEmpty) ||
     structurallyHeaderishRow(lowerRow);
 
-  // 반복 헤더 바로 위의 실제 데이터행(예: 개발/대리/5000)이
+  // 반복 헤더 바로 위의 실제 데이터행(예: 개발/대리/5000, 배임/2042)이
   // 상위 병합 헤더 레이어로 붙는 것을 막는다.
   if (sameWidthAsLower && lowerLooksHeaderish && numericDate > 0) {
-    return temporalCount === 0;
+    return temporalCount === 0 || isLikelyDataRow(row);
   }
 
   return false;
@@ -1289,6 +1301,272 @@ function mergeHeaderRows(json = [], headerRowIndexes = [], headerIndex) {
   };
 }
 
+function normalizedHeaderSignatureValue(value = "") {
+  return normalizeHeaderCompare(value)
+    .replace(/column\d+$/i, "")
+    .trim();
+}
+
+function buildHeaderSignatureFromRow(row = [], headerCols = []) {
+  return (headerCols || [])
+    .map((col) => normalizedHeaderSignatureValue(row?.[col]))
+    .filter(Boolean);
+}
+
+function buildHeaderSignatureInfo(
+  json = [],
+  headerRowIndexes = [],
+  headerIndex = 0,
+) {
+  const mergedHeaderInfo = mergeHeaderRows(json, headerRowIndexes, headerIndex);
+  const headerRow = json[headerIndex] || [];
+  const effectiveHeaderRow = mergedHeaderInfo?.merged || headerRow;
+  const headerCols = rowNonEmptyIndexes(effectiveHeaderRow);
+
+  return {
+    headerIndex,
+    headerRows: mergedHeaderInfo?.headerRows?.length
+      ? mergedHeaderInfo.headerRows.map((row) => row - 1)
+      : [headerIndex],
+    effectiveHeaderRow,
+    headerCols,
+    signature: buildHeaderSignatureFromRow(effectiveHeaderRow, headerCols),
+  };
+}
+
+function headerSignatureSimilarity(left = [], right = []) {
+  const a = (left || []).filter(Boolean);
+  const b = (right || []).filter(Boolean);
+  if (!a.length || !b.length) return 0;
+
+  const bSet = new Set(b);
+  const matched = a.filter((value) => bSet.has(value)).length;
+  return matched / Math.max(a.length, b.length);
+}
+
+function looksLikeSameHeaderSignature(left = [], right = []) {
+  const a = (left || []).filter(Boolean);
+  const b = (right || []).filter(Boolean);
+  if (a.length < 2 || b.length < 2) return false;
+
+  const similarity = headerSignatureSimilarity(a, b);
+  if (similarity >= 0.86) return true;
+
+  const leadingComparable = Math.min(6, a.length, b.length);
+  let leadingMatched = 0;
+  for (let i = 0; i < leadingComparable; i += 1) {
+    if (a[i] && b[i] && a[i] === b[i]) leadingMatched += 1;
+  }
+
+  if (leadingComparable >= 4 && leadingMatched / leadingComparable >= 0.75) {
+    return true;
+  }
+
+  // 넓은 표는 반복 헤더가 일부 컬럼만 비어도 같은 헤더로 본다.
+  return a.length >= 8 && b.length >= 8 && similarity >= 0.78;
+}
+
+function hasStrongHeaderBoundaryBefore(json = [], headerStartIndex = 0) {
+  for (
+    let r = headerStartIndex - 1;
+    r >= Math.max(0, headerStartIndex - 3);
+    r -= 1
+  ) {
+    const row = json[r] || [];
+    if (isBlankRow(row)) return true;
+    if (looksLikeNoteOrCommentRow(row)) return true;
+    if (looksLikeSectionTitleRow(row)) return true;
+
+    // 제목/섹션명처럼 텍스트 1~2개만 있는 행이 바로 앞에 있으면 별도 표일 수 있다.
+    if (numericDateCount(row) === 0 && nonEmptyCount(row) <= 2) return true;
+
+    if (nonEmptyCount(row) >= 2) return false;
+  }
+
+  return false;
+}
+
+function isMissingValuePlaceholderCell(value) {
+  const s = compactCellText(value);
+  if (!s) return false;
+  return /^(?:[-–—]+|[.]+|N\/A|NA|NULL|없음|미상)$/i.test(s);
+}
+
+function isGenericDimensionHeaderToken(value) {
+  const s = normalizeNoiseText(value);
+  return /^(구분|분류|항목|유형|종류|지역|국가|국가별|산업|산업별|성별|연령|연령별|기간|연도|월|분기|category|item|type|group|class)$/.test(
+    s,
+  );
+}
+
+function countDataValueSignals(cells = []) {
+  return (cells || []).filter((cell) => {
+    if (cell == null || String(cell).trim() === "") return false;
+    return (
+      isNumericLike(cell) ||
+      isDateLike(cell) ||
+      isTimeLike(cell) ||
+      isMissingValuePlaceholderCell(cell)
+    );
+  }).length;
+}
+
+function looksLikeContinuationDataCandidateRow(row = []) {
+  const firstIdx = firstNonEmptyIndex(row);
+  if (firstIdx < 0) return false;
+
+  const cells = nonEmptyCells(row);
+  const nonEmpty = cells.length;
+  if (nonEmpty < 3) return false;
+
+  const temporalCount = cells.filter(isTemporalHeaderLike).length;
+  if (temporalCount >= 2) return false;
+
+  const first = row[firstIdx];
+  const firstText = compactCellText(first);
+  if (!firstText) return false;
+
+  const firstIsDataValue =
+    isNumericLike(first) ||
+    isDateLike(first) ||
+    isTimeLike(first) ||
+    isMissingValuePlaceholderCell(first) ||
+    isTemporalHeaderLike(first);
+  if (firstIsDataValue) return false;
+
+  const afterFirst = row
+    .slice(firstIdx + 1)
+    .filter((cell) => cell != null && String(cell).trim() !== "");
+  if (afterFirst.length < 2) return false;
+
+  const dataSignals = countDataValueSignals(afterFirst);
+  const placeholderSignals = afterFirst.filter(
+    isMissingValuePlaceholderCell,
+  ).length;
+  const signalRatio = dataSignals / afterFirst.length;
+
+  // blank row 뒤에 이어지는 실제 데이터 행이 헤더 후보로 승격되는 케이스 방지.
+  // 예: ["지붕", "-", "-", ...], ["비상구", 45, 23, ...]
+  // 반대로 ["구분", "2021", "2022", "2023"] 같은 진짜 기간형 헤더는 temporalCount로 제외된다.
+  if (placeholderSignals > 0 && signalRatio >= 0.45) return true;
+
+  if (!isGenericDimensionHeaderToken(first) && signalRatio >= 0.65) {
+    return true;
+  }
+
+  return false;
+}
+
+function headerCandidateLooksLikeDataBlock(json = [], candidateInfo = {}) {
+  const rows = (candidateInfo.headerRows || []).map((idx) => json[idx] || []);
+  if (!rows.length) return false;
+
+  const continuationDataLikeRows = rows.filter(
+    looksLikeContinuationDataCandidateRow,
+  ).length;
+  if (continuationDataLikeRows >= Math.ceil(rows.length / 2)) {
+    return true;
+  }
+
+  let rawNumericDateCount = 0;
+  let rawTemporalCount = 0;
+  let rawNonEmptyCount = 0;
+
+  for (const row of rows) {
+    rawNumericDateCount += numericDateCount(row);
+    rawTemporalCount += countTemporalHeaderTokens(row);
+    rawNonEmptyCount += nonEmptyCount(row);
+  }
+
+  // 데이터 행 1~2개가 헤더 후보로 묶인 경우는 숫자값이 많지만
+  // 2024 같은 시간축 헤더 토큰은 거의 없다.
+  if (rawNonEmptyCount > 0) {
+    const rawNumericRatio = rawNumericDateCount / rawNonEmptyCount;
+    if (
+      rawNumericDateCount >= 3 &&
+      rawNumericRatio >= 0.25 &&
+      rawTemporalCount <= 2
+    ) {
+      return true;
+    }
+  }
+
+  const dataLikeRows = rows.filter((row) => {
+    const nonEmpty = nonEmptyCount(row);
+    if (!nonEmpty) return false;
+    const numericDate = numericDateCount(row);
+    const numericDateRatio = numericDate / nonEmpty;
+    const temporalCount = countTemporalHeaderTokens(row);
+
+    if (isLikelyDataRow(row)) return true;
+    if (numericDateRatio >= 0.25 && temporalCount === 0) {
+      return true;
+    }
+    return false;
+  }).length;
+
+  if (!dataLikeRows) return false;
+  return dataLikeRows >= Math.ceil(rows.length / 2);
+}
+
+function resolveNextDistinctHeaderInfo({
+  json = [],
+  selectedHeaders = [],
+  currentPosition = 0,
+  currentSignature = [],
+  allHeaderRowIndexes = [],
+} = {}) {
+  const repeatedHeaderBands = [];
+  let nextHeaderIndex = json.length;
+
+  for (let j = currentPosition + 1; j < selectedHeaders.length; j += 1) {
+    const candidateIndex = selectedHeaders[j];
+    const candidateInfo = buildHeaderSignatureInfo(
+      json,
+      allHeaderRowIndexes,
+      candidateIndex,
+    );
+    const candidateStart = Math.min(...candidateInfo.headerRows);
+    const sameHeader = looksLikeSameHeaderSignature(
+      currentSignature,
+      candidateInfo.signature,
+    );
+
+    if (sameHeader && !hasStrongHeaderBoundaryBefore(json, candidateStart)) {
+      repeatedHeaderBands.push({
+        headerIndex: candidateIndex,
+        rows: candidateInfo.headerRows,
+        signatureSimilarity: Number(
+          headerSignatureSimilarity(
+            currentSignature,
+            candidateInfo.signature,
+          ).toFixed(3),
+        ),
+      });
+      continue;
+    }
+
+    // 원래 헤더 후보로 잡혔더라도 실제 데이터/소계 행으로 보이면
+    // 새 table boundary로 사용하지 않는다.
+    if (headerCandidateLooksLikeDataBlock(json, candidateInfo)) {
+      continue;
+    }
+
+    nextHeaderIndex = candidateIndex;
+    break;
+  }
+
+  const repeatedHeaderRowSet = new Set(
+    repeatedHeaderBands.flatMap((band) => band.rows || []),
+  );
+
+  return {
+    nextHeaderIndex,
+    repeatedHeaderBands,
+    repeatedHeaderRowSet,
+  };
+}
+
 function cloneJsonRows(json = []) {
   return json.map((row) => (Array.isArray(row) ? [...row] : []));
 }
@@ -1398,11 +1676,19 @@ function detectTableBlocks(
       headerStartIndex,
       baseContext,
     );
-    const nextHeaderIndex = nearestFutureHeaderIndex(
-      selectedHeaders,
-      headerIndex,
-      json.length,
+    const currentSignature = buildHeaderSignatureFromRow(
+      effectiveHeaderRow,
+      headerCols,
     );
+    const nextHeaderInfo = resolveNextDistinctHeaderInfo({
+      json,
+      selectedHeaders,
+      currentPosition: i,
+      currentSignature,
+      allHeaderRowIndexes: segmentationHeaderRowIndexes,
+    });
+    const nextHeaderIndex = nextHeaderInfo.nextHeaderIndex;
+    const repeatedHeaderRowSet = nextHeaderInfo.repeatedHeaderRowSet;
 
     let dataStart = headerIndex + 1;
     const excludedRows = [];
@@ -1428,6 +1714,18 @@ function detectTableBlocks(
 
     for (let r = dataStart; r < Math.min(nextHeaderIndex, json.length); r++) {
       const row = json[r] || [];
+
+      if (repeatedHeaderRowSet.has(r)) {
+        excludedRows.push({
+          row: r + 1,
+          reason: "REPEATED_HEADER_ROW",
+          phase: "insideDataRange",
+          kind: "repeatedHeader",
+        });
+        blankStreak = 0;
+        continue;
+      }
+
       const classified = classifyTableRow(row, baseContext);
 
       if (classified.include) {
@@ -1525,6 +1823,13 @@ function detectTableBlocks(
         version: TABLE_SEGMENTATION_VERSION,
         addedBySegmentation,
         titleRows,
+        repeatedHeaderBands: (nextHeaderInfo.repeatedHeaderBands || []).map(
+          (band) => ({
+            headerRow: band.headerIndex + 1,
+            rows: (band.rows || []).map((row) => row + 1),
+            signatureSimilarity: band.signatureSimilarity,
+          }),
+        ),
         previousBlockEnd: previousBlockEnd >= 0 ? previousBlockEnd + 1 : null,
         nextHeaderRow:
           nextHeaderIndex < json.length ? nextHeaderIndex + 1 : null,

@@ -26,6 +26,7 @@ function makeCandidate({
     tableId: table.tableId,
     sheetName: table.sheetName,
     confidence: table.confidence,
+    tableUsage: table.tableUsage || null,
     columns: {
       metric: metric?.header || null,
       dimension: dimension?.header || null,
@@ -46,6 +47,10 @@ function uniqueColumns(columns = []) {
 
 function buildTableCandidates(table = {}) {
   const candidates = [];
+
+  if (table.tableUsage?.analysisEligible === false) {
+    return candidates;
+  }
 
   if (Number(table.confidence) < ANALYSIS_RECIPE_OPTIONS.minTableConfidence) {
     return candidates;

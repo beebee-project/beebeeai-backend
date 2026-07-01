@@ -6,6 +6,53 @@ const {
 
 const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v1";
 
+const DEFAULT_TABLE_USAGE = Object.freeze({
+  version: "table_usage_quality_v1",
+  queryable: true,
+  analysisEligible: true,
+  templateEligible: true,
+  reasons: ["TABLE_USAGE_NOT_PROVIDED"],
+  metrics: {},
+});
+
+function normalizeTableUsage(table = {}) {
+  const usage = table.tableUsage || table.usage || null;
+  if (!usage || typeof usage !== "object") return { ...DEFAULT_TABLE_USAGE };
+
+  return {
+    version: usage.version || DEFAULT_TABLE_USAGE.version,
+    queryable: usage.queryable !== false,
+    analysisEligible: usage.analysisEligible !== false,
+    templateEligible: usage.templateEligible !== false,
+    reasons:
+      Array.isArray(usage.reasons) && usage.reasons.length
+        ? usage.reasons
+        : DEFAULT_TABLE_USAGE.reasons,
+    metrics: usage.metrics || {},
+  };
+}
+
+function isAnalysisEligibleTable(table = {}) {
+  return normalizeTableUsage(table).analysisEligible !== false;
+}
+
+function inheritVirtualTableUsage(
+  sourceTable = {},
+  transformationType = "virtual",
+) {
+  const sourceUsage = normalizeTableUsage(sourceTable);
+  return {
+    ...sourceUsage,
+    queryable: true,
+    analysisEligible: sourceUsage.analysisEligible !== false,
+    templateEligible: sourceUsage.templateEligible !== false,
+    reasons: [
+      ...(sourceUsage.reasons || []),
+      `VIRTUAL_TABLE_FROM_${String(transformationType || "virtual").toUpperCase()}`,
+    ],
+  };
+}
+
 function isBlank(value) {
   return value == null || String(value).trim() === "";
 }
@@ -692,8 +739,10 @@ function buildDiagnostics({
       source: table.source || (table.isFallback ? "fallback" : "tableBlock"),
       isVirtual: Boolean(table.isVirtual),
       transformationType: table.transformation?.type || null,
+      tableUsage: normalizeTableUsage(table),
     },
     transformation: table.transformation || null,
+    tableUsage: normalizeTableUsage(table),
     roleCounts,
     analysisReadiness: readiness,
     structureSignals,
@@ -920,6 +969,7 @@ function buildWideToLongVirtualTable(table = {}, index = 0) {
       0.92,
       Math.max(0.68, Number(table.confidence || 0.72)),
     ),
+    tableUsage: inheritVirtualTableUsage(table, "wide_to_long"),
     transformation: {
       version: "wide_to_long_normalization_v1",
       type: "wideToLong",
@@ -942,6 +992,7 @@ function buildWideToLongVirtualTables(normalizedTables = []) {
   const out = [];
 
   for (let i = 0; i < normalizedTables.length; i += 1) {
+    if (!isAnalysisEligibleTable(normalizedTables[i])) continue;
     const virtualTable = buildWideToLongVirtualTable(normalizedTables[i], i);
     if (virtualTable)
       out.push(
@@ -1141,6 +1192,7 @@ function buildCrossTableToLongVirtualTable(table = {}, index = 0) {
     excludedRows: [],
     warnings: [],
     confidence: Math.min(0.9, Math.max(0.65, Number(table.confidence || 0.7))),
+    tableUsage: inheritVirtualTableUsage(table, "cross_table_to_long"),
     transformation: {
       version: "cross_table_to_long_normalization_v1",
       type: "crossTableToLong",
@@ -1166,6 +1218,7 @@ function buildCrossTableToLongVirtualTables(normalizedTables = []) {
   const out = [];
 
   for (let i = 0; i < normalizedTables.length; i += 1) {
+    if (!isAnalysisEligibleTable(normalizedTables[i])) continue;
     const virtualTable = buildCrossTableToLongVirtualTable(
       normalizedTables[i],
       i,
@@ -1227,6 +1280,7 @@ function normalizeTable(table = {}, index = 0) {
     sourceTableId: table.sourceTableId || null,
     isVirtual: Boolean(table.isVirtual),
     transformation: table.transformation || null,
+    tableUsage: normalizeTableUsage(table),
     headerRows: table.headerRows || [],
     dataStartRow: table.dataStartRow ?? null,
     range: table.range || null,

@@ -74,6 +74,232 @@ function inferColumnType(meta = {}) {
   return "text";
 }
 
+const TABLE_USAGE_QUALITY_VERSION = "table_usage_quality_v1";
+
+function normalizeUsageText(value = "") {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>]+/g, "")
+    .trim();
+}
+
+function includesAnyNormalized(value = "", tokens = []) {
+  const normalized = normalizeUsageText(value);
+  if (!normalized) return false;
+  return tokens.some((token) => normalized.includes(normalizeUsageText(token)));
+}
+
+const META_OR_INSTRUCTION_SHEET_TOKENS = [
+  "메타",
+  "metadata",
+  "meta",
+  "설명",
+  "테스트설명",
+  "사용안내",
+  "안내",
+  "readme",
+  "guide",
+  "instruction",
+];
+
+const META_OR_INSTRUCTION_CELL_TOKENS = [
+  "통계표ID",
+  "조회기간",
+  "자료다운일자",
+  "자료유형",
+  "원본파일",
+  "작성기관",
+  "작성일",
+  "생성일",
+  "데이터기준",
+  "자료기준",
+  "단위",
+  "출처",
+  "통계표URL",
+  "URL",
+  "비고",
+  "주석",
+  "설명",
+  "테스트목적",
+  "테스트설명",
+];
+
+const FORM_LIKE_TOKENS = [
+  "입력값",
+  "입력란",
+  "확인",
+  "검토",
+  "결재",
+  "승인",
+  "담당자",
+  "서명",
+  "날인",
+  "체크",
+  "양식",
+  "□",
+  "☐",
+];
+
+function collectTableUsageTexts(table = {}) {
+  const headers = (table.columns || []).map(
+    (c) => c.header || c.originalHeader || "",
+  );
+  const samples = (table.columns || [])
+    .flatMap((c) => c.sampleValues || [])
+    .filter((v) => v != null)
+    .slice(0, 60);
+  const rowValues = (table.rows || [])
+    .slice(0, 5)
+    .flatMap((row) => Object.values(row || {}))
+    .filter((v) => v != null)
+    .slice(0, 60);
+
+  return {
+    headers,
+    samples,
+    rowValues,
+    all: [
+      table.sheetName,
+      table.tableTitle,
+      table.tableName,
+      ...headers,
+      ...samples,
+      ...rowValues,
+    ].map((v) => String(v ?? "")),
+  };
+}
+
+function countTextsWithTokens(texts = [], tokens = []) {
+  return texts.filter((value) => includesAnyNormalized(value, tokens)).length;
+}
+
+function hasUrlLikeValue(texts = []) {
+  return texts.some((value) =>
+    /https?:\/\/|www\.|\.go\.kr|\.or\.kr|\.com/i.test(String(value || "")),
+  );
+}
+
+function scoreTableUsageQuality(table = {}) {
+  const rowCount = Number(table.rowCount || 0);
+  const colCount = Array.isArray(table.columns) ? table.columns.length : 0;
+  const confidence = Number(table.confidence || 0);
+  const numericColumns = (table.columns || []).filter(
+    (c) => c.type === "number",
+  ).length;
+  const dateColumns = (table.columns || []).filter(
+    (c) => c.type === "date",
+  ).length;
+  const categoryColumns = (table.columns || []).filter(
+    (c) => c.type === "category",
+  ).length;
+  const textColumns = (table.columns || []).filter(
+    (c) => c.type === "text",
+  ).length;
+  const rangeRows = Math.max(0, Number(table.rawDataRowCount || rowCount || 0));
+  const excludedCount = Array.isArray(table.excludedRows)
+    ? table.excludedRows.length
+    : 0;
+  const texts = collectTableUsageTexts(table);
+  const headerMetaTokens = countTextsWithTokens(
+    texts.headers,
+    META_OR_INSTRUCTION_CELL_TOKENS,
+  );
+  const allMetaTokens = countTextsWithTokens(
+    texts.all,
+    META_OR_INSTRUCTION_CELL_TOKENS,
+  );
+  const formTokens = countTextsWithTokens(texts.all, FORM_LIKE_TOKENS);
+  const sheetLooksMetaOrInstruction = includesAnyNormalized(
+    table.sheetName || "",
+    META_OR_INSTRUCTION_SHEET_TOKENS,
+  );
+  const hasUrl = hasUrlLikeValue(texts.all);
+
+  const broadTableEvidence =
+    (rowCount >= 5 && colCount >= 2) ||
+    (rowCount >= 3 && colCount >= 3 && numericColumns >= 1) ||
+    (rowCount >= 2 && colCount >= 4 && numericColumns >= 2) ||
+    (rowCount >= 2 && colCount >= 4 && dateColumns >= 1 && numericColumns >= 1);
+
+  const metadataLikeBlock = Boolean(
+    !broadTableEvidence &&
+    (sheetLooksMetaOrInstruction ||
+      hasUrl ||
+      headerMetaTokens >= 2 ||
+      allMetaTokens >= 3 ||
+      (rowCount <= 2 && colCount <= 6 && allMetaTokens >= 2)),
+  );
+
+  const formLikeBlock = Boolean(
+    !broadTableEvidence &&
+    (formTokens >= 2 ||
+      (rowCount <= 3 && colCount <= 5 && formTokens >= 1 && textColumns >= 2)),
+  );
+
+  const verySmallWeakBlock = Boolean(
+    !broadTableEvidence &&
+    rowCount <= 1 &&
+    (numericColumns + dateColumns === 0 || allMetaTokens >= 1),
+  );
+
+  const lowConfidenceWeakBlock = Boolean(
+    !broadTableEvidence && confidence < 45 && rowCount <= 2,
+  );
+
+  const reasons = [];
+  if (sheetLooksMetaOrInstruction) reasons.push("META_OR_INSTRUCTION_SHEET");
+  if (metadataLikeBlock) reasons.push("META_OR_INSTRUCTION_TABLE");
+  if (formLikeBlock) reasons.push("FORM_LIKE_TABLE_BLOCK");
+  if (verySmallWeakBlock) reasons.push("VERY_SMALL_WEAK_TABLE_BLOCK");
+  if (lowConfidenceWeakBlock) reasons.push("LOW_CONFIDENCE_WEAK_TABLE_BLOCK");
+
+  const analysisEligible = Boolean(
+    rowCount > 0 &&
+    colCount >= 2 &&
+    !metadataLikeBlock &&
+    !formLikeBlock &&
+    !verySmallWeakBlock &&
+    !lowConfidenceWeakBlock,
+  );
+
+  const templateEligible = Boolean(
+    analysisEligible &&
+    (broadTableEvidence ||
+      rowCount >= 3 ||
+      numericColumns >= 2 ||
+      categoryColumns >= 1),
+  );
+
+  return {
+    version: TABLE_USAGE_QUALITY_VERSION,
+    queryable: rowCount > 0 && colCount >= 2,
+    analysisEligible,
+    templateEligible,
+    reasons: reasons.length
+      ? reasons
+      : analysisEligible
+        ? ["TABLE_LIKE_STRUCTURE"]
+        : ["LOW_TABLE_USAGE_CONFIDENCE"],
+    metrics: {
+      rowCount,
+      rawDataRowCount: rangeRows,
+      columnCount: colCount,
+      numericColumnCount: numericColumns,
+      dateColumnCount: dateColumns,
+      categoryColumnCount: categoryColumns,
+      textColumnCount: textColumns,
+      excludedRowCount: excludedCount,
+      confidence,
+      headerMetaTokenCount: headerMetaTokens,
+      allMetaTokenCount: allMetaTokens,
+      formTokenCount: formTokens,
+      broadTableEvidence,
+      sheetLooksMetaOrInstruction,
+      hasUrl,
+    },
+  };
+}
+
 function buildFallbackBlockFromMeta(sheetName, sheetInfo = {}, rows = []) {
   const meta = sheetInfo.metaData || {};
   const entries = Object.entries(meta);
@@ -287,6 +513,7 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
       };
 
       queryTable.confidence = scoreQueryTable(queryTable);
+      queryTable.tableUsage = scoreTableUsageQuality(queryTable);
       tables.push(queryTable);
     }
   }
@@ -296,7 +523,9 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
 
   for (let i = 0; i < tables.length; i += 1) {
     const t = tables[i];
-    const score = Number(t.confidence || 0);
+    const eligibleBonus = t.tableUsage?.templateEligible ? 1000 : 0;
+    const analysisBonus = t.tableUsage?.analysisEligible ? 500 : 0;
+    const score = eligibleBonus + analysisBonus + Number(t.confidence || 0);
 
     if (score > bestScore) {
       bestScore = score;
