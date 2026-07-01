@@ -64,6 +64,39 @@ function coerceValue(value, type) {
   return String(value).trim();
 }
 
+function rowToObject(row = [], columns = []) {
+  const obj = {};
+
+  for (const col of columns) {
+    const raw = cellValue(row, col.columnIndex);
+    obj[col.key] = coerceValue(raw, col.type);
+  }
+
+  return obj;
+}
+
+function buildSummaryRows(rows = [], columns = [], excludedRows = []) {
+  return (excludedRows || [])
+    .filter(
+      (item) =>
+        String(item?.reason || "").toUpperCase() === "TOTAL_OR_SUBTOTAL_ROW" ||
+        String(item?.kind || "").toLowerCase() === "total",
+    )
+    .map((item) => {
+      const rowNumber = Number(item.row || 0);
+      const rawRow = rows[rowNumber - 1] || [];
+      return {
+        row: rowNumber,
+        reason: item.reason || "TOTAL_OR_SUBTOTAL_ROW",
+        phase: item.phase || null,
+        kind: item.kind || "total",
+        detectorVersion: item.detectorVersion || "summary_row_detector_v2",
+        values: rowToObject(rawRow, columns),
+        rawCells: columns.map((col) => cellValue(rawRow, col.columnIndex)),
+      };
+    });
+}
+
 function inferColumnType(meta = {}) {
   const profileType = String(meta.profileType || "").toLowerCase();
   const dominantType = String(meta.dominantType || "").toLowerCase();
@@ -74,7 +107,8 @@ function inferColumnType(meta = {}) {
   return "text";
 }
 
-const TABLE_USAGE_QUALITY_VERSION = "table_usage_quality_v1";
+const TABLE_USAGE_QUALITY_VERSION = "table_usage_quality_v2_1";
+const FORM_LIKE_DOCUMENT_VERSION = "form_like_document_v1";
 
 function normalizeUsageText(value = "") {
   return String(value ?? "")
@@ -221,19 +255,47 @@ function scoreTableUsageQuality(table = {}) {
     (rowCount >= 2 && colCount >= 4 && numericColumns >= 2) ||
     (rowCount >= 2 && colCount >= 4 && dateColumns >= 1 && numericColumns >= 1);
 
+  const strongAnalyticalEvidence = Boolean(
+    rowCount >= 10 &&
+    colCount >= 3 &&
+    numericColumns >= 2 &&
+    !hasUrl &&
+    allMetaTokens <= 1,
+  );
+
+  // v2.1: 시트명이 메타/설명 계열인 경우, 표처럼 보이는 2열짜리
+  // 메타 목록(예: 항목명/값, URL 포함)을 broadTableEvidence만으로 통과시키지 않는다.
+  // 단, 상단메타_실제표처럼 같은 시트 안의 실제 대형 데이터 표는 유지한다.
+  const metaSheetWeakBlock = Boolean(
+    sheetLooksMetaOrInstruction &&
+    !strongAnalyticalEvidence &&
+    (hasUrl || headerMetaTokens >= 1 || allMetaTokens >= 2) &&
+    (colCount <= 2 || rowCount <= 10 || numericColumns <= 1),
+  );
+
   const metadataLikeBlock = Boolean(
-    !broadTableEvidence &&
-    (sheetLooksMetaOrInstruction ||
-      hasUrl ||
-      headerMetaTokens >= 2 ||
-      allMetaTokens >= 3 ||
-      (rowCount <= 2 && colCount <= 6 && allMetaTokens >= 2)),
+    metaSheetWeakBlock ||
+    (!broadTableEvidence &&
+      (sheetLooksMetaOrInstruction ||
+        hasUrl ||
+        headerMetaTokens >= 2 ||
+        allMetaTokens >= 3 ||
+        (rowCount <= 2 && colCount <= 6 && allMetaTokens >= 2))),
   );
 
   const formLikeBlock = Boolean(
-    !broadTableEvidence &&
-    (formTokens >= 2 ||
-      (rowCount <= 3 && colCount <= 5 && formTokens >= 1 && textColumns >= 2)),
+    (!broadTableEvidence &&
+      (formTokens >= 2 ||
+        (rowCount <= 3 &&
+          colCount <= 5 &&
+          formTokens >= 1 &&
+          textColumns >= 2))) ||
+    (rowCount <= 5 &&
+      colCount <= 6 &&
+      formTokens >= 4 &&
+      textColumns >= 2 &&
+      numericColumns <= 2 &&
+      excludedCount >= 2),
   );
 
   const verySmallWeakBlock = Boolean(
@@ -296,8 +358,206 @@ function scoreTableUsageQuality(table = {}) {
       broadTableEvidence,
       sheetLooksMetaOrInstruction,
       hasUrl,
+      strongAnalyticalEvidence,
+      metaSheetWeakBlock,
     },
   };
+}
+
+function toUsageNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function usageReasons(table = {}) {
+  return Array.isArray(table.tableUsage?.reasons)
+    ? table.tableUsage.reasons
+    : [];
+}
+
+function tableUsageMetric(table = {}, key, fallback = 0) {
+  return toUsageNumber(table.tableUsage?.metrics?.[key], fallback);
+}
+
+function hasUsageReason(table = {}, reason = "") {
+  return usageReasons(table).includes(reason);
+}
+
+function sheetNameLooksFormLike(sheetName = "") {
+  return includesAnyNormalized(sheetName, [
+    "서식",
+    "양식",
+    "입력양식",
+    "입력폼",
+    "신청서",
+    "조사표",
+    "체크리스트",
+    "form",
+    "template",
+    "application",
+  ]);
+}
+
+function isStrongAnalyticalTable(table = {}) {
+  const rowCount = toUsageNumber(table.rowCount);
+  const colCount = Array.isArray(table.columns) ? table.columns.length : 0;
+  const numericColumns = tableUsageMetric(table, "numericColumnCount");
+  const categoryColumns = tableUsageMetric(table, "categoryColumnCount");
+  const formTokenCount = tableUsageMetric(table, "formTokenCount");
+  const metaTokenCount = tableUsageMetric(table, "allMetaTokenCount");
+
+  if (hasUsageReason(table, "META_OR_INSTRUCTION_TABLE")) return false;
+  if (hasUsageReason(table, "FORM_LIKE_TABLE_BLOCK")) return false;
+
+  return Boolean(
+    rowCount >= 15 &&
+    colCount >= 3 &&
+    numericColumns >= 2 &&
+    categoryColumns + numericColumns >= 3 &&
+    formTokenCount <= 2 &&
+    metaTokenCount <= 3,
+  );
+}
+
+function collectSheetUsageProfile(sheetTables = []) {
+  const queryableTables = sheetTables.filter(
+    (t) => t.tableUsage?.queryable !== false,
+  );
+  const eligibleTables = queryableTables.filter(
+    (t) => t.tableUsage?.analysisEligible !== false,
+  );
+  const totalRowCount = queryableTables.reduce(
+    (sum, t) => sum + toUsageNumber(t.rowCount),
+    0,
+  );
+  const totalRawRowCount = queryableTables.reduce(
+    (sum, t) => sum + toUsageNumber(t.rawDataRowCount || t.rowCount),
+    0,
+  );
+  const totalExcludedRowCount = queryableTables.reduce(
+    (sum, t) => sum + tableUsageMetric(t, "excludedRowCount"),
+    0,
+  );
+  const totalFormTokenCount = queryableTables.reduce(
+    (sum, t) => sum + tableUsageMetric(t, "formTokenCount"),
+    0,
+  );
+  const totalMetaTokenCount = queryableTables.reduce(
+    (sum, t) => sum + tableUsageMetric(t, "allMetaTokenCount"),
+    0,
+  );
+  const totalNumericColumnCount = queryableTables.reduce(
+    (sum, t) => sum + tableUsageMetric(t, "numericColumnCount"),
+    0,
+  );
+  const totalTextColumnCount = queryableTables.reduce(
+    (sum, t) => sum + tableUsageMetric(t, "textColumnCount"),
+    0,
+  );
+  const excludedRatio =
+    totalRawRowCount + totalExcludedRowCount > 0
+      ? totalExcludedRowCount / (totalRawRowCount + totalExcludedRowCount)
+      : 0;
+  const hasStrongAnalyticalTable = queryableTables.some(
+    isStrongAnalyticalTable,
+  );
+  const sheetName =
+    queryableTables[0]?.sheetName || sheetTables[0]?.sheetName || "";
+  const sheetFormLike = sheetNameLooksFormLike(sheetName);
+  const tableRanges = queryableTables.map((t) => t.range).filter(Boolean);
+
+  return {
+    version: FORM_LIKE_DOCUMENT_VERSION,
+    sheetName,
+    queryableTableCount: queryableTables.length,
+    eligibleTableCount: eligibleTables.length,
+    totalRowCount,
+    totalRawRowCount,
+    totalExcludedRowCount,
+    excludedRatio,
+    totalFormTokenCount,
+    totalMetaTokenCount,
+    totalNumericColumnCount,
+    totalTextColumnCount,
+    sheetFormLike,
+    hasStrongAnalyticalTable,
+    tableRanges,
+  };
+}
+
+function isFormLikeDocumentSheetProfile(profile = {}) {
+  if (!profile.queryableTableCount || !profile.eligibleTableCount) return false;
+  if (profile.hasStrongAnalyticalTable) return false;
+
+  const compactMultiBlock =
+    profile.queryableTableCount >= 2 &&
+    profile.totalRowCount <= 30 &&
+    profile.excludedRatio >= 0.25;
+
+  const strongFormSignal =
+    profile.totalFormTokenCount >= 6 ||
+    (profile.sheetFormLike && profile.totalFormTokenCount >= 2);
+
+  const formDocumentSignal =
+    (strongFormSignal && compactMultiBlock) ||
+    (profile.sheetFormLike &&
+      profile.totalFormTokenCount >= 5 &&
+      profile.totalRowCount <= 35) ||
+    (profile.totalFormTokenCount >= 10 && profile.totalRowCount <= 40);
+
+  return Boolean(formDocumentSignal);
+}
+
+function markTableAsFormLikeDocument(table = {}, profile = {}) {
+  const usage = table.tableUsage || scoreTableUsageQuality(table);
+  const reasons = Array.from(
+    new Set([
+      ...(Array.isArray(usage.reasons) ? usage.reasons : []),
+      "FORM_LIKE_DOCUMENT",
+    ]),
+  );
+
+  table.tableUsage = {
+    ...usage,
+    analysisEligible: false,
+    templateEligible: false,
+    reasons,
+    metrics: {
+      ...(usage.metrics || {}),
+      formLikeDocument: {
+        version: FORM_LIKE_DOCUMENT_VERSION,
+        sheetName: profile.sheetName,
+        queryableTableCount: profile.queryableTableCount,
+        eligibleTableCount: profile.eligibleTableCount,
+        totalRowCount: profile.totalRowCount,
+        totalFormTokenCount: profile.totalFormTokenCount,
+        totalMetaTokenCount: profile.totalMetaTokenCount,
+        excludedRatio: Number(profile.excludedRatio.toFixed(4)),
+        sheetFormLike: profile.sheetFormLike,
+        tableRanges: profile.tableRanges,
+      },
+    },
+  };
+}
+
+function applyFormLikeDocumentFilter(tables = []) {
+  const bySheet = new Map();
+
+  for (const table of tables) {
+    const key = table.sheetName || "__unknown_sheet__";
+    if (!bySheet.has(key)) bySheet.set(key, []);
+    bySheet.get(key).push(table);
+  }
+
+  for (const sheetTables of bySheet.values()) {
+    const profile = collectSheetUsageProfile(sheetTables);
+    if (!isFormLikeDocumentSheetProfile(profile)) continue;
+
+    for (const table of sheetTables) {
+      if (table.tableUsage?.queryable === false) continue;
+      markTableAsFormLikeDocument(table, profile);
+    }
+  }
 }
 
 function buildFallbackBlockFromMeta(sheetName, sheetInfo = {}, rows = []) {
@@ -455,11 +715,15 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
 
       const columns = uniqueKeys(safeRawColumns);
       const data = [];
+      const blockExcludedRows = Array.isArray(block.excludedRows)
+        ? block.excludedRows
+        : [];
       const excludedRowSet = new Set(
-        (Array.isArray(block.excludedRows) ? block.excludedRows : [])
+        blockExcludedRows
           .map((row) => Number(row?.row || row))
           .filter((row) => Number.isFinite(row)),
       );
+      const summaryRows = buildSummaryRows(rows, columns, blockExcludedRows);
 
       for (let r = block.dataStartRow; r <= block.dataEndRow; r += 1) {
         if (excludedRowSet.has(r)) continue;
@@ -501,10 +765,20 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
           0,
           Number(block.dataEndRow || 0) - Number(block.dataStartRow || 0) + 1,
         ),
-        excludedRows: Array.isArray(block.excludedRows)
-          ? block.excludedRows
-          : [],
-        dataQuality: block.dataQuality || null,
+        excludedRows: blockExcludedRows,
+        summaryRows,
+        dataQuality: block.dataQuality
+          ? {
+              ...block.dataQuality,
+              summaryRowCount:
+                block.dataQuality.summaryRowCount ?? summaryRows.length,
+            }
+          : summaryRows.length
+            ? {
+                version: "table_data_row_filter_v1",
+                summaryRowCount: summaryRows.length,
+              }
+            : null,
         tableSegmentation: block.tableSegmentation || null,
         headerQuality: block.headerQuality || null,
         blockScore: block.score ?? null,
@@ -517,6 +791,8 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
       tables.push(queryTable);
     }
   }
+
+  applyFormLikeDocumentFilter(tables);
 
   let bestIdx = -1;
   let bestScore = -1;

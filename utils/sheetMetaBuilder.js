@@ -185,6 +185,37 @@ function looksLikeNoteOrCommentRow(row = [], options = {}) {
   );
 }
 
+const SUMMARY_ROW_DETECTOR_VERSION = "summary_row_detector_v2";
+
+function normalizeSummaryToken(value = "") {
+  return normalizeNoiseText(value).replace(/grandtotal/g, "grandtotal");
+}
+
+function isStrongSummaryToken(value = "") {
+  const normalized = normalizeSummaryToken(value);
+  return /^(합계|총계|소계|누계|계|total|subtotal|grandtotal)$/.test(
+    normalized,
+  );
+}
+
+function isWeakSummaryToken(value = "") {
+  const normalized = normalizeSummaryToken(value);
+  return /^(전체|all|overall)$/.test(normalized);
+}
+
+function getLeadingNonNumericCells(slice = [], limit = 3) {
+  const out = [];
+
+  for (let idx = 0; idx < slice.length && out.length < limit; idx += 1) {
+    const value = slice[idx];
+    if (value == null || String(value).trim() === "") continue;
+    if (isNumericLike(value) || isDateLike(value) || isTimeLike(value)) break;
+    out.push({ value: compactCellText(value), index: idx });
+  }
+
+  return out;
+}
+
 function looksLikeTotalOrSubtotalRow(row = [], options = {}) {
   const cells = nonEmptyCells(row).map(compactCellText);
   if (!cells.length) return false;
@@ -200,12 +231,35 @@ function looksLikeTotalOrSubtotalRow(row = [], options = {}) {
   const numericLike = slice.filter(
     (cell) => cell != null && String(cell).trim() !== "" && isNumericLike(cell),
   ).length;
+  const numericDateLike = numericDateCount(slice);
+  const leadingContextCells = getLeadingNonNumericCells(slice, 3);
+  const leadingValues = leadingContextCells.map((cell) => cell.value);
+  const strongSummaryInLeadingContext =
+    leadingValues.some(isStrongSummaryToken);
+  const weakSummaryInLeadingContext = leadingValues.some(isWeakSummaryToken);
+  const hasContextBeforeMetric = leadingContextCells.length > 0;
 
-  const totalToken =
+  const startsWithSummaryToken =
     /^(합계|총계|소계|누계|계|total|subtotal|grandtotal)$/.test(first) ||
     /^(합계|총계|소계|누계|total|subtotal|grandtotal)/.test(joined);
 
-  return Boolean(totalToken && (numericLike > 0 || nonEmpty <= 2));
+  const dimensionSubtotalPattern = Boolean(
+    strongSummaryInLeadingContext &&
+    hasContextBeforeMetric &&
+    (numericLike > 0 || numericDateLike > leadingContextCells.length),
+  );
+
+  const weakTotalPattern = Boolean(
+    weakSummaryInLeadingContext &&
+    leadingValues.some(isStrongSummaryToken) &&
+    (numericLike > 0 || numericDateLike > leadingContextCells.length),
+  );
+
+  return Boolean(
+    (startsWithSummaryToken && (numericLike > 0 || nonEmpty <= 2)) ||
+    dimensionSubtotalPattern ||
+    weakTotalPattern,
+  );
 }
 
 function normalizeHeaderCompare(value = "") {
@@ -1692,17 +1746,30 @@ function detectTableBlocks(
 
     let dataStart = headerIndex + 1;
     const excludedRows = [];
+    const summaryRows = [];
 
     while (dataStart < Math.min(nextHeaderIndex, json.length)) {
       const classified = classifyTableRow(json[dataStart] || [], baseContext);
       if (classified.include) break;
 
-      excludedRows.push({
+      const excludedRow = {
         row: dataStart + 1,
         reason: classified.reason,
         phase: "beforeDataStart",
         kind: classified.kind,
-      });
+      };
+      excludedRows.push(excludedRow);
+      if (classified.kind === "total") {
+        summaryRows.push({
+          ...excludedRow,
+          detectorVersion: SUMMARY_ROW_DETECTOR_VERSION,
+          rawCells: rowSliceByColumnRange(
+            json[dataStart] || [],
+            minCol,
+            maxCol,
+          ),
+        });
+      }
       dataStart += 1;
     }
 
@@ -1734,12 +1801,20 @@ function detectTableBlocks(
         continue;
       }
 
-      excludedRows.push({
+      const excludedRow = {
         row: r + 1,
         reason: classified.reason,
         phase: "insideDataRange",
         kind: classified.kind,
-      });
+      };
+      excludedRows.push(excludedRow);
+      if (classified.kind === "total") {
+        summaryRows.push({
+          ...excludedRow,
+          detectorVersion: SUMMARY_ROW_DETECTOR_VERSION,
+          rawCells: rowSliceByColumnRange(row, minCol, maxCol),
+        });
+      }
 
       if (classified.kind === "blank") blankStreak += 1;
 
@@ -1766,7 +1841,20 @@ function detectTableBlocks(
 
     if (dataEnd < dataStart) continue;
 
-    previousBlockEnd = Math.max(previousBlockEnd, dataEnd);
+    // summary_row_detector_v2_1:
+    // 마지막 행이 소계/총계로 분류되어 rows에서는 제외되더라도,
+    // summaryRows에는 보존되므로 table range/dataRange도 해당 행까지 포함해야 한다.
+    // BLANK_ROW 같은 단순 경계 행은 기존처럼 range 밖에 둘 수 있도록 total 행만 확장 대상으로 삼는다.
+    const summaryEnd = summaryRows.reduce((maxRowIndex, row) => {
+      if (row.phase !== "insideDataRange") return maxRowIndex;
+      const rowIndex = Number(row.row || 0) - 1;
+      return Number.isFinite(rowIndex)
+        ? Math.max(maxRowIndex, rowIndex)
+        : maxRowIndex;
+    }, dataEnd);
+    const blockEnd = Math.max(dataEnd, summaryEnd);
+
+    previousBlockEnd = Math.max(previousBlockEnd, blockEnd);
 
     const columns = headerCols
       .map((idx) => {
@@ -1784,11 +1872,11 @@ function detectTableBlocks(
       .filter(Boolean);
 
     const excludedInsideRange = excludedRows.filter(
-      (row) => row.row >= dataStart + 1 && row.row <= dataEnd + 1,
+      (row) => row.row >= dataStart + 1 && row.row <= blockEnd + 1,
     );
     const includedRowCount = Math.max(
       0,
-      dataEnd - dataStart + 1 - excludedInsideRange.length,
+      blockEnd - dataStart + 1 - excludedInsideRange.length,
     );
     const addedBySegmentation = (segmentation.addedRows || []).some(
       (row) => row.rowIndex === headerIndex,
@@ -1803,20 +1891,22 @@ function detectTableBlocks(
       hasMergedHeader: Boolean(mergedHeaderInfo && mergedHeaderInfo.depth > 1),
       headerFlattenStrategy: mergedHeaderInfo?.strategy || "single_header_row",
       dataStartRow: dataStart + 1,
-      dataEndRow: dataEnd + 1,
+      dataEndRow: blockEnd + 1,
       startCol: indexToColumnLetter(minCol),
       endCol: indexToColumnLetter(maxCol),
       startColIndex: minCol + 1,
       endColIndex: maxCol + 1,
-      range: `'${sheetName}'!${indexToColumnLetter(minCol)}${headerStartIndex + 1}:${indexToColumnLetter(maxCol)}${dataEnd + 1}`,
-      dataRange: `'${sheetName}'!${indexToColumnLetter(minCol)}${dataStart + 1}:${indexToColumnLetter(maxCol)}${dataEnd + 1}`,
+      range: `'${sheetName}'!${indexToColumnLetter(minCol)}${headerStartIndex + 1}:${indexToColumnLetter(maxCol)}${blockEnd + 1}`,
+      dataRange: `'${sheetName}'!${indexToColumnLetter(minCol)}${dataStart + 1}:${indexToColumnLetter(maxCol)}${blockEnd + 1}`,
       columns,
       headerPartsByColumn: mergedHeaderInfo?.partsByColumn || {},
       excludedRows,
+      summaryRows,
       dataQuality: {
         version: "table_data_row_filter_v1",
         includedRowCount,
         excludedRowCount: excludedRows.length,
+        summaryRowCount: summaryRows.length,
         excludedReasonCounts: summarizeExcludedRows(excludedRows),
       },
       tableSegmentation: {

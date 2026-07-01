@@ -735,6 +735,9 @@ function buildDiagnostics({
       typeConsistency: Number(typeConsistency.toFixed(3)),
       confidence,
       excludedRowCount: excludedRows.length,
+      summaryRowCount: Array.isArray(table.summaryRows)
+        ? table.summaryRows.length
+        : 0,
       isFallback: Boolean(table.isFallback),
       source: table.source || (table.isFallback ? "fallback" : "tableBlock"),
       isVirtual: Boolean(table.isVirtual),
@@ -1288,6 +1291,7 @@ function normalizeTable(table = {}, index = 0) {
     columns,
     rows,
     excludedRows: Array.isArray(table.excludedRows) ? table.excludedRows : [],
+    summaryRows: Array.isArray(table.summaryRows) ? table.summaryRows : [],
     dataQuality: table.dataQuality || null,
     warnings,
     confidence,
