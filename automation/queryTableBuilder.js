@@ -799,9 +799,15 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
 
   for (let i = 0; i < tables.length; i += 1) {
     const t = tables[i];
-    const eligibleBonus = t.tableUsage?.templateEligible ? 1000 : 0;
-    const analysisBonus = t.tableUsage?.analysisEligible ? 500 : 0;
-    const score = eligibleBonus + analysisBonus + Number(t.confidence || 0);
+    const isAnalysisEligible = Boolean(t.tableUsage?.analysisEligible);
+
+    // UI consistency: diagnostic-only tables should never become primary.
+    // If every extracted table is ineligible, keep all isPrimary=false so
+    // the frontend can show a clear "generation withheld" state.
+    if (!isAnalysisEligible) continue;
+
+    const templateBonus = t.tableUsage?.templateEligible ? 1000 : 0;
+    const score = templateBonus + Number(t.confidence || 0);
 
     if (score > bestScore) {
       bestScore = score;
@@ -809,8 +815,23 @@ function buildQueryTablesFromWorkbook(workbook, allSheetsData = {}) {
     }
   }
 
+  const primarySelectionReason =
+    bestIdx >= 0
+      ? "BEST_ANALYSIS_ELIGIBLE_TABLE"
+      : "NO_ANALYSIS_ELIGIBLE_TABLE";
+
   tables.forEach((t, idx) => {
-    t.isPrimary = idx === bestIdx;
+    const selected = idx === bestIdx;
+    t.isPrimary = selected;
+    t.primarySelection = {
+      version: "primary_selection_v1",
+      selected,
+      reason: selected
+        ? primarySelectionReason
+        : bestIdx >= 0
+          ? "NOT_SELECTED"
+          : primarySelectionReason,
+    };
   });
 
   return tables;
