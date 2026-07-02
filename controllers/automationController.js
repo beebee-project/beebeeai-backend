@@ -243,7 +243,6 @@ function assertGeneratedStorageKeyAccess(req, storageKey = "") {
   );
 }
 
-
 function assertQueryTablesKeyAccess(req, queryTablesKey = "") {
   const key = String(queryTablesKey || "");
   if (!key) return false;
@@ -257,7 +256,9 @@ function assertQueryTablesKeyAccess(req, queryTablesKey = "") {
 }
 
 function shouldDeleteAfterDownload(value = "1") {
-  const normalized = String(value ?? "1").trim().toLowerCase();
+  const normalized = String(value ?? "1")
+    .trim()
+    .toLowerCase();
   return !["0", "false", "no", "off"].includes(normalized);
 }
 
@@ -293,7 +294,9 @@ async function cleanupGeneratedDownloadArtifacts({
   }
 
   if (queryTablesKey && assertQueryTablesKeyAccess(req, queryTablesKey)) {
-    await tryDelete("queryTables:" + queryTablesKey, () => deleteObject(queryTablesKey));
+    await tryDelete("queryTables:" + queryTablesKey, () =>
+      deleteObject(queryTablesKey),
+    );
   }
 
   if (deleted.length || errors.length) {
@@ -939,16 +942,29 @@ exports.createSummarySheet = async (req, res, next) => {
       ? null
       : buildChartSpec(result);
 
-    const workbook = buildSummaryWorkbook({
-      fileName: saved.fileName,
-      message,
-      intent: queryIntent,
-      result,
-      sourceTables: normalizedQueryTables,
-      summarySheetMode,
-      includeSourceDataSheet,
-      formulaOptions,
-    });
+    const useSourceDataOnlyWorkbook =
+      summarySheetMode === "sourceDataOnly" ||
+      result?.resultType === "sourceDataRegression" ||
+      result?.executionMeta?.sourceDataOnly === true;
+
+    const workbook = useSourceDataOnlyWorkbook
+      ? buildAutomationTemplateWorkbook({
+          fileName: saved.fileName,
+          message,
+          intent: queryIntent,
+          result,
+          tables: saved.tables || normalizedQueryTables,
+        })
+      : buildSummaryWorkbook({
+          fileName: saved.fileName,
+          message,
+          intent: queryIntent,
+          result,
+          sourceTables: normalizedQueryTables,
+          summarySheetMode,
+          includeSourceDataSheet,
+          formulaOptions,
+        });
 
     const buffer = workbookToBuffer(workbook);
     const formulaEngineMeta = workbook["!beebeeFormulaEngine"] || {

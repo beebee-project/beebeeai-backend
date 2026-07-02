@@ -12,10 +12,17 @@ const SHEET_NAMES = Object.freeze({
   AUTOMATION_GUIDE: "사용방법",
   AUTOMATION_SETTINGS: "자동화설정",
   AUTOMATION_TEMPLATE: "자동화시트",
+  SUMMARY_ROWS: "요약행",
+  DIAGNOSTICS: "진단정보",
   EXECUTION_PREVIEW: "실행결과_미리보기",
 });
 
-const SUMMARY_SHEET_MODES = Object.freeze(["static", "formula", "hybrid"]);
+const SUMMARY_SHEET_MODES = Object.freeze([
+  "static",
+  "formula",
+  "hybrid",
+  "sourceDataOnly",
+]);
 const SUMMARY_SHEET_MODE_SET = new Set(SUMMARY_SHEET_MODES);
 
 function normalizeSummarySheetMode(mode = "static") {
@@ -31,9 +38,9 @@ function sourceSheetNameForTableIndex(index = 0, total = 1) {
   const safeIndex = Math.max(0, Number(index) || 0);
   const safeTotal = Math.max(1, Number(total) || 1);
 
-  return safeTotal > 1
-    ? `${SHEET_NAMES.SOURCE_DATA}_${safeIndex + 1}`
-    : SHEET_NAMES.SOURCE_DATA;
+  if (safeTotal <= 1 || safeIndex === 0) return SHEET_NAMES.SOURCE_DATA;
+
+  return `${SHEET_NAMES.SOURCE_DATA}${safeIndex + 1}`;
 }
 
 module.exports = {
