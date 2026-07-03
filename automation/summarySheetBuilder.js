@@ -1,4 +1,5 @@
 const XLSX = require("xlsx");
+const zlib = require("zlib");
 const { buildNarrativeSections } = require("./reportNarrativeBuilder");
 const { recommendChartSpec } = require("./chartRecommendationBuilder");
 const { buildReportSections } = require("./reportSectionBuilder");
@@ -23,6 +24,10 @@ const {
   sourceSheetNameForTableIndex,
 } = require("./config/automationSheetConfig");
 const {
+  buildSourceTablePolicy,
+  summarizeSourceTablePolicy,
+} = require("./sourceTablePolicy");
+const {
   getSourceColumnHeader,
   createSourceColumnMap,
   resolveSourceColumn,
@@ -34,6 +39,13 @@ const {
   resolveCriteriaColumnIndex,
   resolveAggregateFormulaTargets,
 } = require("./utils/aggregateResolver");
+
+const AUTOMATION_SHEET_V2_VERSION = "automation_sheet_v2";
+const WORKBOOK_RECALCULATION_FLAG_VERSION = "workbook_recalculation_flag_v1";
+const WORKBOOK_XML_CALCPR_INJECTION_VERSION =
+  "workbook_xml_calcpr_injection_v1";
+const WORKBOOK_CALCPR_XML =
+  '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
 
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
@@ -547,6 +559,310 @@ function attachWorkbookFormulaEngineMeta(wb, meta) {
   return wb;
 }
 
+function ensureWorkbookRecalculationOnOpen(
+  wb,
+  reason = "formula_or_dynamic_summary",
+) {
+  if (!wb || typeof wb !== "object") return wb;
+
+  if (!wb.Workbook || typeof wb.Workbook !== "object") {
+    wb.Workbook = {};
+  }
+
+  const calcPr = {
+    ...(wb.CalcPr || {}),
+    ...(wb.Workbook.CalcPr || {}),
+    calcId: wb.Workbook.CalcPr?.calcId || wb.CalcPr?.calcId || 171027,
+    calcMode: "auto",
+    fullCalcOnLoad: "1",
+    forceFullCalc: "1",
+  };
+
+  wb.CalcPr = calcPr;
+  wb.Workbook.CalcPr = calcPr;
+  wb.Workbook.WBProps = {
+    ...(wb.Workbook.WBProps || {}),
+  };
+
+  wb["!beebeeWorkbookRecalculation"] = {
+    version: WORKBOOK_RECALCULATION_FLAG_VERSION,
+    applied: true,
+    calcMode: "auto",
+    fullCalcOnLoad: true,
+    forceFullCalc: true,
+    reason,
+  };
+
+  return wb;
+}
+
+function makeCrc32Table() {
+  const table = new Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let crc = i;
+    for (let j = 0; j < 8; j += 1) {
+      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+    }
+    table[i] = crc >>> 0;
+  }
+  return table;
+}
+
+const CRC32_TABLE = makeCrc32Table();
+
+function crc32(buffer) {
+  const input = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || "");
+  let crc = 0xffffffff;
+  for (let i = 0; i < input.length; i += 1) {
+    crc = CRC32_TABLE[(crc ^ input[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function findZipEndOfCentralDirectory(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 22) return -1;
+  const min = Math.max(0, buffer.length - 0xffff - 22);
+  for (let offset = buffer.length - 22; offset >= min; offset -= 1) {
+    if (buffer.readUInt32LE(offset) === 0x06054b50) return offset;
+  }
+  return -1;
+}
+
+function parseZipEntries(buffer) {
+  const eocdOffset = findZipEndOfCentralDirectory(buffer);
+  if (eocdOffset < 0) {
+    throw new Error("ZIP_EOCD_NOT_FOUND");
+  }
+
+  const entryCount = buffer.readUInt16LE(eocdOffset + 10);
+  const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const commentLength = buffer.readUInt16LE(eocdOffset + 20);
+  const eocdComment = buffer.slice(
+    eocdOffset + 22,
+    eocdOffset + 22 + commentLength,
+  );
+
+  const entries = [];
+  let cursor = centralDirectoryOffset;
+  for (let i = 0; i < entryCount; i += 1) {
+    if (buffer.readUInt32LE(cursor) !== 0x02014b50) {
+      throw new Error(`ZIP_CENTRAL_DIRECTORY_ENTRY_INVALID_${i}`);
+    }
+
+    const versionMadeBy = buffer.readUInt16LE(cursor + 4);
+    const versionNeeded = buffer.readUInt16LE(cursor + 6);
+    const flags = buffer.readUInt16LE(cursor + 8);
+    const method = buffer.readUInt16LE(cursor + 10);
+    const modTime = buffer.readUInt16LE(cursor + 12);
+    const modDate = buffer.readUInt16LE(cursor + 14);
+    const compressedSize = buffer.readUInt32LE(cursor + 20);
+    const uncompressedSize = buffer.readUInt32LE(cursor + 24);
+    const fileNameLength = buffer.readUInt16LE(cursor + 28);
+    const extraLength = buffer.readUInt16LE(cursor + 30);
+    const commentLengthEntry = buffer.readUInt16LE(cursor + 32);
+    const diskStart = buffer.readUInt16LE(cursor + 34);
+    const internalAttrs = buffer.readUInt16LE(cursor + 36);
+    const externalAttrs = buffer.readUInt32LE(cursor + 38);
+    const localHeaderOffset = buffer.readUInt32LE(cursor + 42);
+    const fileNameBuffer = buffer.slice(
+      cursor + 46,
+      cursor + 46 + fileNameLength,
+    );
+    const extra = buffer.slice(
+      cursor + 46 + fileNameLength,
+      cursor + 46 + fileNameLength + extraLength,
+    );
+    const comment = buffer.slice(
+      cursor + 46 + fileNameLength + extraLength,
+      cursor + 46 + fileNameLength + extraLength + commentLengthEntry,
+    );
+    const fileName = fileNameBuffer.toString("utf8");
+
+    if (buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      throw new Error(`ZIP_LOCAL_HEADER_INVALID_${fileName}`);
+    }
+    const localFileNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
+    const dataOffset =
+      localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+    const compressedData = buffer.slice(
+      dataOffset,
+      dataOffset + compressedSize,
+    );
+
+    entries.push({
+      versionMadeBy,
+      versionNeeded,
+      flags,
+      method,
+      modTime,
+      modDate,
+      crc: buffer.readUInt32LE(cursor + 16),
+      compressedSize,
+      uncompressedSize,
+      fileNameBuffer,
+      fileName,
+      extra,
+      comment,
+      diskStart,
+      internalAttrs,
+      externalAttrs,
+      compressedData,
+    });
+
+    cursor += 46 + fileNameLength + extraLength + commentLengthEntry;
+  }
+
+  return { entries, eocdComment };
+}
+
+function inflateZipEntry(entry) {
+  if (entry.method === 0) return Buffer.from(entry.compressedData);
+  if (entry.method === 8) return zlib.inflateRawSync(entry.compressedData);
+  throw new Error(
+    `ZIP_UNSUPPORTED_COMPRESSION_METHOD_${entry.method}_${entry.fileName}`,
+  );
+}
+
+function deflateZipEntry(entry, uncompressed) {
+  if (entry.method === 0) return Buffer.from(uncompressed);
+  if (entry.method === 8) return zlib.deflateRawSync(uncompressed);
+  throw new Error(
+    `ZIP_UNSUPPORTED_COMPRESSION_METHOD_${entry.method}_${entry.fileName}`,
+  );
+}
+
+function injectCalcPrXml(workbookXml = "") {
+  const xml = String(workbookXml || "");
+  const calcPrPattern = /<calcPr\b[^>]*(?:\/>|>[\s\S]*?<\/calcPr>)/i;
+  if (calcPrPattern.test(xml)) {
+    return xml.replace(calcPrPattern, WORKBOOK_CALCPR_XML);
+  }
+  if (/<\/workbook>/i.test(xml)) {
+    return xml.replace(/<\/workbook>/i, `${WORKBOOK_CALCPR_XML}</workbook>`);
+  }
+  throw new Error("WORKBOOK_XML_CLOSING_TAG_NOT_FOUND");
+}
+
+function buildZipBuffer(entries, eocdComment = Buffer.alloc(0)) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  entries.forEach((entry) => {
+    const fileNameBuffer = Buffer.from(
+      entry.fileNameBuffer || Buffer.from(entry.fileName, "utf8"),
+    );
+    const extra = Buffer.from(entry.extra || Buffer.alloc(0));
+    const comment = Buffer.from(entry.comment || Buffer.alloc(0));
+    const compressedData = Buffer.from(entry.compressedData || Buffer.alloc(0));
+    const localHeader = Buffer.alloc(30);
+
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(entry.versionNeeded || 20, 4);
+    localHeader.writeUInt16LE(entry.flags || 0, 6);
+    localHeader.writeUInt16LE(entry.method || 0, 8);
+    localHeader.writeUInt16LE(entry.modTime || 0, 10);
+    localHeader.writeUInt16LE(entry.modDate || 0, 12);
+    localHeader.writeUInt32LE(entry.crc >>> 0, 14);
+    localHeader.writeUInt32LE(compressedData.length >>> 0, 18);
+    localHeader.writeUInt32LE((entry.uncompressedSize || 0) >>> 0, 22);
+    localHeader.writeUInt16LE(fileNameBuffer.length, 26);
+    localHeader.writeUInt16LE(extra.length, 28);
+
+    localParts.push(localHeader, fileNameBuffer, extra, compressedData);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(entry.versionMadeBy || 20, 4);
+    centralHeader.writeUInt16LE(entry.versionNeeded || 20, 6);
+    centralHeader.writeUInt16LE(entry.flags || 0, 8);
+    centralHeader.writeUInt16LE(entry.method || 0, 10);
+    centralHeader.writeUInt16LE(entry.modTime || 0, 12);
+    centralHeader.writeUInt16LE(entry.modDate || 0, 14);
+    centralHeader.writeUInt32LE(entry.crc >>> 0, 16);
+    centralHeader.writeUInt32LE(compressedData.length >>> 0, 20);
+    centralHeader.writeUInt32LE((entry.uncompressedSize || 0) >>> 0, 24);
+    centralHeader.writeUInt16LE(fileNameBuffer.length, 28);
+    centralHeader.writeUInt16LE(extra.length, 30);
+    centralHeader.writeUInt16LE(comment.length, 32);
+    centralHeader.writeUInt16LE(entry.diskStart || 0, 34);
+    centralHeader.writeUInt16LE(entry.internalAttrs || 0, 36);
+    centralHeader.writeUInt32LE((entry.externalAttrs || 0) >>> 0, 38);
+    centralHeader.writeUInt32LE(offset >>> 0, 42);
+
+    centralParts.push(centralHeader, fileNameBuffer, extra, comment);
+    offset +=
+      localHeader.length +
+      fileNameBuffer.length +
+      extra.length +
+      compressedData.length;
+  });
+
+  const centralDirectoryOffset = offset;
+  const centralDirectory = Buffer.concat(centralParts);
+  const centralDirectorySize = centralDirectory.length;
+  const comment = Buffer.from(eocdComment || Buffer.alloc(0));
+  const eocd = Buffer.alloc(22);
+
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralDirectorySize >>> 0, 12);
+  eocd.writeUInt32LE(centralDirectoryOffset >>> 0, 16);
+  eocd.writeUInt16LE(comment.length, 20);
+
+  return Buffer.concat([...localParts, centralDirectory, eocd, comment]);
+}
+
+function injectWorkbookCalcPrIntoXlsxBuffer(buffer) {
+  const result = {
+    version: WORKBOOK_XML_CALCPR_INJECTION_VERSION,
+    applied: false,
+    workbookXmlPatched: false,
+    workbookXmlPath: "xl/workbook.xml",
+    error: "",
+    buffer,
+  };
+
+  try {
+    if (!Buffer.isBuffer(buffer)) {
+      throw new Error("XLSX_BUFFER_NOT_BUFFER");
+    }
+    const { entries, eocdComment } = parseZipEntries(buffer);
+    const workbookEntry = entries.find(
+      (entry) => entry.fileName === result.workbookXmlPath,
+    );
+    if (!workbookEntry) {
+      throw new Error("WORKBOOK_XML_ENTRY_NOT_FOUND");
+    }
+
+    const workbookXml = inflateZipEntry(workbookEntry).toString("utf8");
+    const patchedXml = injectCalcPrXml(workbookXml);
+    const patchedXmlBuffer = Buffer.from(patchedXml, "utf8");
+    const patchedCompressedData = deflateZipEntry(
+      workbookEntry,
+      patchedXmlBuffer,
+    );
+
+    workbookEntry.compressedData = patchedCompressedData;
+    workbookEntry.uncompressedSize = patchedXmlBuffer.length;
+    workbookEntry.compressedSize = patchedCompressedData.length;
+    workbookEntry.crc = crc32(patchedXmlBuffer);
+
+    result.buffer = buildZipBuffer(entries, eocdComment);
+    result.applied = true;
+    result.workbookXmlPatched = true;
+    result.error = "";
+  } catch (error) {
+    result.error = error?.message || String(error);
+  }
+
+  return result;
+}
+
 function buildFormulaEngineContext({
   sourceTables = [],
   summarySheetMode = "static",
@@ -899,11 +1215,15 @@ function buildDiagnosticsAoa({
   primaryTable = {},
   tables = [],
   sourceRows = [],
+  sourceTablePolicy = null,
 } = {}) {
   const dataRowCount = Math.max(0, sourceRows.length - 1);
   const primaryUsage = primaryTable.tableUsage || {};
   const primarySelection = primaryTable.primarySelection || {};
   const dataQuality = primaryTable.dataQuality || {};
+  const policySummary = sourceTablePolicy
+    ? summarizeSourceTablePolicy(sourceTablePolicy)
+    : null;
 
   const overviewRows = [
     ["항목", "값", "비고"],
@@ -911,8 +1231,30 @@ function buildDiagnosticsAoa({
     ["요청", message || "", "자동화 템플릿 생성 요청"],
     [
       "원본데이터 시트",
-      SHEET_NAMES.SOURCE_DATA,
+      policySummary?.sourceTables
+        ?.map((entry) => entry.sourceSheetName)
+        .join(", ") || SHEET_NAMES.SOURCE_DATA,
       "1행 헤더, 2행부터 정리된 분석 데이터",
+    ],
+    [
+      "sourceTablePolicy.version",
+      policySummary?.version || "",
+      "원본데이터 시트 선택 정책",
+    ],
+    [
+      "sourceTablePolicy.scope",
+      policySummary?.sourceScope || "",
+      "singleTable/multiTable",
+    ],
+    [
+      "sourceTablePolicy.sourceTableCount",
+      policySummary?.counts?.sourceTableCount ?? "",
+      "원본데이터 시트로 출력된 physical table 수",
+    ],
+    [
+      "sourceTablePolicy.primaryStrategy",
+      policySummary?.primaryStrategy || "",
+      "대표 테이블 선택 전략",
     ],
     ["대표 테이블", primaryTable.tableId || "", "analysisEligible 기준 선택"],
     ["원본 범위", primaryTable.range || "", "업로드 파일 내 감지 범위"],
@@ -949,13 +1291,27 @@ function buildDiagnosticsAoa({
       "dataRange",
       "tableUsage.reasons",
       "primarySelection.reason",
+      "sourceTableId",
+      "sourceSheetName",
+      "sourceScope",
     ],
   ];
+
+  const sourceEntryByTableId = new Map();
+  for (const entry of sourceTablePolicy?.sourceTableEntries || []) {
+    [entry.tableId, entry.sourceTableId].filter(Boolean).forEach((id) => {
+      sourceEntryByTableId.set(id, entry);
+    });
+  }
 
   const tableRows = (Array.isArray(tables) ? tables : []).map((table) => {
     const usage = table.tableUsage || {};
     const selection = table.primarySelection || {};
     const quality = table.dataQuality || {};
+    const sourceEntry =
+      sourceEntryByTableId.get(table.tableId) ||
+      sourceEntryByTableId.get(table.sourceTableId) ||
+      null;
 
     return [
       table.tableId || "",
@@ -971,6 +1327,9 @@ function buildDiagnosticsAoa({
       table.dataRange || "",
       flattenReasonList(usage.reasons),
       selection.reason || "",
+      sourceEntry?.sourceTableId || "",
+      sourceEntry?.sourceSheetName || "",
+      sourceEntry?.sourceScope || "",
     ];
   });
 
@@ -1152,6 +1511,7 @@ function buildSummaryWorkbook({
     });
 
     attachWorkbookFormulaEngineMeta(wb, formulaEngineMeta);
+    ensureWorkbookRecalculationOnOpen(wb, "business_sections_formula_workbook");
     return wb;
   }
 
@@ -1288,14 +1648,37 @@ function buildSummaryWorkbook({
   }
 
   attachWorkbookFormulaEngineMeta(wb, formulaEngineMeta);
+  ensureWorkbookRecalculationOnOpen(wb, "summary_workbook");
   return wb;
 }
 
 function workbookToBuffer(workbook) {
-  return XLSX.write(workbook, {
+  ensureWorkbookRecalculationOnOpen(workbook, "workbook_to_buffer_final_guard");
+  const rawBuffer = XLSX.write(workbook, {
     type: "buffer",
     bookType: "xlsx",
   });
+
+  const injected = injectWorkbookCalcPrIntoXlsxBuffer(rawBuffer);
+  const previousMeta = workbook?.["!beebeeWorkbookRecalculation"] || {};
+  if (workbook && typeof workbook === "object") {
+    workbook["!beebeeWorkbookRecalculation"] = {
+      ...previousMeta,
+      version: WORKBOOK_RECALCULATION_FLAG_VERSION,
+      applied: injected.applied,
+      calcMode: "auto",
+      fullCalcOnLoad: true,
+      forceFullCalc: true,
+      reason: previousMeta.reason || "workbook_to_buffer_final_guard",
+      injectionVersion: injected.version,
+      workbookXmlPatched: injected.workbookXmlPatched,
+      workbookXmlPath: injected.workbookXmlPath,
+      injectionMethod: "xlsx_zip_workbook_xml_patch",
+      injectionError: injected.error || "",
+    };
+  }
+
+  return injected.buffer;
 }
 
 function getRowValueByColumn(row = {}, col = {}) {
@@ -1410,6 +1793,467 @@ function isAnalysisEligibleSourceTable(table = {}) {
   return table?.tableUsage?.analysisEligible === true;
 }
 
+function asNonEmptyArray(value) {
+  if (Array.isArray(value))
+    return value.filter((item) => item != null && item !== "");
+  if (value == null || value === "") return [];
+  return [value];
+}
+
+function resolveAutomationCandidateTitle({
+  result = {},
+  candidate = null,
+  templateCandidate = null,
+} = {}) {
+  return (
+    candidate?.title ||
+    candidate?.candidateTitle ||
+    templateCandidate?.title ||
+    templateCandidate?.templateTitle ||
+    result?.title ||
+    result?.templateTitle ||
+    result?.operation ||
+    "자동화 후보"
+  );
+}
+
+function resolveAutomationCandidateType({
+  result = {},
+  candidate = null,
+  templateCandidate = null,
+} = {}) {
+  return (
+    candidate?.candidateType ||
+    candidate?.recipeType ||
+    candidate?.type ||
+    templateCandidate?.templateId ||
+    result?.recipeType ||
+    result?.operation ||
+    result?.resultType ||
+    "sourceDataOnly"
+  );
+}
+
+function resolvePreferredSourceTableId({
+  result = {},
+  intent = {},
+  candidate = null,
+  templateCandidate = null,
+} = {}) {
+  return (
+    result?.sourceTableId ||
+    result?.tableId ||
+    result?.table?.tableId ||
+    candidate?.sourceTableId ||
+    asNonEmptyArray(candidate?.sourceTableIds)[0] ||
+    candidate?.tableId ||
+    templateCandidate?.sourceTableId ||
+    asNonEmptyArray(templateCandidate?.sourceTableIds)[0] ||
+    intent?.table?.tableId ||
+    intent?.sourceTableId ||
+    ""
+  );
+}
+
+function buildCandidateSummaryAoa({
+  result = {},
+  candidate = null,
+  templateCandidate = null,
+  sourceTablePolicy = null,
+} = {}) {
+  const candidateTitle = resolveAutomationCandidateTitle({
+    result,
+    candidate,
+    templateCandidate,
+  });
+  const candidateType = resolveAutomationCandidateType({
+    result,
+    candidate,
+    templateCandidate,
+  });
+  const sourceSheetNames = asNonEmptyArray(
+    candidate?.sourceSheetNames ||
+      result?.sourceSheetName ||
+      sourceTablePolicy?.primarySourceSheetName,
+  );
+  const sourceTableIds = asNonEmptyArray(
+    candidate?.sourceTableIds ||
+      result?.sourceTableId ||
+      sourceTablePolicy?.primarySourceTableId,
+  );
+
+  return [
+    ["항목", "값"],
+    ["자동화시트버전", AUTOMATION_SHEET_V2_VERSION],
+    ["후보명", candidateTitle],
+    ["후보유형", candidateType],
+    [
+      "후보ID",
+      candidate?.candidateId ||
+        candidate?.id ||
+        templateCandidate?.templateId ||
+        "",
+    ],
+    [
+      "recipeIds",
+      asNonEmptyArray(candidate?.recipeIds || result?.recipeType).join(", "),
+    ],
+    [
+      "sourceScope",
+      candidate?.sourceScope || sourceTablePolicy?.sourceScope || "",
+    ],
+    ["sourceTableIds", sourceTableIds.join(", ")],
+    ["sourceSheetNames", sourceSheetNames.join(", ")],
+    ["rankScore", candidate?.rankScore ?? ""],
+    ["rankingTier", candidate?.rankingTier || ""],
+    ["reasonCodes", flattenReasonList(candidate?.reasonCodes || [])],
+    [
+      "outputTypes",
+      asNonEmptyArray(candidate?.outputTypes || ["summarySheet"]).join(", "),
+    ],
+    ["resultType", result?.resultType || ""],
+    ["operation", result?.operation || ""],
+    [
+      "rowCount",
+      Array.isArray(result?.rows) ? result.rows.length : result?.rowCount || 0,
+    ],
+  ];
+}
+
+function buildSumIfsFormula({
+  valueRange,
+  criteriaRange1,
+  criteriaCell1,
+  criteriaRange2 = "",
+  criteriaCell2 = "",
+}) {
+  if (criteriaRange2 && criteriaCell2) {
+    return `IFERROR(SUMIFS(${valueRange},${criteriaRange1},${criteriaCell1},${criteriaRange2},${criteriaCell2}),0)`;
+  }
+  return `IFERROR(SUMIFS(${valueRange},${criteriaRange1},${criteriaCell1}),0)`;
+}
+
+function buildAverageIfsFormula({
+  valueRange,
+  criteriaRange1,
+  criteriaCell1,
+  criteriaRange2 = "",
+  criteriaCell2 = "",
+}) {
+  if (criteriaRange2 && criteriaCell2) {
+    return `IFERROR(AVERAGEIFS(${valueRange},${criteriaRange1},${criteriaCell1},${criteriaRange2},${criteriaCell2}),0)`;
+  }
+  return `IFERROR(AVERAGEIFS(${valueRange},${criteriaRange1},${criteriaCell1}),0)`;
+}
+
+function buildCountIfsFormulaV2({
+  criteriaRange1,
+  criteriaCell1,
+  criteriaRange2 = "",
+  criteriaCell2 = "",
+}) {
+  if (criteriaRange2 && criteriaCell2) {
+    return `IFERROR(COUNTIFS(${criteriaRange1},${criteriaCell1},${criteriaRange2},${criteriaCell2}),0)`;
+  }
+  return buildCountIfsFormula({
+    criteriaRange: criteriaRange1,
+    criteriaCell: criteriaCell1,
+  });
+}
+
+function resolveResultLabel(row = {}, result = {}, fallbackIndex = 0) {
+  const groupHeader = result?.groupBy?.header || result?.date?.header || "";
+  if (row.period != null) return row.period;
+  if (groupHeader && row[groupHeader] != null) return row[groupHeader];
+  if (row.label != null) return row.label;
+  const firstValue = Object.values(row || {}).find(
+    (value) => value != null && value !== "",
+  );
+  return firstValue ?? `항목_${fallbackIndex + 1}`;
+}
+
+function resolveResultLabel2(row = {}, result = {}) {
+  const groupHeader2 = result?.groupBy2?.header || "";
+  if (groupHeader2 && row[groupHeader2] != null) return row[groupHeader2];
+  if (row.dimension2 != null) return row.dimension2;
+  return "";
+}
+
+function uniqueResultLabels(resultRows = [], result = {}) {
+  const seen = new Set();
+  const values = [];
+  resultRows.forEach((row, index) => {
+    const value = resolveResultLabel(row, result, index);
+    const key = String(value ?? "").trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    values.push(value);
+  });
+  return values;
+}
+
+function uniqueResultPairs(resultRows = [], result = {}) {
+  const seen = new Set();
+  const values = [];
+  resultRows.forEach((row, index) => {
+    const a = resolveResultLabel(row, result, index);
+    const b = resolveResultLabel2(row, result);
+    const key = `${a}||${b}`;
+    if (!String(a ?? "").trim() || seen.has(key)) return;
+    seen.add(key);
+    values.push([a, b]);
+  });
+  return values;
+}
+
+function operationFormulaType(rawOperation = "") {
+  const op = String(rawOperation || "").toLowerCase();
+  if (op.includes("count")) return "count";
+  if (op.includes("average") || op.includes("avg")) return "average";
+  return "sum";
+}
+
+function buildAutomationSheetV2({
+  result = {},
+  candidate = null,
+  templateCandidate = null,
+  primarySourceSheetName = SHEET_NAMES.SOURCE_DATA,
+  groupLetter = "A",
+  metricLetter = "B",
+  groupHeader = "",
+  metricHeader = "",
+  columns = [],
+  orderedColumns = [],
+  derivedGroupLetter = null,
+} = {}) {
+  const resultRows = Array.isArray(result?.rows) ? result.rows : [];
+  const rawOperation =
+    result?.operation || candidate?.recipeType || candidate?.type || "sum";
+  const resultType = result?.resultType || "grouped";
+  const candidateTitle = resolveAutomationCandidateTitle({
+    result,
+    candidate,
+    templateCandidate,
+  });
+  const candidateType = resolveAutomationCandidateType({
+    result,
+    candidate,
+    templateCandidate,
+  });
+  const valueHeader = metricHeader || result?.metric?.header || "값";
+  const labelHeader =
+    resultType === "timeSeries"
+      ? "기간"
+      : groupHeader || result?.groupBy?.header || "기준";
+  const formulaGroupLetter = derivedGroupLetter || groupLetter;
+  const labelRange = buildColumnRange(
+    primarySourceSheetName,
+    formulaGroupLetter,
+  );
+  const valueRange = buildColumnRange(primarySourceSheetName, metricLetter);
+  const formulaType = operationFormulaType(rawOperation);
+
+  const rows = [
+    ["자동화시트 v2"],
+    ["후보명", candidateTitle],
+    ["후보유형", candidateType],
+    ["원본시트", primarySourceSheetName],
+    ["분석유형", `${resultType} / ${rawOperation}`],
+    [],
+  ];
+
+  const opLower = String(rawOperation || "").toLowerCase();
+  const recipeLower = String(
+    candidate?.recipeType || candidate?.type || "",
+  ).toLowerCase();
+  const isTopBottom =
+    opLower.includes("topbottom") || recipeLower.includes("top_bottom");
+  const isComposition =
+    opLower.includes("composition") ||
+    recipeLower.includes("composition_ratio");
+  const isCumulative = opLower.includes("cumulative");
+  const isGrowth = opLower.includes("growth");
+  const isCross = resultType === "crossTable" || opLower.startsWith("cross");
+  const isTime = resultType === "timeSeries" || /time|trend|wide/.test(opLower);
+
+  if (isTopBottom) {
+    rows.push(["순위", "항목", valueHeader, "구분"]);
+    const rowCount = Math.max(10, Math.min(20, resultRows.length || 10));
+    for (let i = 1; i <= rowCount; i += 1)
+      rows.push([i, null, null, i <= 5 ? "상위" : "하위"]);
+    const sheet = XLSX.utils.aoa_to_sheet(rows);
+    for (let i = 1; i <= rowCount; i += 1) {
+      const rowNum = 7 + i;
+      const rank = i <= 5 ? i : Math.max(1, rowCount - i + 1);
+      sheet[`C${rowNum}`] = {
+        t: "n",
+        f: buildRankValueFormula({ valueRange, rank }),
+        v: 0,
+      };
+      sheet[`B${rowNum}`] = {
+        t: "s",
+        f: buildRankLabelFormula({
+          labelRange,
+          valueRange,
+          rankValueCell: `C${rowNum}`,
+        }),
+        v: "",
+      };
+    }
+    sheet["!ref"] = `A1:D${rows.length}`;
+    return {
+      sheet,
+      rows,
+      meta: {
+        version: AUTOMATION_SHEET_V2_VERSION,
+        layout: "topBottom",
+        rowCount,
+      },
+    };
+  }
+
+  if (isCross) {
+    const secondHeader =
+      result?.groupBy2?.header || candidate?.columns?.dimension2 || "비교기준";
+    const secondCol = columns.find((c) => c.header === secondHeader) || {};
+    const secondLetter = resolveSourceDataColumnLetter(
+      orderedColumns,
+      secondCol,
+      groupLetter,
+    );
+    const secondRange = buildColumnRange(primarySourceSheetName, secondLetter);
+    const pairs = uniqueResultPairs(resultRows, result);
+    rows.push([labelHeader, secondHeader, valueHeader]);
+    pairs.forEach(([a, b]) => rows.push([a, b, null]));
+    const sheet = XLSX.utils.aoa_to_sheet(rows);
+    pairs.forEach((_, index) => {
+      const rowNum = 8 + index;
+      const formula =
+        formulaType === "count"
+          ? buildCountIfsFormulaV2({
+              criteriaRange1: labelRange,
+              criteriaCell1: `A${rowNum}`,
+              criteriaRange2: secondRange,
+              criteriaCell2: `B${rowNum}`,
+            })
+          : buildSumIfsFormula({
+              valueRange,
+              criteriaRange1: labelRange,
+              criteriaCell1: `A${rowNum}`,
+              criteriaRange2: secondRange,
+              criteriaCell2: `B${rowNum}`,
+            });
+      sheet[`C${rowNum}`] = { t: "n", f: formula, v: 0 };
+    });
+    sheet["!ref"] = `A1:C${Math.max(rows.length, 8)}`;
+    return {
+      sheet,
+      rows,
+      meta: {
+        version: AUTOMATION_SHEET_V2_VERSION,
+        layout: "crossTable",
+        rowCount: pairs.length,
+      },
+    };
+  }
+
+  const labels = uniqueResultLabels(resultRows, result);
+  const safeLabels = labels.length
+    ? labels
+    : Array.from({ length: 10 }, (_, index) => `항목_${index + 1}`);
+  const headers = [labelHeader, valueHeader];
+  if (isComposition) headers.push("구성비");
+  if (isCumulative) headers.push("누적값");
+  if (isGrowth) headers.push("증감률");
+  if (isTime && !isCumulative && !isGrowth) headers.push("전기대비");
+  const maxColumns = Math.max(headers.length, 4);
+  rows.push(headers);
+  safeLabels.forEach((value) =>
+    rows.push([value, null, null, null].slice(0, maxColumns)),
+  );
+
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  const firstDataRow = 8;
+  safeLabels.forEach((_, index) => {
+    const rowNum = firstDataRow + index;
+    let formula = buildGroupAggregateFormula({
+      operation: formulaType,
+      sheetName: primarySourceSheetName,
+      groupLetter: formulaGroupLetter,
+      metricLetter,
+      criteriaCell: `A${rowNum}`,
+    });
+    if (formulaType === "count") {
+      formula = buildCountIfsFormula({
+        criteriaRange: labelRange,
+        criteriaCell: `A${rowNum}`,
+      });
+    }
+    if (formulaType === "average") {
+      formula = buildAverageIfsFormula({
+        valueRange,
+        criteriaRange1: labelRange,
+        criteriaCell1: `A${rowNum}`,
+      });
+    }
+    sheet[`B${rowNum}`] = { t: "n", f: formula, v: 0 };
+
+    let colIndex = 2;
+    if (isComposition) {
+      const col = XLSX.utils.encode_col(colIndex);
+      sheet[`${col}${rowNum}`] = {
+        t: "n",
+        f: `IFERROR(B${rowNum}/SUM(B${firstDataRow}:B${firstDataRow + safeLabels.length - 1}),"")`,
+        v: 0,
+      };
+      colIndex += 1;
+    }
+    if (isCumulative) {
+      const col = XLSX.utils.encode_col(colIndex);
+      sheet[`${col}${rowNum}`] = {
+        t: "n",
+        f:
+          rowNum === firstDataRow
+            ? `IFERROR(B${rowNum},"")`
+            : buildRunningSumFormula({
+                valueCell: `B${rowNum}`,
+                previousCell: `${col}${rowNum - 1}`,
+              }),
+        v: 0,
+      };
+      colIndex += 1;
+    }
+    if (isGrowth || (isTime && !isCumulative)) {
+      const col = XLSX.utils.encode_col(colIndex);
+      sheet[`${col}${rowNum}`] = {
+        t: "n",
+        f:
+          rowNum === firstDataRow
+            ? `""`
+            : buildGrowthRateFormula({
+                currentCell: `B${rowNum}`,
+                previousCell: `B${rowNum - 1}`,
+              }),
+        v: 0,
+      };
+    }
+  });
+
+  sheet["!ref"] =
+    `A1:${XLSX.utils.encode_col(maxColumns - 1)}${Math.max(rows.length, firstDataRow)}`;
+  return {
+    sheet,
+    rows,
+    meta: {
+      version: AUTOMATION_SHEET_V2_VERSION,
+      layout: isTime ? "timeSeries" : isComposition ? "composition" : "grouped",
+      rowCount: safeLabels.length,
+      formulaType,
+      sourceSheetName: primarySourceSheetName,
+    },
+  };
+}
+
 function getAutomationSourceTables(tables = []) {
   const list = Array.isArray(tables) ? tables.filter(Boolean) : [];
   const eligibleTables = list.filter(isAnalysisEligibleSourceTable);
@@ -1443,17 +2287,28 @@ function buildAutomationTemplateWorkbook({
   message = "",
   intent = null,
   result = null,
+  candidate = null,
+  templateCandidate = null,
   tables = [],
 }) {
   const wb = XLSX.utils.book_new();
 
   const allTables = Array.isArray(tables) ? tables.filter(Boolean) : [];
-  const sourceTables = getAutomationSourceTables(allTables);
-  const primaryTable = pickAutomationPrimaryTable(sourceTables, allTables);
-  const primarySourceSheetName = getPrimarySourceSheetName(
-    primaryTable,
-    sourceTables.length ? sourceTables : [primaryTable],
-  );
+  const sourceTablePolicy = buildSourceTablePolicy({
+    tables: allTables,
+    preferredTableId: resolvePreferredSourceTableId({
+      result,
+      intent,
+      candidate,
+      templateCandidate,
+    }),
+    sourceSheetBaseName: SHEET_NAMES.SOURCE_DATA,
+  });
+  const sourceTables = sourceTablePolicy.sourceTables || [];
+  const sourceTableEntries = sourceTablePolicy.sourceTableEntries || [];
+  const primaryTable = sourceTablePolicy.primaryTable || {};
+  const primarySourceSheetName =
+    sourceTablePolicy.primarySourceSheetName || SHEET_NAMES.SOURCE_DATA;
   const columns = primaryTable.columns || [];
   const cleanSourceData = buildCleanSourceDataAoa(primaryTable);
 
@@ -1473,6 +2328,18 @@ function buildAutomationTemplateWorkbook({
       ["파일명", fileName],
       ["요청", message],
       ["작업", result?.operation || intent?.operation || ""],
+      ["원본데이터 정책", sourceTablePolicy.version],
+      ["원본데이터 범위", sourceTablePolicy.sourceScope],
+      ["원본데이터 시트 수", sourceTablePolicy.counts?.sourceTableCount || 0],
+      ["자동화시트 버전", AUTOMATION_SHEET_V2_VERSION],
+      [
+        "후보",
+        resolveAutomationCandidateTitle({
+          result,
+          candidate,
+          templateCandidate,
+        }),
+      ],
     ]),
     SHEET_NAMES.AUTOMATION_GUIDE,
   );
@@ -1549,240 +2416,108 @@ function buildAutomationTemplateWorkbook({
       ["값열", metricLetter, "합계/평균 계산 대상 열"],
       ["집계방식", operation, "average, sum, count 중 선택"],
       ["요청문", message, "자동 생성 기준 요청"],
+      [
+        "원본데이터정책",
+        sourceTablePolicy.version,
+        "source table policy version",
+      ],
+      [
+        "원본데이터범위",
+        sourceTablePolicy.sourceScope,
+        "singleTable/multiTable",
+      ],
+      [
+        "원본데이터시트수",
+        sourceTablePolicy.counts?.sourceTableCount || 0,
+        "생성된 원본데이터 시트 수",
+      ],
+      [
+        "자동화시트버전",
+        AUTOMATION_SHEET_V2_VERSION,
+        "candidate-aware automation sheet layout",
+      ],
+      [
+        "후보명",
+        resolveAutomationCandidateTitle({
+          result,
+          candidate,
+          templateCandidate,
+        }),
+        "후보/템플릿 제목",
+      ],
+      [
+        "후보유형",
+        resolveAutomationCandidateType({
+          result,
+          candidate,
+          templateCandidate,
+        }),
+        "candidateType/recipeType/templateId",
+      ],
+      [
+        "후보ID",
+        candidate?.candidateId ||
+          candidate?.id ||
+          templateCandidate?.templateId ||
+          result?.recipeType ||
+          "",
+        "후보 식별자",
+      ],
+      ["rankScore", candidate?.rankScore ?? "", "Candidate Scoring v1 점수"],
+      [
+        "reasonCodes",
+        flattenReasonList(candidate?.reasonCodes || []),
+        "후보 추천 사유",
+      ],
     ]),
     SHEET_NAMES.AUTOMATION_SETTINGS,
   );
 
-  const resultRows = Array.isArray(result?.rows) ? result.rows : [];
-  const autoGroupHeader = groupHeader || "기준";
-
-  const uniqueValues = resultRows
-    .map((row) => row[autoGroupHeader])
-    .filter((v) => v !== undefined && v !== null && v !== "");
-
-  const labelRange = buildColumnRange(primarySourceSheetName, groupLetter);
-  const valueRange = buildColumnRange(primarySourceSheetName, metricLetter);
-
-  const isListTemplate = rawOperation === "list";
-  const isCumulativeTemplate = rawOperation === "cumulativeSum";
-  const isRollingTemplate = rawOperation === "rollingAverage";
-  const isGrowthTemplate = rawOperation === "growthRate";
-  const isPivotTemplate = rawOperation === "pivot";
-  const isMultiAggregateTemplate = rawOperation === "multiAggregate";
-  const isPipelineCombineTemplate = rawOperation === "pipelineCombine";
-
-  let autoRows = [
-    ["자동화시트"],
-    ["설정값을 바꾸면 아래 결과가 자동 계산됩니다."],
-    [],
-  ];
-
-  if (isPivotTemplate) {
-    const pivotColumns = result?.pivot?.columns || [];
-    autoRows.push(["기준", ...pivotColumns]);
-
-    uniqueValues.forEach((value) => {
-      autoRows.push([value, ...pivotColumns.map(() => null)]);
-    });
-  } else if (isMultiAggregateTemplate) {
-    autoRows.push(["기준", "평균", "최대값", "건수"]);
-    uniqueValues.forEach((value) => autoRows.push([value, null, null, null]));
-  } else if (isPipelineCombineTemplate) {
-    autoRows.push(["상태", "설명"]);
-    autoRows.push([
-      "미지원",
-      "pipelineCombine은 다중 기준/다중 지표 템플릿 분기가 필요합니다.",
-    ]);
-  } else if (isListTemplate) {
-    autoRows.push(["순위", "항목", "값"]);
-    for (let i = 1; i <= Math.min(10, resultRows.length || 10); i += 1) {
-      autoRows.push([i, null, null]);
-    }
-  } else if (isCumulativeTemplate) {
-    autoRows.push(["기준", "값", "누적값"]);
-    uniqueValues.forEach((value) => autoRows.push([value, null, null]));
-  } else if (isRollingTemplate) {
-    autoRows.push(["기준", "값", "이동평균"]);
-    uniqueValues.forEach((value) => autoRows.push([value, null, null]));
-  } else if (isGrowthTemplate) {
-    autoRows.push(["기준", "값", "증감률"]);
-    uniqueValues.forEach((value) => autoRows.push([value, null, null]));
-  } else {
-    autoRows.push(["기준", "값"]);
-    uniqueValues.forEach((value) => autoRows.push([value, null]));
-  }
-
-  const autoSheet = XLSX.utils.aoa_to_sheet(autoRows);
-
-  if (isPivotTemplate) {
-    const pivotColumns = result?.pivot?.columns || [];
-    const rowGroupHeader =
-      result?.pivot?.rowGroup?.header || result?.groupBy?.header || groupHeader;
-    const colGroupHeader = result?.pivot?.columnGroup?.header || "";
-
-    const rowCol = columns.find((c) => c.header === rowGroupHeader) || groupCol;
-    const colCol = columns.find((c) => c.header === colGroupHeader) || {};
-
-    const rowLetter =
-      derivedGroupLetter ||
-      resolveSourceDataColumnLetter(orderedColumns, rowCol, groupLetter);
-    const colLetter = resolveSourceDataColumnLetter(
-      orderedColumns,
-      colCol,
-      groupLetter,
-    );
-
-    const rowRange = buildColumnRange(primarySourceSheetName, rowLetter);
-    const colRange = buildColumnRange(primarySourceSheetName, colLetter);
-
-    for (let r = 0; r < uniqueValues.length; r += 1) {
-      const rowNum = r + 5;
-
-      for (let c = 0; c < pivotColumns.length; c += 1) {
-        const colNum = c + 2;
-        const cellAddr = XLSX.utils.encode_cell({
-          r: rowNum - 1,
-          c: colNum - 1,
-        });
-        const headerAddr = XLSX.utils.encode_cell({
-          r: 3,
-          c: colNum - 1,
-        });
-
-        autoSheet[cellAddr] = {
-          t: "n",
-          f: buildPivotAverageFormula({
-            rowRange,
-            rowCriteriaCell: `A${rowNum}`,
-            colRange,
-            colCriteriaCell: headerAddr,
-            valueRange,
-          }),
-          v: 0,
-        };
-      }
-    }
-  } else if (isMultiAggregateTemplate) {
-    for (let i = 0; i < uniqueValues.length; i += 1) {
-      const rowNum = i + 5;
-
-      autoSheet[`B${rowNum}`] = {
-        t: "n",
-        f: buildGroupAggregateFormula({
-          operation: "average",
-          sheetName: primarySourceSheetName,
-          groupLetter,
-          metricLetter,
-          criteriaCell: `A${rowNum}`,
-        }),
-        v: 0,
-      };
-
-      autoSheet[`C${rowNum}`] = {
-        t: "n",
-        f: buildMaxIfFormula({
-          groupRange: labelRange,
-          criteriaCell: `A${rowNum}`,
-          valueRange,
-        }),
-        v: 0,
-      };
-
-      autoSheet[`D${rowNum}`] = {
-        t: "n",
-        f: buildCountIfsFormula({
-          criteriaRange: labelRange,
-          criteriaCell: `A${rowNum}`,
-        }),
-        v: 0,
-      };
-    }
-  } else if (isPipelineCombineTemplate) {
-    // 현재 베타에서는 안내형 템플릿만 생성
-  } else if (isListTemplate) {
-    for (let i = 0; i < Math.min(10, resultRows.length || 10); i += 1) {
-      const rowNum = i + 5;
-      const rank = i + 1;
-
-      autoSheet[`C${rowNum}`] = {
-        t: "n",
-        f: buildRankValueFormula({ valueRange, rank }),
-        v: 0,
-      };
-
-      autoSheet[`B${rowNum}`] = {
-        t: "s",
-        f: buildRankLabelFormula({
-          labelRange,
-          valueRange,
-          rankValueCell: `C${rowNum}`,
-        }),
-        v: "",
-      };
-    }
-  } else {
-    for (let i = 0; i < uniqueValues.length; i += 1) {
-      const rowNum = i + 5;
-
-      const baseFormula = buildGroupAggregateFormula({
-        operation,
-        sheetName: primarySourceSheetName,
-        groupLetter,
-        metricLetter,
-        criteriaCell: `A${rowNum}`,
-      });
-
-      autoSheet[`B${rowNum}`] = {
-        t: "n",
-        f: baseFormula,
-        v: 0,
-      };
-
-      if (isCumulativeTemplate) {
-        autoSheet[`C${rowNum}`] = {
-          t: "n",
-          f:
-            rowNum === 5
-              ? `IFERROR(B${rowNum},"")`
-              : buildRunningSumFormula({
-                  valueCell: `B${rowNum}`,
-                  previousCell: `C${rowNum - 1}`,
-                }),
-          v: 0,
-        };
-      }
-
-      if (isRollingTemplate) {
-        const startRow = Math.max(5, rowNum - 2);
-        autoSheet[`C${rowNum}`] = {
-          t: "n",
-          f: `IFERROR(AVERAGE(B${startRow}:B${rowNum}),"")`,
-          v: 0,
-        };
-      }
-
-      if (isGrowthTemplate) {
-        autoSheet[`C${rowNum}`] = {
-          t: "n",
-          f:
-            rowNum === 5
-              ? `""`
-              : buildGrowthRateFormula({
-                  currentCell: `B${rowNum}`,
-                  previousCell: `B${rowNum - 1}`,
-                }),
-          v: 0,
-        };
-      }
-    }
-  }
-
-  autoSheet["!ref"] = `A1:C${Math.max(5, autoRows.length)}`;
-
+  const automationSheetV2 = buildAutomationSheetV2({
+    result,
+    candidate,
+    templateCandidate,
+    primarySourceSheetName,
+    groupLetter,
+    metricLetter,
+    groupHeader,
+    metricHeader,
+    columns,
+    orderedColumns,
+    groupCol,
+    metricCol,
+    derivedGroupLetter,
+  });
+  const autoSheet = automationSheetV2.sheet;
+  setAoaColumnWidths(autoSheet, automationSheetV2.rows || []);
+  styleHeaderRow(autoSheet);
+  applyDefaultSheetOptions(autoSheet);
   XLSX.utils.book_append_sheet(wb, autoSheet, SHEET_NAMES.AUTOMATION_TEMPLATE);
 
-  const sheetsToWrite = sourceTables.length ? sourceTables : [primaryTable];
-  sheetsToWrite.forEach((table, index) => {
+  const candidateSummaryAoa = buildCandidateSummaryAoa({
+    result,
+    candidate,
+    templateCandidate,
+    sourceTablePolicy,
+  });
+  const candidateSummarySheet = XLSX.utils.aoa_to_sheet(candidateSummaryAoa);
+  setAoaColumnWidths(candidateSummarySheet, candidateSummaryAoa);
+  styleHeaderRow(candidateSummarySheet);
+  applyDefaultSheetOptions(candidateSummarySheet);
+  appendSheetSafe(wb, candidateSummarySheet, "후보요약");
+
+  const sourceEntriesToWrite = sourceTableEntries.length
+    ? sourceTableEntries
+    : [
+        {
+          table: primaryTable,
+          sourceSheetName: primarySourceSheetName,
+          sourceTableIndex: 0,
+        },
+      ].filter((entry) => entry.table && Object.keys(entry.table).length);
+
+  sourceEntriesToWrite.forEach((entry) => {
+    const table = entry.table;
     const sourceData =
       table === primaryTable ? cleanSourceData : buildCleanSourceDataAoa(table);
     const tableSourceRows = sourceData.sourceRows?.length
@@ -1792,11 +2527,7 @@ function buildAutomationTemplateWorkbook({
     setAoaColumnWidths(sourceDataSheet, tableSourceRows);
     styleHeaderRow(sourceDataSheet);
     applyDefaultSheetOptions(sourceDataSheet);
-    appendSheetSafe(
-      wb,
-      sourceDataSheet,
-      sourceSheetNameForTableIndex(index, sheetsToWrite.length),
-    );
+    appendSheetSafe(wb, sourceDataSheet, entry.sourceSheetName);
   });
 
   const summaryRowsAoa = buildSummaryRowsAoa(primaryTable);
@@ -1812,6 +2543,7 @@ function buildAutomationTemplateWorkbook({
     primaryTable,
     tables,
     sourceRows,
+    sourceTablePolicy,
   });
   const diagnosticsSheet = XLSX.utils.aoa_to_sheet(diagnosticsAoa);
   setAoaColumnWidths(diagnosticsSheet, diagnosticsAoa);
@@ -1822,6 +2554,27 @@ function buildAutomationTemplateWorkbook({
   const previewSheet = XLSX.utils.json_to_sheet(result?.rows || []);
   applyDefaultSheetOptions(previewSheet);
   XLSX.utils.book_append_sheet(wb, previewSheet, SHEET_NAMES.EXECUTION_PREVIEW);
+
+  wb["!beebeeSourceTablePolicy"] =
+    summarizeSourceTablePolicy(sourceTablePolicy);
+  wb["!beebeeAutomationSheetV2"] = {
+    version: AUTOMATION_SHEET_V2_VERSION,
+    applied: true,
+    layout: automationSheetV2.meta?.layout || "unknown",
+    rowCount: automationSheetV2.meta?.rowCount || 0,
+    sourceSheetName: primarySourceSheetName,
+    candidateTitle: resolveAutomationCandidateTitle({
+      result,
+      candidate,
+      templateCandidate,
+    }),
+    candidateType: resolveAutomationCandidateType({
+      result,
+      candidate,
+      templateCandidate,
+    }),
+  };
+  ensureWorkbookRecalculationOnOpen(wb, "automation_sheet_v2_formula_workbook");
 
   return wb;
 }
@@ -1835,4 +2588,8 @@ module.exports = {
   buildFormulaEngineContext,
   buildSectionFormulaPlan,
   applySimpleAggregateFormulaSection,
+  AUTOMATION_SHEET_V2_VERSION,
+  WORKBOOK_RECALCULATION_FLAG_VERSION,
+  ensureWorkbookRecalculationOnOpen,
+  injectWorkbookCalcPrIntoXlsxBuffer,
 };

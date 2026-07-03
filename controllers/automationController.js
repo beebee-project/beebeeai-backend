@@ -66,6 +66,10 @@ const {
 const {
   validateCandidateBundle,
 } = require("../automation/candidateGeneration/candidateValidator");
+const {
+  normalizeCandidateBundleContractV2,
+} = require("../automation/candidateContractV2");
+const { scoreCandidateBundle } = require("../automation/candidateScorer");
 
 function resolveGenerateCandidateBundle() {
   const direct = candidateGenerationModule;
@@ -98,23 +102,26 @@ function resolveGenerateCandidateBundle() {
       normalizedQueryTables,
     );
 
-    return {
-      ...validated,
-      candidateGeneration: {
-        ...(validated.candidateGeneration || {}),
-        version:
-          validated.candidateGeneration?.version || "candidate_generation_v1",
-        source,
-        fallbackUsed: true,
-        fileName,
-        aiReranker: {
-          enabled: false,
-          used: false,
-          skippedReason: "INVALID_CANDIDATE_GENERATION_EXPORT",
+    return normalizeCandidateBundleContractV2(
+      {
+        ...validated,
+        candidateGeneration: {
+          ...(validated.candidateGeneration || {}),
+          version:
+            validated.candidateGeneration?.version || "candidate_generation_v2",
+          source,
+          fallbackUsed: true,
+          fileName,
+          aiReranker: {
+            enabled: false,
+            used: false,
+            skippedReason: "INVALID_CANDIDATE_GENERATION_EXPORT",
+          },
+          generatedAt: new Date().toISOString(),
         },
-        generatedAt: new Date().toISOString(),
       },
-    };
+      { source, fileName },
+    );
   };
 }
 
@@ -508,6 +515,13 @@ async function buildQueryTablesForFile(req, fileName) {
       });
     }
 
+    candidateBundle = scoreCandidateBundle(
+      normalizeCandidateBundleContractV2(candidateBundle, {
+        source: "encrypted-query-json",
+        fileName,
+      }),
+    );
+
     return {
       fileHash: savedQueryJson.payload.fileHash,
       sheetStateSig: savedQueryJson.payload.sheetStateSig,
@@ -515,9 +529,14 @@ async function buildQueryTablesForFile(req, fileName) {
       normalizedQueryTables,
       analysisRecipeCandidates: candidateBundle.analysisRecipeCandidates || [],
       categoryCandidates: candidateBundle.categoryCandidates || [],
+      dashboardCandidates: candidateBundle.dashboardCandidates || [],
       businessTemplateCandidates:
         candidateBundle.businessTemplateCandidates || [],
       candidateGeneration: candidateBundle.candidateGeneration || null,
+      candidateContract: candidateBundle.candidateContract || null,
+      candidateScoring: candidateBundle.candidateScoring || null,
+      topCandidates: candidateBundle.topCandidates || [],
+      secondaryCandidates: candidateBundle.secondaryCandidates || [],
       source: "encrypted-query-json",
     };
   }
@@ -597,18 +616,29 @@ async function buildQueryTablesForFile(req, fileName) {
   });
 
   const normalizedQueryTables = buildNormalizedQueryTables(tables);
-  const candidateBundle = await generateCandidateBundle({
+  const rawCandidateBundle = await generateCandidateBundle({
     normalizedQueryTables,
     fileName,
     source: "rebuilt-from-xlsx",
   });
+  const candidateBundle = scoreCandidateBundle(
+    normalizeCandidateBundleContractV2(rawCandidateBundle, {
+      source: "rebuilt-from-xlsx",
+      fileName,
+    }),
+  );
 
   const analysisRecipeCandidates =
     candidateBundle.analysisRecipeCandidates || [];
   const categoryCandidates = candidateBundle.categoryCandidates || [];
+  const dashboardCandidates = candidateBundle.dashboardCandidates || [];
   const businessTemplateCandidates =
     candidateBundle.businessTemplateCandidates || [];
   const candidateGeneration = candidateBundle.candidateGeneration || null;
+  const candidateContract = candidateBundle.candidateContract || null;
+  const candidateScoring = candidateBundle.candidateScoring || null;
+  const topCandidates = candidateBundle.topCandidates || [];
+  const secondaryCandidates = candidateBundle.secondaryCandidates || [];
 
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
     await saveQueryJsonForFile({
@@ -626,8 +656,13 @@ async function buildQueryTablesForFile(req, fileName) {
         normalizedQueryTables,
         analysisRecipeCandidates,
         categoryCandidates,
+        dashboardCandidates,
         businessTemplateCandidates,
         candidateGeneration,
+        candidateContract,
+        candidateScoring,
+        topCandidates,
+        secondaryCandidates,
       },
     });
   }
@@ -639,8 +674,13 @@ async function buildQueryTablesForFile(req, fileName) {
     normalizedQueryTables,
     analysisRecipeCandidates,
     categoryCandidates,
+    dashboardCandidates,
     businessTemplateCandidates,
     candidateGeneration,
+    candidateContract,
+    candidateScoring,
+    topCandidates,
+    secondaryCandidates,
     source: "rebuilt-from-xlsx",
   };
 }
@@ -657,7 +697,9 @@ function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
       `candidate_${index + 1}`;
 
     return {
-      candidateId: id,
+      candidateId: candidate.candidateId || id,
+      candidateType: candidate.candidateType || "analysisRecipe",
+      candidateContractVersion: candidate.candidateContractVersion || "",
       title:
         candidate.title ||
         candidate.name ||
@@ -676,6 +718,15 @@ function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
       priority: Number.isFinite(candidate.priority)
         ? candidate.priority
         : index + 1,
+      confidence: candidate.confidence,
+      sourceScope: candidate.sourceScope || "",
+      sourceTableId: candidate.sourceTableId || "",
+      sourceSheetName: candidate.sourceSheetName || "",
+      sourceTableIds: candidate.sourceTableIds || [],
+      sourceSheetNames: candidate.sourceSheetNames || [],
+      recipeIds: candidate.recipeIds || [],
+      outputTypes: candidate.outputTypes || [],
+      reasonCodes: candidate.reasonCodes || [],
       candidate,
     };
   });
@@ -953,6 +1004,8 @@ exports.createSummarySheet = async (req, res, next) => {
           message,
           intent: queryIntent,
           result,
+          candidate,
+          templateCandidate,
           tables: saved.tables || normalizedQueryTables,
         })
       : buildSummaryWorkbook({
@@ -973,6 +1026,10 @@ exports.createSummarySheet = async (req, res, next) => {
       mode: summarySheetMode,
       formulaCount: 0,
     };
+    const sourceTablePolicy = workbook["!beebeeSourceTablePolicy"] || null;
+    const automationSheet = workbook["!beebeeAutomationSheetV2"] || null;
+    const workbookRecalculation =
+      workbook["!beebeeWorkbookRecalculation"] || null;
 
     const userId = req.user?.id || "local-dev";
     const outputType = OUTPUT_TYPES.SUMMARY_SHEET;
@@ -1018,6 +1075,9 @@ exports.createSummarySheet = async (req, res, next) => {
       summarySheetMode,
       includeSourceDataSheet,
       formulaEngine: formulaEngineMeta,
+      sourceTablePolicy,
+      automationSheet,
+      workbookRecalculation,
       chartSpec,
       intent: queryIntent,
       result,
@@ -1235,6 +1295,8 @@ exports.exportXlsx = async (req, res) => {
     });
 
     const buffer = workbookToBuffer(workbook);
+    const workbookRecalculation =
+      workbook["!beebeeWorkbookRecalculation"] || null;
 
     const outputType = OUTPUT_TYPES.SUMMARY_SHEET;
     const fileName = buildGeneratedFileName({
@@ -1265,6 +1327,7 @@ exports.exportXlsx = async (req, res) => {
       filePath,
       outputType,
       outputLabel: outputTypeLabel(outputType),
+      workbookRecalculation,
       sheetNames: workbook.SheetNames || [],
       formulaEngine: workbook["!beebeeFormulaEngine"] || {
         prepared: true,
@@ -1559,6 +1622,9 @@ exports.getAnalysisCandidates = async (req, res, next) => {
           analysisRecipeCandidates: rebuilt.analysisRecipeCandidates,
           categoryCandidates: rebuilt.categoryCandidates,
           businessTemplateCandidates: rebuilt.businessTemplateCandidates,
+          candidateScoring: rebuilt.candidateScoring || null,
+          topCandidates: rebuilt.topCandidates || [],
+          secondaryCandidates: rebuilt.secondaryCandidates || [],
         };
 
         await saveJsonObject(key, saved);
@@ -1568,13 +1634,19 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       const normalizedQueryTables =
         built.normalizedQueryTables || buildNormalizedQueryTables(built.tables);
 
-      const candidateBundle = built.candidateGeneration
+      const rawCandidateBundle = built.candidateGeneration
         ? built
         : await generateCandidateBundle({
             normalizedQueryTables,
             fileName,
             source: "analysis-candidates-file",
           });
+      const candidateBundle = scoreCandidateBundle(
+        normalizeCandidateBundleContractV2(rawCandidateBundle, {
+          source: "analysis-candidates-file",
+          fileName,
+        }),
+      );
 
       const analysisRecipeCandidates =
         candidateBundle.analysisRecipeCandidates || [];
@@ -1582,10 +1654,15 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
 
       const categoryCandidates = candidateBundle.categoryCandidates || [];
+      const dashboardCandidates = candidateBundle.dashboardCandidates || [];
 
       const businessTemplateCandidates =
         candidateBundle.businessTemplateCandidates || [];
       const candidateGeneration = candidateBundle.candidateGeneration || null;
+      const candidateContract = candidateBundle.candidateContract || null;
+      const candidateScoring = candidateBundle.candidateScoring || null;
+      const topCandidates = candidateBundle.topCandidates || [];
+      const secondaryCandidates = candidateBundle.secondaryCandidates || [];
 
       console.log("[analysis-candidates]", {
         source: "file",
@@ -1605,8 +1682,13 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         analysisRecipeCandidates,
         candidates,
         categoryCandidates,
+        dashboardCandidates,
         businessTemplateCandidates,
         candidateGeneration,
+        candidateContract,
+        candidateScoring,
+        topCandidates,
+        secondaryCandidates,
       });
     }
 
@@ -1622,28 +1704,41 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       saved.normalizedQueryTables ||
       buildNormalizedQueryTables(saved.tables || []);
 
-    const candidateBundle = saved.candidateGeneration
+    const rawCandidateBundle = saved.candidateGeneration
       ? {
           analysisRecipeCandidates: saved.analysisRecipeCandidates || [],
           categoryCandidates: saved.categoryCandidates || [],
+          dashboardCandidates: saved.dashboardCandidates || [],
           businessTemplateCandidates: saved.businessTemplateCandidates || [],
           candidateGeneration: saved.candidateGeneration,
+          candidateContract: saved.candidateContract || null,
         }
       : await generateCandidateBundle({
           normalizedQueryTables,
           fileName: saved.fileName,
           source: "analysis-candidates-query-tables",
         });
+    const candidateBundle = scoreCandidateBundle(
+      normalizeCandidateBundleContractV2(rawCandidateBundle, {
+        source: "analysis-candidates-query-tables",
+        fileName: saved.fileName,
+      }),
+    );
 
     const analysisRecipeCandidates =
       candidateBundle.analysisRecipeCandidates || [];
 
     const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
     const categoryCandidates = candidateBundle.categoryCandidates || [];
+    const dashboardCandidates = candidateBundle.dashboardCandidates || [];
 
     const businessTemplateCandidates =
       candidateBundle.businessTemplateCandidates || [];
     const candidateGeneration = candidateBundle.candidateGeneration || null;
+    const candidateContract = candidateBundle.candidateContract || null;
+    const candidateScoring = candidateBundle.candidateScoring || null;
+    const topCandidates = candidateBundle.topCandidates || [];
+    const secondaryCandidates = candidateBundle.secondaryCandidates || [];
 
     console.log("[analysis-candidates]", {
       source: "query-tables",
@@ -1664,8 +1759,13 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       analysisRecipeCandidates,
       candidates,
       categoryCandidates,
+      dashboardCandidates,
       businessTemplateCandidates,
       candidateGeneration,
+      candidateContract,
+      candidateScoring,
+      topCandidates,
+      secondaryCandidates,
     });
   } catch (e) {
     console.error("[automation.getAnalysisCandidates]", e);
@@ -1755,20 +1855,26 @@ exports.previewQueryTables = async (req, res, next) => {
     const normalizedQueryTables =
       built.normalizedQueryTables || buildNormalizedQueryTables(tables);
 
-    const candidateBundle = built.candidateGeneration
+    const rawCandidateBundle = built.candidateGeneration
       ? built
       : await generateCandidateBundle({
           normalizedQueryTables,
           fileName,
           source: "preview-query-tables",
         });
+    const candidateBundle = normalizeCandidateBundleContractV2(
+      rawCandidateBundle,
+      { source: "preview-query-tables", fileName },
+    );
 
     const analysisRecipeCandidates =
       candidateBundle.analysisRecipeCandidates || [];
     const categoryCandidates = candidateBundle.categoryCandidates || [];
+    const dashboardCandidates = candidateBundle.dashboardCandidates || [];
     const businessTemplateCandidates =
       candidateBundle.businessTemplateCandidates || [];
     const candidateGeneration = candidateBundle.candidateGeneration || null;
+    const candidateContract = candidateBundle.candidateContract || null;
 
     return res.json({
       ok: true,
@@ -1779,8 +1885,10 @@ exports.previewQueryTables = async (req, res, next) => {
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
+      dashboardCandidates,
       businessTemplateCandidates,
       candidateGeneration,
+      candidateContract,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
@@ -1816,22 +1924,33 @@ exports.saveQueryTables = async (req, res, next) => {
     const normalizedQueryTables =
       built.normalizedQueryTables || buildNormalizedQueryTables(tables);
 
-    const candidateBundle = built.candidateGeneration
+    const rawCandidateBundle = built.candidateGeneration
       ? built
       : await generateCandidateBundle({
           normalizedQueryTables,
           fileName,
           source: "save-query-tables",
         });
+    const candidateBundle = scoreCandidateBundle(
+      normalizeCandidateBundleContractV2(rawCandidateBundle, {
+        source: "save-query-tables",
+        fileName,
+      }),
+    );
 
     const analysisRecipeCandidates =
       candidateBundle.analysisRecipeCandidates || [];
 
     const categoryCandidates = candidateBundle.categoryCandidates || [];
+    const dashboardCandidates = candidateBundle.dashboardCandidates || [];
 
     const businessTemplateCandidates =
       candidateBundle.businessTemplateCandidates || [];
     const candidateGeneration = candidateBundle.candidateGeneration || null;
+    const candidateContract = candidateBundle.candidateContract || null;
+    const candidateScoring = candidateBundle.candidateScoring || null;
+    const topCandidates = candidateBundle.topCandidates || [];
+    const secondaryCandidates = candidateBundle.secondaryCandidates || [];
 
     const now = new Date();
     const userId = req.user?.id || "local-dev";
@@ -1850,8 +1969,13 @@ exports.saveQueryTables = async (req, res, next) => {
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
+      dashboardCandidates,
       businessTemplateCandidates,
       candidateGeneration,
+      candidateContract,
+      candidateScoring,
+      topCandidates,
+      secondaryCandidates,
     };
 
     const saved = await saveJsonObject(key, payload);
@@ -1866,8 +1990,13 @@ exports.saveQueryTables = async (req, res, next) => {
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
+      dashboardCandidates,
       businessTemplateCandidates,
       candidateGeneration,
+      candidateContract,
+      candidateScoring,
+      topCandidates,
+      secondaryCandidates,
       localName: saved.localName,
       gcsName: saved.gcsName,
       tables: tables.map((t) => ({

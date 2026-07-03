@@ -1,5 +1,8 @@
 const { BUSINESS_TEMPLATE_DEFS } = require("../businessTemplateConfig");
 const {
+  normalizeCandidateBundleContractV2,
+} = require("../candidateContractV2");
+const {
   ALLOWED_OUTPUT_TYPES,
   normalizeOutputTypes,
 } = require("../businessTemplateContract");
@@ -67,6 +70,7 @@ function sanitizeBusinessTemplateCandidate(
   );
 
   return {
+    ...candidate,
     type: "businessTemplate",
     templateId: def.templateId,
     title: cleanText(candidate.title || def.title, 120),
@@ -142,16 +146,19 @@ function validateCandidateBundle(bundle = {}, normalizedQueryTables = []) {
     allowedOutputTypes: [...ALLOWED_OUTPUT_TYPES],
   };
 
-  return {
-    ...bundle,
-    analysisRecipeCandidates,
-    categoryCandidates,
-    businessTemplateCandidates,
-    candidateGeneration: {
-      ...(bundle.candidateGeneration || {}),
-      validation,
+  return normalizeCandidateBundleContractV2(
+    {
+      ...bundle,
+      analysisRecipeCandidates,
+      categoryCandidates,
+      businessTemplateCandidates,
+      candidateGeneration: {
+        ...(bundle.candidateGeneration || {}),
+        validation,
+      },
     },
-  };
+    { source: "candidate-validator" },
+  );
 }
 
 module.exports = {
