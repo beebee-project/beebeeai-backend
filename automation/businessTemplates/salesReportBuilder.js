@@ -13,6 +13,10 @@ const {
 } = require("../structuralBuilders/periodMetricReportBuilder");
 
 const SALES_REPORT_VERSION = "sales_report_v2";
+const SALES_LEGACY_FILTER_VERSION =
+  "sales_legacy_filter_virtual_period_binding_v1";
+const SALES_WIDE_TREND_RESTORATION_VERSION = "sales_wide_trend_restoration_v1";
+const SALES_RATE_SCALE_VERSION = "growth_rate_scale_hotfix_v1";
 
 const SALES_HINTS = {
   metric: [
@@ -143,40 +147,348 @@ function sameHeader(a = "", b = "") {
   return normalizeText(a) === normalizeText(b);
 }
 
-function findFirstColumnHeader(table = {}, hintGroups = []) {
-  for (const hints of hintGroups) {
-    const matched = findColumnHeader(table, hints || []);
-    if (matched) return matched;
-  }
-  return "";
+function getColumnHeader(column = {}) {
+  return (
+    column.header ||
+    column.originalHeader ||
+    column.name ||
+    column.key ||
+    column.accessor ||
+    ""
+  );
 }
 
-function resolveSalesColumns(table = {}, config = {}) {
+function getColumns(table = {}) {
+  return Array.isArray(table.columns) ? table.columns : [];
+}
+
+function getHeaderStats(table = {}, header = "") {
+  const rows = getRows(table);
+  let numericCount = 0;
+  let nonEmptyCount = 0;
+  for (const row of rows) {
+    const value = getRowValue(row, header);
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      nonEmptyCount += 1;
+      if (toNumber(value) != null) numericCount += 1;
+    }
+  }
+  return {
+    rowCount: rows.length,
+    numericCount,
+    nonEmptyCount,
+    numericRatio: nonEmptyCount ? numericCount / nonEmptyCount : 0,
+  };
+}
+
+function isQuantityLikeHeader(header = "") {
+  const n = normalizeText(header);
+  return /매출수량|판매수량|수량|판매량|거래건수|주문수|건수|quantity|qty|count/.test(
+    n,
+  );
+}
+
+function isTimeLikeHeader(header = "") {
+  const n = normalizeText(header);
+  return /연도구분|기준년도|매출연도|판매연도|연도|년도|월구분|기준월|매출월|판매월|월|연월|기간|date|year|month/.test(
+    n,
+  );
+}
+
+function scoreHeaderByHints(header = "", hints = []) {
+  const h = normalizeText(header);
+  if (!h) return 0;
+  let score = 0;
+  for (const hint of hints || []) {
+    const normalizedHint = normalizeText(hint);
+    if (!normalizedHint) continue;
+    if (h === normalizedHint) score = Math.max(score, 120);
+    else if (h.includes(normalizedHint)) score = Math.max(score, 80);
+    else if (normalizedHint.includes(h) && h.length >= 2)
+      score = Math.max(score, 35);
+  }
+  return score;
+}
+
+function findBestHeader(table = {}, hints = [], options = {}) {
+  const {
+    exclude = () => false,
+    requireNumeric = false,
+    bonus = () => 0,
+  } = options;
+  let best = { header: "", score: -Infinity };
+  for (const column of getColumns(table)) {
+    const header = getColumnHeader(column);
+    if (!header || exclude(header, column)) continue;
+    const stats = getHeaderStats(table, header);
+    if (requireNumeric && stats.numericCount === 0) continue;
+
+    let score = scoreHeaderByHints(header, hints);
+    if (score <= 0) continue;
+    score += Math.min(30, Math.round(stats.numericRatio * 30));
+    if (column.role === "metric" || column.inferredRole === "metric")
+      score += 15;
+    if (column.type === "number" || column.dominantType === "number")
+      score += 10;
+    score += bonus(header, column, stats) || 0;
+
+    if (score > best.score) best = { header, score };
+  }
+  return best.header;
+}
+
+function findBestDimensionHeader(table = {}, hints = [], options = {}) {
+  const { exclude = () => false, bonus = () => 0 } = options;
+  let best = { header: "", score: -Infinity };
+  for (const column of getColumns(table)) {
+    const header = getColumnHeader(column);
+    if (!header || exclude(header, column)) continue;
+    const h = normalizeText(header);
+    let score = 0;
+    for (const hint of hints || []) {
+      const normalizedHint = normalizeText(hint);
+      if (!normalizedHint) continue;
+      if (normalizedHint.length <= 1 && h !== normalizedHint) continue;
+      if (h === normalizedHint) score = Math.max(score, 100);
+      else if (h.includes(normalizedHint)) score = Math.max(score, 55);
+      else if (normalizedHint.includes(h) && h.length >= 2)
+        score = Math.max(score, 25);
+    }
+    if (score <= 0) continue;
+    if (isTimeLikeHeader(header)) score -= 35;
+    if (isQuantityLikeHeader(header)) score -= 60;
+    score += bonus(header, column) || 0;
+    if (score > best.score) best = { header, score };
+  }
+  return best.header;
+}
+
+function findBestTimeHeader(table = {}, hints = []) {
+  let best = { header: "", score: -Infinity };
+  for (const column of getColumns(table)) {
+    const header = getColumnHeader(column);
+    const h = normalizeText(header);
+    if (!h) continue;
+    let score = 0;
+    for (const hint of hints || []) {
+      const normalizedHint = normalizeText(hint);
+      if (!normalizedHint) continue;
+      if (h === normalizedHint) score = Math.max(score, 120);
+      else if (h.length >= 2 && h.includes(normalizedHint))
+        score = Math.max(score, 75);
+      else if (h.length >= 2 && normalizedHint.includes(h))
+        score = Math.max(score, 20);
+    }
+    if (score <= 0) continue;
+    if (/연도|년도|year/.test(h)) score += 30;
+    if (/월|month/.test(h)) score += 30;
+    if (/기간|연월|date/.test(h)) score += 25;
+    if (h.length <= 1) score -= 100;
+    if (score > best.score) best = { header, score };
+  }
+  return best.header;
+}
+
+function findSalesAmountHeader(table = {}, hints = SALES_HINTS) {
+  const amountHints = [
+    "순매출액",
+    "매출액",
+    "매출금액",
+    "판매금액",
+    "판매액",
+    "카드매출액",
+    "신용카드매출액",
+    "거래액",
+    "출하액",
+    "금액",
+    "지표값",
+    "revenue",
+    "salesamount",
+    "amount",
+    "transactionamount",
+  ];
+
+  return findBestHeader(table, amountHints, {
+    requireNumeric: true,
+    exclude: (header) =>
+      isQuantityLikeHeader(header) || isTimeLikeHeader(header),
+    bonus: (header) => {
+      const h = normalizeText(header);
+      if (
+        /순매출액|매출액|매출금액|판매금액|판매액|카드매출액|신용카드매출액|거래액|출하액/.test(
+          h,
+        )
+      )
+        return 80;
+      if (h === "지표값") return 40;
+      if (h === "금액") return 10;
+      return 0;
+    },
+  });
+}
+
+function findSalesQuantityHeader(
+  table = {},
+  hints = SALES_HINTS,
+  metricHeader = "",
+) {
+  return findBestHeader(table, hints.quantity || [], {
+    requireNumeric: true,
+    exclude: (header) => sameHeader(header, metricHeader),
+    bonus: (header) => (isQuantityLikeHeader(header) ? 60 : 0),
+  });
+}
+
+function scoreSalesTable(table = {}, config = {}) {
+  const hints = config.hints || SALES_HINTS;
+  const metricHeader = findSalesAmountHeader(table, hints);
+  const quantityHeader = findSalesQuantityHeader(table, hints, metricHeader);
+  const periodHeader =
+    findBestTimeHeader(table, [
+      "연월",
+      "기간",
+      "기준년월",
+      "월",
+      "연도",
+      "년도",
+      "year",
+      "month",
+    ]) || "";
+  const dimensionHeader =
+    findBestDimensionHeader(table, [
+      ...(hints.item || []),
+      ...(hints.category || []),
+      ...(hints.region || []),
+      ...(hints.channel || []),
+      ...(hints.customer || []),
+    ]) || "";
+  const tableId = String(table.tableId || "");
+
+  let score = 0;
+  if (metricHeader) score += 70;
+  if (quantityHeader) score += 15;
+  if (periodHeader) score += 20;
+  if (dimensionHeader) score += 10;
+  if (table.isVirtual || /WIDE_LONG|CROSS_LONG/.test(tableId))
+    score += metricHeader ? 25 : 0;
+  score += Math.min(10, Math.floor((getRows(table).length || 0) / 20));
+  if (table.isPrimary) score += 5;
+  return score;
+}
+
+function selectSalesExecutionTable({
+  normalizedQueryTables = [],
+  table = {},
+  config = {},
+}) {
+  const candidates = [table, ...normalizedQueryTables].filter(Boolean);
+  let best = { table, score: scoreSalesTable(table, config) };
+  for (const candidate of candidates) {
+    const score = scoreSalesTable(candidate, config);
+    if (score > best.score) best = { table: candidate, score };
+  }
+  return best.table || table;
+}
+
+function getAllCandidateHeaders(table = {}) {
+  const headers = [];
+  const seen = new Set();
+  const add = (header) => {
+    const value = String(header || "").trim();
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    headers.push(value);
+  };
+
+  for (const column of getColumns(table)) add(getColumnHeader(column));
+  for (const row of getRows(table).slice(0, 50)) {
+    if (row && typeof row === "object" && !Array.isArray(row)) {
+      Object.keys(row).forEach(add);
+    }
+  }
+  return headers;
+}
+
+function findBestTimeHeaderAny(table = {}, hints = []) {
+  const headers = getAllCandidateHeaders(table);
+  let best = { header: "", score: -Infinity };
+  for (const header of headers) {
+    const h = normalizeText(header);
+    if (!h) continue;
+    let score = 0;
+    for (const hint of hints || []) {
+      const normalizedHint = normalizeText(hint);
+      if (!normalizedHint) continue;
+      if (h === normalizedHint) score = Math.max(score, 130);
+      else if (h.length >= 2 && h.includes(normalizedHint))
+        score = Math.max(score, 85);
+      else if (h.length >= 2 && normalizedHint.includes(h))
+        score = Math.max(score, 25);
+    }
+    if (/^기간$|^연월$|기준년월|매출년월|판매년월|period|date/.test(h))
+      score += 45;
+    if (/^연도$|^년도$|기준년도|매출연도|판매연도|year/.test(h)) score += 35;
+    if (/^월$|기준월|매출월|판매월|month/.test(h)) score += 30;
+    if (h.length <= 1 && h !== "월") score -= 100;
+    if (score <= 0) continue;
+    if (score > best.score) best = { header, score };
+  }
+  return best.header;
+}
+
+function resolveSalesColumnsForTable(table = {}, config = {}) {
   const hints = config.hints || SALES_HINTS;
   const metricHeader =
     config.metricHeader ||
-    findFirstColumnHeader(table, [
-      hints.metric,
-      ["지표값", "금액", "value", "amount"],
-    ]);
+    findSalesAmountHeader(table, hints) ||
+    findFirstColumnHeader(table, [["지표값", "금액", "value", "amount"]]);
   const quantityHeader =
-    config.quantityHeader || findColumnHeader(table, hints.quantity || []);
-  const yearHeader = findColumnHeader(table, hints.year || []);
-  const monthHeader = findColumnHeader(table, hints.month || []);
+    config.quantityHeader ||
+    findSalesQuantityHeader(table, hints, metricHeader);
+  const yearHeader =
+    findBestTimeHeader(table, hints.year || []) ||
+    findBestTimeHeaderAny(table, hints.year || []);
+  const monthHeader =
+    findBestTimeHeader(table, hints.month || []) ||
+    findBestTimeHeaderAny(table, hints.month || []);
   const periodHeader =
-    findColumnHeader(table, ["연월", "기준년월", "매출년월", "판매년월"]) ||
+    findBestTimeHeader(table, [
+      "연월",
+      "기준년월",
+      "매출년월",
+      "판매년월",
+      "기간",
+      "period",
+      "date",
+    ]) ||
+    findBestTimeHeaderAny(table, [
+      "연월",
+      "기준년월",
+      "매출년월",
+      "판매년월",
+      "기간",
+      "period",
+      "date",
+    ]) ||
+    (yearHeader && monthHeader ? "__YEAR_MONTH__" : "") ||
     findColumnHeader(table, hints.period || []) ||
     yearHeader ||
     monthHeader;
-  const itemHeader = findColumnHeader(table, hints.item || []);
-  const categoryHeader = findColumnHeader(table, hints.category || []);
-  const regionHeader = findColumnHeader(table, hints.region || []);
-  const channelHeader = findColumnHeader(table, hints.channel || []);
-  const customerHeader = findColumnHeader(table, hints.customer || []);
+  const itemHeader = findBestDimensionHeader(table, hints.item || []);
+  const categoryHeader = findBestDimensionHeader(table, hints.category || []);
+  const regionHeader = findBestDimensionHeader(table, hints.region || [], {
+    exclude: (header) =>
+      /구분|분류|연도|년도|월/.test(normalizeText(header)) &&
+      normalizeText(header) !== "구",
+  });
+  const channelHeader = findBestDimensionHeader(table, hints.channel || []);
+  const customerHeader = findBestDimensionHeader(table, hints.customer || []);
 
   return {
     metricHeader,
-    quantityHeader,
+    quantityHeader: sameHeader(quantityHeader, metricHeader)
+      ? ""
+      : quantityHeader,
     yearHeader,
     monthHeader,
     periodHeader,
@@ -186,6 +498,64 @@ function resolveSalesColumns(table = {}, config = {}) {
     channelHeader,
     customerHeader,
   };
+}
+
+function countValidSalesTrendRows(table = {}, columns = {}) {
+  const metricHeader = columns.metricHeader;
+  if (!metricHeader || !columns.periodHeader) return 0;
+  let count = 0;
+  for (const row of getRows(table)) {
+    const period = getSalesPeriod(row, columns);
+    const amount = toNumber(getRowValue(row, metricHeader));
+    if (period && amount != null) count += 1;
+  }
+  return count;
+}
+
+function scoreSalesTrendTable(table = {}, config = {}) {
+  if (!table?.tableId) return -Infinity;
+  const columns = resolveSalesColumnsForTable(table, config);
+  if (!columns.metricHeader || !columns.periodHeader) return -Infinity;
+  const validRows = countValidSalesTrendRows(table, columns);
+  if (!validRows) return -Infinity;
+
+  let score = validRows;
+  const tableId = String(table.tableId || "");
+  if (isVirtualSalesTable(table)) score += 500;
+  if (/WIDE_LONG/i.test(tableId)) score += 120;
+  if (/CROSS_LONG/i.test(tableId)) score += 80;
+  if (columns.periodHeader === "기간") score += 80;
+  if (columns.periodHeader === "__YEAR_MONTH__") score += 70;
+  if (columns.yearHeader && columns.monthHeader) score += 35;
+  if (columns.metricHeader === "지표값") score += 20;
+  if (table.isPrimary) score += 5;
+  return score;
+}
+
+function selectSalesTrendTable({
+  normalizedQueryTables = [],
+  table = {},
+  config = {},
+}) {
+  const candidates = [table, ...normalizedQueryTables].filter(Boolean);
+  let best = { table: null, score: -Infinity };
+  for (const candidate of candidates) {
+    const score = scoreSalesTrendTable(candidate, config);
+    if (score > best.score) best = { table: candidate, score };
+  }
+  return best.table || table;
+}
+
+function findFirstColumnHeader(table = {}, hintGroups = []) {
+  for (const hints of hintGroups) {
+    const matched = findColumnHeader(table, hints || []);
+    if (matched) return matched;
+  }
+  return "";
+}
+
+function resolveSalesColumns(table = {}, config = {}) {
+  return resolveSalesColumnsForTable(table, config);
 }
 
 function normalizePeriodValue(value = "") {
@@ -221,6 +591,27 @@ function comparePeriodValues(a, b) {
   const bv = periodSortValue(b);
   if (typeof av === "number" && typeof bv === "number") return av - bv;
   return String(av).localeCompare(String(bv), "ko");
+}
+
+function getSalesPeriod(row = {}, columns = {}) {
+  const { periodHeader, yearHeader, monthHeader } = columns;
+  if (periodHeader === "__YEAR_MONTH__" && yearHeader && monthHeader) {
+    const year =
+      String(getRowValue(row, yearHeader) ?? "").match(/(19|20)\d{2}/)?.[0] ||
+      "";
+    const monthRaw = String(getRowValue(row, monthHeader) ?? "").trim();
+    const month = monthRaw.match(/(0?[1-9]|1[0-2])/)?.[1] || "";
+    if (year && month)
+      return `${year}-${String(Number(month)).padStart(2, "0")}`;
+    if (year) return year;
+  }
+  return normalizePeriodValue(getRowValue(row, periodHeader));
+}
+
+function getSalesPeriodLabel(columns = {}) {
+  return columns.periodHeader === "__YEAR_MONTH__"
+    ? "연월"
+    : columns.periodHeader;
 }
 
 function getDimensionValue(row = {}, header = "") {
@@ -271,6 +662,8 @@ function makeSalesSection({
       meta: {
         salesReportVersion: SALES_REPORT_VERSION,
         sectionType,
+        rateValueScale: "ratio",
+        growthRateScaleVersion: SALES_RATE_SCALE_VERSION,
       },
     },
     result: {
@@ -284,6 +677,8 @@ function makeSalesSection({
       rowCount: rows.length,
       meta: {
         salesReportVersion: SALES_REPORT_VERSION,
+        rateValueScale: "ratio",
+        growthRateScaleVersion: SALES_RATE_SCALE_VERSION,
       },
     },
     chartHint,
@@ -300,7 +695,7 @@ function buildSalesTrendSection({ table, columns }) {
 
   const periodMap = new Map();
   for (const row of getRows(table)) {
-    const period = normalizePeriodValue(getRowValue(row, periodHeader));
+    const period = getSalesPeriod(row, columns);
     const amount = toNumber(getRowValue(row, metricHeader));
     const quantity = quantityHeader
       ? toNumber(getRowValue(row, quantityHeader))
@@ -343,11 +738,11 @@ function buildSalesTrendSection({ table, columns }) {
   return makeSalesSection({
     sectionId: "sales_trend_growth_v2",
     sectionType: "sales_trend_growth",
-    title: `${periodHeader}별 ${metricHeader} 추이 및 증감률`,
+    title: `${getSalesPeriodLabel(columns)}별 ${metricHeader} 추이 및 증감률`,
     table,
     rows,
     columns: {
-      date: periodHeader,
+      date: getSalesPeriodLabel(columns),
       metric: metricHeader,
       quantity: quantityHeader || null,
     },
@@ -485,9 +880,7 @@ function buildSalesAverageTicketSection({ table, columns }) {
 
   const periodMap = new Map();
   for (const row of getRows(table)) {
-    const period = periodHeader
-      ? normalizePeriodValue(getRowValue(row, periodHeader))
-      : "전체";
+    const period = periodHeader ? getSalesPeriod(row, columns) : "전체";
     const amount = toNumber(getRowValue(row, metricHeader));
     const quantity = toNumber(getRowValue(row, quantityHeader));
     if (!period || amount == null || quantity == null || !quantity) continue;
@@ -516,7 +909,7 @@ function buildSalesAverageTicketSection({ table, columns }) {
     table,
     rows,
     columns: {
-      date: periodHeader || null,
+      date: getSalesPeriodLabel(columns) || null,
       metric: metricHeader,
       quantity: quantityHeader,
     },
@@ -531,6 +924,178 @@ function buildSalesAverageTicketSection({ table, columns }) {
       quantity: quantityHeader,
     },
   });
+}
+
+function getSalesRankingDimension(columns = {}) {
+  return (
+    columns.itemHeader ||
+    columns.categoryHeader ||
+    columns.regionHeader ||
+    columns.channelHeader ||
+    columns.customerHeader ||
+    (columns.periodHeader ? "__PERIOD__" : "")
+  );
+}
+
+function buildSalesTopBottomSection({ table, columns }) {
+  const { metricHeader } = columns;
+  if (!metricHeader) return null;
+
+  const rankingDimension = getSalesRankingDimension(columns);
+  if (!rankingDimension) return null;
+
+  let aggregated = [];
+  let dimensionHeader = rankingDimension;
+
+  if (rankingDimension === "__PERIOD__") {
+    dimensionHeader = getSalesPeriodLabel(columns) || "기간";
+    const periodMap = new Map();
+    for (const row of getRows(table)) {
+      const period = getSalesPeriod(row, columns);
+      const amount = toNumber(getRowValue(row, metricHeader));
+      if (!period || amount == null) continue;
+      const current = periodMap.get(period) || {
+        label: period,
+        value: 0,
+        count: 0,
+      };
+      current.value += amount;
+      current.count += 1;
+      periodMap.set(period, current);
+    }
+    aggregated = Array.from(periodMap.values());
+  } else {
+    aggregated = aggregateBy({ table, dimensionHeader, metricHeader });
+  }
+
+  aggregated = aggregated
+    .filter((row) => row && row.value != null && row.value !== 0)
+    .sort((a, b) => b.value - a.value);
+  if (!aggregated.length) return null;
+
+  const top = aggregated.slice(0, 10).map((row, index) => ({
+    구분: "상위",
+    순위: index + 1,
+    [dimensionHeader]: row.label,
+    매출합계: row.value,
+    건수: row.count,
+  }));
+  const bottom = aggregated
+    .slice(-10)
+    .reverse()
+    .map((row, index) => ({
+      구분: "하위",
+      순위: index + 1,
+      [dimensionHeader]: row.label,
+      매출합계: row.value,
+      건수: row.count,
+    }));
+
+  return makeSalesSection({
+    sectionId: "top_bottom_sales_v2",
+    sectionType: "top_bottom_sales",
+    title: `${dimensionHeader} 기준 ${metricHeader} 상위/하위`,
+    table,
+    rows: [...top, ...bottom],
+    columns: {
+      dimension: dimensionHeader,
+      metric: metricHeader,
+    },
+    chartHint: {
+      preferredType: "bar",
+      categoryField: dimensionHeader,
+      valueField: "매출합계",
+    },
+    narrativeHint: {
+      focus: "top_bottom_sales",
+      metric: metricHeader,
+      dimension: dimensionHeader,
+    },
+  });
+}
+
+function getSectionRows(section = {}) {
+  return section?.result?.rows || section?.rows || [];
+}
+
+function hasMeaningfulNumericValue(row = {}) {
+  return Object.entries(row || {}).some(([key, value]) => {
+    if (["구분", "순위", "기간", "건수", "행수"].includes(key)) return false;
+    const number = toNumber(value);
+    return number != null && number !== 0;
+  });
+}
+
+function isEmptyOrNoDataSection(section = {}) {
+  const rows = getSectionRows(section);
+  if (!Array.isArray(rows) || rows.length === 0) return true;
+  const title = String(section.title || section?.result?.title || "");
+  if (/데이터\s*없음|no\s*data/i.test(title)) return true;
+  return !rows.some((row) => hasMeaningfulNumericValue(row));
+}
+
+function isVirtualSalesTable(table = {}) {
+  const id = String(table.tableId || table.sourceTableId || "");
+  return Boolean(
+    table.isVirtual ||
+    /#?(WIDE_LONG|CROSS_LONG)$/i.test(id) ||
+    /WIDE_LONG|CROSS_LONG/i.test(id),
+  );
+}
+
+function shouldKeepSalesLegacySection(section = {}, context = {}) {
+  if (!section) return false;
+  const { v2Sections = [], selectedTable = {} } = context;
+  const sectionId = String(
+    section.sectionId || section?.candidate?.sectionId || "",
+  );
+  const sectionType = String(
+    section.sectionType || section?.candidate?.sectionType || "",
+  );
+  const title = String(section.title || section?.result?.title || "");
+  const hasV2Average = v2Sections.some(
+    (item) => item.sectionId === "average_sales_amount_v2",
+  );
+  const hasV2TopBottom = v2Sections.some(
+    (item) => item.sectionId === "top_bottom_sales_v2",
+  );
+  const hasV2Trend = v2Sections.some(
+    (item) => item.sectionId === "sales_trend_growth_v2",
+  );
+  const isVirtual = isVirtualSalesTable(selectedTable);
+
+  if (isEmptyOrNoDataSection(section)) return false;
+  if (
+    hasV2Average &&
+    /average_sales_amount|평균\s*판매금액/.test(
+      `${sectionId} ${sectionType} ${title}`,
+    )
+  ) {
+    return false;
+  }
+  if (
+    hasV2TopBottom &&
+    /top_bottom_sales|매출\s*상위|상위\s*하위/.test(
+      `${sectionId} ${sectionType} ${title}`,
+    )
+  ) {
+    return false;
+  }
+  if (
+    isVirtual &&
+    hasV2Trend &&
+    /yearly_sales|period_sales|monthly_sales|monthly_quantity/.test(sectionId)
+  ) {
+    return false;
+  }
+  if (
+    isVirtual &&
+    hasV2Trend &&
+    /(연도별|월별|기간별).*매출\s*추이|월별\s*판매수량/.test(title)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function hasSameSection(sections = [], sectionId = "") {
@@ -562,18 +1127,40 @@ function buildSalesV2Sections({
   templateCandidate,
   config,
 }) {
-  const { selectedTable } = selectExecutionTable({
+  const { selectedTable: structuralSelectedTable } = selectExecutionTable({
     normalizedQueryTables,
     table,
     hints: config.hints || SALES_HINTS,
   });
+  const selectedTable = selectSalesExecutionTable({
+    normalizedQueryTables,
+    table: structuralSelectedTable || table,
+    config,
+  });
   const columns = resolveSalesColumns(selectedTable, config);
 
+  const trendTable = selectSalesTrendTable({
+    normalizedQueryTables,
+    table: selectedTable,
+    config,
+  });
+  const trendColumns = resolveSalesColumns(trendTable, config);
+
+  const trendSection = buildSalesTrendSection({
+    table: trendTable,
+    columns: trendColumns,
+  });
+  const averageSection = buildSalesAverageTicketSection({
+    table: trendSection ? trendTable : selectedTable,
+    columns: trendSection ? trendColumns : columns,
+  });
+
   const sections = [
-    buildSalesTrendSection({ table: selectedTable, columns }),
+    trendSection,
     buildSalesCompositionSection({ table: selectedTable, columns }),
     ...buildSalesRegionChannelSections({ table: selectedTable, columns }),
-    buildSalesAverageTicketSection({ table: selectedTable, columns }),
+    buildSalesTopBottomSection({ table: selectedTable, columns }),
+    averageSection,
   ].filter(Boolean);
 
   return uniqueSections(sections).map((section) => ({
@@ -581,6 +1168,10 @@ function buildSalesV2Sections({
     candidate: {
       ...section.candidate,
       templateId: templateCandidate.templateId || "sales_report",
+      meta: {
+        ...(section.candidate?.meta || {}),
+        salesWideTrendRestorationVersion: SALES_WIDE_TREND_RESTORATION_VERSION,
+      },
     },
   }));
 }
@@ -680,32 +1271,46 @@ function executeSalesReport({
 
   const config = buildSalesReportConfig();
 
-  const baseSections = buildPeriodMetricReportSections({
+  const selectedBusinessTable = selectSalesExecutionTable({
     normalizedQueryTables,
     table,
+    config,
+  });
+
+  const baseSections = buildPeriodMetricReportSections({
+    normalizedQueryTables,
+    table: selectedBusinessTable,
     templateCandidate,
     config,
   });
 
   const v2Sections = buildSalesV2Sections({
     normalizedQueryTables,
-    table,
+    table: selectedBusinessTable,
     templateCandidate,
     config,
   });
 
-  const sections = uniqueSections([
-    ...v2Sections,
-    ...baseSections.filter(
-      (section) => !hasSameSection(v2Sections, section.sectionId),
-    ),
-  ]).map((section) => ({
-    ...section,
-    meta: {
-      ...(section.meta || {}),
-      salesReportVersion: SALES_REPORT_VERSION,
-    },
-  }));
+  const filteredBaseSections = baseSections.filter(
+    (section) =>
+      !hasSameSection(v2Sections, section.sectionId) &&
+      shouldKeepSalesLegacySection(section, {
+        v2Sections,
+        selectedTable: selectedBusinessTable,
+      }),
+  );
+
+  const sections = uniqueSections([...v2Sections, ...filteredBaseSections]).map(
+    (section) => ({
+      ...section,
+      meta: {
+        ...(section.meta || {}),
+        salesReportVersion: SALES_REPORT_VERSION,
+        salesLegacyFilterVersion: SALES_LEGACY_FILTER_VERSION,
+        salesWideTrendRestorationVersion: SALES_WIDE_TREND_RESTORATION_VERSION,
+      },
+    }),
+  );
 
   if (!sections.length) {
     return executeTemplateSections({
@@ -722,4 +1327,10 @@ module.exports = {
   executeSalesReport,
   buildSalesReportConfig,
   buildSalesV2Sections,
+  resolveSalesColumns,
+  findSalesAmountHeader,
+  selectSalesExecutionTable,
+  selectSalesTrendTable,
+  buildSalesTopBottomSection,
+  shouldKeepSalesLegacySection,
 };

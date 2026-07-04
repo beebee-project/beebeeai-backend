@@ -16,6 +16,9 @@ const {
 } = require("../structuralBuilders/categorySummaryReportBuilder");
 
 const RESEARCH_BUDGET_REPORT_VERSION = "research_budget_report_v2";
+const RESEARCH_BUDGET_RATE_SCALE_VERSION = "growth_rate_scale_hotfix_v1";
+const RESEARCH_BUDGET_LEGACY_FILTER_VERSION =
+  "research_budget_legacy_section_filter_v1";
 
 const RESEARCH_BUDGET_HINTS = {
   executionAmount: [
@@ -181,6 +184,218 @@ function sameHeader(a = "", b = "") {
   return normalizeText(a) === normalizeText(b);
 }
 
+function getColumnHeader(column = {}) {
+  return (
+    column.header ||
+    column.originalHeader ||
+    column.name ||
+    column.key ||
+    column.accessor ||
+    ""
+  );
+}
+
+function getColumns(table = {}) {
+  return Array.isArray(table.columns) ? table.columns : [];
+}
+
+function getHeaderStats(table = {}, header = "") {
+  const rows = getRows(table);
+  let numericCount = 0;
+  let nonEmptyCount = 0;
+  for (const row of rows) {
+    const value = getRowValue(row, header);
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      nonEmptyCount += 1;
+      if (toNumber(value) != null) numericCount += 1;
+    }
+  }
+  return {
+    rowCount: rows.length,
+    numericCount,
+    nonEmptyCount,
+    numericRatio: nonEmptyCount ? numericCount / nonEmptyCount : 0,
+  };
+}
+
+function scoreHeaderByHints(header = "", hints = []) {
+  const h = normalizeText(header);
+  if (!h) return 0;
+  let score = 0;
+  for (const hint of hints || []) {
+    const normalizedHint = normalizeText(hint);
+    if (!normalizedHint) continue;
+    if (h === normalizedHint) score = Math.max(score, 140);
+    else if (h.includes(normalizedHint)) score = Math.max(score, 85);
+    else if (normalizedHint.includes(h) && h.length >= 2)
+      score = Math.max(score, 30);
+  }
+  return score;
+}
+
+function isYearOrPeriodLikeHeader(header = "") {
+  const h = normalizeText(header);
+  return /예산년도|진행년도|집행년도|기준년도|연도|년도|년월|기간|시작일|종료일|year|date/.test(
+    h,
+  );
+}
+
+function isAmountLikeHeader(header = "") {
+  const h = normalizeText(header);
+  return /금액|금|비|예산액|총액|사업비|집행액|집행금액|출연금|지원금|부담금|amount|budget|grant|expense|spent/.test(
+    h,
+  );
+}
+
+function findBestBudgetHeader(table = {}, hints = [], options = {}) {
+  const {
+    exclude = () => false,
+    requireNumeric = true,
+    bonus = () => 0,
+  } = options;
+  let best = { header: "", score: -Infinity };
+
+  for (const column of getColumns(table)) {
+    const header = getColumnHeader(column);
+    if (!header || exclude(header, column)) continue;
+    const stats = getHeaderStats(table, header);
+    if (requireNumeric && stats.numericCount === 0) continue;
+
+    let score = scoreHeaderByHints(header, hints);
+    if (score <= 0) continue;
+    score += Math.min(30, Math.round(stats.numericRatio * 30));
+    if (column.role === "metric" || column.inferredRole === "metric")
+      score += 12;
+    if (column.type === "number" || column.dominantType === "number")
+      score += 8;
+    if (isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header))
+      score -= 120;
+    score += bonus(header, column, stats) || 0;
+
+    if (score > best.score) best = { header, score };
+  }
+
+  return best.header;
+}
+
+function findExecutionHeader(table = {}, hints = RESEARCH_BUDGET_HINTS) {
+  return findBestBudgetHeader(table, hints.executionAmount || [], {
+    exclude: (header) =>
+      isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header),
+    bonus: (header) => {
+      const h = normalizeText(header);
+      if (/집행금액현금|현금집행금액|집행액현금|현금집행액/.test(h)) return 55;
+      if (
+        /집행금액|집행액|사용금액|지출금액|연구비집행액|연구개발비집행액/.test(
+          h,
+        )
+      )
+        return 45;
+      if (h === "금액" || h === "amount") return -15;
+      return 0;
+    },
+  });
+}
+
+function findCashExecutionHeader(table = {}, hints = RESEARCH_BUDGET_HINTS) {
+  return findBestBudgetHeader(table, hints.cashExecution || [], {
+    exclude: (header) => {
+      const h = normalizeText(header);
+      return (
+        (isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header)) ||
+        h === "현금"
+      );
+    },
+    bonus: (header) => {
+      const h = normalizeText(header);
+      if (/집행금액현금|현금집행금액|집행액현금|현금집행액/.test(h)) return 70;
+      if (/현금/.test(h) && /집행|금액|액/.test(h)) return 45;
+      return 0;
+    },
+  });
+}
+
+function findInKindExecutionHeader(table = {}, hints = RESEARCH_BUDGET_HINTS) {
+  return findBestBudgetHeader(table, hints.inKindExecution || [], {
+    exclude: (header) => {
+      const h = normalizeText(header);
+      return (
+        (isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header)) ||
+        h === "현물"
+      );
+    },
+    bonus: (header) => {
+      const h = normalizeText(header);
+      if (/집행금액현물|현물집행금액|집행액현물|현물집행액/.test(h)) return 70;
+      if (/현물/.test(h) && /집행|금액|액/.test(h)) return 45;
+      return 0;
+    },
+  });
+}
+
+function findBudgetAmountHeader(table = {}, hints = RESEARCH_BUDGET_HINTS) {
+  return findBestBudgetHeader(table, hints.budgetAmount || [], {
+    exclude: (header) =>
+      isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header),
+    bonus: (header) => {
+      const h = normalizeText(header);
+      if (/^총연구비$|총연구비|연구비총액|연구개발비총액|총사업비/.test(h))
+        return 90;
+      if (/당해년도연구비|예산액/.test(h)) return 55;
+      if (/^예산$|^금액$|^amount$/.test(h)) return -35;
+      return 0;
+    },
+  });
+}
+
+function findGovernmentAmountHeader(table = {}, hints = RESEARCH_BUDGET_HINTS) {
+  return findBestBudgetHeader(table, hints.governmentAmount || [], {
+    exclude: (header) =>
+      isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header),
+    bonus: (header) => {
+      const h = normalizeText(header);
+      if (/정부출연금|정부지원금|국고지원금|정부연구비/.test(h)) return 85;
+      if (/^정부$|^출연금$/.test(h)) return -10;
+      return 0;
+    },
+  });
+}
+
+function findPrivateAmountHeader(table = {}, hints = RESEARCH_BUDGET_HINTS) {
+  return findBestBudgetHeader(table, hints.privateAmount || [], {
+    exclude: (header) =>
+      isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header),
+    bonus: (header) =>
+      /민간부담금|민간부담액|기업부담금/.test(normalizeText(header)) ? 70 : 0,
+  });
+}
+
+function getBudgetMode(columns = {}) {
+  if (
+    columns.executionHeader ||
+    columns.cashExecutionHeader ||
+    columns.inKindExecutionHeader
+  ) {
+    return "execution";
+  }
+  if (
+    columns.budgetHeader ||
+    columns.governmentHeader ||
+    columns.privateHeader
+  ) {
+    return "funding";
+  }
+  return "unknown";
+}
+
+function getPrimaryValueField(columns = {}) {
+  if (getBudgetMode(columns) === "execution") return "집행액";
+  if (columns.budgetHeader) return "총연구비";
+  if (columns.governmentHeader) return "정부출연금";
+  if (columns.privateHeader) return "민간부담금";
+  return "금액합계";
+}
+
 function findFirstColumnHeader(table = {}, hintGroups = []) {
   for (const hints of hintGroups) {
     const matched = findColumnHeader(table, hints || []);
@@ -191,34 +406,24 @@ function findFirstColumnHeader(table = {}, hintGroups = []) {
 
 function resolveBudgetColumns(table = {}, config = {}) {
   const hints = config.hints || RESEARCH_BUDGET_HINTS;
-  const cashExecutionHeader = findColumnHeader(
-    table,
-    hints.cashExecution || [],
-  );
-  const inKindExecutionHeader = findColumnHeader(
-    table,
-    hints.inKindExecution || [],
-  );
+  const cashExecutionHeader = findCashExecutionHeader(table, hints);
+  const inKindExecutionHeader = findInKindExecutionHeader(table, hints);
   const executionHeader =
     cashExecutionHeader ||
-    findFirstColumnHeader(table, [
-      hints.executionAmount,
-      ["집행금액", "집행액", "사용금액", "지출금액", "금액"],
-    ]);
-  const budgetHeader = findFirstColumnHeader(table, [
-    hints.budgetAmount,
-    ["총 연구비", "총연구비", "연구비", "예산", "금액"],
-  ]);
-  const governmentHeader = findColumnHeader(
-    table,
-    hints.governmentAmount || [],
-  );
-  const privateHeader = findColumnHeader(table, hints.privateAmount || []);
+    inKindExecutionHeader ||
+    findExecutionHeader(table, hints);
+  const budgetHeader = findBudgetAmountHeader(table, hints);
+  const governmentHeader = findGovernmentAmountHeader(table, hints);
+  const privateHeader = findPrivateAmountHeader(table, hints);
   const metricHeader =
     executionHeader ||
     budgetHeader ||
     governmentHeader ||
-    findColumnHeader(table, hints.metric || []);
+    privateHeader ||
+    findBestBudgetHeader(table, hints.metric || [], {
+      exclude: (header) =>
+        isYearOrPeriodLikeHeader(header) && !isAmountLikeHeader(header),
+    });
 
   const yearHeader = findColumnHeader(table, hints.year || []);
   const periodHeader =
@@ -251,6 +456,22 @@ function resolveBudgetColumns(table = {}, config = {}) {
     agencyHeader,
     organizationHeader,
     researcherHeader,
+    budgetMode: getBudgetMode({
+      executionHeader,
+      cashExecutionHeader,
+      inKindExecutionHeader,
+      budgetHeader,
+      governmentHeader,
+      privateHeader,
+    }),
+    primaryValueField: getPrimaryValueField({
+      executionHeader,
+      cashExecutionHeader,
+      inKindExecutionHeader,
+      budgetHeader,
+      governmentHeader,
+      privateHeader,
+    }),
   };
 }
 
@@ -399,6 +620,8 @@ function makeBudgetSection({
       meta: {
         researchBudgetReportVersion: RESEARCH_BUDGET_REPORT_VERSION,
         sectionType,
+        rateValueScale: "ratio",
+        growthRateScaleVersion: RESEARCH_BUDGET_RATE_SCALE_VERSION,
       },
     },
     result: {
@@ -412,6 +635,8 @@ function makeBudgetSection({
       rowCount: rows.length,
       meta: {
         researchBudgetReportVersion: RESEARCH_BUDGET_REPORT_VERSION,
+        rateValueScale: "ratio",
+        growthRateScaleVersion: RESEARCH_BUDGET_RATE_SCALE_VERSION,
       },
     },
     chartHint,
@@ -468,14 +693,24 @@ function buildBudgetTrendSection({ table, columns }) {
     row.전기대비증감 = previous == null ? null : value - previous;
     row.전기대비증감률 =
       previous == null || previous === 0 ? null : (value - previous) / previous;
-    row.집행률 = row.총연구비 ? row.집행액 / row.총연구비 : null;
+    row.집행률 =
+      columns.executionHeader && row.총연구비
+        ? row.집행액 / row.총연구비
+        : null;
     previous = value;
   });
+
+  const primaryField = getPrimaryValueField(columns);
+  const modeLabel =
+    getBudgetMode(columns) === "funding" ? "연구비/출연금" : "연구비/집행액";
+  const secondaryValueFields = ["총연구비", "정부출연금", "누적금액"];
+  if (columns.executionHeader && columns.budgetHeader)
+    secondaryValueFields.push("집행률");
 
   return makeBudgetSection({
     sectionId: "research_budget_trend_growth_v2",
     sectionType: "research_budget_trend_growth",
-    title: `${periodHeader}별 연구비/집행액 추이 및 증감률`,
+    title: `${periodHeader}별 ${modeLabel} 추이 및 증감률`,
     table,
     rows,
     columns: {
@@ -484,16 +719,19 @@ function buildBudgetTrendSection({ table, columns }) {
       execution: columns.executionHeader,
       budget: columns.budgetHeader,
       government: columns.governmentHeader,
+      budgetMode: getBudgetMode(columns),
+      primaryValueField: primaryField,
     },
     chartHint: {
       preferredType: "line",
       categoryField: "기간",
-      valueField: "집행액",
-      secondaryValueFields: ["총연구비", "정부출연금", "누적금액", "집행률"],
+      valueField: primaryField,
+      secondaryValueFields,
     },
     narrativeHint: {
       focus: "research_budget_trend_growth",
       date: periodHeader,
+      budgetMode: getBudgetMode(columns),
     },
   });
 }
@@ -586,6 +824,8 @@ function buildCompositionSection({
     columns: {
       dimension: dimensionHeader,
       metric: columns.metricHeader,
+      budgetMode: getBudgetMode(columns),
+      primaryValueField: getPrimaryValueField(columns),
     },
     chartHint: {
       preferredType: "bar",
@@ -776,6 +1016,117 @@ function uniqueSections(sections = []) {
     seen.add(key);
     return true;
   });
+}
+
+function getSectionRows(section = {}) {
+  return section?.result?.rows || section?.rows || [];
+}
+
+function hasMeaningfulBudgetNumericValue(row = {}) {
+  return Object.entries(row || {}).some(([key, value]) => {
+    if (["구분", "순위", "기간", "건수", "행수", "과제수"].includes(key))
+      return false;
+    const number = toNumber(value);
+    return number != null && number !== 0;
+  });
+}
+
+function isEmptyOrNoDataSection(section = {}) {
+  const rows = getSectionRows(section);
+  if (!Array.isArray(rows) || rows.length === 0) return true;
+  const title = String(section.title || section?.result?.title || "");
+  if (/데이터\s*없음|no\s*data/i.test(title)) return true;
+  return !rows.some((row) => hasMeaningfulBudgetNumericValue(row));
+}
+
+function getSectionMetric(section = {}) {
+  return (
+    section?.candidate?.columns?.metric ||
+    section?.result?.columns?.metric ||
+    section?.candidate?.metricHeader ||
+    section?.result?.metricHeader ||
+    ""
+  );
+}
+
+function isMeaninglessPeriodMetricSection(section = {}) {
+  const title = String(section.title || section?.result?.title || "");
+  const metric = getSectionMetric(section);
+  const normalizedTitle = normalizeText(title);
+  const normalizedMetric = normalizeText(metric);
+
+  if (metric && isYearOrPeriodLikeHeader(metric) && !isAmountLikeHeader(metric))
+    return true;
+  if (
+    /예산년도별예산년도|진행년도별진행년도|집행년도별집행년도|기준년도별기준년도|연도별연도|년도별년도/.test(
+      normalizedTitle,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /연월별예산년도|기간별예산년도|기간별진행년도|기간별집행년도/.test(
+      normalizedTitle,
+    )
+  ) {
+    return true;
+  }
+  if (
+    normalizedMetric &&
+    normalizedTitle.includes(`${normalizedMetric}별${normalizedMetric}`)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function hasV2Section(v2Sections = [], pattern) {
+  return v2Sections.some((section) =>
+    pattern.test(
+      String(section.sectionId || section.sectionType || section.title || ""),
+    ),
+  );
+}
+
+function shouldKeepResearchLegacySection(section = {}, context = {}) {
+  if (!section) return false;
+  const { columns = {}, v2Sections = [] } = context;
+  const sectionId = String(
+    section.sectionId || section?.candidate?.sectionId || "",
+  );
+  const sectionType = String(
+    section.sectionType || section?.candidate?.sectionType || "",
+  );
+  const title = String(section.title || section?.result?.title || "");
+  const joined = `${sectionId} ${sectionType} ${title}`;
+  const budgetMode = getBudgetMode(columns);
+
+  if (isEmptyOrNoDataSection(section)) return false;
+  if (isMeaninglessPeriodMetricSection(section)) return false;
+
+  // Funding-only datasets do not have execution amounts. Legacy execution sections create
+  // misleading zero/empty sheets, so keep the v2 funding sections and drop execution fallbacks.
+  if (budgetMode === "funding" && /execution|집행/.test(joined)) return false;
+
+  if (
+    hasV2Section(v2Sections, /research_budget_trend_growth/) &&
+    /yearly_.*trend|period_.*trend|연도별|기간별|연월별/.test(joined)
+  ) {
+    return false;
+  }
+  if (
+    hasV2Section(v2Sections, /top_bottom_research_budget/) &&
+    /top_bottom|상위|하위/.test(joined)
+  ) {
+    return false;
+  }
+  if (
+    /예산년도|진행년도|집행년도/.test(getSectionMetric(section)) &&
+    !isAmountLikeHeader(getSectionMetric(section))
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function buildResearchBudgetV2Sections({
@@ -978,6 +1329,15 @@ function executeResearchBudgetReport({
 
   const execution = executionConfig();
   const allocated = allocatedBudgetConfig();
+  const { selectedTable: selectedBudgetTable } = selectExecutionTable({
+    normalizedQueryTables,
+    table,
+    hints: RESEARCH_BUDGET_HINTS,
+  });
+  const selectedBudgetColumns = resolveBudgetColumns(
+    selectedBudgetTable || table,
+    { hints: RESEARCH_BUDGET_HINTS },
+  );
 
   const v2Sections = buildResearchBudgetV2Sections({
     normalizedQueryTables,
@@ -1006,22 +1366,37 @@ function executeResearchBudgetReport({
     templateCandidate,
   });
 
+  const legacyFilterContext = {
+    columns: selectedBudgetColumns,
+    v2Sections,
+  };
+  const filteredExecutionSections = executionSections.filter(
+    (section) =>
+      !hasSameSection(v2Sections, section.sectionId) &&
+      shouldKeepResearchLegacySection(section, legacyFilterContext),
+  );
+  const filteredAllocatedSections = allocatedSections.filter(
+    (section) =>
+      !hasSameSection(v2Sections, section.sectionId) &&
+      shouldKeepResearchLegacySection(section, legacyFilterContext),
+  );
+  const filteredCategoryFallbackSections = categoryFallbackSections.filter(
+    (section) =>
+      !hasSameSection(v2Sections, section.sectionId) &&
+      shouldKeepResearchLegacySection(section, legacyFilterContext),
+  );
+
   const sections = uniqueSections([
     ...v2Sections,
-    ...executionSections.filter(
-      (section) => !hasSameSection(v2Sections, section.sectionId),
-    ),
-    ...allocatedSections.filter(
-      (section) => !hasSameSection(v2Sections, section.sectionId),
-    ),
-    ...categoryFallbackSections.filter(
-      (section) => !hasSameSection(v2Sections, section.sectionId),
-    ),
+    ...filteredExecutionSections,
+    ...filteredAllocatedSections,
+    ...filteredCategoryFallbackSections,
   ]).map((section) => ({
     ...section,
     meta: {
       ...(section.meta || {}),
       researchBudgetReportVersion: RESEARCH_BUDGET_REPORT_VERSION,
+      researchBudgetLegacyFilterVersion: RESEARCH_BUDGET_LEGACY_FILTER_VERSION,
     },
   }));
 
@@ -1041,4 +1416,10 @@ module.exports = {
   executeResearchBudgetReport,
   buildResearchBudgetV2Sections,
   resolveBudgetColumns,
+  findBudgetAmountHeader,
+  findGovernmentAmountHeader,
+  findExecutionHeader,
+  getBudgetMode,
+  getPrimaryValueField,
+  shouldKeepResearchLegacySection,
 };

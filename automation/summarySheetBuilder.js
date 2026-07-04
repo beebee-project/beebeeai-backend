@@ -285,6 +285,28 @@ function setAoaColumnWidths(ws, aoa = []) {
   });
 }
 
+function hasBusinessTemplateRatioScale(result = {}) {
+  const meta = result?.meta || {};
+  const recipeType = String(
+    result?.recipeType || result?.candidate?.recipeType || "",
+  );
+  const explicitScale = String(
+    meta.rateValueScale ||
+      meta.percentageValueScale ||
+      result.rateValueScale ||
+      "",
+  ).toLowerCase();
+
+  if (explicitScale === "ratio" || explicitScale === "fraction") return true;
+  if (meta.salesReportVersion || meta.researchBudgetReportVersion) return true;
+  if (
+    /sales_report_v2_custom|research_budget_report_v2_custom/.test(recipeType)
+  )
+    return true;
+
+  return false;
+}
+
 function inferNumberFormat(header = "", result = {}) {
   const h = String(header || "");
 
@@ -294,9 +316,10 @@ function inferNumberFormat(header = "", result = {}) {
     h.includes("비율") ||
     (result.metric?.type === "rate" && h === "값")
   ) {
+    const alreadyRatio = hasBusinessTemplateRatioScale(result);
     return {
       z: "0.00%",
-      divideBy100: true,
+      divideBy100: !alreadyRatio,
     };
   }
 
