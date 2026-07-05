@@ -1,8 +1,45 @@
 const SOURCE_TABLE_POLICY_VERSION = "source_table_policy_v1";
 const DEFAULT_SOURCE_SHEET_BASE_NAME = "원본데이터";
+const VIRTUAL_TABLE_SUFFIX_RE = /#(?:WIDE_LONG|CROSS_LONG)(?:_[^#]*)?$/i;
+const VIRTUAL_TABLE_TOKEN_RE = /#(?:WIDE_LONG|CROSS_LONG)(?:_|$)/i;
 
 function normalizeText(value = "") {
   return String(value || "").trim();
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = normalizeText(value);
+    if (text) return text;
+  }
+  return "";
+}
+
+function getCanonicalTableId(table = {}) {
+  if (typeof table === "string") return normalizeText(table);
+  return firstNonEmpty(
+    table.tableId,
+    table.id,
+    table.queryTableId,
+    table.normalizedTableId,
+    table.meta?.tableId,
+    table.metadata?.tableId,
+    table.diagnostics?.tableId,
+  );
+}
+
+function getTransformationType(table = {}) {
+  return firstNonEmpty(
+    table.transformation?.type,
+    table.transformationType,
+    table.normalizationType,
+    table.normalizedType,
+    table.virtualTableKind,
+    table.tableKind,
+    table.tableType,
+    table.type,
+    table.sourceScope,
+  );
 }
 
 function sourceSheetNameForTableIndex(
@@ -17,24 +54,40 @@ function sourceSheetNameForTableIndex(
 }
 
 function isVirtualQueryTable(table = {}) {
-  const id = normalizeText(table.tableId);
+  const id = getCanonicalTableId(table);
+  const sourceId = firstNonEmpty(
+    table.sourceTableId,
+    table.transformation?.sourceTableId,
+  );
+  const kind = getTransformationType(table);
   return (
     table.isVirtual === true ||
+    table.virtual === true ||
     Boolean(table.transformation) ||
-    /#(?:WIDE_LONG|CROSS_LONG)$/i.test(id)
+    VIRTUAL_TABLE_TOKEN_RE.test(id) ||
+    VIRTUAL_TABLE_TOKEN_RE.test(sourceId) ||
+    /(?:WIDE_LONG|CROSS_LONG)/i.test(kind)
   );
 }
 
 function stripVirtualTableSuffix(tableId = "") {
-  return normalizeText(tableId).replace(/#(?:WIDE_LONG|CROSS_LONG)$/i, "");
+  return normalizeText(tableId).replace(VIRTUAL_TABLE_SUFFIX_RE, "");
 }
 
 function getSourceTableId(table = {}) {
-  return (
-    table.sourceTableId ||
-    table.transformation?.sourceTableId ||
-    table.transformation?.source?.tableId ||
-    stripVirtualTableSuffix(table.tableId)
+  const tableId = getCanonicalTableId(table);
+  return firstNonEmpty(
+    table.sourceTableId,
+    table.physicalTableId,
+    table.parentTableId,
+    table.originTableId,
+    table.transformation?.sourceTableId,
+    table.transformation?.source?.tableId,
+    table.transformation?.source?.id,
+    table.source?.tableId,
+    table.source?.id,
+    stripVirtualTableSuffix(tableId),
+    tableId,
   );
 }
 
@@ -62,7 +115,7 @@ function tableMatchesId(table = {}, id = "") {
   const target = normalizeText(id);
   if (!target) return false;
   const sourceId = normalizeText(getSourceTableId(table));
-  const tableId = normalizeText(table.tableId);
+  const tableId = normalizeText(getCanonicalTableId(table));
   return (
     tableId === target ||
     sourceId === target ||
@@ -139,8 +192,8 @@ function makeSourceTableEntry({
   return {
     sourceTableIndex: index,
     sourceTableId: getSourceTableId(table),
-    tableId: table?.tableId || "",
-    sheetName: table?.sheetName || "",
+    tableId: getCanonicalTableId(table),
+    sheetName: table?.sheetName || table?.name || table?.sheet || "",
     sourceSheetName,
     sourceScope: "singleTable",
     table,
@@ -153,12 +206,15 @@ function buildSourceTablePolicy({
   preferredTableId = "",
   sourceSheetBaseName = DEFAULT_SOURCE_SHEET_BASE_NAME,
 } = {}) {
-  const physicalTables = Array.isArray(tables) ? tables.filter(Boolean) : [];
+  const inputTables = Array.isArray(tables) ? tables.filter(Boolean) : [];
   const normalizedTables = Array.isArray(normalizedQueryTables)
     ? normalizedQueryTables.filter(Boolean)
     : [];
-  const allTables = physicalTables.length
-    ? physicalTables
+  const physicalTables = inputTables.filter(
+    (table) => !isVirtualQueryTable(table),
+  );
+  const allTables = inputTables.length
+    ? inputTables
     : normalizedTables.length
       ? normalizedTables
       : [];
@@ -296,20 +352,25 @@ function resolveSourceRefForTableId(tableId = "", policy = {}) {
     sourceTableId: sourceId,
     sourceSheetName: policy.sourceSheetByTableId?.[sourceId] || "",
     tableId: id,
-    virtualTableId: /#(?:WIDE_LONG|CROSS_LONG)$/i.test(id) ? id : "",
+    virtualTableId: VIRTUAL_TABLE_TOKEN_RE.test(id) ? id : "",
   };
 }
 
 function resolveSourceRefForTable(table = {}, policy = {}) {
   return resolveSourceRefForTableId(
-    table.tableId || getSourceTableId(table),
+    getCanonicalTableId(table) || getSourceTableId(table),
     policy,
   );
 }
 
 function enrichCandidateWithSourceTablePolicy(candidate = {}, policy = {}) {
   if (!candidate || typeof candidate !== "object") return candidate;
-  const tableId = candidate.tableId || candidate.sourceTableId || "";
+  const tableId =
+    candidate.tableId ||
+    candidate.sourceTableId ||
+    candidate.id ||
+    candidate.queryTableId ||
+    "";
   const sourceRef = resolveSourceRefForTableId(tableId, policy);
 
   return {
@@ -338,9 +399,12 @@ function enrichCandidateListWithSourceTablePolicy(
 module.exports = {
   SOURCE_TABLE_POLICY_VERSION,
   DEFAULT_SOURCE_SHEET_BASE_NAME,
+  VIRTUAL_TABLE_SUFFIX_RE,
+  VIRTUAL_TABLE_TOKEN_RE,
   sourceSheetNameForTableIndex,
   isVirtualQueryTable,
   stripVirtualTableSuffix,
+  getCanonicalTableId,
   getSourceTableId,
   getTableUsage,
   isAnalysisEligibleSourceTable,

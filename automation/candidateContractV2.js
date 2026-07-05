@@ -9,6 +9,7 @@ const CANDIDATE_TYPE = Object.freeze({
   DASHBOARD: "dashboard",
   BUSINESS_TEMPLATE: "businessTemplate",
   AUTOMATION_CATEGORY: "automationCategory",
+  MULTI_SOURCE: "multiSource",
 });
 
 function asArray(value) {
@@ -79,6 +80,12 @@ function inferCandidateType(candidate = {}, fallback = "") {
   }
   if (candidate.categoryId && Array.isArray(candidate.candidates)) {
     return CANDIDATE_TYPE.AUTOMATION_CATEGORY;
+  }
+  if (
+    candidate.multiSourceCandidateVersion ||
+    candidate.type === "multiSource"
+  ) {
+    return CANDIDATE_TYPE.MULTI_SOURCE;
   }
   if (candidate.recipeType || candidate.tableId) {
     return CANDIDATE_TYPE.ANALYSIS_RECIPE;
@@ -272,6 +279,38 @@ function buildDashboardCandidateFromCategory(category = {}, index = 0) {
   );
 }
 
+function normalizeMultiSourceCandidate(candidate = {}, index = 0) {
+  const nested = asArray(candidate.candidates).map((item, itemIndex) =>
+    normalizeAnalysisRecipeCandidate(item, itemIndex),
+  );
+
+  return normalizeCandidateContractV2(
+    {
+      ...candidate,
+      candidates: nested,
+      candidateType: CANDIDATE_TYPE.MULTI_SOURCE,
+      type: "multiSource",
+      reasonCodes: unique([
+        "MULTI_SOURCE_CANDIDATE",
+        ...(candidate.reasonCodes || []),
+      ]),
+      outputTypes: candidate.outputTypes || [
+        "summarySheet",
+        "analysisReport",
+        "ppt",
+      ],
+    },
+    {
+      candidateType: CANDIDATE_TYPE.MULTI_SOURCE,
+      outputTypes: ["summarySheet", "analysisReport", "ppt"],
+      priority: Number.isFinite(Number(candidate.priority))
+        ? Number(candidate.priority)
+        : 700 - index,
+      confidence: candidate.confidence ?? 0.7,
+    },
+  );
+}
+
 function normalizeCategoryCandidate(category = {}, index = 0) {
   const nested = asArray(category.candidates).map((item, itemIndex) =>
     normalizeAnalysisRecipeCandidate(item, itemIndex),
@@ -322,6 +361,9 @@ function normalizeCandidateBundleContractV2(bundle = {}, options = {}) {
   const businessTemplateCandidates = asArray(
     bundle.businessTemplateCandidates,
   ).map(normalizeBusinessTemplateCandidate);
+  const multiSourceCandidates = asArray(bundle.multiSourceCandidates).map(
+    normalizeMultiSourceCandidate,
+  );
 
   return {
     ...bundle,
@@ -329,6 +371,7 @@ function normalizeCandidateBundleContractV2(bundle = {}, options = {}) {
     categoryCandidates,
     dashboardCandidates,
     businessTemplateCandidates,
+    multiSourceCandidates,
     candidateContract: {
       version: CANDIDATE_CONTRACT_VERSION,
       generatedAt: new Date().toISOString(),
@@ -337,6 +380,7 @@ function normalizeCandidateBundleContractV2(bundle = {}, options = {}) {
         categoryCandidates: categoryCandidates.length,
         dashboardCandidates: dashboardCandidates.length,
         businessTemplateCandidates: businessTemplateCandidates.length,
+        multiSourceCandidates: multiSourceCandidates.length,
       },
       fields: [
         "candidateId",
@@ -351,6 +395,9 @@ function normalizeCandidateBundleContractV2(bundle = {}, options = {}) {
         "priority",
         "reasonCodes",
         "outputTypes",
+        "multiSourceCandidateVersion",
+        "virtualTableId",
+        "sharedColumns",
       ],
       source:
         options.source ||
@@ -376,6 +423,7 @@ module.exports = {
   normalizeAnalysisRecipeCandidate,
   normalizeBusinessTemplateCandidate,
   normalizeCategoryCandidate,
+  normalizeMultiSourceCandidate,
   buildDashboardCandidateFromCategory,
   normalizeCandidateBundleContractV2,
 };

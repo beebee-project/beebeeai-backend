@@ -121,6 +121,29 @@ function validateCandidateBundle(bundle = {}, normalizedQueryTables = []) {
     .filter(Boolean)
     .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence);
 
+  const multiSourceCandidates = (
+    Array.isArray(bundle.multiSourceCandidates)
+      ? bundle.multiSourceCandidates
+      : []
+  )
+    .filter(
+      (candidate) =>
+        candidate &&
+        Array.isArray(candidate.sourceTableIds) &&
+        candidate.sourceTableIds.length >= 2,
+    )
+    .map((candidate) => ({
+      ...candidate,
+      candidateType: "multiSource",
+      type: "multiSource",
+      title: cleanText(candidate.title || "다중 원본 후보", 120),
+      description: cleanText(candidate.description || "", 500),
+      confidence: clampNumber(candidate.confidence, 0.7, 0, 1),
+      priority: Number.isFinite(Number(candidate.priority))
+        ? Number(candidate.priority)
+        : 700,
+    }));
+
   const analysisObjectSet = new Set(analysisRecipeCandidates);
   const categoryCandidates = (
     Array.isArray(bundle.categoryCandidates) ? bundle.categoryCandidates : []
@@ -142,6 +165,10 @@ function validateCandidateBundle(bundle = {}, normalizedQueryTables = []) {
         originalAnalysis.length - analysisRecipeCandidates.length,
       businessTemplateCandidates:
         originalBusiness.length - businessTemplateCandidates.length,
+      multiSourceCandidates:
+        (Array.isArray(bundle.multiSourceCandidates)
+          ? bundle.multiSourceCandidates.length
+          : 0) - multiSourceCandidates.length,
     },
     allowedOutputTypes: [...ALLOWED_OUTPUT_TYPES],
   };
@@ -152,6 +179,7 @@ function validateCandidateBundle(bundle = {}, normalizedQueryTables = []) {
       analysisRecipeCandidates,
       categoryCandidates,
       businessTemplateCandidates,
+      multiSourceCandidates,
       candidateGeneration: {
         ...(bundle.candidateGeneration || {}),
         validation,

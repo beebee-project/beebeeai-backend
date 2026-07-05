@@ -66,10 +66,6 @@ const {
 const {
   validateCandidateBundle,
 } = require("../automation/candidateGeneration/candidateValidator");
-const {
-  normalizeCandidateBundleContractV2,
-} = require("../automation/candidateContractV2");
-const { scoreCandidateBundle } = require("../automation/candidateScorer");
 
 function resolveGenerateCandidateBundle() {
   const direct = candidateGenerationModule;
@@ -102,30 +98,119 @@ function resolveGenerateCandidateBundle() {
       normalizedQueryTables,
     );
 
-    return normalizeCandidateBundleContractV2(
-      {
-        ...validated,
-        candidateGeneration: {
-          ...(validated.candidateGeneration || {}),
-          version:
-            validated.candidateGeneration?.version || "candidate_generation_v2",
-          source,
-          fallbackUsed: true,
-          fileName,
-          aiReranker: {
-            enabled: false,
-            used: false,
-            skippedReason: "INVALID_CANDIDATE_GENERATION_EXPORT",
-          },
-          generatedAt: new Date().toISOString(),
+    return {
+      ...validated,
+      candidateGeneration: {
+        ...(validated.candidateGeneration || {}),
+        version:
+          validated.candidateGeneration?.version || "candidate_generation_v1",
+        source,
+        fallbackUsed: true,
+        fileName,
+        aiReranker: {
+          enabled: false,
+          used: false,
+          skippedReason: "INVALID_CANDIDATE_GENERATION_EXPORT",
         },
+        generatedAt: new Date().toISOString(),
       },
-      { source, fileName },
-    );
+    };
   };
 }
 
 const generateCandidateBundle = resolveGenerateCandidateBundle();
+
+const CANDIDATE_BUNDLE_PROPAGATION_VERSION = "candidate_bundle_propagation_v1";
+
+function candidateSortValue(candidate = {}) {
+  const rank = Number(candidate.rank);
+  if (Number.isFinite(rank) && rank > 0) return { hasRank: true, rank };
+  return { hasRank: false, rank: Number.MAX_SAFE_INTEGER };
+}
+
+function candidateScoreValue(candidate = {}) {
+  const rankScore = Number(candidate.rankScore);
+  if (Number.isFinite(rankScore)) return rankScore;
+  const scoreTotal = Number(candidate.score?.total);
+  return Number.isFinite(scoreTotal) ? scoreTotal : -Infinity;
+}
+
+function sortCandidateArray(candidates = []) {
+  return (Array.isArray(candidates) ? candidates : [])
+    .filter(Boolean)
+    .slice()
+    .sort((a, b) => {
+      const leftRank = candidateSortValue(a);
+      const rightRank = candidateSortValue(b);
+
+      if (leftRank.hasRank || rightRank.hasRank) {
+        if (leftRank.rank !== rightRank.rank)
+          return leftRank.rank - rightRank.rank;
+      }
+
+      const scoreDiff = candidateScoreValue(b) - candidateScoreValue(a);
+      if (Math.abs(scoreDiff) > 0.00001) return scoreDiff;
+
+      const priorityDiff = Number(b.priority || 0) - Number(a.priority || 0);
+      if (priorityDiff) return priorityDiff;
+
+      return String(a.candidateId || a.id || a.templateId || "").localeCompare(
+        String(b.candidateId || b.id || b.templateId || ""),
+      );
+    });
+}
+
+function candidateBundleFields(bundle = {}) {
+  const safe = bundle && typeof bundle === "object" ? bundle : {};
+  return {
+    analysisRecipeCandidates: sortCandidateArray(safe.analysisRecipeCandidates),
+    categoryCandidates: sortCandidateArray(safe.categoryCandidates),
+    dashboardCandidates: sortCandidateArray(safe.dashboardCandidates),
+    businessTemplateCandidates: sortCandidateArray(
+      safe.businessTemplateCandidates,
+    ),
+    multiSourceCandidates: sortCandidateArray(safe.multiSourceCandidates),
+    topCandidates: sortCandidateArray(safe.topCandidates),
+    secondaryCandidates: sortCandidateArray(safe.secondaryCandidates),
+    candidateContract: safe.candidateContract || null,
+    candidateScoring: safe.candidateScoring || null,
+    candidateGeneration: safe.candidateGeneration || null,
+  };
+}
+
+function candidateBundleHasPropagatedFields(bundle = {}) {
+  return (
+    Array.isArray(bundle.multiSourceCandidates) &&
+    Array.isArray(bundle.topCandidates) &&
+    Array.isArray(bundle.secondaryCandidates)
+  );
+}
+
+function shouldRegenerateCandidateBundle(bundle = {}) {
+  if (!bundle || typeof bundle !== "object") return true;
+  if (!bundle.candidateGeneration) return true;
+  if (!Array.isArray(bundle.analysisRecipeCandidates)) return true;
+  if (!Array.isArray(bundle.businessTemplateCandidates)) return true;
+  if (!candidateBundleHasPropagatedFields(bundle)) return true;
+  return false;
+}
+
+function candidateBundlePropagationMeta(bundle = {}) {
+  const fields = candidateBundleFields(bundle);
+  return {
+    version: CANDIDATE_BUNDLE_PROPAGATION_VERSION,
+    applied: true,
+    counts: {
+      analysisRecipeCandidates: fields.analysisRecipeCandidates.length,
+      categoryCandidates: fields.categoryCandidates.length,
+      dashboardCandidates: fields.dashboardCandidates.length,
+      businessTemplateCandidates: fields.businessTemplateCandidates.length,
+      multiSourceCandidates: fields.multiSourceCandidates.length,
+      topCandidates: fields.topCandidates.length,
+      secondaryCandidates: fields.secondaryCandidates.length,
+    },
+  };
+}
 const {
   isBusinessTemplateResult,
   normalizeBusinessTemplateResult,
@@ -492,22 +577,11 @@ async function buildQueryTablesForFile(req, fileName) {
       candidateGeneration = candidateBundle.candidateGeneration || null;
     }
 
-    let candidateBundle = {
-      analysisRecipeCandidates:
-        savedQueryJson.payload.analysisRecipeCandidates || [],
-      categoryCandidates: savedQueryJson.payload.categoryCandidates || [],
-      businessTemplateCandidates:
-        savedQueryJson.payload.businessTemplateCandidates || [],
-      candidateGeneration: savedQueryJson.payload.candidateGeneration || null,
-    };
+    let candidateBundle = candidateBundleFields(savedQueryJson.payload);
 
     // 구버전 query-json에는 candidateGeneration 메타 또는 business 후보가 없을 수 있다.
-    // 이 경우에도 AI 실패와 무관하게 deterministic 후보를 다시 만든다.
-    if (
-      !candidateBundle.candidateGeneration ||
-      !candidateBundle.analysisRecipeCandidates.length ||
-      !candidateBundle.businessTemplateCandidates.length
-    ) {
+    // Patch 22+ 후보 필드가 top-level로 전파되지 않은 경우도 다시 만든다.
+    if (shouldRegenerateCandidateBundle(candidateBundle)) {
       candidateBundle = await generateCandidateBundle({
         normalizedQueryTables,
         fileName,
@@ -515,28 +589,14 @@ async function buildQueryTablesForFile(req, fileName) {
       });
     }
 
-    candidateBundle = scoreCandidateBundle(
-      normalizeCandidateBundleContractV2(candidateBundle, {
-        source: "encrypted-query-json",
-        fileName,
-      }),
-    );
-
     return {
       fileHash: savedQueryJson.payload.fileHash,
       sheetStateSig: savedQueryJson.payload.sheetStateSig,
       tables: savedQueryJson.payload.tables || [],
       normalizedQueryTables,
-      analysisRecipeCandidates: candidateBundle.analysisRecipeCandidates || [],
-      categoryCandidates: candidateBundle.categoryCandidates || [],
-      dashboardCandidates: candidateBundle.dashboardCandidates || [],
-      businessTemplateCandidates:
-        candidateBundle.businessTemplateCandidates || [],
-      candidateGeneration: candidateBundle.candidateGeneration || null,
-      candidateContract: candidateBundle.candidateContract || null,
-      candidateScoring: candidateBundle.candidateScoring || null,
-      topCandidates: candidateBundle.topCandidates || [],
-      secondaryCandidates: candidateBundle.secondaryCandidates || [],
+      ...candidateBundleFields(candidateBundle),
+      candidateBundlePropagation:
+        candidateBundlePropagationMeta(candidateBundle),
       source: "encrypted-query-json",
     };
   }
@@ -616,29 +676,18 @@ async function buildQueryTablesForFile(req, fileName) {
   });
 
   const normalizedQueryTables = buildNormalizedQueryTables(tables);
-  const rawCandidateBundle = await generateCandidateBundle({
+  const candidateBundle = await generateCandidateBundle({
     normalizedQueryTables,
     fileName,
     source: "rebuilt-from-xlsx",
   });
-  const candidateBundle = scoreCandidateBundle(
-    normalizeCandidateBundleContractV2(rawCandidateBundle, {
-      source: "rebuilt-from-xlsx",
-      fileName,
-    }),
-  );
 
+  const propagatedCandidateBundle = candidateBundleFields(candidateBundle);
   const analysisRecipeCandidates =
-    candidateBundle.analysisRecipeCandidates || [];
-  const categoryCandidates = candidateBundle.categoryCandidates || [];
-  const dashboardCandidates = candidateBundle.dashboardCandidates || [];
+    propagatedCandidateBundle.analysisRecipeCandidates || [];
+  const categoryCandidates = propagatedCandidateBundle.categoryCandidates || [];
   const businessTemplateCandidates =
-    candidateBundle.businessTemplateCandidates || [];
-  const candidateGeneration = candidateBundle.candidateGeneration || null;
-  const candidateContract = candidateBundle.candidateContract || null;
-  const candidateScoring = candidateBundle.candidateScoring || null;
-  const topCandidates = candidateBundle.topCandidates || [];
-  const secondaryCandidates = candidateBundle.secondaryCandidates || [];
+    propagatedCandidateBundle.businessTemplateCandidates || [];
 
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
     await saveQueryJsonForFile({
@@ -654,15 +703,10 @@ async function buildQueryTablesForFile(req, fileName) {
         createdAt: new Date().toISOString(),
         tables,
         normalizedQueryTables,
-        analysisRecipeCandidates,
-        categoryCandidates,
-        dashboardCandidates,
-        businessTemplateCandidates,
-        candidateGeneration,
-        candidateContract,
-        candidateScoring,
-        topCandidates,
-        secondaryCandidates,
+        ...propagatedCandidateBundle,
+        candidateBundlePropagation: candidateBundlePropagationMeta(
+          propagatedCandidateBundle,
+        ),
       },
     });
   }
@@ -672,15 +716,10 @@ async function buildQueryTablesForFile(req, fileName) {
     sheetStateSig,
     tables,
     normalizedQueryTables,
-    analysisRecipeCandidates,
-    categoryCandidates,
-    dashboardCandidates,
-    businessTemplateCandidates,
-    candidateGeneration,
-    candidateContract,
-    candidateScoring,
-    topCandidates,
-    secondaryCandidates,
+    ...propagatedCandidateBundle,
+    candidateBundlePropagation: candidateBundlePropagationMeta(
+      propagatedCandidateBundle,
+    ),
     source: "rebuilt-from-xlsx",
   };
 }
@@ -697,9 +736,7 @@ function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
       `candidate_${index + 1}`;
 
     return {
-      candidateId: candidate.candidateId || id,
-      candidateType: candidate.candidateType || "analysisRecipe",
-      candidateContractVersion: candidate.candidateContractVersion || "",
+      candidateId: id,
       title:
         candidate.title ||
         candidate.name ||
@@ -718,15 +755,6 @@ function normalizeAnalysisCandidates(analysisRecipeCandidates = []) {
       priority: Number.isFinite(candidate.priority)
         ? candidate.priority
         : index + 1,
-      confidence: candidate.confidence,
-      sourceScope: candidate.sourceScope || "",
-      sourceTableId: candidate.sourceTableId || "",
-      sourceSheetName: candidate.sourceSheetName || "",
-      sourceTableIds: candidate.sourceTableIds || [],
-      sourceSheetNames: candidate.sourceSheetNames || [],
-      recipeIds: candidate.recipeIds || [],
-      outputTypes: candidate.outputTypes || [],
-      reasonCodes: candidate.reasonCodes || [],
       candidate,
     };
   });
@@ -1004,9 +1032,7 @@ exports.createSummarySheet = async (req, res, next) => {
           message,
           intent: queryIntent,
           result,
-          candidate,
-          templateCandidate,
-          tables: saved.tables || normalizedQueryTables,
+          tables: normalizedQueryTables,
         })
       : buildSummaryWorkbook({
           fileName: saved.fileName,
@@ -1026,8 +1052,6 @@ exports.createSummarySheet = async (req, res, next) => {
       mode: summarySheetMode,
       formulaCount: 0,
     };
-    const sourceTablePolicy = workbook["!beebeeSourceTablePolicy"] || null;
-    const automationSheet = workbook["!beebeeAutomationSheetV2"] || null;
     const workbookRecalculation =
       workbook["!beebeeWorkbookRecalculation"] || null;
 
@@ -1075,8 +1099,6 @@ exports.createSummarySheet = async (req, res, next) => {
       summarySheetMode,
       includeSourceDataSheet,
       formulaEngine: formulaEngineMeta,
-      sourceTablePolicy,
-      automationSheet,
       workbookRecalculation,
       chartSpec,
       intent: queryIntent,
@@ -1327,7 +1349,6 @@ exports.exportXlsx = async (req, res) => {
       filePath,
       outputType,
       outputLabel: outputTypeLabel(outputType),
-      workbookRecalculation,
       sheetNames: workbook.SheetNames || [],
       formulaEngine: workbook["!beebeeFormulaEngine"] || {
         prepared: true,
@@ -1335,6 +1356,7 @@ exports.exportXlsx = async (req, res) => {
         mode: req.body?.summarySheetMode || "hybrid",
         formulaCount: 0,
       },
+      workbookRecalculation,
       result,
     });
   } catch (err) {
@@ -1622,9 +1644,8 @@ exports.getAnalysisCandidates = async (req, res, next) => {
           analysisRecipeCandidates: rebuilt.analysisRecipeCandidates,
           categoryCandidates: rebuilt.categoryCandidates,
           businessTemplateCandidates: rebuilt.businessTemplateCandidates,
-          candidateScoring: rebuilt.candidateScoring || null,
-          topCandidates: rebuilt.topCandidates || [],
-          secondaryCandidates: rebuilt.secondaryCandidates || [],
+          ...candidateBundleFields(rebuilt),
+          candidateBundlePropagation: candidateBundlePropagationMeta(rebuilt),
         };
 
         await saveJsonObject(key, saved);
@@ -1634,35 +1655,38 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       const normalizedQueryTables =
         built.normalizedQueryTables || buildNormalizedQueryTables(built.tables);
 
-      const rawCandidateBundle = built.candidateGeneration
+      const candidateBundle = built.candidateGeneration
         ? built
         : await generateCandidateBundle({
             normalizedQueryTables,
             fileName,
             source: "analysis-candidates-file",
           });
-      const candidateBundle = scoreCandidateBundle(
-        normalizeCandidateBundleContractV2(rawCandidateBundle, {
-          source: "analysis-candidates-file",
-          fileName,
-        }),
-      );
 
+      const propagatedCandidateBundle = candidateBundleFields(candidateBundle);
       const analysisRecipeCandidates =
-        candidateBundle.analysisRecipeCandidates || [];
+        propagatedCandidateBundle.analysisRecipeCandidates || [];
 
       const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
 
-      const categoryCandidates = candidateBundle.categoryCandidates || [];
-      const dashboardCandidates = candidateBundle.dashboardCandidates || [];
+      const categoryCandidates =
+        propagatedCandidateBundle.categoryCandidates || [];
+      const dashboardCandidates =
+        propagatedCandidateBundle.dashboardCandidates || [];
 
       const businessTemplateCandidates =
-        candidateBundle.businessTemplateCandidates || [];
-      const candidateGeneration = candidateBundle.candidateGeneration || null;
-      const candidateContract = candidateBundle.candidateContract || null;
-      const candidateScoring = candidateBundle.candidateScoring || null;
-      const topCandidates = candidateBundle.topCandidates || [];
-      const secondaryCandidates = candidateBundle.secondaryCandidates || [];
+        propagatedCandidateBundle.businessTemplateCandidates || [];
+      const multiSourceCandidates =
+        propagatedCandidateBundle.multiSourceCandidates || [];
+      const topCandidates = propagatedCandidateBundle.topCandidates || [];
+      const secondaryCandidates =
+        propagatedCandidateBundle.secondaryCandidates || [];
+      const candidateContract =
+        propagatedCandidateBundle.candidateContract || null;
+      const candidateScoring =
+        propagatedCandidateBundle.candidateScoring || null;
+      const candidateGeneration =
+        propagatedCandidateBundle.candidateGeneration || null;
 
       console.log("[analysis-candidates]", {
         source: "file",
@@ -1684,11 +1708,15 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         categoryCandidates,
         dashboardCandidates,
         businessTemplateCandidates,
-        candidateGeneration,
-        candidateContract,
-        candidateScoring,
+        multiSourceCandidates,
         topCandidates,
         secondaryCandidates,
+        candidateContract,
+        candidateScoring,
+        candidateGeneration,
+        candidateBundlePropagation: candidateBundlePropagationMeta(
+          propagatedCandidateBundle,
+        ),
       });
     }
 
@@ -1704,41 +1732,44 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       saved.normalizedQueryTables ||
       buildNormalizedQueryTables(saved.tables || []);
 
-    const rawCandidateBundle = saved.candidateGeneration
-      ? {
-          analysisRecipeCandidates: saved.analysisRecipeCandidates || [],
-          categoryCandidates: saved.categoryCandidates || [],
-          dashboardCandidates: saved.dashboardCandidates || [],
-          businessTemplateCandidates: saved.businessTemplateCandidates || [],
-          candidateGeneration: saved.candidateGeneration,
-          candidateContract: saved.candidateContract || null,
-        }
+    let candidateBundle = saved.candidateGeneration
+      ? candidateBundleFields(saved)
       : await generateCandidateBundle({
           normalizedQueryTables,
           fileName: saved.fileName,
           source: "analysis-candidates-query-tables",
         });
-    const candidateBundle = scoreCandidateBundle(
-      normalizeCandidateBundleContractV2(rawCandidateBundle, {
-        source: "analysis-candidates-query-tables",
-        fileName: saved.fileName,
-      }),
-    );
 
+    if (shouldRegenerateCandidateBundle(candidateBundle)) {
+      candidateBundle = await generateCandidateBundle({
+        normalizedQueryTables,
+        fileName: saved.fileName,
+        source: "analysis-candidates-query-tables-regenerated",
+      });
+    }
+
+    const propagatedCandidateBundle = candidateBundleFields(candidateBundle);
     const analysisRecipeCandidates =
-      candidateBundle.analysisRecipeCandidates || [];
+      propagatedCandidateBundle.analysisRecipeCandidates || [];
 
     const candidates = normalizeAnalysisCandidates(analysisRecipeCandidates);
-    const categoryCandidates = candidateBundle.categoryCandidates || [];
-    const dashboardCandidates = candidateBundle.dashboardCandidates || [];
+    const categoryCandidates =
+      propagatedCandidateBundle.categoryCandidates || [];
+    const dashboardCandidates =
+      propagatedCandidateBundle.dashboardCandidates || [];
 
     const businessTemplateCandidates =
-      candidateBundle.businessTemplateCandidates || [];
-    const candidateGeneration = candidateBundle.candidateGeneration || null;
-    const candidateContract = candidateBundle.candidateContract || null;
-    const candidateScoring = candidateBundle.candidateScoring || null;
-    const topCandidates = candidateBundle.topCandidates || [];
-    const secondaryCandidates = candidateBundle.secondaryCandidates || [];
+      propagatedCandidateBundle.businessTemplateCandidates || [];
+    const multiSourceCandidates =
+      propagatedCandidateBundle.multiSourceCandidates || [];
+    const topCandidates = propagatedCandidateBundle.topCandidates || [];
+    const secondaryCandidates =
+      propagatedCandidateBundle.secondaryCandidates || [];
+    const candidateContract =
+      propagatedCandidateBundle.candidateContract || null;
+    const candidateScoring = propagatedCandidateBundle.candidateScoring || null;
+    const candidateGeneration =
+      propagatedCandidateBundle.candidateGeneration || null;
 
     console.log("[analysis-candidates]", {
       source: "query-tables",
@@ -1761,11 +1792,15 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       categoryCandidates,
       dashboardCandidates,
       businessTemplateCandidates,
-      candidateGeneration,
-      candidateContract,
-      candidateScoring,
+      multiSourceCandidates,
       topCandidates,
       secondaryCandidates,
+      candidateContract,
+      candidateScoring,
+      candidateGeneration,
+      candidateBundlePropagation: candidateBundlePropagationMeta(
+        propagatedCandidateBundle,
+      ),
     });
   } catch (e) {
     console.error("[automation.getAnalysisCandidates]", e);
@@ -1855,26 +1890,33 @@ exports.previewQueryTables = async (req, res, next) => {
     const normalizedQueryTables =
       built.normalizedQueryTables || buildNormalizedQueryTables(tables);
 
-    const rawCandidateBundle = built.candidateGeneration
+    const candidateBundle = built.candidateGeneration
       ? built
       : await generateCandidateBundle({
           normalizedQueryTables,
           fileName,
           source: "preview-query-tables",
         });
-    const candidateBundle = normalizeCandidateBundleContractV2(
-      rawCandidateBundle,
-      { source: "preview-query-tables", fileName },
-    );
 
+    const propagatedCandidateBundle = candidateBundleFields(candidateBundle);
     const analysisRecipeCandidates =
-      candidateBundle.analysisRecipeCandidates || [];
-    const categoryCandidates = candidateBundle.categoryCandidates || [];
-    const dashboardCandidates = candidateBundle.dashboardCandidates || [];
+      propagatedCandidateBundle.analysisRecipeCandidates || [];
+    const categoryCandidates =
+      propagatedCandidateBundle.categoryCandidates || [];
+    const dashboardCandidates =
+      propagatedCandidateBundle.dashboardCandidates || [];
     const businessTemplateCandidates =
-      candidateBundle.businessTemplateCandidates || [];
-    const candidateGeneration = candidateBundle.candidateGeneration || null;
-    const candidateContract = candidateBundle.candidateContract || null;
+      propagatedCandidateBundle.businessTemplateCandidates || [];
+    const multiSourceCandidates =
+      propagatedCandidateBundle.multiSourceCandidates || [];
+    const topCandidates = propagatedCandidateBundle.topCandidates || [];
+    const secondaryCandidates =
+      propagatedCandidateBundle.secondaryCandidates || [];
+    const candidateContract =
+      propagatedCandidateBundle.candidateContract || null;
+    const candidateScoring = propagatedCandidateBundle.candidateScoring || null;
+    const candidateGeneration =
+      propagatedCandidateBundle.candidateGeneration || null;
 
     return res.json({
       ok: true,
@@ -1887,8 +1929,15 @@ exports.previewQueryTables = async (req, res, next) => {
       categoryCandidates,
       dashboardCandidates,
       businessTemplateCandidates,
-      candidateGeneration,
+      multiSourceCandidates,
+      topCandidates,
+      secondaryCandidates,
       candidateContract,
+      candidateScoring,
+      candidateGeneration,
+      candidateBundlePropagation: candidateBundlePropagationMeta(
+        propagatedCandidateBundle,
+      ),
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
@@ -1924,33 +1973,35 @@ exports.saveQueryTables = async (req, res, next) => {
     const normalizedQueryTables =
       built.normalizedQueryTables || buildNormalizedQueryTables(tables);
 
-    const rawCandidateBundle = built.candidateGeneration
+    const candidateBundle = built.candidateGeneration
       ? built
       : await generateCandidateBundle({
           normalizedQueryTables,
           fileName,
           source: "save-query-tables",
         });
-    const candidateBundle = scoreCandidateBundle(
-      normalizeCandidateBundleContractV2(rawCandidateBundle, {
-        source: "save-query-tables",
-        fileName,
-      }),
-    );
 
+    const propagatedCandidateBundle = candidateBundleFields(candidateBundle);
     const analysisRecipeCandidates =
-      candidateBundle.analysisRecipeCandidates || [];
+      propagatedCandidateBundle.analysisRecipeCandidates || [];
 
-    const categoryCandidates = candidateBundle.categoryCandidates || [];
-    const dashboardCandidates = candidateBundle.dashboardCandidates || [];
+    const categoryCandidates =
+      propagatedCandidateBundle.categoryCandidates || [];
+    const dashboardCandidates =
+      propagatedCandidateBundle.dashboardCandidates || [];
 
     const businessTemplateCandidates =
-      candidateBundle.businessTemplateCandidates || [];
-    const candidateGeneration = candidateBundle.candidateGeneration || null;
-    const candidateContract = candidateBundle.candidateContract || null;
-    const candidateScoring = candidateBundle.candidateScoring || null;
-    const topCandidates = candidateBundle.topCandidates || [];
-    const secondaryCandidates = candidateBundle.secondaryCandidates || [];
+      propagatedCandidateBundle.businessTemplateCandidates || [];
+    const multiSourceCandidates =
+      propagatedCandidateBundle.multiSourceCandidates || [];
+    const topCandidates = propagatedCandidateBundle.topCandidates || [];
+    const secondaryCandidates =
+      propagatedCandidateBundle.secondaryCandidates || [];
+    const candidateContract =
+      propagatedCandidateBundle.candidateContract || null;
+    const candidateScoring = propagatedCandidateBundle.candidateScoring || null;
+    const candidateGeneration =
+      propagatedCandidateBundle.candidateGeneration || null;
 
     const now = new Date();
     const userId = req.user?.id || "local-dev";
@@ -1971,11 +2022,15 @@ exports.saveQueryTables = async (req, res, next) => {
       categoryCandidates,
       dashboardCandidates,
       businessTemplateCandidates,
-      candidateGeneration,
-      candidateContract,
-      candidateScoring,
+      multiSourceCandidates,
       topCandidates,
       secondaryCandidates,
+      candidateContract,
+      candidateScoring,
+      candidateGeneration,
+      candidateBundlePropagation: candidateBundlePropagationMeta(
+        propagatedCandidateBundle,
+      ),
     };
 
     const saved = await saveJsonObject(key, payload);
@@ -1992,11 +2047,15 @@ exports.saveQueryTables = async (req, res, next) => {
       categoryCandidates,
       dashboardCandidates,
       businessTemplateCandidates,
-      candidateGeneration,
-      candidateContract,
-      candidateScoring,
+      multiSourceCandidates,
       topCandidates,
       secondaryCandidates,
+      candidateContract,
+      candidateScoring,
+      candidateGeneration,
+      candidateBundlePropagation: candidateBundlePropagationMeta(
+        propagatedCandidateBundle,
+      ),
       localName: saved.localName,
       gcsName: saved.gcsName,
       tables: tables.map((t) => ({
