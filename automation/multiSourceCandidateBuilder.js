@@ -7,11 +7,21 @@ const {
   getTableUsage,
 } = require("./sourceTablePolicy");
 
-const MULTI_SOURCE_CANDIDATE_VERSION = "multi_source_candidate_builder_v1_2";
+const MULTI_SOURCE_CANDIDATE_VERSION = "multi_source_candidate_builder_v1_4";
 const MULTI_SOURCE_DETECTION_HOTFIX_VERSION =
   "multi_source_candidate_detection_hotfix_v1";
 const MULTI_SOURCE_PAYLOAD_FALLBACK_HOTFIX_VERSION =
   "multi_source_candidate_payload_fallback_hotfix_v1";
+const MULTI_SOURCE_SCHEMA_GROUP_VERSION = "multi_source_schema_group_v1_1";
+const MULTI_SOURCE_SCHEMA_UNION_VERSION = "multi_source_schema_union_v1_1";
+const MULTI_SOURCE_COMPATIBLE_SCHEMA_VERSION =
+  "multi_source_compatible_schema_v1";
+const MULTI_SOURCE_INDIVIDUAL_SOURCE_VERSION =
+  "multi_source_individual_source_candidates_v1";
+const UNION_SOURCE_DIMENSION_HEADER = "원본데이터시트";
+const UNION_SOURCE_TABLE_ID_HEADER = "원본테이블ID";
+const UNION_ORIGINAL_SHEET_HEADER = "원본시트명";
+const UNION_PREVIEW_ROW_LIMIT = 30;
 
 function asArray(value) {
   if (Array.isArray(value)) return value.filter((item) => item != null);
@@ -62,6 +72,15 @@ function normalizeKey(value = "") {
     .toLowerCase()
     .replace(/[\s_\-()\[\]{}.,:;\/\\]+/g, "")
     .replace(/(전체|남자|여자|남성|여성|유효|데이터|sheet\d*)/gi, "");
+}
+
+function stableIdKey(value = "") {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/[\s_\-()\[\]{}.,:;\/\#]+/g, "_")
+    .replace(/[^\p{Letter}\p{Number}_]+/gu, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 140);
 }
 
 function tableIdOf(table = {}) {
@@ -481,9 +500,10 @@ function makePhysicalMultiSourceCandidate({
   );
 
   return {
-    candidateId: `multi_source_physical_${sourceIds.map(normalizeKey).join("_").slice(0, 120)}`,
+    candidateId: `multi_source_physical_${sourceIds.map(stableIdKey).join("_").slice(0, 120)}`,
     candidateType: "multiSource",
     type: "multiSource",
+    multiSourceCandidateKind: "physicalComparison",
     multiSourceCandidateVersion: MULTI_SOURCE_CANDIDATE_VERSION,
     multiSourceDetectionHotfixVersion: MULTI_SOURCE_DETECTION_HOTFIX_VERSION,
     title: titleForPhysicalGroup(sourceTables),
@@ -535,6 +555,659 @@ function makePhysicalMultiSourceCandidate({
   };
 }
 
+function hashText(value = "") {
+  let hash = 5381;
+  const text = String(value || "");
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 33) ^ text.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function schemaColumnKind(column = {}, table = {}) {
+  const header = normalizeText(
+    column.header || column.name || column.key || "",
+  );
+  const metricSet = new Set(metricHeaders(table).map(normalizeKey));
+  if (metricSet.has(normalizeKey(header))) return "metric";
+  if (isPeriodLike(header)) return "period";
+  if (isIdentifierLike(header)) return "id";
+  return "dimension";
+}
+
+function isSchemaNoiseHeader(header = "") {
+  const raw = String(header || "").trim();
+  const normalized = normalizeKey(raw);
+  if (!raw || !normalized) return true;
+
+  // 서식/검증/출처/주석성 열은 schema grouping을 깨뜨리기 쉽다.
+  // 특히 다중시트 회귀 케이스의 "테스트 목적_... 전체/남자/여자 ..." 열은
+  // 실제 분석 축이 아니라 설명 열이므로 compatible schema 판단에서 제외한다.
+  if (
+    /테스트\s*목적|테스트설명|사용\s*안내|설명|비고|주석|출처|자료\s*기준|작성\s*기관|작성\s*일|조회\s*기간|다운로드|통계표|url|metadata|meta|note|comment|remark|source/i.test(
+      raw,
+    )
+  ) {
+    return true;
+  }
+
+  // 너무 긴 자연어형 헤더는 보통 메모/주석성 열이다.
+  if (raw.length >= 28 && /[.:：]|\s/.test(raw)) return true;
+
+  return false;
+}
+
+function comparableSchemaColumnsForTable(table = {}) {
+  return schemaColumnsForTable(table).filter(
+    (column) => !isSchemaNoiseHeader(column.header),
+  );
+}
+
+function schemaColumnKeys(columns = []) {
+  return asArray(columns)
+    .map((column) => column.key || normalizeKey(column.header))
+    .filter(Boolean);
+}
+
+function sameTableGroupKey(tables = []) {
+  return unique(asArray(tables).map(sourceTableIdOf)).sort().join("|");
+}
+
+function compatibleSchemaSignatureForTable(table = {}) {
+  const columns = comparableSchemaColumnsForTable(table);
+  if (columns.length < 2) return "";
+
+  const kindSeq = columns.map((column) => column.kind || "dimension").join("|");
+  const metricCount = columns.filter(
+    (column) => column.kind === "metric",
+  ).length;
+  const periodCount = columns.filter(
+    (column) => column.kind === "period",
+  ).length;
+  const dimensionCount = columns.filter(
+    (column) => column.kind === "dimension",
+  ).length;
+
+  // 헤더명이 일부 달라도 열의 역할/개수 구성이 같으면 compatible schema로 본다.
+  // union 후보는 실제 row를 합칠 때 공통 헤더만 쓰므로 안전하다.
+  return [
+    `cols:${columns.length}`,
+    `kinds:${kindSeq}`,
+    `m:${metricCount}`,
+    `p:${periodCount}`,
+    `d:${dimensionCount}`,
+  ].join("|");
+}
+
+function compatibleGroupQuality(tables = []) {
+  const sourceTables = uniqueTables(tables);
+  const sharedColumnHeaders = sharedHeaders(sourceTables, (table) =>
+    comparableSchemaColumnsForTable(table).map((column) => column.header),
+  );
+  const sharedDimensions = sharedHeaders(sourceTables, dimensionHeaders).filter(
+    (header) => !isSchemaNoiseHeader(header),
+  );
+  const sharedMetrics = sharedHeaders(sourceTables, metricHeaders).filter(
+    (header) => !isSchemaNoiseHeader(header),
+  );
+  const rowCount = sourceTables.reduce(
+    (sum, table) =>
+      sum + Number(table.rowCount || rowObjects(table).length || 0),
+    0,
+  );
+
+  const firstColumns = comparableSchemaColumnsForTable(sourceTables[0] || {});
+  const minComparableColumnCount = Math.min(
+    ...sourceTables.map(
+      (table) => comparableSchemaColumnsForTable(table).length,
+    ),
+  );
+  const maxComparableColumnCount = Math.max(
+    ...sourceTables.map(
+      (table) => comparableSchemaColumnsForTable(table).length,
+    ),
+  );
+
+  return {
+    sharedColumnHeaders,
+    sharedDimensions,
+    sharedMetrics,
+    rowCount,
+    firstColumns,
+    minComparableColumnCount,
+    maxComparableColumnCount,
+    columnCountGap: maxComparableColumnCount - minComparableColumnCount,
+    ok:
+      sourceTables.length >= 2 &&
+      minComparableColumnCount >= 2 &&
+      rowCount > 0 &&
+      (sharedColumnHeaders.length >= 2 ||
+        sharedMetrics.length >= 1 ||
+        sharedDimensions.length >= 2 ||
+        maxComparableColumnCount === minComparableColumnCount),
+  };
+}
+
+function schemaColumnsForTable(table = {}) {
+  return normalizedColumns(table)
+    .map((column) => {
+      const header = normalizeText(
+        column.header || column.name || column.key || "",
+      );
+      const key = normalizeKey(header);
+      if (!key) return null;
+      return {
+        header,
+        key,
+        kind: schemaColumnKind(column, table),
+      };
+    })
+    .filter(Boolean);
+}
+
+function schemaSignatureForTable(table = {}) {
+  const columns = comparableSchemaColumnsForTable(table);
+  if (columns.length < 2) return "";
+
+  // 같은 schema 판단은 열 순서까지 포함한다. 단, 설명/주석성 열은 제외한다.
+  return columns.map((column) => `${column.key}:${column.kind}`).join("|");
+}
+
+function groupTablesBySchemaSignature(sourceTables = []) {
+  const groups = new Map();
+
+  for (const table of asArray(sourceTables)) {
+    const signature = schemaSignatureForTable(table);
+    if (!signature) continue;
+
+    if (!groups.has(signature)) {
+      groups.set(signature, {
+        schemaSignature: signature,
+        schemaSignatureHash: hashText(signature),
+        schemaColumns: comparableSchemaColumnsForTable(table),
+        tables: [],
+      });
+    }
+
+    groups.get(signature).tables.push(table);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      tables: uniqueTables(group.tables),
+    }))
+    .filter((group) => group.tables.length >= 2);
+}
+
+function groupTablesByCompatibleSchema(sourceTables = [], exactGroups = []) {
+  const source = uniqueTables(sourceTables);
+  if (source.length < 2) return [];
+
+  const exactKeys = new Set(
+    exactGroups.map((group) => sameTableGroupKey(group.tables)),
+  );
+  const groups = new Map();
+
+  for (const table of source) {
+    const signature = compatibleSchemaSignatureForTable(table);
+    if (!signature) continue;
+    if (!groups.has(signature)) {
+      groups.set(signature, {
+        schemaSignature: `compatible:${signature}`,
+        schemaSignatureHash: hashText(`compatible:${signature}`),
+        schemaCompatibilityMode: "compatible",
+        schemaColumns: comparableSchemaColumnsForTable(table),
+        tables: [],
+      });
+    }
+    groups.get(signature).tables.push(table);
+  }
+
+  const compatible = [...groups.values()]
+    .map((group) => {
+      const tables = uniqueTables(group.tables);
+      const quality = compatibleGroupQuality(tables);
+      return {
+        ...group,
+        tables,
+        schemaColumns: group.schemaColumns?.length
+          ? group.schemaColumns
+          : quality.firstColumns,
+        compatibility: quality,
+      };
+    })
+    .filter((group) => {
+      if (group.tables.length < 2) return false;
+      if (exactKeys.has(sameTableGroupKey(group.tables))) return false;
+      return group.compatibility?.ok === true;
+    });
+
+  // kind/개수 grouping도 실패하면, 다중 physical table 전체를 compatible fallback으로 묶는다.
+  if (!compatible.length) {
+    const quality = compatibleGroupQuality(source);
+    const key = sameTableGroupKey(source);
+    if (quality.ok && !exactKeys.has(key)) {
+      return [
+        {
+          schemaSignature: `compatible:fallback:${hashText(key)}`,
+          schemaSignatureHash: hashText(`compatible:fallback:${key}`),
+          schemaCompatibilityMode: "compatibleFallback",
+          schemaColumns: quality.firstColumns,
+          tables: source,
+          compatibility: quality,
+        },
+      ];
+    }
+  }
+
+  return compatible;
+}
+
+function commonSchemaHeadersForGroup(sourceTables = [], group = {}) {
+  const common = sharedHeaders(sourceTables, (table) =>
+    comparableSchemaColumnsForTable(table).map((column) => column.header),
+  ).filter((header) => !isSchemaNoiseHeader(header));
+  if (common.length) return common;
+
+  const schemaHeaders = asArray(group.schemaColumns)
+    .map((column) => column.header)
+    .filter((header) => header && !isSchemaNoiseHeader(header));
+  if (schemaHeaders.length) return schemaHeaders;
+
+  return comparableSchemaColumnsForTable(sourceTables[0] || {}).map(
+    (column) => column.header,
+  );
+}
+
+function compactLinkedAnalysisCandidate(candidate = {}) {
+  return {
+    candidateId:
+      candidate.candidateId || candidate.id || candidate.recipeId || "",
+    recipeType:
+      candidate.recipeType || candidate.type || candidate.recipeId || "",
+    title: candidate.title || "",
+    sourceTableId: candidate.sourceTableId || candidate.tableId || "",
+    sourceSheetName: candidate.sourceSheetName || "",
+    outputTypes: asArray(candidate.outputTypes),
+  };
+}
+
+function linkedAnalysisCandidatesForSourceTables({
+  sourceTables = [],
+  analysisRecipeCandidates = [],
+} = {}) {
+  const sourceIds = new Set(
+    sourceTables
+      .flatMap((table) => [sourceTableIdOf(table), tableIdOf(table)])
+      .filter(Boolean),
+  );
+
+  const linked = flattenCandidateItems(analysisRecipeCandidates).filter(
+    (candidate) => {
+      const ids = candidateSourceIds(candidate).flatMap((id) => [
+        id,
+        stripVirtualTableSuffix(id),
+      ]);
+      return ids.some((id) => sourceIds.has(id));
+    },
+  );
+
+  const seen = new Set();
+  return linked.map(compactLinkedAnalysisCandidate).filter((candidate) => {
+    const key = candidate.candidateId || JSON.stringify(candidate);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildUnionPreviewRows({
+  sourceTables = [],
+  headers = [],
+  policy = {},
+  limit = UNION_PREVIEW_ROW_LIMIT,
+} = {}) {
+  const previewRows = [];
+  let rowCount = 0;
+
+  for (const table of sourceTables) {
+    const rows = rowObjects(table);
+    const sourceSheetName = sourceSheetNameOf(table, policy);
+    const sourceTableId = sourceTableIdOf(table);
+    const originalSheetName =
+      table.sheetName || table.name || table.tableName || "";
+
+    for (const row of rows) {
+      rowCount += 1;
+
+      if (previewRows.length >= limit) continue;
+
+      const next = {
+        [UNION_SOURCE_DIMENSION_HEADER]: sourceSheetName,
+        [UNION_SOURCE_TABLE_ID_HEADER]: sourceTableId,
+        [UNION_ORIGINAL_SHEET_HEADER]: originalSheetName,
+      };
+
+      for (const header of headers) {
+        next[header] = valueForHeader(row, header);
+      }
+
+      previewRows.push(next);
+    }
+  }
+
+  return { previewRows, rowCount };
+}
+
+function sourceTableSummaries(sourceTables = [], policy = {}) {
+  return sourceTables.map((table, index) => {
+    const entry = sourceEntryForTable(table, policy) || {};
+    return {
+      sourceTableIndex: entry.sourceTableIndex ?? index,
+      sourceTableId: sourceTableIdOf(table),
+      tableId: tableIdOf(table),
+      sheetName: table.sheetName || table.name || "",
+      sourceSheetName:
+        entry.sourceSheetName || sourceSheetNameOf(table, policy),
+      rowCount: Number(table.rowCount || rowObjects(table).length || 0),
+      columnCount: columnHeaders(table).length,
+      schemaSignature: schemaSignatureForTable(table),
+      analysisEligible: isAnalysisEligible(table),
+    };
+  });
+}
+
+function makeSchemaUnionCandidate({
+  group = {},
+  groupIndex = 0,
+  policy = {},
+  analysisRecipeCandidates = [],
+} = {}) {
+  const sourceTables = uniqueTables(group.tables || []);
+  if (sourceTables.length < 2) return null;
+
+  const sourceIds = unique(sourceTables.map(sourceTableIdOf));
+  const sourceSheets = unique(
+    sourceTables.map((table) => sourceSheetNameOf(table, policy)),
+  );
+  const headers = commonSchemaHeadersForGroup(sourceTables, group);
+  const sharedDimensions = sharedHeaders(sourceTables, dimensionHeaders);
+  const sharedMetrics = sharedHeaders(sourceTables, metricHeaders);
+  const { previewRows, rowCount } = buildUnionPreviewRows({
+    sourceTables,
+    headers,
+    policy,
+  });
+  const linkedAnalysisCandidates = linkedAnalysisCandidatesForSourceTables({
+    sourceTables,
+    analysisRecipeCandidates,
+  });
+  const hash = group.schemaSignatureHash || hashText(group.schemaSignature);
+
+  return {
+    candidateId: `multi_source_schema_union_${hash}`,
+    candidateType: "multiSource",
+    type: "multiSource",
+    multiSourceCandidateKind: "schemaUnion",
+    multiSourceCandidateVersion: MULTI_SOURCE_CANDIDATE_VERSION,
+    multiSourceSchemaGroupVersion: MULTI_SOURCE_SCHEMA_GROUP_VERSION,
+    multiSourceSchemaUnionVersion: MULTI_SOURCE_SCHEMA_UNION_VERSION,
+    title:
+      sourceSheets.length >= 2
+        ? `${sourceSheets.slice(0, 3).join("·")} 통합 분석 후보`
+        : "동일 구조 원본 통합 분석 후보",
+    description:
+      "동일 schema 원본데이터들을 하나의 union 분석 단위로 묶고, 원본데이터시트를 구분 dimension으로 추가합니다.",
+    sourceScope: "multiTable",
+    sourceTableIds: sourceIds,
+    sourceSheetNames: sourceSheets,
+    sourceTableId: sourceIds[0] || "",
+    sourceSheetName: sourceSheets[0] || "",
+    sourceTables: sourceTableSummaries(sourceTables, policy),
+    schemaGroupIndex: groupIndex,
+    schemaSignature: group.schemaSignature,
+    schemaSignatureHash: hash,
+    schemaCompatibilityMode: group.schemaCompatibilityMode || "exact",
+    schemaCompatibility: group.compatibility || null,
+    schemaColumns: group.schemaColumns || [],
+    sharedColumns: headers,
+    sharedDimensions,
+    sharedMetrics,
+    unionSourceDimension: UNION_SOURCE_DIMENSION_HEADER,
+    unionTable: {
+      tableId: `union_${hash}`,
+      tableName: "다중 원본 통합 테이블",
+      virtualTableKind: "MULTI_SOURCE_UNION",
+      sourceScope: "multiTable",
+      isVirtual: true,
+      rowCount,
+      previewRowLimit: UNION_PREVIEW_ROW_LIMIT,
+      columns: [
+        {
+          header: UNION_SOURCE_DIMENSION_HEADER,
+          type: "category",
+          role: "dimension",
+        },
+        {
+          header: UNION_SOURCE_TABLE_ID_HEADER,
+          type: "text",
+          role: "id",
+        },
+        {
+          header: UNION_ORIGINAL_SHEET_HEADER,
+          type: "category",
+          role: "dimension",
+        },
+        ...headers.map((header) => ({
+          header,
+          type: sharedMetrics.some(
+            (metric) => normalizeKey(metric) === normalizeKey(header),
+          )
+            ? "number"
+            : "text",
+          role: sharedMetrics.some(
+            (metric) => normalizeKey(metric) === normalizeKey(header),
+          )
+            ? "metric"
+            : "dimension",
+        })),
+      ],
+      previewRows,
+    },
+    unionRowCount: rowCount,
+    unionPreviewRows: previewRows,
+    linkedAnalysisCandidates,
+    linkedAnalysisCandidateCount: linkedAnalysisCandidates.length,
+    outputTypes: ["summarySheet", "analysisReport", "ppt"],
+    recipeIds: unique([
+      "multi_source_schema_union",
+      "multi_source_dashboard",
+      sharedMetrics.length
+        ? "multi_source_metric_comparison"
+        : "multi_source_count_comparison",
+      ...linkedAnalysisCandidates.map((candidate) => candidate.recipeType),
+    ]),
+    confidence: sharedMetrics.length ? 0.86 : 0.78,
+    priority:
+      820 + Math.min(60, sourceIds.length * 8 + sharedMetrics.length * 4),
+    reasonCodes: unique([
+      "MULTI_SOURCE_CANDIDATE_BUILDER_V1_4",
+      group.schemaCompatibilityMode
+        ? "COMPATIBLE_SCHEMA_GROUPED"
+        : "SCHEMA_SIGNATURE_GROUPED",
+      "MULTI_SOURCE_SCHEMA_UNION",
+      "SOURCE_SHEET_NAME_DIMENSION_ADDED",
+      rowCount ? "UNION_ROWS_AVAILABLE" : "UNION_PREVIEW_EMPTY",
+      sharedMetrics.length ? "SHARED_METRICS" : "NO_SHARED_METRICS",
+      sharedDimensions.length ? "SHARED_DIMENSIONS" : "NO_SHARED_DIMENSIONS",
+    ]),
+    recommendationReason:
+      "동일 구조의 원본데이터가 여러 개 있으므로 원본데이터시트 dimension을 추가해 전체 통합·시트별 비교 분석을 만들 수 있습니다.",
+  };
+}
+
+function makeSchemaComparisonCandidate({
+  group = {},
+  groupIndex = 0,
+  policy = {},
+} = {}) {
+  const sourceTables = uniqueTables(group.tables || []);
+  const base = makePhysicalMultiSourceCandidate({ sourceTables, policy });
+  if (!base) return null;
+  const hash = group.schemaSignatureHash || hashText(group.schemaSignature);
+  return {
+    ...base,
+    candidateId: `multi_source_schema_compare_${hash}`,
+    multiSourceCandidateKind: "schemaComparison",
+    multiSourceSchemaGroupVersion: MULTI_SOURCE_SCHEMA_GROUP_VERSION,
+    title: `${base.sourceSheetNames.slice(0, 3).join("·")} 동일 구조 비교 후보`,
+    schemaGroupIndex: groupIndex,
+    schemaSignature: group.schemaSignature,
+    schemaSignatureHash: hash,
+    schemaCompatibilityMode: group.schemaCompatibilityMode || "exact",
+    schemaCompatibility: group.compatibility || null,
+    schemaColumns: group.schemaColumns || [],
+    priority: Math.max(Number(base.priority || 0), 800),
+    reasonCodes: unique([
+      ...(base.reasonCodes || []),
+      "MULTI_SOURCE_CANDIDATE_BUILDER_V1_4",
+      group.schemaCompatibilityMode
+        ? "COMPATIBLE_SCHEMA_GROUPED"
+        : "SCHEMA_SIGNATURE_GROUPED",
+      "SCHEMA_LEVEL_COMPARISON",
+    ]),
+    recommendationReason:
+      "동일 schema 원본데이터끼리 묶어 시트 간 비교 후보로 제공합니다.",
+  };
+}
+
+function makeIndividualSourceCandidate({
+  table = {},
+  policy = {},
+  schemaSignature = "",
+  schemaSignatureHash = "",
+  analysisRecipeCandidates = [],
+  index = 0,
+} = {}) {
+  const sourceId = sourceTableIdOf(table);
+  if (!sourceId) return null;
+
+  const sourceSheetName =
+    sourceSheetNameOf(table, policy) || fallbackSourceSheetName(index);
+  const metrics = metricHeaders(table);
+  const dimensions = dimensionHeaders(table);
+  const linkedAnalysisCandidates = linkedAnalysisCandidatesForSourceTables({
+    sourceTables: [table],
+    analysisRecipeCandidates,
+  });
+  const hash = schemaSignatureHash || hashText(schemaSignature || sourceId);
+
+  return {
+    candidateId: `multi_source_individual_${stableIdKey(sourceId).slice(0, 100)}_${hash}`,
+    candidateType: "multiSource",
+    type: "multiSource",
+    multiSourceCandidateKind: "individualSource",
+    multiSourceCandidateVersion: MULTI_SOURCE_CANDIDATE_VERSION,
+    multiSourceIndividualSourceVersion: MULTI_SOURCE_INDIVIDUAL_SOURCE_VERSION,
+    title: `${sourceSheetName} 개별 자동화 후보`,
+    description:
+      "다중 원본 파일 안의 개별 원본데이터 시트를 독립 자동화 후보로 추적합니다.",
+    sourceScope: "singleTable",
+    sourceTableIds: [sourceId],
+    sourceSheetNames: [sourceSheetName],
+    sourceTableId: sourceId,
+    sourceSheetName,
+    sourceTables: sourceTableSummaries([table], policy),
+    schemaSignature,
+    schemaSignatureHash: hash,
+    sharedColumns: columnHeaders(table),
+    sharedDimensions: dimensions,
+    sharedMetrics: metrics,
+    linkedAnalysisCandidates,
+    linkedAnalysisCandidateCount: linkedAnalysisCandidates.length,
+    outputTypes: ["summarySheet", "analysisReport", "ppt"],
+    recipeIds: unique([
+      "single_source_dashboard",
+      metrics.length
+        ? "single_source_metric_summary"
+        : "single_source_count_summary",
+      ...linkedAnalysisCandidates.map((candidate) => candidate.recipeType),
+    ]),
+    confidence: metrics.length ? 0.68 : 0.6,
+    priority: 600 + Math.min(35, metrics.length * 4 + dimensions.length),
+    reasonCodes: unique([
+      "MULTI_SOURCE_CANDIDATE_BUILDER_V1_4",
+      "INDIVIDUAL_SOURCE_CANDIDATE",
+      "SOURCE_SHEET_NAME_SCOPED",
+      metrics.length ? "HAS_SOURCE_METRICS" : "NO_SOURCE_METRICS",
+    ]),
+    recommendationReason:
+      "다중 원본 중 특정 원본데이터 시트만 대상으로 자동화 시트를 생성할 수 있도록 개별 후보를 유지합니다.",
+  };
+}
+
+function buildSchemaGroupCandidates({
+  sourceTables = [],
+  policy = {},
+  analysisRecipeCandidates = [],
+} = {}) {
+  const exactGroups = groupTablesBySchemaSignature(sourceTables);
+  const compatibleGroups = groupTablesByCompatibleSchema(
+    sourceTables,
+    exactGroups,
+  );
+  const groups = [...exactGroups, ...compatibleGroups];
+  const candidates = [];
+
+  groups.forEach((group, groupIndex) => {
+    const comparison = makeSchemaComparisonCandidate({
+      group,
+      groupIndex,
+      policy,
+    });
+    if (comparison) candidates.push(comparison);
+
+    const union = makeSchemaUnionCandidate({
+      group,
+      groupIndex,
+      policy,
+      analysisRecipeCandidates,
+    });
+    if (union) candidates.push(union);
+  });
+
+  const tableToGroup = new Map();
+  groups.forEach((group) => {
+    const hash = group.schemaSignatureHash || hashText(group.schemaSignature);
+    group.tables.forEach((table) => {
+      tableToGroup.set(sourceTableIdOf(table), {
+        schemaSignature: group.schemaSignature,
+        schemaSignatureHash: hash,
+      });
+    });
+  });
+
+  sourceTables.forEach((table, index) => {
+    const groupMeta = tableToGroup.get(sourceTableIdOf(table)) || {
+      schemaSignature: schemaSignatureForTable(table),
+      schemaSignatureHash: hashText(
+        schemaSignatureForTable(table) || sourceTableIdOf(table),
+      ),
+    };
+    const individual = makeIndividualSourceCandidate({
+      table,
+      policy,
+      analysisRecipeCandidates,
+      index,
+      ...groupMeta,
+    });
+    if (individual) candidates.push(individual);
+  });
+
+  return candidates;
+}
+
 function virtualKind(table = {}) {
   const id = tableIdOf(table);
   const kind = [
@@ -572,9 +1245,10 @@ function makeVirtualLinkCandidate({
   const sourceIds = unique([physicalId, virtualId]);
 
   return {
-    candidateId: `multi_source_virtual_${normalizeKey(virtualId).slice(0, 140)}`,
+    candidateId: `multi_source_virtual_${stableIdKey(virtualId).slice(0, 140)}`,
     candidateType: "multiSource",
     type: "multiSource",
+    multiSourceCandidateKind: "physicalComparison",
     multiSourceCandidateVersion: MULTI_SOURCE_CANDIDATE_VERSION,
     multiSourceDetectionHotfixVersion: MULTI_SOURCE_DETECTION_HOTFIX_VERSION,
     title:
@@ -791,7 +1465,7 @@ function buildPayloadFallbackPhysicalCandidate({
 
   return {
     ...candidate,
-    candidateId: `multi_source_payload_physical_${physicalIds.map(normalizeKey).join("_").slice(0, 120)}`,
+    candidateId: `multi_source_payload_physical_${physicalIds.map(stableIdKey).join("_").slice(0, 120)}`,
     title: candidate.title || "분석 후보 기반 다중 원본 연결 후보",
     multiSourcePayloadFallbackHotfixVersion:
       MULTI_SOURCE_PAYLOAD_FALLBACK_HOTFIX_VERSION,
@@ -804,6 +1478,73 @@ function buildPayloadFallbackPhysicalCandidate({
       candidate.recommendationReason ||
       "분석 후보 payload의 sourceTableIds를 기준으로 여러 원본 표를 연결했습니다.",
   };
+}
+
+function buildPayloadFallbackSchemaCandidates({ refs = [], policy = {} } = {}) {
+  const physicalIds = unique(
+    refs
+      .flatMap((ref) => ref.physicalIds)
+      .filter((id) => !isVirtualTableId(id)),
+  );
+  if (physicalIds.length < 2) return [];
+
+  const syntheticTables = physicalIds.map((id, index) =>
+    syntheticPhysicalTable({
+      id,
+      sourceSheetName: sourceSheetNameForRef({ id, refs, policy, index }),
+      index,
+    }),
+  );
+  const key = physicalIds.join("|");
+  const group = {
+    schemaSignature: `payloadFallback:${key}`,
+    schemaSignatureHash: hashText(`payloadFallback:${key}`),
+    schemaCompatibilityMode: "payloadFallback",
+    schemaColumns: [],
+    tables: syntheticTables,
+    compatibility: {
+      ok: true,
+      source: "analysisCandidatePayload",
+      sharedColumnHeaders: [],
+      sharedDimensions: [],
+      sharedMetrics: [],
+      rowCount: 0,
+    },
+  };
+
+  const comparison = makeSchemaComparisonCandidate({ group, policy });
+  const union = makeSchemaUnionCandidate({ group, policy });
+  const individuals = syntheticTables.map((table, index) =>
+    makeIndividualSourceCandidate({
+      table,
+      policy,
+      schemaSignature: group.schemaSignature,
+      schemaSignatureHash: group.schemaSignatureHash,
+      index,
+    }),
+  );
+
+  return [comparison, union, ...individuals]
+    .filter(Boolean)
+    .map((candidate) => ({
+      ...candidate,
+      candidateId:
+        candidate.multiSourceCandidateKind === "schemaUnion"
+          ? `multi_source_payload_schema_union_${group.schemaSignatureHash}`
+          : candidate.multiSourceCandidateKind === "schemaComparison"
+            ? `multi_source_payload_schema_compare_${group.schemaSignatureHash}`
+            : candidate.candidateId,
+      multiSourcePayloadFallbackHotfixVersion:
+        MULTI_SOURCE_PAYLOAD_FALLBACK_HOTFIX_VERSION,
+      reasonCodes: unique([
+        ...(candidate.reasonCodes || []),
+        "PAYLOAD_FALLBACK_FROM_ANALYSIS_CANDIDATES",
+        "PAYLOAD_FALLBACK_SCHEMA_GROUP",
+      ]),
+      recommendationReason:
+        candidate.recommendationReason ||
+        "분석 후보 payload의 sourceTableIds를 기준으로 schemaUnion 후보를 복구했습니다.",
+    }));
 }
 
 function buildPayloadFallbackVirtualCandidates({
@@ -837,7 +1578,7 @@ function buildPayloadFallbackVirtualCandidates({
       if (!candidate) return null;
       return {
         ...candidate,
-        candidateId: `multi_source_payload_virtual_${normalizeKey(virtualId).slice(0, 140)}`,
+        candidateId: `multi_source_payload_virtual_${stableIdKey(virtualId).slice(0, 140)}`,
         multiSourcePayloadFallbackHotfixVersion:
           MULTI_SOURCE_PAYLOAD_FALLBACK_HOTFIX_VERSION,
         reasonCodes: unique([
@@ -885,7 +1626,23 @@ function buildMultiSourceCandidates({
     sourceTables,
     policy: sourceTablePolicy,
   });
-  if (physicalCandidate) candidates.push(physicalCandidate);
+  if (physicalCandidate) {
+    candidates.push({
+      ...physicalCandidate,
+      reasonCodes: unique([
+        ...(physicalCandidate.reasonCodes || []),
+        "MULTI_SOURCE_CANDIDATE_BUILDER_V1_3",
+      ]),
+    });
+  }
+
+  candidates.push(
+    ...buildSchemaGroupCandidates({
+      sourceTables,
+      policy: sourceTablePolicy,
+      analysisRecipeCandidates,
+    }),
+  );
 
   const physicalBySourceId = new Map(
     sourceTables.map((table) => [sourceTableIdOf(table), table]),
@@ -912,6 +1669,20 @@ function buildMultiSourceCandidates({
     policy: sourceTablePolicy,
   });
   if (payloadPhysicalCandidate) candidates.push(payloadPhysicalCandidate);
+
+  if (
+    refsFromAnalysisCandidates.length &&
+    !candidates.some(
+      (candidate) => candidate.multiSourceCandidateKind === "schemaUnion",
+    )
+  ) {
+    candidates.push(
+      ...buildPayloadFallbackSchemaCandidates({
+        refs: refsFromAnalysisCandidates,
+        policy: sourceTablePolicy,
+      }),
+    );
+  }
 
   candidates.push(
     ...buildPayloadFallbackVirtualCandidates({
@@ -957,6 +1728,29 @@ function buildMultiSourceCandidates({
     generatedFrom: unique(
       result.flatMap((candidate) => candidate.reasonCodes || []),
     ).filter((code) => /FALLBACK|PHYSICAL|VIRTUAL|MULTI_SOURCE/i.test(code)),
+    schemaGroupVersion: MULTI_SOURCE_SCHEMA_GROUP_VERSION,
+    schemaUnionVersion: MULTI_SOURCE_SCHEMA_UNION_VERSION,
+    individualSourceVersion: MULTI_SOURCE_INDIVIDUAL_SOURCE_VERSION,
+    exactSchemaGroupCount: groupTablesBySchemaSignature(sourceTables).length,
+    compatibleSchemaGroupCount: groupTablesByCompatibleSchema(
+      sourceTables,
+      groupTablesBySchemaSignature(sourceTables),
+    ).length,
+    schemaGroupCount:
+      groupTablesBySchemaSignature(sourceTables).length +
+      groupTablesByCompatibleSchema(
+        sourceTables,
+        groupTablesBySchemaSignature(sourceTables),
+      ).length,
+    schemaUnionCandidateCount: result.filter(
+      (candidate) => candidate.multiSourceCandidateKind === "schemaUnion",
+    ).length,
+    schemaComparisonCandidateCount: result.filter(
+      (candidate) => candidate.multiSourceCandidateKind === "schemaComparison",
+    ).length,
+    individualSourceCandidateCount: result.filter(
+      (candidate) => candidate.multiSourceCandidateKind === "individualSource",
+    ).length,
     outputCandidateCount: result.length,
   });
 }
@@ -965,5 +1759,9 @@ module.exports = {
   MULTI_SOURCE_CANDIDATE_VERSION,
   MULTI_SOURCE_DETECTION_HOTFIX_VERSION,
   MULTI_SOURCE_PAYLOAD_FALLBACK_HOTFIX_VERSION,
+  MULTI_SOURCE_SCHEMA_GROUP_VERSION,
+  MULTI_SOURCE_SCHEMA_UNION_VERSION,
+  MULTI_SOURCE_INDIVIDUAL_SOURCE_VERSION,
+  UNION_SOURCE_DIMENSION_HEADER,
   buildMultiSourceCandidates,
 };

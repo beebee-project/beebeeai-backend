@@ -121,17 +121,27 @@ function validateCandidateBundle(bundle = {}, normalizedQueryTables = []) {
     .filter(Boolean)
     .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence);
 
+  function isValidMultiSourceCandidate(candidate = {}) {
+    if (!candidate || !Array.isArray(candidate.sourceTableIds)) return false;
+
+    const kind = String(candidate.multiSourceCandidateKind || "").trim();
+    const scope = String(candidate.sourceScope || "").trim();
+
+    // Patch 22.1: individualSource는 다중 원본 파일 안의 "개별 원본데이터" 후보라서
+    // sourceTableIds가 1개인 것이 정상이다. 기존 >=2 필터가 이 후보를 제거했다.
+    if (kind === "individualSource" || scope === "singleTable") {
+      return candidate.sourceTableIds.length >= 1;
+    }
+
+    return candidate.sourceTableIds.length >= 2;
+  }
+
   const multiSourceCandidates = (
     Array.isArray(bundle.multiSourceCandidates)
       ? bundle.multiSourceCandidates
       : []
   )
-    .filter(
-      (candidate) =>
-        candidate &&
-        Array.isArray(candidate.sourceTableIds) &&
-        candidate.sourceTableIds.length >= 2,
-    )
+    .filter(isValidMultiSourceCandidate)
     .map((candidate) => ({
       ...candidate,
       candidateType: "multiSource",
