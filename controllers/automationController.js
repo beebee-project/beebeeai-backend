@@ -50,6 +50,9 @@ const {
 const {
   executeBusinessTemplate,
 } = require("../automation/businessTemplateExecutor");
+const {
+  buildCandidateUiPayload,
+} = require("../automation/candidateUiPayloadBuilder");
 let candidateGenerationModule = {};
 
 try {
@@ -211,6 +214,49 @@ function candidateBundlePropagationMeta(bundle = {}) {
     },
   };
 }
+
+function buildCandidateUiPayloadForResponse({
+  fileName = "",
+  normalizedQueryTables = [],
+  candidateBundle = {},
+  source = "automation-controller",
+} = {}) {
+  try {
+    return buildCandidateUiPayload({
+      fileName,
+      normalizedQueryTables,
+      candidateBundle,
+      source,
+    });
+  } catch (error) {
+    console.warn(
+      "[candidate-ui-payload] build failed:",
+      error?.message || error,
+    );
+    return {
+      version: "candidate_ui_payload_v2",
+      generatedAt: new Date().toISOString(),
+      fileName,
+      source,
+      error: error?.message || String(error),
+      recommendedCandidates: [],
+      candidateGroups: [],
+      sourceTables: [],
+      sourceStructure: {
+        title: "원본데이터 구조 확인",
+        sourceSheetNames: [],
+      },
+      displayPolicy: {
+        recommendedLimit: 3,
+        showSourceStructure: true,
+        showConfidence: true,
+        showRecommendationReason: true,
+        showOutputTypes: true,
+      },
+    };
+  }
+}
+
 const {
   isBusinessTemplateResult,
   normalizeBusinessTemplateResult,
@@ -1687,6 +1733,12 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         propagatedCandidateBundle.candidateScoring || null;
       const candidateGeneration =
         propagatedCandidateBundle.candidateGeneration || null;
+      const candidateUiPayload = buildCandidateUiPayloadForResponse({
+        fileName,
+        normalizedQueryTables,
+        candidateBundle: propagatedCandidateBundle,
+        source: "analysis-candidates-file",
+      });
 
       console.log("[analysis-candidates]", {
         source: "file",
@@ -1714,6 +1766,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
         candidateContract,
         candidateScoring,
         candidateGeneration,
+        candidateUiPayload,
         candidateBundlePropagation: candidateBundlePropagationMeta(
           propagatedCandidateBundle,
         ),
@@ -1770,6 +1823,12 @@ exports.getAnalysisCandidates = async (req, res, next) => {
     const candidateScoring = propagatedCandidateBundle.candidateScoring || null;
     const candidateGeneration =
       propagatedCandidateBundle.candidateGeneration || null;
+    const candidateUiPayload = buildCandidateUiPayloadForResponse({
+      fileName: saved.fileName,
+      normalizedQueryTables,
+      candidateBundle: propagatedCandidateBundle,
+      source: "analysis-candidates-query-tables",
+    });
 
     console.log("[analysis-candidates]", {
       source: "query-tables",
@@ -1798,6 +1857,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
       candidateContract,
       candidateScoring,
       candidateGeneration,
+      candidateUiPayload,
       candidateBundlePropagation: candidateBundlePropagationMeta(
         propagatedCandidateBundle,
       ),
@@ -1917,6 +1977,12 @@ exports.previewQueryTables = async (req, res, next) => {
     const candidateScoring = propagatedCandidateBundle.candidateScoring || null;
     const candidateGeneration =
       propagatedCandidateBundle.candidateGeneration || null;
+    const candidateUiPayload = buildCandidateUiPayloadForResponse({
+      fileName,
+      normalizedQueryTables,
+      candidateBundle: propagatedCandidateBundle,
+      source: "preview-query-tables",
+    });
 
     return res.json({
       ok: true,
@@ -1935,6 +2001,7 @@ exports.previewQueryTables = async (req, res, next) => {
       candidateContract,
       candidateScoring,
       candidateGeneration,
+      candidateUiPayload,
       candidateBundlePropagation: candidateBundlePropagationMeta(
         propagatedCandidateBundle,
       ),
@@ -2002,6 +2069,12 @@ exports.saveQueryTables = async (req, res, next) => {
     const candidateScoring = propagatedCandidateBundle.candidateScoring || null;
     const candidateGeneration =
       propagatedCandidateBundle.candidateGeneration || null;
+    const candidateUiPayload = buildCandidateUiPayloadForResponse({
+      fileName,
+      normalizedQueryTables,
+      candidateBundle: propagatedCandidateBundle,
+      source: "save-query-tables",
+    });
 
     const now = new Date();
     const userId = req.user?.id || "local-dev";
@@ -2028,6 +2101,7 @@ exports.saveQueryTables = async (req, res, next) => {
       candidateContract,
       candidateScoring,
       candidateGeneration,
+      candidateUiPayload,
       candidateBundlePropagation: candidateBundlePropagationMeta(
         propagatedCandidateBundle,
       ),
@@ -2053,6 +2127,7 @@ exports.saveQueryTables = async (req, res, next) => {
       candidateContract,
       candidateScoring,
       candidateGeneration,
+      candidateUiPayload,
       candidateBundlePropagation: candidateBundlePropagationMeta(
         propagatedCandidateBundle,
       ),

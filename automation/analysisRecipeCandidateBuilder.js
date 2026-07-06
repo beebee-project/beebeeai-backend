@@ -64,6 +64,41 @@ function headerHasAny(column = {}, hints = []) {
   });
 }
 
+function isNameLabelColumn(column = {}) {
+  const header = normalizeText(getColumnHeader(column));
+  const role = String(column.role || "").toLowerCase();
+  const type = String(column.type || "").toLowerCase();
+  if (!header || role === "metric") return false;
+  if (
+    ["number", "numeric", "integer", "float", "currency", "rate"].includes(type)
+  ) {
+    return false;
+  }
+
+  // Patch 24.2: `metricHeaderHints` contains "명" for headcount-style metrics.
+  // This must not make label columns such as 지표명/항목명/사업명 numeric metrics.
+  const nameLabelPatterns = [
+    "지표명",
+    "항목명",
+    "분류명",
+    "자료명",
+    "사업명",
+    "과제명",
+    "기관명",
+    "전문기관명",
+    "연구기관",
+    "상품명",
+    "제품명",
+    "품목명",
+    "성명",
+    "이름",
+    "명칭",
+  ];
+  return nameLabelPatterns.some((pattern) =>
+    header.includes(normalizeText(pattern)),
+  );
+}
+
 function isVirtualTable(table = {}) {
   return Boolean(
     table.isVirtual ||
@@ -131,6 +166,7 @@ function isMetricColumn(column = {}) {
   const role = String(column.role || "").toLowerCase();
   const type = String(column.type || "").toLowerCase();
   if (["date", "id"].includes(role)) return false;
+  if (isNameLabelColumn(column)) return false;
   if (role === "metric") return true;
   if (
     ["number", "numeric", "integer", "float", "currency", "rate"].includes(type)
@@ -138,7 +174,7 @@ function isMetricColumn(column = {}) {
     return true;
   return (
     headerHasAny(column, ANALYSIS_RECIPE_OPTIONS.metricHeaderHints) &&
-    type !== "text"
+    !["text", "string", "category"].includes(type)
   );
 }
 
@@ -170,6 +206,35 @@ function isDimensionColumn(column = {}) {
   if (ANALYSIS_RECIPE_OPTIONS.categoryTypesForDimensionFallback.includes(type))
     return true;
   return false;
+}
+
+function isCompositionDimensionColumn(column = {}) {
+  if (!column || !getColumnHeader(column)) return false;
+  if (isIdLikeColumn(column) || isMetricColumn(column)) return false;
+
+  const role = String(column.role || "").toLowerCase();
+  const type = String(column.type || "").toLowerCase();
+  const uniqueCount = getUniqueCount(column);
+  const uniqueRatio = getUniqueRatio(column);
+  const nonEmptyCount = getNonEmptyCount(column);
+
+  if (uniqueCount != null && uniqueCount < 2) return false;
+  if (uniqueCount != null && uniqueCount > Math.max(50, nonEmptyCount * 0.65)) {
+    return false;
+  }
+  if (uniqueRatio != null && uniqueRatio > 0.75) return false;
+
+  // Patch 24.1: 구성비는 일반 category뿐 아니라 연도/월처럼
+  // low-cardinality인 기간성 컬럼도 그룹 기준으로 쓸 수 있어야 한다.
+  if (role === "dimension" || role === "status" || role === "date") return true;
+  if (
+    ["category", "text", "string", "date", "period", "year", "month"].includes(
+      type,
+    )
+  ) {
+    return true;
+  }
+  return isDateColumn(column) || isDimensionColumn(column);
 }
 
 function uniqueColumns(columns = []) {
@@ -388,6 +453,75 @@ function getDimensionPairs(dimensions = []) {
   return pairs.slice(0, ANALYSIS_RECIPE_OPTIONS.maxDimensionPairsPerTable);
 }
 
+function candidateDedupeKey(candidate = {}) {
+  return [
+    candidate.recipeType,
+    candidate.tableId,
+    candidate.columns?.dimension,
+    candidate.columns?.dimension2,
+    candidate.columns?.date,
+    candidate.columns?.metric,
+  ].join("|");
+}
+
+function ensureRecipeTypesWithinLimit(
+  sorted = [],
+  allCandidates = [],
+  recipeTypes = [],
+  limit = 24,
+) {
+  const requiredRecipeTypes = Array.from(new Set(recipeTypes.filter(Boolean)));
+  const result = sorted.slice(0, limit);
+
+  for (const recipeType of requiredRecipeTypes) {
+    if (result.some((candidate) => candidate.recipeType === recipeType)) {
+      continue;
+    }
+
+    const rescue = allCandidates
+      .filter((candidate) => candidate.recipeType === recipeType)
+      .sort(
+        (a, b) => b.priority - a.priority || b.confidence - a.confidence,
+      )[0];
+
+    if (!rescue) continue;
+
+    const rescueKey = candidateDedupeKey(rescue);
+    if (
+      result.some((candidate) => candidateDedupeKey(candidate) === rescueKey)
+    ) {
+      continue;
+    }
+
+    if (result.length < limit) {
+      result.push(rescue);
+      continue;
+    }
+
+    // Patch 24.2: when multiple required recipe types are rescued
+    // (e.g. composition_ratio + top_bottom), do not let a later rescue
+    // replace an earlier required one.
+    let replaceIndex = -1;
+    let replaceScore = Infinity;
+    result.forEach((candidate, index) => {
+      if (requiredRecipeTypes.includes(candidate.recipeType)) return;
+      const score =
+        Number(candidate.priority || 0) + Number(candidate.confidence || 0);
+      if (score < replaceScore) {
+        replaceScore = score;
+        replaceIndex = index;
+      }
+    });
+
+    if (replaceIndex < 0) replaceIndex = result.length - 1;
+    result[replaceIndex] = rescue;
+  }
+
+  return result.sort(
+    (a, b) => b.priority - a.priority || b.confidence - a.confidence,
+  );
+}
+
 function buildTableCandidates(table = {}) {
   const candidates = [];
 
@@ -410,6 +544,23 @@ function buildTableCandidates(table = {}) {
     primaryDimension,
     primaryDate,
   } = classified;
+  const compositionDimensions = sortColumns(
+    [...dimensions, ...statuses, ...dates, ...labelDimensions].filter(
+      isCompositionDimensionColumn,
+    ),
+    "dimension",
+  ).slice(0, Math.max(3, ANALYSIS_RECIPE_OPTIONS.maxDimensionsPerTable));
+  const rankingDimensions = sortColumns(
+    [...dimensions, ...statuses, ...labelDimensions].filter(
+      (column) =>
+        column &&
+        getColumnHeader(column) &&
+        !isIdLikeColumn(column) &&
+        !isDateColumn(column) &&
+        !isMetricColumn(column),
+    ),
+    "dimension",
+  ).slice(0, Math.max(3, ANALYSIS_RECIPE_OPTIONS.maxDimensionsPerTable));
 
   console.log("[recipe-column-roles:v2]", {
     tableId: table.tableId,
@@ -417,6 +568,8 @@ function buildTableCandidates(table = {}) {
     dimensions: dimensions.map(getColumnHeader),
     dates: dates.map(getColumnHeader),
     statuses: statuses.map(getColumnHeader),
+    compositionDimensions: compositionDimensions.map(getColumnHeader),
+    rankingDimensions: rankingDimensions.map(getColumnHeader),
     virtual: isVirtualTable(table),
   });
 
@@ -489,6 +642,43 @@ function buildTableCandidates(table = {}) {
           }),
         );
       }
+    }
+  }
+
+  // Patch 24.1: 일부 매출/기간형 데이터는 일반 dimension이 부족하거나
+  // 구성비 후보가 maxCandidatesPerTable slice에서 밀려날 수 있다.
+  // UI/회귀 테스트에서 구성비 후보를 안정적으로 노출하도록 별도 rescue 후보를 만든다.
+  for (const dimension of compositionDimensions.slice(0, 4)) {
+    for (const metric of metrics.slice(0, 2)) {
+      pushCandidate(
+        candidates,
+        buildFromDef({
+          table,
+          def: findRecipeDef(ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO),
+          metric,
+          dimension,
+          reasonCodes: ["COMPOSITION_RATIO_RESCUE", "PATCH_24_1"],
+        }),
+      );
+    }
+  }
+
+  // Patch 24.2: WIDE_LONG sales-like tables can generate many trend recipes,
+  // causing ranking candidates to be sliced out before regression checks.
+  // Keep at least one dimension + metric top/bottom candidate, preferring
+  // real label dimensions such as 구/업종 over date/period fields.
+  for (const dimension of rankingDimensions.slice(0, 4)) {
+    for (const metric of metrics.slice(0, 2)) {
+      pushCandidate(
+        candidates,
+        buildFromDef({
+          table,
+          def: findRecipeDef(ANALYSIS_RECIPE_TYPES.TOP_BOTTOM),
+          metric,
+          dimension,
+          reasonCodes: ["TOP_BOTTOM_RESCUE", "PATCH_24_2"],
+        }),
+      );
     }
   }
 
@@ -579,10 +769,15 @@ function buildTableCandidates(table = {}) {
     }
   }
 
-  const sorted = candidates
+  const allCandidates = candidates
     .map(({ __dedupeKey, ...candidate }) => candidate)
-    .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence)
-    .slice(0, ANALYSIS_RECIPE_OPTIONS.maxCandidatesPerTable);
+    .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence);
+  const sorted = ensureRecipeTypesWithinLimit(
+    allCandidates,
+    allCandidates,
+    [ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO, ANALYSIS_RECIPE_TYPES.TOP_BOTTOM],
+    ANALYSIS_RECIPE_OPTIONS.maxCandidatesPerTable,
+  );
 
   return sorted;
 }
@@ -610,4 +805,6 @@ module.exports = {
   buildAnalysisRecipeCandidates,
   // exported for focused unit tests
   classifyColumns,
+  isCompositionDimensionColumn,
+  isNameLabelColumn,
 };
