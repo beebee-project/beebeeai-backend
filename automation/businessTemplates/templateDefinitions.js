@@ -1,6 +1,26 @@
-const BUSINESS_TEMPLATE_DEFS = [
+const {
+  TEMPLATE_DOMAINS,
+  IMPLEMENTATION_LEVELS,
+  enrichTemplateDefinition,
+  getTemplateDomainDefinitions,
+  getImplementationLevelDefinitions,
+} = require("../config/templateDomainConfig");
+
+const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "sales_report",
+    domain: TEMPLATE_DOMAINS.SALES,
+    implementationLevel: IMPLEMENTATION_LEVELS.CUSTOM,
+    preferredRecipeTypes: [
+      "time_sum",
+      "time_growth",
+      "cumulative_sum",
+      "group_sum",
+      "composition_ratio",
+      "top_bottom",
+      "wide_time_trend",
+    ],
+    templateTags: ["매출", "판매", "수량", "구성비", "기간추이"],
     title: "매출 분석 보고서",
     description:
       "기간별 매출, 증감률, 누적 매출, 구성비, 상위 항목, 수량, 평균 판매금액을 보고서 형태로 생성합니다.",
@@ -64,6 +84,17 @@ const BUSINESS_TEMPLATE_DEFS = [
   },
   {
     templateId: "research_budget_report",
+    domain: TEMPLATE_DOMAINS.BUDGET,
+    implementationLevel: IMPLEMENTATION_LEVELS.CUSTOM,
+    preferredRecipeTypes: [
+      "group_sum",
+      "time_sum",
+      "time_growth",
+      "composition_ratio",
+      "top_bottom",
+      "wide_time_trend",
+    ],
+    templateTags: ["연구비", "예산", "집행", "기관", "항목"],
     title: "연구비 집행·예산 현황",
     description:
       "연구비, 집행액, 정부출연금, 현금·현물 집행, 항목별·사업별·기관별·연도별 현황과 집행률을 보고서 형태로 생성합니다.",
@@ -132,6 +163,18 @@ const BUSINESS_TEMPLATE_DEFS = [
   },
   {
     templateId: "hr_monthly_report",
+    domain: TEMPLATE_DOMAINS.HR,
+    implementationLevel: IMPLEMENTATION_LEVELS.CUSTOM,
+    preferredRecipeTypes: [
+      "category_count",
+      "status_count",
+      "group_count",
+      "group_summary",
+      "time_count",
+      "composition_ratio",
+      "top_bottom",
+    ],
+    templateTags: ["인사", "명단", "상태", "부서", "직급", "입퇴사"],
     title: "월간 인사 보고서",
     description:
       "임직원 명단, 재직/퇴사 상태, 부서·직급·고용형태별 인원 구성, 입퇴사 증감, 평가등급, 교육이수, 급여·연봉 요약을 보고서 형태로 생성합니다.",
@@ -214,6 +257,10 @@ const BUSINESS_TEMPLATE_DEFS = [
   },
 ];
 
+const BUSINESS_TEMPLATE_DEFS = RAW_BUSINESS_TEMPLATE_DEFS.map(
+  enrichTemplateDefinition,
+);
+
 function getBusinessTemplateDefinitions() {
   return BUSINESS_TEMPLATE_DEFS;
 }
@@ -228,4 +275,6 @@ module.exports = {
   BUSINESS_TEMPLATE_DEFS,
   getBusinessTemplateDefinitions,
   findBusinessTemplateDefinition,
+  getTemplateDomainDefinitions,
+  getImplementationLevelDefinitions,
 };

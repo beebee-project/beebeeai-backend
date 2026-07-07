@@ -1,5 +1,11 @@
 const { normalizeOutputTypes } = require("./businessTemplateContract");
 const {
+  normalizeDomain,
+  normalizeImplementationLevel,
+  getTemplateDomainDef,
+  getImplementationLevelDef,
+} = require("./config/templateDomainConfig");
+const {
   BUSINESS_TEMPLATE_DEFS,
 } = require("./businessTemplates/templateDefinitions");
 
@@ -57,6 +63,33 @@ function scoreHeaderHints(headers = [], hints = []) {
 
 function getRecipeType(candidate = {}) {
   return candidate.recipeType || candidate.type || candidate.recipeId || "";
+}
+
+function templateDefinitionMeta(def = {}) {
+  const domain = normalizeDomain(def.domain);
+  const domainDef = getTemplateDomainDef(domain);
+  const implementationLevel = normalizeImplementationLevel(
+    def.implementationLevel,
+    domain,
+  );
+  const implementationDef = getImplementationLevelDef(
+    implementationLevel,
+    domain,
+  );
+
+  return {
+    domain,
+    domainLabel: def.domainLabel || domainDef.label,
+    domainGroup: def.domainGroup || domainDef.group,
+    implementationLevel,
+    implementationLevelLabel:
+      def.implementationLevelLabel || implementationDef.label,
+    preferredRecipeTypes: Array.isArray(def.preferredRecipeTypes)
+      ? def.preferredRecipeTypes
+      : [],
+    templateTags: Array.isArray(def.templateTags) ? def.templateTags : [],
+    templateDomainVersion: def.templateDomainVersion || null,
+  };
 }
 
 function findCandidatesByTypes(analysisCandidates = [], types = []) {
@@ -153,6 +186,8 @@ function buildBusinessTemplateCandidate(def, analysisCandidates = []) {
     ? headerNumerator / headerDenominator
     : 0.5;
 
+  const templateMeta = templateDefinitionMeta(def);
+
   const matchedHeaderHints = [
     ...(def.requiredHeaderHints || []),
     ...(def.requiredAnyHeaderHints || []),
@@ -164,6 +199,14 @@ function buildBusinessTemplateCandidate(def, analysisCandidates = []) {
     templateId: def.templateId,
     title: def.title,
     description: def.description,
+    domain: templateMeta.domain,
+    domainLabel: templateMeta.domainLabel,
+    domainGroup: templateMeta.domainGroup,
+    implementationLevel: templateMeta.implementationLevel,
+    implementationLevelLabel: templateMeta.implementationLevelLabel,
+    preferredRecipeTypes: templateMeta.preferredRecipeTypes,
+    templateTags: templateMeta.templateTags,
+    templateDomainVersion: templateMeta.templateDomainVersion,
     outputTypes: normalizeOutputTypes(def.outputTypes),
     priority: def.priority,
     confidence: Math.min(1, recipeScore * 0.55 + headerScore * 0.45),
@@ -188,5 +231,6 @@ function buildBusinessTemplateCandidates(analysisCandidates = []) {
 
 module.exports = {
   BUSINESS_TEMPLATE_DEFS,
+  templateDefinitionMeta,
   buildBusinessTemplateCandidates,
 };
