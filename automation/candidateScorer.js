@@ -1,4 +1,4 @@
-const CANDIDATE_SCORING_VERSION = "candidate_scoring_v1_1";
+const CANDIDATE_SCORING_VERSION = "candidate_scoring_v1_2";
 
 const TOP_TIER_MAX = 7;
 const SECONDARY_TIER_MAX = 30;
@@ -37,6 +37,129 @@ function clampNumber(value, fallback = 0, min = 0, max = 100) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
+}
+
+const BUSINESS_TEMPLATE_IMPLEMENTATION_WEIGHTS = Object.freeze({
+  custom: 9,
+  definitionOnly: -4,
+  statusRate: -12,
+  surveyScore: -12,
+  inventoryFlow: -12,
+  composite: -6,
+});
+
+const FUTURE_BUILDER_IMPLEMENTATION_LEVELS = new Set([
+  "statusRate",
+  "surveyScore",
+  "inventoryFlow",
+]);
+
+function isBusinessTemplateCandidate(candidate = {}) {
+  return (
+    /businessTemplate/i.test(candidate.candidateType || "") ||
+    candidate.type === "businessTemplate" ||
+    Boolean(candidate.templateId)
+  );
+}
+
+function getTemplateImplementationLevel(candidate = {}) {
+  return String(candidate.implementationLevel || "").trim() || "definitionOnly";
+}
+
+function getTemplateMatch(candidate = {}) {
+  const match =
+    candidate.templateMatch && typeof candidate.templateMatch === "object"
+      ? candidate.templateMatch
+      : {};
+  const confidence = clampNumber(candidate.confidence, 0, 0, 1);
+  const matchedHeaderHintCount = Number(
+    match.matchedHeaderHintCount ??
+      asArray(candidate.matchedHeaderHints).length,
+  );
+  const matchedHeaderValueCount = Number(
+    match.matchedHeaderValueCount ?? asArray(candidate.matchedHeaders).length,
+  );
+  const matchedCandidateCount = Number(
+    match.matchedCandidateCount ?? candidate.matchedCount ?? 0,
+  );
+  const fitScore = Number.isFinite(Number(match.fitScore))
+    ? Number(match.fitScore)
+    : Math.round(confidence * 100);
+
+  return {
+    fitScore,
+    matchedHeaderHintCount: Number.isFinite(matchedHeaderHintCount)
+      ? matchedHeaderHintCount
+      : 0,
+    matchedHeaderValueCount: Number.isFinite(matchedHeaderValueCount)
+      ? matchedHeaderValueCount
+      : 0,
+    matchedCandidateCount: Number.isFinite(matchedCandidateCount)
+      ? matchedCandidateCount
+      : 0,
+    recommendedEligible: candidate.recommendedEligible !== false,
+  };
+}
+
+function implementationAdjustmentScore(candidate = {}) {
+  if (!isBusinessTemplateCandidate(candidate)) {
+    return { score: 0, signals: [], penalties: [], traits: {} };
+  }
+
+  const implementationLevel = getTemplateImplementationLevel(candidate);
+  const templateMatch = getTemplateMatch(candidate);
+  let score =
+    BUSINESS_TEMPLATE_IMPLEMENTATION_WEIGHTS[implementationLevel] ?? -6;
+  const signals = [];
+  const penalties = [];
+
+  if (implementationLevel === "custom") {
+    signals.push("CUSTOM_TEMPLATE_PRIORITY");
+  } else if (implementationLevel === "definitionOnly") {
+    if (
+      templateMatch.fitScore >= 72 &&
+      templateMatch.matchedCandidateCount >= 2 &&
+      templateMatch.matchedHeaderHintCount >= 2
+    ) {
+      score += 7;
+      signals.push("DEFINITION_TEMPLATE_HIGH_FIT");
+    } else if (
+      templateMatch.fitScore >= 63 &&
+      templateMatch.matchedCandidateCount >= 1 &&
+      templateMatch.matchedHeaderHintCount >= 2
+    ) {
+      score += 2;
+      signals.push("DEFINITION_TEMPLATE_ACCEPTED");
+    } else if (
+      templateMatch.fitScore < 58 ||
+      templateMatch.matchedHeaderHintCount < 1
+    ) {
+      score -= 8;
+      penalties.push("DEFINITION_TEMPLATE_LOW_FIT_PENALTY");
+    } else {
+      score -= 4;
+      penalties.push("DEFINITION_TEMPLATE_LIGHT_EVIDENCE_PENALTY");
+    }
+  } else if (FUTURE_BUILDER_IMPLEMENTATION_LEVELS.has(implementationLevel)) {
+    penalties.push("FUTURE_BUILDER_TEMPLATE_PENALTY");
+  } else {
+    penalties.push("COMPOSITE_TEMPLATE_REVIEW_PENALTY");
+  }
+
+  if (candidate.recommendedEligible === false) {
+    score -= 10;
+    penalties.push("TEMPLATE_NOT_RECOMMENDED_PENALTY");
+  }
+
+  return {
+    score: Math.max(-22, Math.min(18, score)),
+    signals,
+    penalties,
+    traits: {
+      implementationLevel,
+      ...templateMatch,
+    },
+  };
 }
 
 function normalizeText(value = "") {
@@ -454,8 +577,10 @@ function candidateTypeSortRank(candidate = {}) {
 
 function domainSortScore(candidate = {}) {
   return (
-    Number(candidate.score?.signals?.domainFit || 0) -
-    Number(candidate.score?.penalties?.domain || 0)
+    Number(candidate.score?.signals?.domainFit || 0) +
+    Number(candidate.score?.signals?.implementationFit || 0) -
+    Number(candidate.score?.penalties?.domain || 0) -
+    Number(candidate.score?.penalties?.implementation || 0)
   );
 }
 
@@ -466,6 +591,7 @@ function scoreCandidate(candidate = {}, context = {}) {
   const priority = clampNumber(candidate.priority, 0, -10000, 10000);
   const normalizedPriority = Math.max(0, Math.min(10, priority / 80));
   const domain = domainAdjustmentScore(candidate);
+  const implementation = implementationAdjustmentScore(candidate);
   const signals = {
     confidence: Math.round(confidence * 1000) / 1000,
     priority,
@@ -477,17 +603,22 @@ function scoreCandidate(candidate = {}, context = {}) {
     normalizedPriority,
     domainFit: domain.score,
     domainTraits: domain.traits,
+    implementationFit: implementation.score,
+    implementationTraits: implementation.traits,
     versionNotes: [
       "BUSINESS_TEMPLATE_TIE_BREAK",
       "SALES_AMOUNT_OVER_QUANTITY",
       "RESEARCH_YEAR_METRIC_PENALTY",
       "GENERIC_INDICATOR_NAME_PENALTY",
       "REDUCED_SCORE_SATURATION",
+      "IMPLEMENTATION_LEVEL_AWARE_TEMPLATE_SCORING",
+      "DEFINITION_ONLY_TEMPLATE_LIGHT_EVIDENCE_PENALTY",
     ],
   };
   const penalties = {
     quality: penaltyScore(candidate),
     domain: Math.abs(Math.min(0, domain.score)),
+    implementation: Math.abs(Math.min(0, implementation.score)),
   };
   const baseScore = 18;
   const total = clampNumber(
@@ -498,7 +629,8 @@ function scoreCandidate(candidate = {}, context = {}) {
       signals.outputTypes +
       signals.source +
       signals.evidence +
-      domain.score -
+      domain.score +
+      implementation.score -
       penalties.quality,
     0,
     0,
@@ -513,6 +645,8 @@ function scoreCandidate(candidate = {}, context = {}) {
     signals.evidence >= 7 ? "HAS_ANALYSIS_EVIDENCE" : "LOW_ANALYSIS_EVIDENCE",
     ...domain.signals,
     ...domain.penalties,
+    ...implementation.signals,
+    ...implementation.penalties,
     penalties.quality > 0 ? "HAS_RANKING_PENALTY" : "",
   ]);
 
@@ -749,7 +883,7 @@ function scoreCandidateBundle(bundle = {}, context = {}) {
       applied: true,
       generatedAt: new Date().toISOString(),
       notes: [
-        "candidate_scoring_v1_1 reduces score saturation and applies domain-aware metric ranking.",
+        "candidate_scoring_v1_2 reduces score saturation and applies domain/implementation-aware template ranking.",
         "multi_source_final_bundle_injection_v1 rebuilds missing multiSourceCandidates from final candidate payload when needed.",
       ],
       multiSourceDiagnostics: multiSourceGenerationDiagnostics,

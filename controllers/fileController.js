@@ -126,6 +126,7 @@ exports.uploadFile = async (req, res, next) => {
       );
       const businessTemplateCandidates = buildBusinessTemplateCandidates(
         analysisRecipeCandidates,
+        { fileName: originalName },
       );
 
       queryJsonMeta = await saveEncryptedQueryJson({

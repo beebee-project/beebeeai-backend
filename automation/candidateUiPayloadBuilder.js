@@ -71,6 +71,39 @@ function formatConfidencePercent(confidence) {
   return Math.max(0, Math.min(100, pct));
 }
 
+function isRecommendationEligible(candidateOrCard = {}) {
+  if (!candidateOrCard || typeof candidateOrCard !== "object") return false;
+  if (candidateOrCard.recommendedEligible === false) return false;
+
+  const candidateType =
+    candidateOrCard.candidateType || inferCandidateType(candidateOrCard);
+  const implementationLevel = String(
+    candidateOrCard.implementationLevel || "",
+  ).trim();
+
+  if (
+    candidateType === "businessTemplate" &&
+    ["statusRate", "surveyScore", "inventoryFlow"].includes(implementationLevel)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function getBusinessTemplateRecommendationRank(card = {}) {
+  const implementationLevel = String(card.implementationLevel || "").trim();
+  const fitScore = Number(card.templateMatch?.fitScore || 0);
+  const rankScore = Number(card.rankScore || 0);
+  const priority = Number(card.priority || 0);
+
+  if (implementationLevel === "custom") return 100000 + rankScore;
+  if (implementationLevel === "definitionOnly") {
+    return 70000 + fitScore * 10 + rankScore + priority;
+  }
+  return 30000 + fitScore * 5 + rankScore;
+}
+
 function inferCandidateType(candidate = {}) {
   if (candidate.candidateType) return String(candidate.candidateType);
   if (candidate.templateId || candidate.type === "businessTemplate") {
@@ -212,7 +245,10 @@ function buildRecommendationReason(candidate = {}, sourceSheetNames = []) {
     const matchedCount = Array.isArray(candidate.candidates)
       ? candidate.candidates.length
       : Number(candidate.matchedCount || 0);
-    return `${sourceLabel}으로 ${matchedCount || "여러"}개 분석 후보가 매칭되어 ${title || "업무 템플릿"} 생성에 적합합니다.`;
+    const domainLabel = cleanText(candidate.domainLabel, 40);
+    const levelLabel = cleanText(candidate.implementationLevelLabel, 40);
+    const prefix = [domainLabel, levelLabel].filter(Boolean).join(" · ");
+    return `${sourceLabel}으로 ${matchedCount || "여러"}개 분석 후보가 매칭되어 ${prefix ? `${prefix} ` : ""}${title || "업무 템플릿"} 생성에 적합합니다.`;
   }
 
   if (candidateType === "multiSource") {
@@ -285,6 +321,13 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
     candidateId,
     candidateType,
     candidateTypeLabel: CANDIDATE_TYPE_LABELS[candidateType] || candidateType,
+    domain: candidate.domain || "",
+    domainLabel: candidate.domainLabel || "",
+    domainGroup: candidate.domainGroup || "",
+    implementationLevel: candidate.implementationLevel || "",
+    implementationLevelLabel: candidate.implementationLevelLabel || "",
+    recommendedEligible: isRecommendationEligible(candidate),
+    templateMatch: candidate.templateMatch || null,
     templateId: candidate.templateId || "",
     recipeType: candidate.recipeType || candidate.type || "",
     multiSourceCandidateKind: candidate.multiSourceCandidateKind || "",
@@ -327,8 +370,11 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
     columns,
     badges: unique([
       CANDIDATE_TYPE_LABELS[candidateType] || candidateType,
+      candidate.domainLabel || "",
+      candidate.implementationLevelLabel || "",
       SOURCE_SCOPE_LABELS[sourceScope] || sourceScope,
       confidencePercent ? `신뢰도 ${confidencePercent}%` : "",
+      candidate.recommendedEligible === false ? "추천 보류" : "",
       candidate.aiAssisted ? "AI 보조" : "",
     ]),
     execution,
@@ -345,6 +391,7 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
     diagnostics: {
       source: context.source || "candidate-bundle",
       rawType: candidate.type || "",
+      recommendationPolicyVersion: "candidate_recommendation_policy_v1",
     },
   };
 }
@@ -545,12 +592,24 @@ function buildCandidateUiPayload({
   );
 
   const topExecutable = cardsByGroup.topCandidates.filter(
-    (card) => card.execution?.executable,
+    (card) => card.execution?.executable && isRecommendationEligible(card),
+  );
+  const preferredBusinessTemplates = cardsByGroup.businessTemplateCandidates
+    .filter(
+      (card) => card.execution?.executable && isRecommendationEligible(card),
+    )
+    .sort(
+      (a, b) =>
+        getBusinessTemplateRecommendationRank(b) -
+        getBusinessTemplateRecommendationRank(a),
+    );
+  const fallbackAnalysisRecipes = cardsByGroup.analysisRecipeCandidates.filter(
+    (card) => card.execution?.executable && isRecommendationEligible(card),
   );
   const fallbackExecutable = uniqueCardsById([
-    ...cardsByGroup.businessTemplateCandidates,
-    ...cardsByGroup.analysisRecipeCandidates,
-  ]).filter((card) => card.execution?.executable);
+    ...preferredBusinessTemplates,
+    ...fallbackAnalysisRecipes,
+  ]);
   const recommendedCandidates = uniqueCardsById([
     ...topExecutable,
     ...fallbackExecutable,
@@ -610,6 +669,7 @@ function buildCandidateUiPayload({
       showConfidence: true,
       showRecommendationReason: true,
       showOutputTypes: true,
+      recommendationPolicyVersion: "candidate_recommendation_policy_v1",
     },
   };
 }
@@ -619,4 +679,5 @@ module.exports = {
   RECOMMENDED_CANDIDATE_LIMIT,
   buildCandidateUiPayload,
   buildCandidateCard,
+  isRecommendationEligible,
 };

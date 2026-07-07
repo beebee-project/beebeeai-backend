@@ -79,6 +79,7 @@ function mergeUniqueByCandidateId(...groups) {
 
 function buildDeterministicCandidateBundle({
   normalizedQueryTables = [],
+  fileName = "",
   source = "deterministic",
 } = {}) {
   const safeTables = Array.isArray(normalizedQueryTables)
@@ -97,7 +98,10 @@ function buildDeterministicCandidateBundle({
     analysisRecipeCandidates,
   );
   const businessTemplateCandidates = enrichCandidateListWithSourceTablePolicy(
-    buildBusinessTemplateCandidates(analysisRecipeCandidates),
+    buildBusinessTemplateCandidates(analysisRecipeCandidates, {
+      fileName,
+      normalizedQueryTables: safeTables,
+    }),
     sourceTablePolicy,
   );
   const initialMultiSource = buildMultiSourceCandidatesWithDiagnostics({
