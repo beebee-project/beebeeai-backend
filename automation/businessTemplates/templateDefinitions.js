@@ -673,7 +673,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "purchase_inspection_status",
     domain: TEMPLATE_DOMAINS.BUDGET,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["group_sum", "category_count", "status_count"],
     templateTags: ["구매", "검수", "물품", "업체", "상태"],
     title: "구매·검수 현황",
@@ -715,7 +715,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "service_contract_execution_status",
     domain: TEMPLATE_DOMAINS.BUDGET,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["group_sum", "category_count", "status_count"],
     templateTags: ["용역", "계약", "업체", "집행", "상태"],
     title: "용역 계약 집행 현황",
@@ -840,7 +840,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "recruitment_applicant_management",
     domain: TEMPLATE_DOMAINS.HR,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["category_count", "status_count", "group_avg"],
     templateTags: ["채용", "지원자", "전형", "합격", "평가"],
     title: "채용 지원자 관리",
@@ -882,7 +882,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "research_participant_status",
     domain: TEMPLATE_DOMAINS.HR,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["category_count", "time_count", "group_summary"],
     templateTags: ["참여연구원", "역할", "소속", "참여기간", "인건비"],
     title: "참여연구원 현황",
@@ -926,7 +926,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "purchase_order_status",
     domain: TEMPLATE_DOMAINS.INVENTORY,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["group_sum", "category_count", "status_count"],
     templateTags: ["발주", "업체", "품목", "상태", "금액"],
     title: "발주 현황",
@@ -967,7 +967,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "asset_equipment_management",
     domain: TEMPLATE_DOMAINS.INVENTORY,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["category_count", "group_sum", "status_count"],
     templateTags: ["장비", "비품", "자산", "부서", "상태"],
     title: "장비·비품 관리",
@@ -1009,7 +1009,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "customer_inquiry_analysis",
     domain: TEMPLATE_DOMAINS.CUSTOMER,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["category_count", "status_count", "time_count"],
     templateTags: ["고객", "문의", "CS", "상태", "유형"],
     title: "고객 문의 분석",
@@ -1052,7 +1052,7 @@ const RAW_BUSINESS_TEMPLATE_DEFS = [
   {
     templateId: "event_applicant_status",
     domain: TEMPLATE_DOMAINS.OPERATION,
-    implementationLevel: IMPLEMENTATION_LEVELS.DEFINITION_ONLY,
+    implementationLevel: IMPLEMENTATION_LEVELS.STATUS_RATE,
     preferredRecipeTypes: ["category_count", "status_count", "time_count"],
     templateTags: ["행사", "신청자", "참석", "취소", "소속"],
     title: "행사 신청자 현황",
