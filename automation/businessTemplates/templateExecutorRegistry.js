@@ -6,6 +6,9 @@ const {
 const { executeHrMonthlyReport } = require("./hrMonthlyReportBuilder");
 const { executeStatusRateReport } = require("./statusRateTemplateBuilder");
 const { executeSurveyScoreReport } = require("./surveyScoreTemplateBuilder");
+const {
+  executeInventoryFlowReport,
+} = require("./inventoryFlowTemplateBuilder");
 
 const BUSINESS_TEMPLATE_EXECUTORS = Object.freeze({
   sales_report: executeSalesReport,
@@ -38,6 +41,14 @@ const BUSINESS_TEMPLATE_EXECUTORS = Object.freeze({
   course_evaluation_report: executeSurveyScoreReport,
   customer_satisfaction_report: executeSurveyScoreReport,
   internal_survey_score_report: executeSurveyScoreReport,
+
+  // inventoryFlow common builder templates
+  inventory_stock_status: executeInventoryFlowReport,
+  inventory_inout_flow_report: executeInventoryFlowReport,
+  asset_lifecycle_report: executeInventoryFlowReport,
+  equipment_rental_status: executeInventoryFlowReport,
+  supply_usage_report: executeInventoryFlowReport,
+  warehouse_movement_report: executeInventoryFlowReport,
 });
 
 function getBusinessTemplateExecutor(templateId = "") {
