@@ -226,14 +226,20 @@ function getTemplateDomainDisplay(domain = "") {
 
 function getTemplateExposureLevel(templateId = "") {
   const key = normalizeText(templateId);
-  return TEMPLATE_EXPOSURE_OVERRIDES[key] || TEMPLATE_EXPOSURE_LEVELS.CONDITIONAL;
+  return (
+    TEMPLATE_EXPOSURE_OVERRIDES[key] || TEMPLATE_EXPOSURE_LEVELS.CONDITIONAL
+  );
 }
 
 function getTemplateExposure(templateId = "", template = {}) {
-  const exposureLevel = getTemplateExposureLevel(templateId || template.templateId);
+  const exposureLevel = getTemplateExposureLevel(
+    templateId || template.templateId,
+  );
   const levelDef = getExposureLevelDef(exposureLevel);
   const domainDisplay = getTemplateDomainDisplay(template.domain);
-  const title = normalizeText(template.title || template.templateId || templateId);
+  const title = normalizeText(
+    template.title || template.templateId || templateId,
+  );
   const domainOrder = Number(domainDisplay.displayOrder || 100);
   const exposureOrder = Number(levelDef.displayOrder || 99);
 
@@ -267,7 +273,9 @@ function getTemplateExposureBadges(template = {}) {
   return [
     exposure.domainShortLabel || exposure.domainLabel,
     exposure.shortLabel || exposure.label,
-    template.implementationLevelLabel || exposure.implementationLevelLabel || "",
+    template.implementationLevelLabel ||
+      exposure.implementationLevelLabel ||
+      "",
   ].filter(Boolean);
 }
 
