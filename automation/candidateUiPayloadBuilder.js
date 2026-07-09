@@ -9,6 +9,11 @@ const {
   normalizeOutputTypes,
   getOutputTypeUiLabel,
 } = require("./config/outputArtifactConfig");
+const {
+  getTemplateExposure,
+  getTemplateExposureBadges,
+  buildTemplateExposureSummary,
+} = require("./config/templateExposureConfig");
 
 const CANDIDATE_UI_PAYLOAD_VERSION = "candidate_ui_payload_v2";
 const RECOMMENDED_CANDIDATE_LIMIT = 3;
@@ -69,39 +74,6 @@ function formatConfidencePercent(confidence) {
   if (!Number.isFinite(n) || n <= 0) return null;
   const pct = n <= 1 ? Math.round(n * 100) : Math.round(n);
   return Math.max(0, Math.min(100, pct));
-}
-
-function isRecommendationEligible(candidateOrCard = {}) {
-  if (!candidateOrCard || typeof candidateOrCard !== "object") return false;
-  if (candidateOrCard.recommendedEligible === false) return false;
-
-  const candidateType =
-    candidateOrCard.candidateType || inferCandidateType(candidateOrCard);
-  const implementationLevel = String(
-    candidateOrCard.implementationLevel || "",
-  ).trim();
-
-  if (
-    candidateType === "businessTemplate" &&
-    ["statusRate", "surveyScore", "inventoryFlow"].includes(implementationLevel)
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function getBusinessTemplateRecommendationRank(card = {}) {
-  const implementationLevel = String(card.implementationLevel || "").trim();
-  const fitScore = Number(card.templateMatch?.fitScore || 0);
-  const rankScore = Number(card.rankScore || 0);
-  const priority = Number(card.priority || 0);
-
-  if (implementationLevel === "custom") return 100000 + rankScore;
-  if (implementationLevel === "definitionOnly") {
-    return 70000 + fitScore * 10 + rankScore + priority;
-  }
-  return 30000 + fitScore * 5 + rankScore;
 }
 
 function inferCandidateType(candidate = {}) {
@@ -228,6 +200,43 @@ function getCandidateColumns(candidate = {}) {
   };
 }
 
+function getTemplateDisplayMeta(candidate = {}) {
+  if (!candidate.templateId) return null;
+  const exposure = getTemplateExposure(candidate.templateId, candidate);
+
+  return {
+    domain: candidate.domain || exposure.domain || "",
+    domainLabel: candidate.domainLabel || exposure.domainLabel || "",
+    domainGroup: candidate.domainGroup || "",
+    implementationLevel:
+      candidate.implementationLevel || exposure.implementationLevel || "",
+    implementationLevelLabel:
+      candidate.implementationLevelLabel ||
+      exposure.implementationLevelLabel ||
+      "",
+    exposureLevel: exposure.exposureLevel,
+    exposureLabel: exposure.label,
+    exposureShortLabel: exposure.shortLabel,
+    exposureDescription: exposure.description,
+    exposurePriority: exposure.priority,
+    frontExposure: exposure,
+    display: {
+      title: cleanText(exposure.displayTitle || candidate.title || "", 120),
+      subtitle: cleanText(
+        exposure.displaySubtitle || candidate.description || "",
+        180,
+      ),
+      order: Number.isFinite(Number(exposure.displayOrder))
+        ? Number(exposure.displayOrder)
+        : null,
+    },
+  };
+}
+
+function isFrontVisibleCard(card = {}) {
+  return card.frontExposure?.hideFromFrontend !== true;
+}
+
 function buildRecommendationReason(candidate = {}, sourceSheetNames = []) {
   const explicit = cleanText(candidate.recommendationReason, 240);
   if (explicit) return explicit;
@@ -245,10 +254,7 @@ function buildRecommendationReason(candidate = {}, sourceSheetNames = []) {
     const matchedCount = Array.isArray(candidate.candidates)
       ? candidate.candidates.length
       : Number(candidate.matchedCount || 0);
-    const domainLabel = cleanText(candidate.domainLabel, 40);
-    const levelLabel = cleanText(candidate.implementationLevelLabel, 40);
-    const prefix = [domainLabel, levelLabel].filter(Boolean).join(" · ");
-    return `${sourceLabel}으로 ${matchedCount || "여러"}개 분석 후보가 매칭되어 ${prefix ? `${prefix} ` : ""}${title || "업무 템플릿"} 생성에 적합합니다.`;
+    return `${sourceLabel}으로 ${matchedCount || "여러"}개 분석 후보가 매칭되어 ${title || "업무 템플릿"} 생성에 적합합니다.`;
   }
 
   if (candidateType === "multiSource") {
@@ -272,6 +278,22 @@ function isExecutableCandidate(candidate = {}) {
 
 function buildExecutionMeta(candidate = {}) {
   const candidateType = inferCandidateType(candidate);
+  const exposure =
+    candidateType === "businessTemplate"
+      ? getTemplateExposure(candidate.templateId, candidate)
+      : null;
+
+  if (exposure?.hideFromFrontend) {
+    return {
+      executable: false,
+      actionType: "hidden",
+      endpoint: "",
+      disabledReason:
+        exposure.disabledReason ||
+        "현재 버전에서는 안정성 확인 전까지 프론트 추천에서 제외됩니다.",
+    };
+  }
+
   const executable = isExecutableCandidate(candidate);
   const endpoint =
     candidateType === "businessTemplate"
@@ -314,6 +336,13 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
   const confidencePercent = formatConfidencePercent(candidate.confidence);
   const execution = buildExecutionMeta(candidate);
   const columns = getCandidateColumns(candidate);
+  const templateDisplayMeta =
+    candidateType === "businessTemplate"
+      ? getTemplateDisplayMeta(candidate)
+      : null;
+  const templateExposureBadges = templateDisplayMeta
+    ? getTemplateExposureBadges(candidate)
+    : [];
 
   return {
     uiPayloadVersion: CANDIDATE_UI_PAYLOAD_VERSION,
@@ -321,20 +350,39 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
     candidateId,
     candidateType,
     candidateTypeLabel: CANDIDATE_TYPE_LABELS[candidateType] || candidateType,
-    domain: candidate.domain || "",
-    domainLabel: candidate.domainLabel || "",
-    domainGroup: candidate.domainGroup || "",
-    implementationLevel: candidate.implementationLevel || "",
-    implementationLevelLabel: candidate.implementationLevelLabel || "",
-    recommendedEligible: isRecommendationEligible(candidate),
-    templateMatch: candidate.templateMatch || null,
     templateId: candidate.templateId || "",
+    domain: templateDisplayMeta?.domain || candidate.domain || "",
+    domainLabel:
+      templateDisplayMeta?.domainLabel || candidate.domainLabel || "",
+    domainGroup:
+      templateDisplayMeta?.domainGroup || candidate.domainGroup || "",
+    implementationLevel:
+      templateDisplayMeta?.implementationLevel ||
+      candidate.implementationLevel ||
+      "",
+    implementationLevelLabel:
+      templateDisplayMeta?.implementationLevelLabel ||
+      candidate.implementationLevelLabel ||
+      "",
+    exposureLevel: templateDisplayMeta?.exposureLevel || "",
+    exposureLabel: templateDisplayMeta?.exposureLabel || "",
+    exposureShortLabel: templateDisplayMeta?.exposureShortLabel || "",
+    exposurePriority: templateDisplayMeta?.exposurePriority ?? null,
+    frontExposure: templateDisplayMeta?.frontExposure || null,
+    display: templateDisplayMeta?.display || null,
     recipeType: candidate.recipeType || candidate.type || "",
     multiSourceCandidateKind: candidate.multiSourceCandidateKind || "",
-    title: cleanText(candidate.title || candidate.name || candidateId, 120),
+    title: cleanText(
+      templateDisplayMeta?.display?.title ||
+        candidate.title ||
+        candidate.name ||
+        candidateId,
+      120,
+    ),
     description: cleanText(
       candidate.description ||
         candidate.summary ||
+        templateDisplayMeta?.display?.subtitle ||
         "업로드된 파일 구조를 기반으로 추천된 자동화 후보입니다.",
       260,
     ),
@@ -369,12 +417,10 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
     matchedHeaders: getCandidateMatchedHeaders(candidate),
     columns,
     badges: unique([
+      ...templateExposureBadges,
       CANDIDATE_TYPE_LABELS[candidateType] || candidateType,
-      candidate.domainLabel || "",
-      candidate.implementationLevelLabel || "",
       SOURCE_SCOPE_LABELS[sourceScope] || sourceScope,
       confidencePercent ? `신뢰도 ${confidencePercent}%` : "",
-      candidate.recommendedEligible === false ? "추천 보류" : "",
       candidate.aiAssisted ? "AI 보조" : "",
     ]),
     execution,
@@ -391,7 +437,6 @@ function buildCandidateCard(candidate = {}, index = 0, context = {}) {
     diagnostics: {
       source: context.source || "candidate-bundle",
       rawType: candidate.type || "",
-      recommendationPolicyVersion: "candidate_recommendation_policy_v1",
     },
   };
 }
@@ -583,33 +628,23 @@ function buildCandidateUiPayload({
       key,
       uniqueCardsById(
         rankCards(
-          list.map((candidate, index) =>
-            buildCandidateCard(candidate, index, { source }),
-          ),
+          list
+            .map((candidate, index) =>
+              buildCandidateCard(candidate, index, { source }),
+            )
+            .filter(isFrontVisibleCard),
         ),
       ),
     ]),
   );
 
   const topExecutable = cardsByGroup.topCandidates.filter(
-    (card) => card.execution?.executable && isRecommendationEligible(card),
-  );
-  const preferredBusinessTemplates = cardsByGroup.businessTemplateCandidates
-    .filter(
-      (card) => card.execution?.executable && isRecommendationEligible(card),
-    )
-    .sort(
-      (a, b) =>
-        getBusinessTemplateRecommendationRank(b) -
-        getBusinessTemplateRecommendationRank(a),
-    );
-  const fallbackAnalysisRecipes = cardsByGroup.analysisRecipeCandidates.filter(
-    (card) => card.execution?.executable && isRecommendationEligible(card),
+    (card) => card.execution?.executable,
   );
   const fallbackExecutable = uniqueCardsById([
-    ...preferredBusinessTemplates,
-    ...fallbackAnalysisRecipes,
-  ]);
+    ...cardsByGroup.businessTemplateCandidates,
+    ...cardsByGroup.analysisRecipeCandidates,
+  ]).filter((card) => card.execution?.executable);
   const recommendedCandidates = uniqueCardsById([
     ...topExecutable,
     ...fallbackExecutable,
@@ -623,6 +658,10 @@ function buildCandidateUiPayload({
     ...cardsByGroup.analysisRecipeCandidates,
     ...cardsByGroup.secondaryCandidates,
   ]);
+
+  const templateExposureSummary = buildTemplateExposureSummary(
+    allCards.filter((card) => card.candidateType === "businessTemplate"),
+  );
 
   const scopeCounts = allCards.reduce((acc, card) => {
     const key = card.sourceScope || "unknown";
@@ -641,6 +680,8 @@ function buildCandidateUiPayload({
       sourceTableCount: sourceTables.filter((table) => !table.isVirtual).length,
       virtualTableCount: sourceTables.filter((table) => table.isVirtual).length,
       sourceScopeCounts: scopeCounts,
+      businessTemplateExposureCounts:
+        templateExposureSummary.exposureCounts || {},
       emptyReason: recommendedCandidates.length
         ? ""
         : "NO_RECOMMENDED_CANDIDATES",
@@ -669,7 +710,8 @@ function buildCandidateUiPayload({
       showConfidence: true,
       showRecommendationReason: true,
       showOutputTypes: true,
-      recommendationPolicyVersion: "candidate_recommendation_policy_v1",
+      showTemplateExposure: true,
+      templateExposure: templateExposureSummary,
     },
   };
 }
@@ -679,5 +721,4 @@ module.exports = {
   RECOMMENDED_CANDIDATE_LIMIT,
   buildCandidateUiPayload,
   buildCandidateCard,
-  isRecommendationEligible,
 };
