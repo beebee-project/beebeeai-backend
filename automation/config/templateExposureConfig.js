@@ -165,13 +165,12 @@ const GENERAL_VERIFIED_TEMPLATE_IDS = Object.freeze([
   "monthly_expense_report",
   "employee_roster_status",
   "vendor_performance_report",
-]);
-
-const QUARANTINED_TEMPLATE_IDS = Object.freeze([
   "revenue_cost_profit_report",
   "kpi_performance_dashboard",
   "energy_usage_report",
 ]);
+
+const QUARANTINED_TEMPLATE_IDS = Object.freeze([]);
 
 const CONDITIONAL_TEMPLATE_IDS = Object.freeze([
   "purchase_analysis_report",

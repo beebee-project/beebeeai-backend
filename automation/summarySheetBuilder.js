@@ -47,6 +47,56 @@ const WORKBOOK_XML_CALCPR_INJECTION_VERSION =
 const WORKBOOK_CALCPR_XML =
   '<calcPr calcMode="auto" fullCalcOnLoad="1" forceFullCalc="1"/>';
 
+function emitSummarySheetDiagnostic(
+  diagnostic,
+  stage,
+  status = "INFO",
+  meta = {},
+) {
+  try {
+    if (diagnostic && typeof diagnostic.checkpoint === "function") {
+      diagnostic.checkpoint(stage, status, meta);
+    }
+  } catch (error) {
+    // Diagnostics must never break workbook generation.
+  }
+}
+
+function summarizeSectionForWorkbookDiagnostic(section = {}, index = 0) {
+  const sectionResult = section?.result || {};
+  return {
+    index,
+    sectionId: section?.sectionId || "",
+    title: section?.title || "",
+    resultType: sectionResult?.resultType || "",
+    operation: sectionResult?.operation || "",
+    rowCount: Array.isArray(sectionResult?.rows)
+      ? sectionResult.rows.length
+      : 0,
+    hasMetric: Boolean(sectionResult?.metric?.header),
+    hasGroupBy: Boolean(sectionResult?.groupBy?.header),
+  };
+}
+
+function runWorkbookDiagnosticStep(diagnostic, stage, fn, meta = {}) {
+  emitSummarySheetDiagnostic(diagnostic, stage, "START", meta);
+  const startedAt = Date.now();
+  try {
+    const value = fn();
+    emitSummarySheetDiagnostic(diagnostic, stage, "OK", {
+      stageElapsedMs: Date.now() - startedAt,
+    });
+    return value;
+  } catch (error) {
+    emitSummarySheetDiagnostic(diagnostic, stage, "ERROR", {
+      stageElapsedMs: Date.now() - startedAt,
+      error: error?.message || String(error),
+      stack: error?.stack || "",
+    });
+    throw error;
+  }
+}
+
 function buildChartDataRows(result = {}) {
   if (result.resultType === "grouped") {
     if (
@@ -73,31 +123,144 @@ function buildChartDataRows(result = {}) {
   return [];
 }
 
-function sanitizeSheetName(name) {
+const XLSX_MAX_SHEET_NAME_LENGTH = 31;
+const SHEET_NAME_COLLISION_MAX_ATTEMPTS = 200;
+
+function sanitizeSheetNameBase(name) {
   return (
     String(name || "Sheet")
       .replace(/[:\\/?*\[\]]/g, " ")
       .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 31) || "Sheet"
+      .trim() || "Sheet"
   );
 }
 
-function appendSheetSafe(wb, ws, name) {
-  let safeName = sanitizeSheetName(name);
-  const existing = new Set(wb.SheetNames || []);
+function truncateSheetNameBase(base, maxLength = XLSX_MAX_SHEET_NAME_LENGTH) {
+  const safeMax = Math.max(1, Number(maxLength) || XLSX_MAX_SHEET_NAME_LENGTH);
+  return (
+    String(base || "Sheet")
+      .slice(0, safeMax)
+      .trim() || "Sheet"
+  );
+}
 
-  if (!existing.has(safeName)) {
-    XLSX.utils.book_append_sheet(wb, ws, safeName);
-    return;
+function sanitizeSheetName(name) {
+  return truncateSheetNameBase(sanitizeSheetNameBase(name));
+}
+
+function normalizeSheetNameForCollision(name = "") {
+  return String(name || "")
+    .trim()
+    .toLocaleLowerCase("ko-KR");
+}
+
+function buildSheetNameCollisionHash(value = "") {
+  const text = String(value || "Sheet");
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).slice(0, 6);
+}
+
+function resolveUniqueSheetName(wb, requestedName = "Sheet") {
+  const existingNames = Array.isArray(wb?.SheetNames) ? wb.SheetNames : [];
+  const existingNormalized = new Set(
+    existingNames.map((sheetName) => normalizeSheetNameForCollision(sheetName)),
+  );
+  const requestedBase = sanitizeSheetNameBase(requestedName);
+  const initialName = truncateSheetNameBase(requestedBase);
+  const initialKey = normalizeSheetNameForCollision(initialName);
+
+  if (!existingNormalized.has(initialKey)) {
+    return {
+      requestedSheetName: String(requestedName || ""),
+      sanitizedBaseName: requestedBase,
+      safeSheetName: initialName,
+      collisionCount: 0,
+      collisionGuardApplied: false,
+      truncated: requestedBase !== initialName,
+      existingSheetCount: existingNames.length,
+    };
   }
 
-  let idx = 2;
-  while (existing.has(`${safeName}_${idx}`.slice(0, 31))) {
-    idx += 1;
+  for (
+    let attempt = 2;
+    attempt <= SHEET_NAME_COLLISION_MAX_ATTEMPTS;
+    attempt += 1
+  ) {
+    const suffix = `_${attempt}`;
+    const baseLength = XLSX_MAX_SHEET_NAME_LENGTH - suffix.length;
+    const candidate = `${truncateSheetNameBase(requestedBase, baseLength)}${suffix}`;
+    const candidateKey = normalizeSheetNameForCollision(candidate);
+
+    if (!existingNormalized.has(candidateKey)) {
+      return {
+        requestedSheetName: String(requestedName || ""),
+        sanitizedBaseName: requestedBase,
+        safeSheetName: candidate,
+        collisionCount: attempt - 1,
+        collisionGuardApplied: true,
+        truncated: requestedBase !== candidate,
+        existingSheetCount: existingNames.length,
+      };
+    }
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, `${safeName}_${idx}`.slice(0, 31));
+  const hashSuffix = `_${buildSheetNameCollisionHash(
+    `${requestedBase}|${existingNames.join("|")}`,
+  )}`;
+  const hashedName = `${truncateSheetNameBase(
+    requestedBase,
+    XLSX_MAX_SHEET_NAME_LENGTH - hashSuffix.length,
+  )}${hashSuffix}`;
+  let candidate = hashedName;
+  let guardIndex = 2;
+
+  while (
+    existingNormalized.has(normalizeSheetNameForCollision(candidate)) &&
+    guardIndex <= 50
+  ) {
+    const suffix = `_${buildSheetNameCollisionHash(`${hashedName}|${guardIndex}`)}`;
+    candidate = `${truncateSheetNameBase(
+      requestedBase,
+      XLSX_MAX_SHEET_NAME_LENGTH - suffix.length,
+    )}${suffix}`;
+    guardIndex += 1;
+  }
+
+  if (existingNormalized.has(normalizeSheetNameForCollision(candidate))) {
+    throw new Error(
+      `Unable to resolve unique worksheet name after ${SHEET_NAME_COLLISION_MAX_ATTEMPTS} attempts: ${requestedBase}`,
+    );
+  }
+
+  return {
+    requestedSheetName: String(requestedName || ""),
+    sanitizedBaseName: requestedBase,
+    safeSheetName: candidate,
+    collisionCount: SHEET_NAME_COLLISION_MAX_ATTEMPTS,
+    collisionGuardApplied: true,
+    hashFallbackApplied: true,
+    truncated: requestedBase !== candidate,
+    existingSheetCount: existingNames.length,
+  };
+}
+
+function appendSheetSafe(wb, ws, name, options = {}) {
+  const resolved = resolveUniqueSheetName(wb, name);
+
+  if (options && typeof options.onResolved === "function") {
+    try {
+      options.onResolved(resolved);
+    } catch (error) {
+      // Worksheet diagnostics must never break workbook generation.
+    }
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, resolved.safeSheetName);
+  return resolved;
 }
 
 function objectToAoa(obj = {}, prefix = "") {
@@ -1442,6 +1605,7 @@ function buildSummaryWorkbook({
   summarySheetMode = "static",
   includeSourceDataSheet = true,
   formulaOptions = {},
+  diagnostic = null,
 }) {
   const normalizedSummarySheetMode =
     normalizeSummarySheetMode(summarySheetMode);
@@ -1452,6 +1616,14 @@ function buildSummaryWorkbook({
   });
   const wb = XLSX.utils.book_new();
   const formulaEngineMeta = createFormulaEngineMeta(normalizedSummarySheetMode);
+  emitSummarySheetDiagnostic(diagnostic, "summary_workbook:start", "INFO", {
+    summarySheetMode: normalizedSummarySheetMode,
+    includeSourceDataSheet,
+    sourceTableCount: Array.isArray(sourceTables) ? sourceTables.length : 0,
+    sectionCount: Array.isArray(result?.sections) ? result.sections.length : 0,
+    resultType: result?.resultType || "",
+    operation: result?.operation || "",
+  });
 
   const summaryRows = [
     ["요청", message || ""],
@@ -1483,20 +1655,46 @@ function buildSummaryWorkbook({
       sourceTables,
     });
 
-    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+    const wsSummary = runWorkbookDiagnosticStep(
+      diagnostic,
+      "business_workbook:summary_sheet_aoa",
+      () => XLSX.utils.aoa_to_sheet(summaryRows),
+      { rowCount: summaryRows.length },
+    );
     setAoaColumnWidths(wsSummary, summaryRows);
     styleHeaderRow(wsSummary);
     applyDefaultSheetOptions(wsSummary);
     appendSheetSafe(wb, wsSummary, SHEET_NAMES.SUMMARY);
 
-    appendSourceDataSheets(wb, sourceTables, {
-      includeSourceDataSheet,
-      summarySheetMode: normalizedSummarySheetMode,
-    });
+    runWorkbookDiagnosticStep(
+      diagnostic,
+      "business_workbook:append_source_data",
+      () =>
+        appendSourceDataSheets(wb, sourceTables, {
+          includeSourceDataSheet,
+          summarySheetMode: normalizedSummarySheetMode,
+        }),
+      {
+        includeSourceDataSheet,
+        sourceTableCount: Array.isArray(sourceTables) ? sourceTables.length : 0,
+      },
+    );
 
     businessSections.forEach((section, index) => {
+      const sectionMeta = summarizeSectionForWorkbookDiagnostic(section, index);
+      emitSummarySheetDiagnostic(
+        diagnostic,
+        "business_section:start",
+        "INFO",
+        sectionMeta,
+      );
       const sectionResult = section.result || {};
-      const rows = resultToRows(sectionResult);
+      const rows = runWorkbookDiagnosticStep(
+        diagnostic,
+        "business_section:result_to_rows",
+        () => resultToRows(sectionResult),
+        sectionMeta,
+      );
       const outputRows = rows.length
         ? rows
         : [
@@ -1505,36 +1703,112 @@ function buildSummaryWorkbook({
               결과: "데이터 없음",
             },
           ];
-      const ws = XLSX.utils.json_to_sheet(outputRows);
-      const formulaPlan = buildSectionFormulaPlan({
-        section,
-        rows,
-        formulaContext,
-      });
+      emitSummarySheetDiagnostic(
+        diagnostic,
+        "business_section:rows_ready",
+        "INFO",
+        {
+          ...sectionMeta,
+          rowCount: rows.length,
+          outputRowCount: outputRows.length,
+          columnCount:
+            outputRows.length &&
+            outputRows[0] &&
+            typeof outputRows[0] === "object"
+              ? Object.keys(outputRows[0]).length
+              : 0,
+        },
+      );
+      const ws = runWorkbookDiagnosticStep(
+        diagnostic,
+        "business_section:json_to_sheet",
+        () => XLSX.utils.json_to_sheet(outputRows),
+        { ...sectionMeta, outputRowCount: outputRows.length },
+      );
+      const formulaPlan = runWorkbookDiagnosticStep(
+        diagnostic,
+        "business_section:formula_plan",
+        () =>
+          buildSectionFormulaPlan({
+            section,
+            rows,
+            formulaContext,
+          }),
+        sectionMeta,
+      );
 
-      setColumnWidths(ws, outputRows);
-      formatNumberCells(ws, sectionResult);
-      styleHeaderRow(ws);
-      applyDefaultSheetOptions(ws);
-      ws["!freeze"] = { xSplit: 0, ySplit: 1 };
-      const formulaCount = applySimpleAggregateFormulaSection({
-        ws,
-        rows,
-        formulaPlan,
-        formulaContext,
-      });
+      runWorkbookDiagnosticStep(
+        diagnostic,
+        "business_section:format_sheet",
+        () => {
+          setColumnWidths(ws, outputRows);
+          formatNumberCells(ws, sectionResult);
+          styleHeaderRow(ws);
+          applyDefaultSheetOptions(ws);
+          ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+        },
+        sectionMeta,
+      );
+      const formulaCount = runWorkbookDiagnosticStep(
+        diagnostic,
+        "business_section:apply_formulas",
+        () =>
+          applySimpleAggregateFormulaSection({
+            ws,
+            rows,
+            formulaPlan,
+            formulaContext,
+          }),
+        sectionMeta,
+      );
       recordFormulaApplication(formulaEngineMeta, formulaCount);
       attachFormulaPlan(ws, formulaPlan);
 
-      appendSheetSafe(
-        wb,
-        ws,
-        section.title || section.sectionId || `섹션_${index + 1}`,
+      const requestedSheetName =
+        section.title || section.sectionId || `섹션_${index + 1}`;
+      runWorkbookDiagnosticStep(
+        diagnostic,
+        "business_section:append_sheet",
+        () =>
+          appendSheetSafe(wb, ws, requestedSheetName, {
+            onResolved: (resolvedSheetName) =>
+              emitSummarySheetDiagnostic(
+                diagnostic,
+                "business_section:resolved_sheet_name",
+                "INFO",
+                {
+                  ...sectionMeta,
+                  formulaCount,
+                  ...resolvedSheetName,
+                },
+              ),
+          }),
+        {
+          ...sectionMeta,
+          formulaCount,
+          requestedSheetName: String(requestedSheetName || ""),
+          existingSheetCount: Array.isArray(wb.SheetNames)
+            ? wb.SheetNames.length
+            : 0,
+        },
       );
     });
 
-    attachWorkbookFormulaEngineMeta(wb, formulaEngineMeta);
-    ensureWorkbookRecalculationOnOpen(wb, "business_sections_formula_workbook");
+    runWorkbookDiagnosticStep(
+      diagnostic,
+      "business_workbook:finalize",
+      () => {
+        attachWorkbookFormulaEngineMeta(wb, formulaEngineMeta);
+        ensureWorkbookRecalculationOnOpen(
+          wb,
+          "business_sections_formula_workbook",
+        );
+      },
+      { sheetCount: wb.SheetNames?.length || 0 },
+    );
+    emitSummarySheetDiagnostic(diagnostic, "business_workbook:complete", "OK", {
+      sheetCount: wb.SheetNames?.length || 0,
+    });
     return wb;
   }
 
