@@ -373,6 +373,227 @@ function buildTableSection(section = {}) {
   };
 }
 
+const ANALYSIS_REPORT_QUALITY_VERSION = "analysis_report_quality_v1";
+
+const DOMAIN_NARRATIVE_DEFS = Object.freeze({
+  sales: Object.freeze({
+    label: "매출·영업",
+    summary:
+      "매출 규모, 구성비, 상위·하위 항목을 중심으로 실적 흐름을 정리했습니다.",
+    action: "매출 비중이 큰 항목과 변동 폭이 큰 항목을 우선 확인하세요.",
+  }),
+  budget: Object.freeze({
+    label: "예산·지출·정산",
+    summary:
+      "집행 규모, 비목별 구성, 잔액 또는 초과 가능성을 중심으로 정산 관점의 흐름을 정리했습니다.",
+    action:
+      "집행 비중이 큰 비목과 증빙 확인이 필요한 지출 항목을 우선 점검하세요.",
+  }),
+  hr: Object.freeze({
+    label: "인사·조직",
+    summary:
+      "부서·직급별 인원 구성과 주요 변동 항목을 중심으로 조직 현황을 정리했습니다.",
+    action:
+      "특정 부서 또는 직급에 인원이 집중되는지, 변동이 큰 구간이 있는지 확인하세요.",
+  }),
+  inventory: Object.freeze({
+    label: "재고·물류·자산",
+    summary:
+      "입출고 흐름, 보유 현황, 품목·창고별 편차를 중심으로 재고 관점의 흐름을 정리했습니다.",
+    action:
+      "재고 과다·부족 가능성이 있는 품목과 이동량이 큰 창고를 우선 확인하세요.",
+  }),
+  survey: Object.freeze({
+    label: "설문·평가",
+    summary:
+      "평균 점수, 문항별 분포, 낮은 점수 항목을 중심으로 응답 경향을 정리했습니다.",
+    action:
+      "평균보다 낮은 문항과 응답 편차가 큰 문항을 개선 후보로 검토하세요.",
+  }),
+  operation: Object.freeze({
+    label: "운영·상태",
+    summary:
+      "상태별 분포, 완료율, 미처리·지연 항목을 중심으로 운영 현황을 정리했습니다.",
+    action: "미완료·지연 상태의 항목을 우선 조치 대상으로 분류하세요.",
+  }),
+  project: Object.freeze({
+    label: "프로젝트·성과",
+    summary:
+      "목표 대비 실적, 달성률, 성과 편차를 중심으로 핵심 지표 흐름을 정리했습니다.",
+    action: "목표 대비 미달 항목과 가중치가 큰 핵심 지표를 우선 확인하세요.",
+  }),
+  energy: Object.freeze({
+    label: "에너지·비용",
+    summary:
+      "사용량, 절감량, 비용, 회수기간을 중심으로 에너지 운영 현황을 정리했습니다.",
+    action:
+      "사용량 또는 비용이 큰 항목과 절감 효과가 낮은 항목을 우선 확인하세요.",
+  }),
+  general: Object.freeze({
+    label: "일반",
+    summary:
+      "주요 그룹, 수치 규모, 상위·하위 항목을 중심으로 결과를 정리했습니다.",
+    action: "수치가 큰 항목과 변동 폭이 큰 항목을 우선 확인하세요.",
+  }),
+});
+
+function cleanReportText(value = "") {
+  return String(value ?? "")
+    .replace(/undefined|null|NaN|\[object Object\]/gi, "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function uniqueBullets(items = [], limit = 8) {
+  const seen = new Set();
+  const result = [];
+  for (const item of items.map(cleanReportText).filter(Boolean)) {
+    const key = item.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+function inferReportDomain({
+  title = "",
+  fileName = "",
+  message = "",
+  result = {},
+  normalizedBusinessResult = null,
+} = {}) {
+  const source = cleanReportText(
+    [
+      normalizedBusinessResult?.domain,
+      normalizedBusinessResult?.templateId,
+      result?.templateId,
+      result?.operation,
+      title,
+      fileName,
+      message,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  ).toLowerCase();
+
+  if (/energy|에너지|전력|전기|절감|회수기간/.test(source)) return "energy";
+  if (/kpi|성과|달성률|목표|실적|프로젝트|project/.test(source))
+    return "project";
+  if (/매출|영업|판매|revenue|sales|손익|profit/.test(source)) return "sales";
+  if (/예산|집행|정산|카드|출장|회의비|budget|expense|cost|비용/.test(source))
+    return "budget";
+  if (/인사|직원|부서|직급|입사|퇴사|연봉|hr|employee/.test(source))
+    return "hr";
+  if (/재고|입고|출고|창고|자산|장비|inventory|asset|warehouse/.test(source))
+    return "inventory";
+  if (/만족도|설문|문항|평점|점수|survey|feedback/.test(source))
+    return "survey";
+  if (/상태|완료|처리|이수|점검|배송|운영|status|operation/.test(source))
+    return "operation";
+  return "general";
+}
+
+function getDomainNarrativeDef(domain = "general") {
+  return DOMAIN_NARRATIVE_DEFS[domain] || DOMAIN_NARRATIVE_DEFS.general;
+}
+
+function getNumericFieldsForRows(rows = []) {
+  return getRowKeys(rows).filter((key) => isMostlyNumeric(rows, key));
+}
+
+function formatKoreanNumber(value, field = "") {
+  if (!isNumericValue(value)) return cleanReportText(value);
+  const n = Number(value);
+  const digits = /율|비율|rate|ratio|증감|달성/.test(String(field))
+    ? 1
+    : Number.isInteger(n)
+      ? 0
+      : 1;
+  return n.toLocaleString("ko-KR", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  });
+}
+
+function getExtremeRows(rows = [], valueField = "") {
+  if (!rows.length || !valueField) return { max: null, min: null };
+  const numericRows = rows
+    .filter((row) => isNumericValue(row?.[valueField]))
+    .slice()
+    .sort((a, b) => Number(b[valueField]) - Number(a[valueField]));
+  return {
+    max: numericRows[0] || null,
+    min: numericRows[numericRows.length - 1] || null,
+  };
+}
+
+function buildSectionInsight(section = {}, domain = "general") {
+  const rows = safeRows(section);
+  const title = cleanReportText(getSectionTitle(section));
+  const rowCount = getSectionRowCount(section, rows);
+  const categoryField = pickCategoryField(rows);
+  const valueField = pickValueField(rows, section);
+  const categoryLabel = displayLabelForField(categoryField, section);
+  const valueLabel = displayLabelForField(valueField, section);
+  const def = getDomainNarrativeDef(domain);
+
+  if (!rows.length) {
+    return `${title}은(는) 요약 항목 중심으로 확인했습니다.`;
+  }
+
+  const { max, min } = getExtremeRows(rows, valueField);
+  if (max && categoryField && valueField) {
+    const maxLabel = cleanReportText(
+      max?.[categoryField] ?? max?.label ?? max?.항목 ?? "상위 항목",
+    );
+    const maxValue = formatKoreanNumber(max?.[valueField], valueField);
+    if (min && min !== max) {
+      const minLabel = cleanReportText(
+        min?.[categoryField] ?? min?.label ?? min?.항목 ?? "하위 항목",
+      );
+      const minValue = formatKoreanNumber(min?.[valueField], valueField);
+      return `${title}: ${categoryLabel} 기준 ${valueLabel}은 ${maxLabel}(${maxValue})이 가장 크고, ${minLabel}(${minValue})이 가장 작습니다.`;
+    }
+    return `${title}: ${categoryLabel} 기준 ${valueLabel} 최상위 항목은 ${maxLabel}(${maxValue})입니다.`;
+  }
+
+  return `${title}: ${rowCount.toLocaleString("ko-KR")}건의 결과를 기준으로 ${def.label} 흐름을 확인했습니다.`;
+}
+
+function buildReportQualitySignals({
+  sections = [],
+  businessSections = [],
+  domain = "general",
+} = {}) {
+  const summarySections = sections.filter(
+    (section) => section.type === "summary",
+  ).length;
+  const insightSections = sections.filter(
+    (section) => section.type === "insight",
+  ).length;
+  const chartSections = sections.filter(
+    (section) => section.type === "chart",
+  ).length;
+  const tableSections = sections.filter(
+    (section) => section.type === "table",
+  ).length;
+  return {
+    version: ANALYSIS_REPORT_QUALITY_VERSION,
+    domain,
+    domainAwareNarrative: domain !== "general",
+    summarySections,
+    insightSections,
+    chartSections,
+    tableSections,
+    businessSectionCount: businessSections.length,
+    sanitizedText: true,
+    duplicateBulletGuard: true,
+  };
+}
+
 function countSectionsByType(sections = [], type = "") {
   return sections.filter((section) => section.type === type).length;
 }
@@ -394,24 +615,30 @@ function buildSummaryBullets({
   businessSections = [],
   sections = [],
   totalRows = 0,
+  domain = "general",
 }) {
   const tableSections = sections.filter((section) => section.type === "table");
   const chartSections = sections.filter((section) => section.type === "chart");
+  const def = getDomainNarrativeDef(domain);
   const bullets = [
-    `${businessSections.length || tableSections.length}개 분석 섹션이 생성되었습니다.`,
-    `${tableSections.length}개 표 섹션과 ${chartSections.length}개 차트 후보를 확인했습니다.`,
+    `${def.label} 관점에서 ${businessSections.length || tableSections.length}개 분석 섹션을 정리했습니다.`,
+    `${tableSections.length}개 표 섹션과 ${chartSections.length}개 차트 후보를 함께 확인했습니다.`,
   ];
 
-  if (totalRows)
-    bullets.push(`${totalRows}건의 결과 행을 보고서 구조로 정리했습니다.`);
-
-  for (const section of tableSections.slice(0, 4)) {
+  if (totalRows) {
     bullets.push(
-      `${section.title || "분석 결과"}: ${section.rowCount || section.rows?.length || 0}건`,
+      `${totalRows.toLocaleString("ko-KR")}건의 결과 행을 기준으로 핵심 흐름을 요약했습니다.`,
     );
   }
 
-  return bullets.slice(0, 8);
+  const sectionInsights = businessSections
+    .map((section) => buildSectionInsight(section, domain))
+    .filter(Boolean);
+
+  bullets.push(...sectionInsights.slice(0, 4));
+  bullets.push(def.action);
+
+  return uniqueBullets(bullets, 8);
 }
 
 function resolveBusinessTotalRows(
@@ -442,6 +669,14 @@ function buildBusinessReportSections({
   );
   const title =
     normalizedBusinessResult?.title || result?.title || "업무 템플릿 보고서";
+  const domain = inferReportDomain({
+    title,
+    fileName,
+    message,
+    result,
+    normalizedBusinessResult,
+  });
+  const domainDef = getDomainNarrativeDef(domain);
   const generatedAt = new Date().toISOString();
 
   const bodySections = [];
@@ -459,45 +694,51 @@ function buildBusinessReportSections({
     normalizedBusinessResult,
   );
   const decoratedBodySections = decorateReportSections(bodySections);
+  const summaryBullets = buildSummaryBullets({
+    businessSections,
+    sections: decoratedBodySections,
+    totalRows,
+    domain,
+  });
+  const chartInsights = decoratedBodySections
+    .filter((section) => section.type === "chart" && section.insight)
+    .map((section) => section.insight);
+  const sectionInsights = businessSections.map((section) =>
+    buildSectionInsight(section, domain),
+  );
+  const insightBullets = uniqueBullets(
+    [...chartInsights, ...sectionInsights, domainDef.action],
+    8,
+  );
 
   const sections = decorateReportSections([
     {
       type: "cover",
       title,
-      subtitle: fileName || "",
+      subtitle: [fileName || "", domainDef.label].filter(Boolean).join(" · "),
       generatedAt,
     },
     {
       type: "summary",
       title: "핵심 요약",
-      summary: `${businessSections.length}개 분석 섹션을 보고서 형태로 정리했습니다.`,
-      bullets: buildSummaryBullets({
-        businessSections,
-        sections: decoratedBodySections,
-        totalRows,
-      }),
+      summary: `${domainDef.summary} 총 ${businessSections.length.toLocaleString("ko-KR")}개 분석 섹션과 ${totalRows.toLocaleString("ko-KR")}건의 결과 행을 기준으로 작성했습니다.`,
+      bullets: summaryBullets,
     },
     ...decoratedBodySections,
     {
       type: "insight",
       title: "분석 인사이트",
-      bullets: decoratedBodySections
-        .filter((section) => section.type === "chart" && section.insight)
-        .map((section) => section.insight)
-        .concat(
-          businessSections.map(
-            (section) =>
-              `${section.title || section.sectionId || "섹션"} 결과가 생성되었습니다.`,
-          ),
-        )
-        .slice(0, 8),
+      bullets: insightBullets,
     },
   ]);
 
   return {
     version: "report_sections_v2",
     reportType: "analysisReport",
+    qualityVersion: ANALYSIS_REPORT_QUALITY_VERSION,
     title,
+    domain,
+    domainLabel: domainDef.label,
     generatedAt,
     source: {
       fileName: fileName || "",
@@ -512,6 +753,11 @@ function buildBusinessReportSections({
       sectionCount: businessSections.length,
       totalRows,
     }),
+    qualitySignals: buildReportQualitySignals({
+      sections,
+      businessSections,
+      domain,
+    }),
     sections,
   };
 }
@@ -521,6 +767,15 @@ function buildGenericReportSections({ fileName, message, result } = {}) {
     message,
     fileName,
   });
+  const domain =
+    narrative.domain ||
+    inferReportDomain({
+      title: narrative.title,
+      fileName,
+      message,
+      result,
+    });
+  const domainDef = getDomainNarrativeDef(domain);
   const chartSpec = recommendChartSpec(result);
   const rows = safeRows(result);
   const title = narrative.title || result?.title || "분석 보고서";
@@ -530,7 +785,7 @@ function buildGenericReportSections({ fileName, message, result } = {}) {
     {
       type: "cover",
       title,
-      subtitle: fileName || "",
+      subtitle: [fileName || "", domainDef.label].filter(Boolean).join(" · "),
       generatedAt,
     },
     {
@@ -567,7 +822,10 @@ function buildGenericReportSections({ fileName, message, result } = {}) {
   return {
     version: "report_sections_v2",
     reportType: "analysisReport",
+    qualityVersion: ANALYSIS_REPORT_QUALITY_VERSION,
     title,
+    domain,
+    domainLabel: domainDef.label,
     generatedAt,
     source: {
       fileName: fileName || "",
@@ -579,6 +837,11 @@ function buildGenericReportSections({ fileName, message, result } = {}) {
       title,
       sections: finalSections,
       totalRows: rows.length,
+    }),
+    qualitySignals: buildReportQualitySignals({
+      sections: finalSections,
+      businessSections: [],
+      domain,
     }),
     sections: finalSections,
   };
