@@ -282,235 +282,6 @@ const SUMMARY_SHEET_STORAGE_PREFIX = getGeneratedStoragePrefix(
   OUTPUT_TYPES.SUMMARY_SHEET,
 );
 
-const SUMMARY_SHEET_ENDPOINT_DIAGNOSIS_VERSION =
-  "summary_sheet_endpoint_diagnosis_v1";
-const SUMMARY_SHEET_DIAGNOSTIC_ROOT = path.join(
-  process.cwd(),
-  "tests",
-  "results",
-  "summary-sheet-diagnostics",
-);
-const SUMMARY_SHEET_DIAGNOSTIC_WARN_MS = Number(
-  process.env.SUMMARY_SHEET_DIAGNOSTIC_WARN_MS ||
-    process.env.SUMMARY_SHEET_STAGE_WARN_MS ||
-    5000,
-);
-
-function sanitizeDiagnosticSegment(value, fallback = "unknown") {
-  const safe = String(value || "")
-    .replace(/[^a-zA-Z0-9_.-]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 120);
-  return safe || fallback;
-}
-
-function isSummarySheetEndpointDiagnosisEnabled(req = {}) {
-  const envEnabled = String(
-    process.env.SUMMARY_SHEET_ENDPOINT_DIAGNOSIS ||
-      process.env.SUMMARY_SHEET_DIAGNOSIS ||
-      "",
-  ).toLowerCase();
-  if (["1", "true", "yes", "on"].includes(envEnabled)) return true;
-  return req?.body?.diagnosticContext?.enabled === true;
-}
-
-function summarizeQueryTablesForDiagnosis(tables = []) {
-  return (Array.isArray(tables) ? tables : []).map((table, index) => ({
-    index,
-    tableId: table?.tableId || table?.id || "",
-    tableName: table?.tableName || table?.name || "",
-    sheetName: table?.sheetName || "",
-    rowCount: Array.isArray(table?.rows) ? table.rows.length : 0,
-    headerCount: Array.isArray(table?.headers) ? table.headers.length : 0,
-    analysisEligible: table?.analysisEligible !== false,
-  }));
-}
-
-function summarizeResultForDiagnosis(result = {}) {
-  const sections = Array.isArray(result?.sections) ? result.sections : [];
-  return {
-    ok: result?.ok !== false,
-    operation: result?.operation || "",
-    resultType: result?.resultType || "",
-    rowCount: Array.isArray(result?.rows) ? result.rows.length : 0,
-    sectionCount: sections.length,
-    sections: sections.map((section, index) => ({
-      index,
-      sectionId: section?.sectionId || "",
-      title: section?.title || "",
-      resultType: section?.result?.resultType || "",
-      operation: section?.result?.operation || "",
-      rowCount: Array.isArray(section?.result?.rows)
-        ? section.result.rows.length
-        : 0,
-    })),
-  };
-}
-
-function calculateSafeJsonBytes(value = {}) {
-  try {
-    return Buffer.byteLength(JSON.stringify(value || {}), "utf8");
-  } catch (error) {
-    return 0;
-  }
-}
-
-function createSummarySheetEndpointDiagnosis(req = {}) {
-  if (!isSummarySheetEndpointDiagnosisEnabled(req)) return null;
-
-  const context = req?.body?.diagnosticContext || {};
-  const runId = sanitizeDiagnosticSegment(
-    context.runId || new Date().toISOString().replace(/[:.]/g, "-"),
-    "manual-run",
-  );
-  const caseId = sanitizeDiagnosticSegment(
-    context.caseId || context.templateId || "summary-sheet",
-  );
-  const requestId = `${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-  const dir = path.join(SUMMARY_SHEET_DIAGNOSTIC_ROOT, runId);
-  const fileName = `${caseId}_${requestId}.json`;
-  const filePath = path.join(dir, fileName);
-  const startedAtMs = Date.now();
-
-  const state = {
-    version: SUMMARY_SHEET_ENDPOINT_DIAGNOSIS_VERSION,
-    requestId,
-    runId,
-    caseId,
-    templateId:
-      context.templateId || req?.body?.templateCandidate?.templateId || "",
-    candidateTitle:
-      context.candidateTitle || req?.body?.templateCandidate?.title || "",
-    reentryProbe: context.reentryProbe === true,
-    generatedAt: new Date().toISOString(),
-    status: "STARTED",
-    warningThresholdMs: SUMMARY_SHEET_DIAGNOSTIC_WARN_MS,
-    request: {
-      queryTablesKey: req?.body?.queryTablesKey || "",
-      summarySheetMode: req?.body?.summarySheetMode || "",
-      includeSourceDataSheet: req?.body?.includeSourceDataSheet !== false,
-      payloadBytes: calculateSafeJsonBytes(req?.body || {}),
-    },
-    checkpoints: [],
-    warnings: [],
-    error: null,
-    output: null,
-  };
-
-  function persist() {
-    try {
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(filePath, JSON.stringify(state, null, 2), "utf8");
-    } catch (error) {
-      console.warn(
-        "[summary-sheet-diagnosis] write failed:",
-        error?.message || error,
-      );
-    }
-  }
-
-  function checkpoint(stage, status = "INFO", meta = {}) {
-    const now = Date.now();
-    const elapsedMs = now - startedAtMs;
-    const entry = {
-      stage,
-      status,
-      elapsedMs,
-      at: new Date(now).toISOString(),
-      ...(meta && typeof meta === "object" ? meta : {}),
-    };
-    state.checkpoints.push(entry);
-    if (
-      status === "OK" &&
-      Number.isFinite(Number(meta?.stageElapsedMs)) &&
-      Number(meta.stageElapsedMs) > SUMMARY_SHEET_DIAGNOSTIC_WARN_MS
-    ) {
-      state.warnings.push({
-        stage,
-        elapsedMs: Number(meta.stageElapsedMs),
-        thresholdMs: SUMMARY_SHEET_DIAGNOSTIC_WARN_MS,
-        message: `summary-sheet stage exceeded ${SUMMARY_SHEET_DIAGNOSTIC_WARN_MS}ms`,
-      });
-    }
-    persist();
-    return entry;
-  }
-
-  function finish(status = "OK", meta = {}) {
-    state.status = status;
-    state.finishedAt = new Date().toISOString();
-    state.elapsedMs = Date.now() - startedAtMs;
-    if (meta && typeof meta === "object") {
-      Object.assign(state, meta);
-    }
-    persist();
-  }
-
-  function responseMeta() {
-    return {
-      version: SUMMARY_SHEET_ENDPOINT_DIAGNOSIS_VERSION,
-      requestId,
-      runId,
-      caseId,
-      templateId: state.templateId,
-      fileName,
-      filePath,
-      status: state.status,
-      warningCount: state.warnings.length,
-    };
-  }
-
-  checkpoint("request_received", "START", state.request);
-  return {
-    state,
-    fileName,
-    filePath,
-    checkpoint,
-    finish,
-    responseMeta,
-  };
-}
-
-async function runSummarySheetEndpointStage(diagnosis, stage, fn, meta = {}) {
-  if (!diagnosis) return await fn();
-  diagnosis.checkpoint(stage, "START", meta);
-  const startedAt = Date.now();
-  try {
-    const value = await fn();
-    diagnosis.checkpoint(stage, "OK", {
-      stageElapsedMs: Date.now() - startedAt,
-    });
-    return value;
-  } catch (error) {
-    diagnosis.checkpoint(stage, "ERROR", {
-      stageElapsedMs: Date.now() - startedAt,
-      error: error?.message || String(error),
-      stack: error?.stack || "",
-    });
-    throw error;
-  }
-}
-
-function runSummarySheetEndpointSyncStage(diagnosis, stage, fn, meta = {}) {
-  if (!diagnosis) return fn();
-  diagnosis.checkpoint(stage, "START", meta);
-  const startedAt = Date.now();
-  try {
-    const value = fn();
-    diagnosis.checkpoint(stage, "OK", {
-      stageElapsedMs: Date.now() - startedAt,
-    });
-    return value;
-  } catch (error) {
-    diagnosis.checkpoint(stage, "ERROR", {
-      stageElapsedMs: Date.now() - startedAt,
-      error: error?.message || String(error),
-      stack: error?.stack || "",
-    });
-    throw error;
-  }
-}
-
 async function assertTemplateGenerationUsage(req, res) {
   if (!req.user?.id) return true;
 
@@ -1209,7 +980,6 @@ exports.downloadGeneratedFile = async (req, res, next) => {
 };
 
 exports.createSummarySheet = async (req, res, next) => {
-  const diagnosis = createSummarySheetEndpointDiagnosis(req);
   try {
     const {
       queryTablesKey,
@@ -1224,57 +994,26 @@ exports.createSummarySheet = async (req, res, next) => {
     } = req.body || {};
 
     if (!queryTablesKey) {
-      diagnosis?.finish("ERROR", {
-        error: { code: "QUERY_TABLES_KEY_REQUIRED" },
-      });
       return res.status(400).json({
         ok: false,
         error: "queryTablesKey가 필요합니다.",
-        summarySheetDiagnosis: diagnosis?.responseMeta(),
       });
     }
-    if (!(await assertTemplateGenerationUsage(req, res))) {
-      diagnosis?.finish("ERROR", {
-        error: { code: "USAGE_LIMIT_OR_AUTH" },
-      });
-      return;
-    }
+    if (!(await assertTemplateGenerationUsage(req, res))) return;
 
-    const saved = await runSummarySheetEndpointStage(
-      diagnosis,
-      "read_query_tables",
-      async () => readJsonObject(queryTablesKey),
-      { queryTablesKey },
-    );
-    const normalizedQueryTables = runSummarySheetEndpointSyncStage(
-      diagnosis,
-      "normalize_query_tables",
-      () =>
-        saved.normalizedQueryTables ||
-        buildNormalizedQueryTables(saved.tables || []),
-      { rawTableCount: Array.isArray(saved.tables) ? saved.tables.length : 0 },
-    );
-    diagnosis?.checkpoint("query_tables_summary", "INFO", {
-      fileName: saved.fileName || "",
-      fileHash: saved.fileHash || "",
-      tableCount: normalizedQueryTables.length,
-      tables: summarizeQueryTablesForDiagnosis(normalizedQueryTables),
-    });
+    const saved = await readJsonObject(queryTablesKey);
+    const normalizedQueryTables =
+      saved.normalizedQueryTables ||
+      buildNormalizedQueryTables(saved.tables || []);
 
     let queryIntent = intent || null;
     let result = executionResult || null;
 
     if (!result && templateCandidate?.templateId) {
-      result = runSummarySheetEndpointSyncStage(
-        diagnosis,
-        "execute_business_template",
-        () =>
-          executeBusinessTemplate({
-            normalizedQueryTables,
-            templateCandidate,
-          }),
-        { templateId: templateCandidate.templateId },
-      );
+      result = executeBusinessTemplate({
+        normalizedQueryTables,
+        templateCandidate,
+      });
 
       queryIntent = {
         ok: true,
@@ -1285,16 +1024,10 @@ exports.createSummarySheet = async (req, res, next) => {
     }
 
     if (!result && candidate) {
-      result = runSummarySheetEndpointSyncStage(
-        diagnosis,
-        "execute_analysis_candidate",
-        () =>
-          executeAnalysisRecipeCandidate({
-            normalizedQueryTables,
-            candidate,
-          }),
-        { candidateId: candidate.candidateId || candidate.id || "" },
-      );
+      result = executeAnalysisRecipeCandidate({
+        normalizedQueryTables,
+        candidate,
+      });
 
       queryIntent = {
         ok: true,
@@ -1306,68 +1039,33 @@ exports.createSummarySheet = async (req, res, next) => {
     }
 
     if (!result) {
-      queryIntent = runSummarySheetEndpointSyncStage(
-        diagnosis,
-        "parse_query_intent",
-        () => intent || parseQueryIntent(message, saved.tables || []),
-      );
+      queryIntent = intent || parseQueryIntent(message, saved.tables || []);
 
       if (!queryIntent?.ok) {
-        diagnosis?.finish("ERROR", {
-          error: {
-            code: "QUERY_INTENT_FAILED",
-            message: queryIntent?.error || "",
-          },
-        });
         return res.status(400).json({
           ok: false,
           error: queryIntent?.error || "query intent 생성 실패",
           intent: queryIntent,
-          summarySheetDiagnosis: diagnosis?.responseMeta(),
         });
       }
 
-      result = runSummarySheetEndpointSyncStage(
-        diagnosis,
-        "execute_query_intent",
-        () => executeQueryIntent(saved.tables || [], queryIntent),
-      );
+      result = executeQueryIntent(saved.tables || [], queryIntent);
     }
 
-    result = runSummarySheetEndpointSyncStage(
-      diagnosis,
-      "normalize_executed_result",
-      () => normalizeExecutedResult(result, templateCandidate),
-    );
-    diagnosis?.checkpoint(
-      "execution_result_summary",
-      "INFO",
-      summarizeResultForDiagnosis(result),
-    );
+    result = normalizeExecutedResult(result, templateCandidate);
 
     if (!result?.ok) {
-      diagnosis?.finish("ERROR", {
-        error: {
-          code: "EXECUTION_RESULT_NOT_OK",
-          message: result?.error || result?.message || "",
-        },
-        resultSummary: summarizeResultForDiagnosis(result),
-      });
       return res.status(400).json({
         ok: false,
         error: result?.error || result?.message || "query 실행 실패",
         intent: queryIntent,
         result,
-        summarySheetDiagnosis: diagnosis?.responseMeta(),
       });
     }
 
-    const chartSpec = runSummarySheetEndpointSyncStage(
-      diagnosis,
-      "build_chart_spec",
-      () => (Array.isArray(result.sections) ? null : buildChartSpec(result)),
-      { hasBusinessSections: Array.isArray(result.sections) },
-    );
+    const chartSpec = Array.isArray(result.sections)
+      ? null
+      : buildChartSpec(result);
 
     const useSourceDataOnlyWorkbook =
       summarySheetMode === "sourceDataOnly" ||
@@ -1375,53 +1073,25 @@ exports.createSummarySheet = async (req, res, next) => {
       result?.executionMeta?.sourceDataOnly === true;
 
     const workbook = useSourceDataOnlyWorkbook
-      ? runSummarySheetEndpointSyncStage(
-          diagnosis,
-          "build_automation_template_workbook",
-          () =>
-            buildAutomationTemplateWorkbook({
-              fileName: saved.fileName,
-              message,
-              intent: queryIntent,
-              result,
-              tables: normalizedQueryTables,
-            }),
-          { tableCount: normalizedQueryTables.length },
-        )
-      : runSummarySheetEndpointSyncStage(
-          diagnosis,
-          "build_summary_workbook",
-          () =>
-            buildSummaryWorkbook({
-              fileName: saved.fileName,
-              message,
-              intent: queryIntent,
-              result,
-              sourceTables: normalizedQueryTables,
-              summarySheetMode,
-              includeSourceDataSheet,
-              formulaOptions,
-              diagnostic: diagnosis,
-            }),
-          {
-            sectionCount: Array.isArray(result.sections)
-              ? result.sections.length
-              : 0,
-            tableCount: normalizedQueryTables.length,
-            includeSourceDataSheet,
-          },
-        );
+      ? buildAutomationTemplateWorkbook({
+          fileName: saved.fileName,
+          message,
+          intent: queryIntent,
+          result,
+          tables: normalizedQueryTables,
+        })
+      : buildSummaryWorkbook({
+          fileName: saved.fileName,
+          message,
+          intent: queryIntent,
+          result,
+          sourceTables: normalizedQueryTables,
+          summarySheetMode,
+          includeSourceDataSheet,
+          formulaOptions,
+        });
 
-    const buffer = runSummarySheetEndpointSyncStage(
-      diagnosis,
-      "workbook_to_buffer",
-      () => workbookToBuffer(workbook),
-      {
-        sheetCount: Array.isArray(workbook.SheetNames)
-          ? workbook.SheetNames.length
-          : 0,
-      },
-    );
+    const buffer = workbookToBuffer(workbook);
     const formulaEngineMeta = workbook["!beebeeFormulaEngine"] || {
       prepared: true,
       applied: false,
@@ -1444,24 +1114,12 @@ exports.createSummarySheet = async (req, res, next) => {
     });
     const key = `${SUMMARY_SHEET_STORAGE_PREFIX}/${userId}/${saved.fileHash}/${outputFileName}`;
 
-    const stored = await runSummarySheetEndpointStage(
-      diagnosis,
-      "save_buffer_object",
-      async () => saveBufferObject(key, buffer, getOutputMimeType(outputType)),
-      { key, bufferBytes: buffer.length },
+    const stored = await saveBufferObject(
+      key,
+      buffer,
+      getOutputMimeType(outputType),
     );
-    await runSummarySheetEndpointStage(diagnosis, "bump_usage", async () =>
-      bumpTemplateGenerationUsage(req),
-    );
-
-    diagnosis?.finish("OK", {
-      output: {
-        fileName: outputFileName,
-        storageKey: key,
-        sheetNames: workbook.SheetNames || [],
-        bufferBytes: buffer.length,
-      },
-    });
+    await bumpTemplateGenerationUsage(req);
 
     return res.json({
       ok: true,
@@ -1491,15 +1149,8 @@ exports.createSummarySheet = async (req, res, next) => {
       chartSpec,
       intent: queryIntent,
       result,
-      summarySheetDiagnosis: diagnosis?.responseMeta(),
     });
   } catch (e) {
-    diagnosis?.finish("ERROR", {
-      error: {
-        message: e?.message || String(e),
-        stack: e?.stack || "",
-      },
-    });
     console.error("[automation.createSummarySheet]", e);
     next(e);
   }
@@ -1588,6 +1239,19 @@ async function writeReportPpt({
   });
 
   const pptx = renderReportPpt(report, { template });
+  const pptReport = pptx._beebeePptReport || report;
+  const pptQuality =
+    pptx._beebeePptQuality ||
+    pptReport.pptQualitySignals ||
+    pptReport.pptQuality ||
+    null;
+  const pptQualityVersion =
+    pptx._beebeePptQualityVersion ||
+    pptQuality?.version ||
+    pptReport.pptQualityVersion ||
+    pptReport.pptQualitySignals?.version ||
+    "";
+  const renderedSlideCount = Number(pptx._beebeeSlideCount || 0);
 
   const outputName = buildGeneratedFileName({
     sourceFileName: fileName,
@@ -1610,8 +1274,12 @@ async function writeReportPpt({
     outputType,
     outputLabel: outputTypeLabel(outputType),
     template: template || "default",
-    report,
-    slideCount: Array.isArray(report.sections) ? report.sections.length : 0,
+    report: pptReport,
+    slideCount:
+      renderedSlideCount ||
+      (Array.isArray(pptReport.sections) ? pptReport.sections.length : 0),
+    pptQualityVersion,
+    pptQuality,
   };
 }
 
@@ -1994,6 +1662,17 @@ exports.exportPptx = async (req, res) => {
       outputLabel: outputTypeLabel(outputType),
       template: exported.template,
       slideCount: exported.slideCount,
+      pptQualityVersion:
+        exported.pptQualityVersion ||
+        exported.pptQuality?.version ||
+        exported.report?.pptQualityVersion ||
+        exported.report?.pptQualitySignals?.version ||
+        "",
+      pptQuality:
+        exported.pptQuality ||
+        exported.report?.pptQualitySignals ||
+        exported.report?.pptQuality ||
+        null,
       report: exported.report,
       result,
     });
