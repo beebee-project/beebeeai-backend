@@ -563,14 +563,14 @@ function normalizePeriodValue(value = "") {
   if (!raw) return "";
 
   const compact = raw.replace(/\s+/g, "");
-  const ym = compact.match(/((?:19|20)\d{2})[.\-/년]?(0?[1-9]|1[0-2])?/);
+  const ym = compact.match(/((?:19|20)\d{2})[.\-/년]?(1[0-2]|0?[1-9])?/);
   if (ym) {
     const year = ym[1];
     const month = ym[2] ? String(Number(ym[2])).padStart(2, "0") : "";
     return month ? `${year}-${month}` : year;
   }
 
-  const month = compact.match(/^(0?[1-9]|1[0-2])월?$/);
+  const month = compact.match(/^(1[0-2]|0?[1-9])월?$/);
   if (month) return `${String(Number(month[1])).padStart(2, "0")}월`;
 
   return raw;
@@ -600,7 +600,7 @@ function getSalesPeriod(row = {}, columns = {}) {
       String(getRowValue(row, yearHeader) ?? "").match(/(19|20)\d{2}/)?.[0] ||
       "";
     const monthRaw = String(getRowValue(row, monthHeader) ?? "").trim();
-    const month = monthRaw.match(/(0?[1-9]|1[0-2])/)?.[1] || "";
+    const month = monthRaw.match(/^(1[0-2]|0?[1-9])(?:월)?$/)?.[1] || "";
     if (year && month)
       return `${year}-${String(Number(month)).padStart(2, "0")}`;
     if (year) return year;
@@ -1333,4 +1333,6 @@ module.exports = {
   selectSalesTrendTable,
   buildSalesTopBottomSection,
   shouldKeepSalesLegacySection,
+  normalizePeriodValue,
+  getSalesPeriod,
 };

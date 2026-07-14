@@ -39,6 +39,10 @@ const {
   resolveCriteriaColumnIndex,
   resolveAggregateFormulaTargets,
 } = require("./utils/aggregateResolver");
+const {
+  SUMMARY_SHEET_RECIPE_MANIFEST_VERSION,
+  appendSummarySheetRecipeManifest,
+} = require("./summarySheetRecipeManifest");
 
 const AUTOMATION_SHEET_V2_VERSION = "automation_sheet_v2";
 const WORKBOOK_RECALCULATION_FLAG_VERSION = "workbook_recalculation_flag_v1";
@@ -1644,6 +1648,7 @@ function buildSummaryWorkbook({
 
   if (businessSections.length) {
     const wb = XLSX.utils.book_new();
+    const resolvedRecipeSections = [];
 
     const summaryRows = buildBusinessWorkbookSummaryRows({
       fileName,
@@ -1771,7 +1776,13 @@ function buildSummaryWorkbook({
         "business_section:append_sheet",
         () =>
           appendSheetSafe(wb, ws, requestedSheetName, {
-            onResolved: (resolvedSheetName) =>
+            onResolved: (resolvedSheetName) => {
+              resolvedRecipeSections.push({
+                index,
+                sectionId: section.sectionId || "",
+                title: section.title || "",
+                resolvedSheetName: resolvedSheetName.safeSheetName || "",
+              });
               emitSummarySheetDiagnostic(
                 diagnostic,
                 "business_section:resolved_sheet_name",
@@ -1781,7 +1792,8 @@ function buildSummaryWorkbook({
                   formulaCount,
                   ...resolvedSheetName,
                 },
-              ),
+              );
+            },
           }),
         {
           ...sectionMeta,
@@ -1793,6 +1805,21 @@ function buildSummaryWorkbook({
         },
       );
     });
+
+    runWorkbookDiagnosticStep(
+      diagnostic,
+      "business_workbook:append_recipe_manifest",
+      () =>
+        appendSummarySheetRecipeManifest(wb, {
+          result,
+          businessSections,
+          resolvedSections: resolvedRecipeSections,
+        }),
+      {
+        manifestVersion: SUMMARY_SHEET_RECIPE_MANIFEST_VERSION,
+        sectionCount: businessSections.length,
+      },
+    );
 
     runWorkbookDiagnosticStep(
       diagnostic,
@@ -2886,6 +2913,7 @@ module.exports = {
   buildSectionFormulaPlan,
   applySimpleAggregateFormulaSection,
   AUTOMATION_SHEET_V2_VERSION,
+  SUMMARY_SHEET_RECIPE_MANIFEST_VERSION,
   WORKBOOK_RECALCULATION_FLAG_VERSION,
   ensureWorkbookRecalculationOnOpen,
   injectWorkbookCalcPrIntoXlsxBuffer,

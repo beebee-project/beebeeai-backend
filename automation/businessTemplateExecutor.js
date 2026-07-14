@@ -6,6 +6,9 @@ const {
   normalizeBusinessTemplateResult,
   validateBusinessTemplateResultContract,
 } = require("./businessTemplateContract");
+const {
+  buildContractDrivenSummarySections,
+} = require("./contractDrivenSummaryRecipeBuilder");
 
 function executeBusinessTemplate({
   normalizedQueryTables = [],
@@ -38,6 +41,14 @@ function executeBusinessTemplate({
     };
   }
 
+  const contractCoverage = buildContractDrivenSummarySections({
+    normalizedQueryTables,
+    templateId,
+  });
+  const coverageSections = Array.isArray(contractCoverage.sections)
+    ? contractCoverage.sections
+    : [];
+
   const normalized = normalizeBusinessTemplateResult(
     {
       ok: true,
@@ -47,10 +58,19 @@ function executeBusinessTemplate({
       description:
         templateCandidate.description || definition?.description || "",
       outputTypes: templateCandidate.outputTypes || definition?.outputTypes,
-      sections,
+      sections: [...sections, ...coverageSections],
+      contractSummaryCoverage: {
+        ...contractCoverage,
+        sections: undefined,
+      },
     },
     templateCandidate,
   );
+
+  normalized.contractSummaryCoverage = {
+    ...contractCoverage,
+    sections: undefined,
+  };
 
   const contract = validateBusinessTemplateResultContract(normalized);
 

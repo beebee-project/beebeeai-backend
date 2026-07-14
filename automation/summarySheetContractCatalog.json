@@ -1,0 +1,4695 @@
+{
+  "version": "summary_sheet_contract_catalog_v1",
+  "sourceContractsVersion": "real_world_template_accuracy_contracts_v1_1",
+  "contracts": {
+    "revenue_cost_profit_report": {
+      "templateId": "revenue_cost_profit_report",
+      "contractId": "accuracy_contract.revenue_cost_profit_report.v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연월",
+            "월",
+            "일자",
+            "date",
+            "period"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "product",
+          "label": "product",
+          "aliases": [
+            "품목",
+            "제품",
+            "상품",
+            "서비스",
+            "product",
+            "item"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "revenue",
+          "label": "revenue",
+          "aliases": [
+            "매출액",
+            "판매금액",
+            "수익",
+            "revenue",
+            "sales",
+            "amount"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "cost",
+          "label": "cost",
+          "aliases": [
+            "비용",
+            "원가",
+            "매입금액",
+            "cost",
+            "expense"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "customerType",
+          "label": "customerType",
+          "aliases": [
+            "거래처유형",
+            "고객유형",
+            "customerType",
+            "customer type"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "revenue.total",
+          "label": "총 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.total_cost",
+          "label": "총 비용",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "cost",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "cost"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.total_profit",
+          "label": "총 이익",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "revenue.total"
+            },
+            {
+              "type": "metric",
+              "ref": "revenue.total_cost"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "revenue.total",
+              "revenue.total_cost"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.profit_margin",
+          "label": "이익률",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "revenue.total_profit"
+            },
+            {
+              "type": "metric",
+              "ref": "revenue.total"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "revenue.total_profit",
+              "revenue.total"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.by_product",
+          "label": "품목별 매출 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue",
+              "product"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.average_by_product",
+          "label": "품목별 평균 매출",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "revenue",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue",
+              "product"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.by_period",
+          "label": "기간별 매출 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": [
+            "period"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue",
+              "period"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "revenue.top_product",
+          "label": "최고 매출 품목",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "revenue.by_product",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "revenue.by_product"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "kpi_performance_dashboard": {
+      "templateId": "kpi_performance_dashboard",
+      "contractId": "accuracy_contract.kpi_performance_dashboard.v1",
+      "sourceRoles": [
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "부서",
+            "조직",
+            "팀",
+            "department",
+            "team"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "metricName",
+          "label": "metricName",
+          "aliases": [
+            "지표명",
+            "KPI",
+            "성과지표",
+            "metric",
+            "metricName"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "target",
+          "label": "target",
+          "aliases": [
+            "목표",
+            "목표값",
+            "target",
+            "goal"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "actual",
+          "label": "actual",
+          "aliases": [
+            "실적",
+            "실적값",
+            "현재값",
+            "actual",
+            "value"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "상태",
+            "달성상태",
+            "status",
+            "result"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연월",
+            "분기",
+            "period",
+            "date"
+          ],
+          "dataType": "period",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "kpi.actual_by_department",
+          "label": "부서별 실적 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "actual",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "actual",
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "kpi.target_by_department",
+          "label": "부서별 목표 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "target",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "target",
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "kpi.achievement_rate_by_department",
+          "label": "부서별 달성률",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "kpi.actual_by_department"
+            },
+            {
+              "type": "metric",
+              "ref": "kpi.target_by_department"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "kpi.actual_by_department",
+              "kpi.target_by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "kpi.average_actual",
+          "label": "평균 실적",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "actual",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "actual"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "kpi.top_department",
+          "label": "최고 성과 부서",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "kpi.actual_by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "kpi.actual_by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "kpi.status_distribution",
+          "label": "달성 상태별 건수",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "status"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "status"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "survey_satisfaction_analysis": {
+      "templateId": "survey_satisfaction_analysis",
+      "contractId": "accuracy_contract.survey_satisfaction_analysis.v1",
+      "sourceRoles": [
+        {
+          "role": "respondentId",
+          "label": "respondentId",
+          "aliases": [
+            "응답자ID",
+            "응답자",
+            "responseId",
+            "respondentId",
+            "id"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "question",
+          "label": "question",
+          "aliases": [
+            "문항",
+            "질문",
+            "항목",
+            "question",
+            "item"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "score",
+          "label": "score",
+          "aliases": [
+            "점수",
+            "만족도",
+            "평점",
+            "score",
+            "rating"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "program",
+          "label": "program",
+          "aliases": [
+            "프로그램",
+            "과정",
+            "행사",
+            "program",
+            "course"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "category",
+          "label": "category",
+          "aliases": [
+            "분류",
+            "영역",
+            "category",
+            "section"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "survey.response_count",
+          "label": "응답 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "survey.respondent_count",
+          "label": "응답자 수",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countDistinct",
+          "valueRole": "respondentId",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "respondentId"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "survey.average_score",
+          "label": "전체 평균 만족도",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "score",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "score"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "survey.score_by_question",
+          "label": "문항별 평균 만족도",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "score",
+          "groupByRoles": [
+            "question"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "score",
+              "question"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "survey.score_by_program",
+          "label": "프로그램별 평균 만족도",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "score",
+          "groupByRoles": [
+            "program"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "score",
+              "program"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "survey.top_question",
+          "label": "최고 평가 문항",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "survey.score_by_question",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "survey.score_by_question"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "inventory_inout_flow_report": {
+      "templateId": "inventory_inout_flow_report",
+      "contractId": "accuracy_contract.inventory_inout_flow_report.v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연월",
+            "일자",
+            "date",
+            "period"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "item",
+          "label": "item",
+          "aliases": [
+            "품목",
+            "상품",
+            "자재",
+            "item",
+            "product"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "inQuantity",
+          "label": "inQuantity",
+          "aliases": [
+            "입고수량",
+            "입고",
+            "inQty",
+            "inQuantity",
+            "received"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "outQuantity",
+          "label": "outQuantity",
+          "aliases": [
+            "출고수량",
+            "출고",
+            "outQty",
+            "outQuantity",
+            "issued"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "warehouse",
+          "label": "warehouse",
+          "aliases": [
+            "창고",
+            "보관소",
+            "warehouse",
+            "location"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "inventory_flow.total_in",
+          "label": "총 입고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "inQuantity",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "inQuantity"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_flow.total_out",
+          "label": "총 출고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "outQuantity",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "outQuantity"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_flow.net_change",
+          "label": "재고 순증감",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "inventory_flow.total_in"
+            },
+            {
+              "type": "metric",
+              "ref": "inventory_flow.total_out"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "inventory_flow.total_in",
+              "inventory_flow.total_out"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_flow.in_by_period",
+          "label": "기간별 입고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "inQuantity",
+          "groupByRoles": [
+            "period"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "inQuantity",
+              "period"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_flow.out_by_period",
+          "label": "기간별 출고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "outQuantity",
+          "groupByRoles": [
+            "period"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "outQuantity",
+              "period"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_flow.out_by_item",
+          "label": "품목별 출고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "outQuantity",
+          "groupByRoles": [
+            "item"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "outQuantity",
+              "item"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_flow.top_out_item",
+          "label": "최다 출고 품목",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "inventory_flow.out_by_item",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "inventory_flow.out_by_item"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "inventory_stock_status": {
+      "templateId": "inventory_stock_status",
+      "contractId": "accuracy_contract.inventory_stock_status.v1",
+      "sourceRoles": [
+        {
+          "role": "item",
+          "label": "item",
+          "aliases": [
+            "품목",
+            "상품",
+            "자재",
+            "item",
+            "product"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "warehouse",
+          "label": "warehouse",
+          "aliases": [
+            "창고",
+            "보관소",
+            "warehouse",
+            "location"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "stockQuantity",
+          "label": "stockQuantity",
+          "aliases": [
+            "재고수량",
+            "현재고",
+            "보유수량",
+            "stock",
+            "stockQuantity",
+            "quantity"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "safetyStock",
+          "label": "safetyStock",
+          "aliases": [
+            "안전재고",
+            "최소재고",
+            "safetyStock",
+            "minimumStock"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "inventory_stock.total",
+          "label": "총 재고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "stockQuantity",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "stockQuantity"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_stock.average",
+          "label": "평균 재고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "stockQuantity",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "stockQuantity"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_stock.by_item",
+          "label": "품목별 재고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "stockQuantity",
+          "groupByRoles": [
+            "item"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "stockQuantity",
+              "item"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_stock.by_warehouse",
+          "label": "창고별 재고수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "stockQuantity",
+          "groupByRoles": [
+            "warehouse"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "stockQuantity",
+              "warehouse"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_stock.low_stock_count",
+          "label": "부족 재고 품목 수",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [
+            {
+              "operator": "ltRole",
+              "leftRole": "stockQuantity",
+              "rightRole": "safetyStock"
+            }
+          ],
+          "operator": "filterCount",
+          "operands": [
+            {
+              "type": "role",
+              "ref": "stockQuantity"
+            },
+            {
+              "type": "role",
+              "ref": "safetyStock"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [
+              "stockQuantity",
+              "safetyStock"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "inventory_stock.top_item",
+          "label": "최다 보유 품목",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "inventory_stock.by_item",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "inventory_stock.by_item"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "corporate_card_usage_report": {
+      "templateId": "corporate_card_usage_report",
+      "contractId": "accuracy_contract.corporate_card_usage_report.v1",
+      "sourceRoles": [
+        {
+          "role": "date",
+          "label": "date",
+          "aliases": [
+            "사용일자",
+            "결제일",
+            "일자",
+            "date",
+            "transactionDate"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "부서",
+            "사용부서",
+            "department",
+            "team"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "category",
+          "label": "category",
+          "aliases": [
+            "사용항목",
+            "비목",
+            "업종",
+            "category",
+            "expenseType"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "merchant",
+          "label": "merchant",
+          "aliases": [
+            "가맹점",
+            "사용처",
+            "상호",
+            "merchant",
+            "vendor"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "amount",
+          "label": "amount",
+          "aliases": [
+            "사용금액",
+            "결제금액",
+            "금액",
+            "amount",
+            "expense"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "card.total_amount",
+          "label": "총 사용금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "card.average_amount",
+          "label": "평균 결제금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "amount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "card.transaction_count",
+          "label": "결제 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "card.by_department",
+          "label": "부서별 사용금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount",
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "card.by_category",
+          "label": "사용항목별 금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [
+            "category"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount",
+              "category"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "card.by_merchant",
+          "label": "가맹점별 사용금액",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [
+            "merchant"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount",
+              "merchant"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "card.top_department",
+          "label": "최다 사용 부서",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "card.by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "card.by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "purchase_order_status": {
+      "templateId": "purchase_order_status",
+      "contractId": "accuracy_contract.purchase_order_status.v1",
+      "sourceRoles": [
+        {
+          "role": "orderId",
+          "label": "orderId",
+          "aliases": [
+            "발주번호",
+            "주문번호",
+            "orderId",
+            "purchaseOrder"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "date",
+          "label": "date",
+          "aliases": [
+            "발주일",
+            "주문일",
+            "일자",
+            "date",
+            "orderDate"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "vendor",
+          "label": "vendor",
+          "aliases": [
+            "거래처",
+            "공급업체",
+            "vendor",
+            "supplier"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "item",
+          "label": "item",
+          "aliases": [
+            "품목",
+            "자재",
+            "item",
+            "product"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "amount",
+          "label": "amount",
+          "aliases": [
+            "발주금액",
+            "주문금액",
+            "금액",
+            "amount",
+            "orderAmount"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "발주상태",
+            "처리상태",
+            "상태",
+            "status",
+            "orderStatus"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "purchase.total_amount",
+          "label": "총 발주금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.average_amount",
+          "label": "평균 발주금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "amount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.order_count",
+          "label": "발주 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.by_vendor",
+          "label": "거래처별 발주금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [
+            "vendor"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount",
+              "vendor"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.status_count",
+          "label": "상태별 발주 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "status"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "status"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.top_vendor",
+          "label": "최대 발주 거래처",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "purchase.by_vendor",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "purchase.by_vendor"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "research_participant_status": {
+      "templateId": "research_participant_status",
+      "contractId": "accuracy_contract.research_participant_status.v1",
+      "sourceRoles": [
+        {
+          "role": "participantId",
+          "label": "participantId",
+          "aliases": [
+            "연구원ID",
+            "사번",
+            "학번",
+            "participantId",
+            "id"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "name",
+          "label": "name",
+          "aliases": [
+            "성명",
+            "이름",
+            "name"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "소속",
+            "부서",
+            "연구실",
+            "department",
+            "lab"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "role",
+          "label": "role",
+          "aliases": [
+            "참여역할",
+            "직급",
+            "구분",
+            "role",
+            "position"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "참여상태",
+            "재직상태",
+            "상태",
+            "status"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "participationRate",
+          "label": "participationRate",
+          "aliases": [
+            "참여율",
+            "지급률",
+            "participationRate",
+            "allocationRate"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "participant.count",
+          "label": "참여연구원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "participant.distinct_count",
+          "label": "고유 참여연구원 수",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countDistinct",
+          "valueRole": "participantId",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "participantId"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "participant.by_department",
+          "label": "소속별 참여연구원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "participant.by_role",
+          "label": "역할별 참여연구원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "role"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "role"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "participant.by_status",
+          "label": "상태별 참여연구원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "status"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "status"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "participant.average_rate",
+          "label": "평균 참여율",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "participationRate",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "participationRate"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "participant.top_department",
+          "label": "최다 인원 소속",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "participant.by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "participant.by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "event_applicant_status": {
+      "templateId": "event_applicant_status",
+      "contractId": "accuracy_contract.event_applicant_status.v1",
+      "sourceRoles": [
+        {
+          "role": "applicantId",
+          "label": "applicantId",
+          "aliases": [
+            "신청자ID",
+            "사번",
+            "학번",
+            "applicantId",
+            "id"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "program",
+          "label": "program",
+          "aliases": [
+            "행사명",
+            "프로그램",
+            "워크숍",
+            "program",
+            "event"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "소속",
+            "부서",
+            "department",
+            "organization"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "신청상태",
+            "승인상태",
+            "상태",
+            "status"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "attendance",
+          "label": "attendance",
+          "aliases": [
+            "참석여부",
+            "출석",
+            "attendance",
+            "attended"
+          ],
+          "dataType": "boolean",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "event.applicant_count",
+          "label": "신청자 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "event.distinct_applicant_count",
+          "label": "고유 신청자 수",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countDistinct",
+          "valueRole": "applicantId",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "applicantId"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "event.by_status",
+          "label": "신청상태별 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "status"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "status"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "event.by_department",
+          "label": "소속별 신청자 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "event.by_program",
+          "label": "프로그램별 신청자 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "program"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "program"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "event.attendance_rate",
+          "label": "참석률",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "attendance",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "attendance"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "event.top_department",
+          "label": "최다 신청 소속",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "event.by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "event.by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "branch_performance_report": {
+      "templateId": "branch_performance_report",
+      "contractId": "accuracy_contract.branch_performance_report.v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "분기",
+            "연월",
+            "period",
+            "date"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "branch",
+          "label": "branch",
+          "aliases": [
+            "지점",
+            "영업점",
+            "branch",
+            "office"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "revenue",
+          "label": "revenue",
+          "aliases": [
+            "매출액",
+            "실적",
+            "revenue",
+            "sales"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "target",
+          "label": "target",
+          "aliases": [
+            "목표",
+            "목표액",
+            "target",
+            "goal"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "cost",
+          "label": "cost",
+          "aliases": [
+            "비용",
+            "원가",
+            "cost",
+            "expense"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        },
+        {
+          "role": "customerCount",
+          "label": "customerCount",
+          "aliases": [
+            "고객수",
+            "거래건수",
+            "customerCount",
+            "transactions"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "branch.total_revenue",
+          "label": "총 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.total_target",
+          "label": "총 목표액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "target",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "target"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.achievement_rate",
+          "label": "목표 달성률",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "branch.total_revenue"
+            },
+            {
+              "type": "metric",
+              "ref": "branch.total_target"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "branch.total_revenue",
+              "branch.total_target"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.revenue_by_branch",
+          "label": "지점별 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": [
+            "branch"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue",
+              "branch"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.average_revenue",
+          "label": "지점 평균 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "revenue",
+          "groupByRoles": [
+            "branch"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "revenue",
+              "branch"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.total_cost",
+          "label": "총 비용",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "cost",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "cost"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.total_profit",
+          "label": "총 이익",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "branch.total_revenue"
+            },
+            {
+              "type": "metric",
+              "ref": "branch.total_cost"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "branch.total_revenue",
+              "branch.total_cost"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "branch.top_branch",
+          "label": "최고 매출 지점",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "branch.revenue_by_branch",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "branch.revenue_by_branch"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "energy_usage_report": {
+      "templateId": "energy_usage_report",
+      "contractId": "accuracy_contract.energy_usage_report.v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연월",
+            "월",
+            "period",
+            "date"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "facility",
+          "label": "facility",
+          "aliases": [
+            "시설",
+            "건물",
+            "사업장",
+            "facility",
+            "building"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "energyType",
+          "label": "energyType",
+          "aliases": [
+            "에너지원",
+            "종류",
+            "energyType",
+            "type"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "usage",
+          "label": "usage",
+          "aliases": [
+            "사용량",
+            "소비량",
+            "usage",
+            "consumption"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "cost",
+          "label": "cost",
+          "aliases": [
+            "요금",
+            "비용",
+            "cost",
+            "charge"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "energy.total_usage",
+          "label": "총 에너지 사용량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "usage",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "usage"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "energy.average_usage",
+          "label": "평균 에너지 사용량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "usage",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "usage"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "energy.by_facility",
+          "label": "시설별 에너지 사용량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "usage",
+          "groupByRoles": [
+            "facility"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "usage",
+              "facility"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "energy.by_period",
+          "label": "기간별 에너지 사용량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "usage",
+          "groupByRoles": [
+            "period"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "usage",
+              "period"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "energy.by_type",
+          "label": "에너지원별 사용량",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "usage",
+          "groupByRoles": [
+            "energyType"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "usage",
+              "energyType"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "energy.total_cost",
+          "label": "총 에너지 비용",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "cost",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "cost"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "energy.top_facility",
+          "label": "최다 사용 시설",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "energy.by_facility",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "energy.by_facility"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "employee_roster_status": {
+      "templateId": "employee_roster_status",
+      "contractId": "accuracy_contract.employee_roster_status.v1",
+      "sourceRoles": [
+        {
+          "role": "employeeId",
+          "label": "employeeId",
+          "aliases": [
+            "사번",
+            "직원ID",
+            "학번",
+            "employeeId",
+            "id"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "name",
+          "label": "name",
+          "aliases": [
+            "성명",
+            "이름",
+            "name"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "부서",
+            "소속",
+            "연구실",
+            "department",
+            "lab"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "position",
+          "label": "position",
+          "aliases": [
+            "직급",
+            "직책",
+            "구분",
+            "position",
+            "role"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "재직상태",
+            "상태",
+            "status",
+            "employmentStatus"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "roster.employee_count",
+          "label": "구성원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "roster.distinct_employee_count",
+          "label": "고유 구성원 수",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countDistinct",
+          "valueRole": "employeeId",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "employeeId"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "roster.by_department",
+          "label": "부서별 구성원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "roster.by_position",
+          "label": "직급별 구성원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "position"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "position"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "roster.by_status",
+          "label": "상태별 구성원 수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "status"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "status"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "roster.top_department",
+          "label": "최다 인원 부서",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "roster.by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "roster.by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "hr_monthly_report": {
+      "templateId": "hr_monthly_report",
+      "contractId": "accuracy_contract.hr_monthly_report.v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기준월",
+            "연월",
+            "기간",
+            "period",
+            "month"
+          ],
+          "dataType": "period",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "employeeId",
+          "label": "employeeId",
+          "aliases": [
+            "사번",
+            "직원ID",
+            "employeeId",
+            "id"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "부서",
+            "소속",
+            "department",
+            "team"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "position",
+          "label": "position",
+          "aliases": [
+            "직급",
+            "직책",
+            "position",
+            "role"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "재직상태",
+            "상태",
+            "status"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "hireFlag",
+          "label": "hireFlag",
+          "aliases": [
+            "입사여부",
+            "신규입사",
+            "hireFlag",
+            "joined"
+          ],
+          "dataType": "boolean",
+          "required": false,
+          "semanticType": "measure"
+        },
+        {
+          "role": "leaveFlag",
+          "label": "leaveFlag",
+          "aliases": [
+            "퇴사여부",
+            "퇴사",
+            "leaveFlag",
+            "left"
+          ],
+          "dataType": "boolean",
+          "required": false,
+          "semanticType": "measure"
+        },
+        {
+          "role": "salary",
+          "label": "salary",
+          "aliases": [
+            "연봉",
+            "급여",
+            "salary",
+            "pay"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "hr.headcount",
+          "label": "전체 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.distinct_headcount",
+          "label": "고유 인원",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countDistinct",
+          "valueRole": "employeeId",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "employeeId"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.hire_count",
+          "label": "입사자 수",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [
+            {
+              "role": "hireFlag",
+              "operator": "truthy"
+            }
+          ],
+          "operator": "filterCount",
+          "operands": [
+            {
+              "type": "role",
+              "ref": "hireFlag"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [
+              "hireFlag"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.leave_count",
+          "label": "퇴사자 수",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [
+            {
+              "role": "leaveFlag",
+              "operator": "truthy"
+            }
+          ],
+          "operator": "filterCount",
+          "operands": [
+            {
+              "type": "role",
+              "ref": "leaveFlag"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [
+              "leaveFlag"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.net_change",
+          "label": "인원 순증감",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "hr.hire_count"
+            },
+            {
+              "type": "metric",
+              "ref": "hr.leave_count"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "hr.hire_count",
+              "hr.leave_count"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.by_department",
+          "label": "부서별 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.by_position",
+          "label": "직급별 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "position"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "position"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.average_salary",
+          "label": "평균 연봉",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salary",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salary"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.average_salary_by_department",
+          "label": "부서별 평균 연봉",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salary",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salary",
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.top_department",
+          "label": "최다 인원 부서",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "hr.by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "hr.by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "sales_report": {
+      "templateId": "sales_report",
+      "contractId": "accuracy_contract.sales_report.v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연월",
+            "월",
+            "일자",
+            "period",
+            "date"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "product",
+          "label": "product",
+          "aliases": [
+            "품목",
+            "제품",
+            "상품",
+            "product",
+            "item"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "quantity",
+          "label": "quantity",
+          "aliases": [
+            "판매수량",
+            "수량",
+            "quantity",
+            "units"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "salesAmount",
+          "label": "salesAmount",
+          "aliases": [
+            "매출액",
+            "판매금액",
+            "금액",
+            "salesAmount",
+            "sales",
+            "amount"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "customerType",
+          "label": "customerType",
+          "aliases": [
+            "고객유형",
+            "거래처유형",
+            "customerType"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "sales.total_amount",
+          "label": "총 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "salesAmount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.total_quantity",
+          "label": "총 판매수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "quantity",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "quantity"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.average_amount",
+          "label": "평균 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salesAmount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.by_product",
+          "label": "품목별 판매 총합",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "salesAmount",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount",
+              "product"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.average_by_product",
+          "label": "품목별 판매 평균",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salesAmount",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount",
+              "product"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.by_period",
+          "label": "기간별 매출 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "salesAmount",
+          "groupByRoles": [
+            "period"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount",
+              "period"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.share_by_product",
+          "label": "품목별 매출 구성비",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "sales.by_product"
+            },
+            {
+              "type": "metric",
+              "ref": "sales.total_amount"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "sales.by_product",
+              "sales.total_amount"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.top_product",
+          "label": "최고 매출 품목",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "sales.by_product",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "sales.by_product"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "research_budget_report": {
+      "templateId": "research_budget_report",
+      "contractId": "accuracy_contract.research_budget_report.v1",
+      "sourceRoles": [
+        {
+          "role": "project",
+          "label": "project",
+          "aliases": [
+            "과제",
+            "사업명",
+            "프로젝트",
+            "project",
+            "program"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "budgetItem",
+          "label": "budgetItem",
+          "aliases": [
+            "비목",
+            "예산항목",
+            "집행항목",
+            "budgetItem",
+            "category"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "institution",
+          "label": "institution",
+          "aliases": [
+            "기관",
+            "수행기관",
+            "institution",
+            "organization"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "allocatedBudget",
+          "label": "allocatedBudget",
+          "aliases": [
+            "배정예산",
+            "예산액",
+            "총예산",
+            "allocatedBudget",
+            "budget"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "executedAmount",
+          "label": "executedAmount",
+          "aliases": [
+            "집행액",
+            "사용액",
+            "executedAmount",
+            "spent"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연도",
+            "연월",
+            "period",
+            "date"
+          ],
+          "dataType": "period",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "budget.total_allocated",
+          "label": "총 예산액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "allocatedBudget",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "allocatedBudget"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.total_executed",
+          "label": "총 집행액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "executedAmount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "executedAmount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.remaining",
+          "label": "예산 잔액",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "budget.total_allocated"
+            },
+            {
+              "type": "metric",
+              "ref": "budget.total_executed"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "budget.total_allocated",
+              "budget.total_executed"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.execution_rate",
+          "label": "예산 집행률",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "budget.total_executed"
+            },
+            {
+              "type": "metric",
+              "ref": "budget.total_allocated"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "budget.total_executed",
+              "budget.total_allocated"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.executed_by_project",
+          "label": "과제별 집행액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "executedAmount",
+          "groupByRoles": [
+            "project"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "executedAmount",
+              "project"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.executed_by_item",
+          "label": "비목별 집행액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "executedAmount",
+          "groupByRoles": [
+            "budgetItem"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "executedAmount",
+              "budgetItem"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.average_by_project",
+          "label": "과제별 평균 집행액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "executedAmount",
+          "groupByRoles": [
+            "project"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "executedAmount",
+              "project"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "budget.top_project",
+          "label": "최대 집행 과제",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "budget.executed_by_project",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "budget.executed_by_project"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    }
+  },
+  "variants": {
+    "purchase_requesting_organization_v1": {
+      "templateId": "purchase_order_status",
+      "contractId": "accuracy_contract.purchase_order_status.v1.purchase_requesting_organization_v1",
+      "sourceRoles": [
+        {
+          "role": "orderId",
+          "label": "orderId",
+          "aliases": [
+            "발주번호",
+            "요청번호",
+            "orderId",
+            "purchaseOrder"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "date",
+          "label": "date",
+          "aliases": [
+            "등록일자",
+            "등록일",
+            "접수일자",
+            "date",
+            "registrationDate"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "requestingOrganization",
+          "label": "requestingOrganization",
+          "aliases": [
+            "요청기관",
+            "요청부서",
+            "신청기관",
+            "requestingOrganization"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "item",
+          "label": "item",
+          "aliases": [
+            "구분",
+            "품목",
+            "자재",
+            "item",
+            "product"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "amount",
+          "label": "amount",
+          "aliases": [
+            "발주금액",
+            "요청금액",
+            "금액",
+            "amount",
+            "orderAmount"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "발주상태",
+            "처리상태",
+            "상태",
+            "status",
+            "orderStatus"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "purchase.total_amount",
+          "label": "총 발주금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.average_amount",
+          "label": "평균 발주금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "amount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.order_count",
+          "label": "발주 요청 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.by_requesting_organization",
+          "label": "요청기관별 발주금액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "amount",
+          "groupByRoles": [
+            "requestingOrganization"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "amount",
+              "requestingOrganization"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.status_count",
+          "label": "상태별 발주 요청 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "status"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "status"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "purchase.top_requesting_organization",
+          "label": "최대 발주 요청기관",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "purchase.by_requesting_organization",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "purchase.by_requesting_organization"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "hr_without_status_v1": {
+      "templateId": "hr_monthly_report",
+      "contractId": "accuracy_contract.hr_monthly_report.v1.hr_without_status_v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기준월",
+            "연월",
+            "기간",
+            "period",
+            "month"
+          ],
+          "dataType": "period",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "employeeId",
+          "label": "employeeId",
+          "aliases": [
+            "사번",
+            "직원ID",
+            "employeeId",
+            "id"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
+          "role": "department",
+          "label": "department",
+          "aliases": [
+            "부서",
+            "소속",
+            "department",
+            "team"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "position",
+          "label": "position",
+          "aliases": [
+            "직급",
+            "직책",
+            "position",
+            "role"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "status",
+          "label": "status",
+          "aliases": [
+            "재직상태",
+            "상태",
+            "status"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "hireFlag",
+          "label": "hireFlag",
+          "aliases": [
+            "입사여부",
+            "신규입사",
+            "hireFlag",
+            "joined"
+          ],
+          "dataType": "boolean",
+          "required": false,
+          "semanticType": "measure"
+        },
+        {
+          "role": "leaveFlag",
+          "label": "leaveFlag",
+          "aliases": [
+            "퇴사여부",
+            "퇴사",
+            "leaveFlag",
+            "left"
+          ],
+          "dataType": "boolean",
+          "required": false,
+          "semanticType": "measure"
+        },
+        {
+          "role": "salary",
+          "label": "salary",
+          "aliases": [
+            "연봉",
+            "급여",
+            "salary",
+            "pay"
+          ],
+          "dataType": "number",
+          "required": false,
+          "semanticType": "measure"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "hr.headcount",
+          "label": "전체 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.distinct_headcount",
+          "label": "고유 인원",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "countDistinct",
+          "valueRole": "employeeId",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "employeeId"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.hire_count",
+          "label": "입사자 수",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [
+            {
+              "role": "hireFlag",
+              "operator": "truthy"
+            }
+          ],
+          "operator": "filterCount",
+          "operands": [
+            {
+              "type": "role",
+              "ref": "hireFlag"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [
+              "hireFlag"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.leave_count",
+          "label": "퇴사자 수",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [
+            {
+              "role": "leaveFlag",
+              "operator": "truthy"
+            }
+          ],
+          "operator": "filterCount",
+          "operands": [
+            {
+              "type": "role",
+              "ref": "leaveFlag"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [
+              "leaveFlag"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.net_change",
+          "label": "인원 순증감",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "hr.hire_count"
+            },
+            {
+              "type": "metric",
+              "ref": "hr.leave_count"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "hr.hire_count",
+              "hr.leave_count"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.by_department",
+          "label": "부서별 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.by_position",
+          "label": "직급별 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": [
+            "position"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "position"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.average_salary",
+          "label": "평균 연봉",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salary",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salary"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.average_salary_by_department",
+          "label": "부서별 평균 연봉",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salary",
+          "groupByRoles": [
+            "department"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salary",
+              "department"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "hr.top_department",
+          "label": "최다 인원 부서",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "hr.by_department",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "hr.by_department"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "sales_monthly_without_product_v1": {
+      "templateId": "sales_report",
+      "contractId": "accuracy_contract.sales_report.v1.sales_monthly_without_product_v1",
+      "sourceRoles": [
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "기간",
+            "연월",
+            "월",
+            "일자",
+            "period",
+            "date"
+          ],
+          "dataType": "period",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "product",
+          "label": "product",
+          "aliases": [
+            "품목",
+            "제품",
+            "상품",
+            "product",
+            "item"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "quantity",
+          "label": "quantity",
+          "aliases": [
+            "판매수량",
+            "수량",
+            "quantity",
+            "units"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "salesAmount",
+          "label": "salesAmount",
+          "aliases": [
+            "매출액",
+            "판매금액",
+            "금액",
+            "salesAmount",
+            "sales",
+            "amount"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "customerType",
+          "label": "customerType",
+          "aliases": [
+            "고객유형",
+            "거래처유형",
+            "customerType"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "sales.total_amount",
+          "label": "총 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "salesAmount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.total_quantity",
+          "label": "총 판매수량",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "quantity",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "quantity"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.average_amount",
+          "label": "평균 매출액",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salesAmount",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.by_product",
+          "label": "품목별 판매 총합",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "salesAmount",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount",
+              "product"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.average_by_product",
+          "label": "품목별 판매 평균",
+          "criticality": "conditional",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "salesAmount",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount",
+              "product"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.by_period",
+          "label": "기간별 매출 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "salesAmount",
+          "groupByRoles": [
+            "period"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "salesAmount",
+              "period"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.share_by_product",
+          "label": "품목별 매출 구성비",
+          "criticality": "conditional",
+          "kind": "derived",
+          "groupByRoles": [
+            "product"
+          ],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "sales.by_product"
+            },
+            {
+              "type": "metric",
+              "ref": "sales.total_amount"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "sales.by_product",
+              "sales.total_amount"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "sales.top_product",
+          "label": "최고 매출 품목",
+          "criticality": "conditional",
+          "kind": "rank",
+          "sourceMetricId": "sales.by_product",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "sales.by_product"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    },
+    "research_budget_funding_v1": {
+      "templateId": "research_budget_report",
+      "contractId": "accuracy_contract.research_budget_report.v1.research_budget_funding_v1",
+      "sourceRoles": [
+        {
+          "role": "project",
+          "label": "project",
+          "aliases": [
+            "과제명",
+            "과제",
+            "사업명",
+            "project",
+            "program"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "fundingCategory",
+          "label": "fundingCategory",
+          "aliases": [
+            "구분",
+            "지원유형",
+            "사업구분",
+            "fundingCategory",
+            "category"
+          ],
+          "dataType": "string",
+          "required": true,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "institution",
+          "label": "institution",
+          "aliases": [
+            "연구기관",
+            "기관",
+            "수행기관",
+            "institution",
+            "organization"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "dimension"
+        },
+        {
+          "role": "totalBudget",
+          "label": "totalBudget",
+          "aliases": [
+            "총 연구비",
+            "총연구비",
+            "연구비총액",
+            "totalBudget",
+            "budget"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "governmentFunding",
+          "label": "governmentFunding",
+          "aliases": [
+            "정부출연금",
+            "정부지원금",
+            "국고지원금",
+            "governmentFunding"
+          ],
+          "dataType": "number",
+          "required": true,
+          "semanticType": "measure"
+        },
+        {
+          "role": "period",
+          "label": "period",
+          "aliases": [
+            "예산년도",
+            "연도",
+            "기간",
+            "period",
+            "year"
+          ],
+          "dataType": "period",
+          "required": false,
+          "semanticType": "dimension"
+        }
+      ],
+      "metrics": [
+        {
+          "metricId": "funding.total_budget",
+          "label": "총 연구비",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "totalBudget",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "totalBudget"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.total_government",
+          "label": "총 정부출연금",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "governmentFunding",
+          "groupByRoles": [],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "governmentFunding"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.non_government",
+          "label": "비정부 재원",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "subtract",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "funding.total_budget"
+            },
+            {
+              "type": "metric",
+              "ref": "funding.total_government"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "funding.total_budget",
+              "funding.total_government"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.government_share",
+          "label": "정부출연금 비중",
+          "criticality": "core",
+          "kind": "derived",
+          "groupByRoles": [],
+          "filters": [],
+          "operator": "percentage",
+          "operands": [
+            {
+              "type": "metric",
+              "ref": "funding.total_government"
+            },
+            {
+              "type": "metric",
+              "ref": "funding.total_budget"
+            }
+          ],
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "funding.total_government",
+              "funding.total_budget"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.by_project",
+          "label": "과제별 총 연구비",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "totalBudget",
+          "groupByRoles": [
+            "project"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "totalBudget",
+              "project"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.by_category",
+          "label": "구분별 총 연구비",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "totalBudget",
+          "groupByRoles": [
+            "fundingCategory"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "totalBudget",
+              "fundingCategory"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.average_by_project",
+          "label": "과제별 평균 연구비",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "average",
+          "valueRole": "totalBudget",
+          "groupByRoles": [
+            "project"
+          ],
+          "filters": [],
+          "activation": {
+            "requiresRoles": [
+              "totalBudget",
+              "project"
+            ],
+            "requiresMetricIds": []
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        },
+        {
+          "metricId": "funding.top_project",
+          "label": "최대 연구비 과제",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "funding.by_project",
+          "direction": "desc",
+          "limit": 1,
+          "activation": {
+            "requiresRoles": [],
+            "requiresMetricIds": [
+              "funding.by_project"
+            ]
+          },
+          "rounding": {
+            "digits": 2,
+            "mode": "half-up"
+          }
+        }
+      ]
+    }
+  }
+}
