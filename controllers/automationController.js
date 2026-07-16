@@ -9,8 +9,16 @@ const {
   readJsonObject,
   saveBufferObject,
   deleteObject,
+  isLocalStorage,
 } = require("../utils/storage");
 const { readWorkbookFromBuffer } = require("../utils/workbookReader");
+const {
+  LOCAL_REGRESSION_ARTIFACT_NAMING_VERSION,
+  normalizeRegressionContext,
+  buildLocalRegressionArtifactFileName,
+  buildLocalRegressionQueryTablesKey,
+  isFlatLocalRegressionQueryTablesKey,
+} = require("../utils/regressionArtifactNaming");
 const { getOrBuildAllSheetsData } = require("../utils/sheetPreprocessor");
 const { buildDownloadFileName } = require("../utils/downloadFileNameBuilder");
 const {
@@ -281,6 +289,51 @@ const AUTOMATION_DIR = getGeneratedLocalDir(OUTPUT_TYPES.SUMMARY_SHEET);
 const SUMMARY_SHEET_STORAGE_PREFIX = getGeneratedStoragePrefix(
   OUTPUT_TYPES.SUMMARY_SHEET,
 );
+const SUMMARY_SHEET_STORAGE_LAYOUT_VERSION = "summary_sheet_storage_layout_v2";
+
+function shouldUseFlatLocalSummarySheetLayout() {
+  return (
+    typeof isLocalStorage === "function" &&
+    isLocalStorage() &&
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function buildSummarySheetStorageKey({
+  userId = "local-dev",
+  fileHash = "",
+  outputFileName = "",
+} = {}) {
+  const safeFileName = path.basename(String(outputFileName || "").trim());
+
+  if (!safeFileName) {
+    throw new Error("자동화 시트 출력 파일명이 필요합니다.");
+  }
+
+  if (shouldUseFlatLocalSummarySheetLayout()) {
+    return `${SUMMARY_SHEET_STORAGE_PREFIX}/${safeFileName}`;
+  }
+
+  return `${SUMMARY_SHEET_STORAGE_PREFIX}/${String(
+    userId || "local-dev",
+  )}/${String(fileHash || "unknown")}/${safeFileName}`;
+}
+
+function isFlatLocalSummarySheetStorageKey(storageKey = "") {
+  if (!shouldUseFlatLocalSummarySheetLayout()) return false;
+
+  const key = String(storageKey || "");
+  const prefix = `${SUMMARY_SHEET_STORAGE_PREFIX}/`;
+  if (!key.startsWith(prefix)) return false;
+
+  const relative = key.slice(prefix.length);
+  return (
+    Boolean(relative) &&
+    !relative.includes("/") &&
+    !relative.includes("\\") &&
+    path.extname(relative).toLowerCase() === ".xlsx"
+  );
+}
 
 async function assertTemplateGenerationUsage(req, res) {
   if (!req.user?.id) return true;
@@ -326,18 +379,55 @@ function resultTemplateTitle(
   );
 }
 
+function localStorageEnabled() {
+  return typeof isLocalStorage === "function" && isLocalStorage();
+}
+
 function buildGeneratedFileName({
   sourceFileName,
   templateTitle,
   outputType,
   extension,
+  regressionContext = null,
 }) {
+  const resolvedExtension = extension || getOutputExtension(outputType);
+  const regressionFileName = buildLocalRegressionArtifactFileName({
+    regressionContext,
+    outputType,
+    extension: resolvedExtension,
+    localStorageEnabled: localStorageEnabled(),
+    nodeEnv: process.env.NODE_ENV,
+  });
+
+  if (regressionFileName) return regressionFileName;
+
   return buildDownloadFileName({
     sourceFileName,
     templateTitle,
     outputType,
-    extension: extension || getOutputExtension(outputType),
+    extension: resolvedExtension,
   });
+}
+
+function regressionArtifactNamingMeta(regressionContext = null) {
+  const context = normalizeRegressionContext(regressionContext);
+  const enabled = Boolean(
+    context &&
+    buildLocalRegressionArtifactFileName({
+      regressionContext: context,
+      outputType: OUTPUT_TYPES.ANALYSIS_REPORT,
+      extension: "json",
+      localStorageEnabled: localStorageEnabled(),
+      nodeEnv: process.env.NODE_ENV,
+    }),
+  );
+
+  return {
+    version: LOCAL_REGRESSION_ARTIFACT_NAMING_VERSION,
+    enabled,
+    retention: context?.retention || "",
+    caseId: context?.caseId || "",
+  };
 }
 
 function encodeDownloadName(fileName = "download") {
@@ -375,6 +465,8 @@ function assertGeneratedStorageKeyAccess(req, storageKey = "") {
 
   const userId = req.user?.id ? String(req.user.id) : "local-dev";
 
+  if (isFlatLocalSummarySheetStorageKey(key)) return true;
+
   return (
     key.startsWith(`${SUMMARY_SHEET_STORAGE_PREFIX}/${userId}/`) ||
     key.startsWith(`${SUMMARY_SHEET_STORAGE_PREFIX}/local-dev/`)
@@ -386,6 +478,16 @@ function assertQueryTablesKeyAccess(req, queryTablesKey = "") {
   if (!key) return false;
 
   const userId = req.user?.id ? String(req.user.id) : "local-dev";
+
+  if (
+    isFlatLocalRegressionQueryTablesKey({
+      key,
+      localStorageEnabled: localStorageEnabled(),
+      nodeEnv: process.env.NODE_ENV,
+    })
+  ) {
+    return true;
+  }
 
   return (
     key.startsWith("query-tables/" + userId + "/") ||
@@ -991,6 +1093,7 @@ exports.createSummarySheet = async (req, res, next) => {
       summarySheetMode = "hybrid",
       includeSourceDataSheet = true,
       formulaOptions = {},
+      regressionContext = null,
     } = req.body || {};
 
     if (!queryTablesKey) {
@@ -1111,8 +1214,13 @@ exports.createSummarySheet = async (req, res, next) => {
         getOutputDefaultTitle(outputType),
       ),
       outputType,
+      regressionContext,
     });
-    const key = `${SUMMARY_SHEET_STORAGE_PREFIX}/${userId}/${saved.fileHash}/${outputFileName}`;
+    const key = buildSummarySheetStorageKey({
+      userId,
+      fileHash: saved.fileHash,
+      outputFileName,
+    });
 
     const stored = await saveBufferObject(
       key,
@@ -1139,6 +1247,13 @@ exports.createSummarySheet = async (req, res, next) => {
       summarySheetKey: key,
       storageKey: key,
       internalFileKey: key,
+      storageLayout: {
+        version: SUMMARY_SHEET_STORAGE_LAYOUT_VERSION,
+        mode: shouldUseFlatLocalSummarySheetLayout()
+          ? "flat-local"
+          : "user-hash-isolated",
+      },
+      artifactNaming: regressionArtifactNamingMeta(regressionContext),
       localName: stored.localName,
       gcsName: stored.gcsName,
       sheetNames: workbook.SheetNames || [],
@@ -1161,6 +1276,7 @@ function writeReportJson({
   message,
   result,
   templateCandidate = null,
+  regressionContext = null,
 }) {
   const outputType = OUTPUT_TYPES.ANALYSIS_REPORT;
   fs.mkdirSync(REPORT_DIR, { recursive: true });
@@ -1206,6 +1322,7 @@ function writeReportJson({
       getOutputDefaultTitle(outputType),
     ),
     outputType,
+    regressionContext,
   });
   const filePath = path.join(REPORT_DIR, outputName);
 
@@ -1218,6 +1335,7 @@ function writeReportJson({
     filePath,
     outputType,
     outputLabel: outputTypeLabel(outputType),
+    artifactNaming: regressionArtifactNamingMeta(regressionContext),
     report,
   };
 }
@@ -1228,6 +1346,7 @@ async function writeReportPpt({
   result,
   template,
   templateCandidate = null,
+  regressionContext = null,
 }) {
   const outputType = OUTPUT_TYPES.PPT;
   fs.mkdirSync(PPT_DIR, { recursive: true });
@@ -1261,6 +1380,7 @@ async function writeReportPpt({
       getOutputDefaultTitle(outputType),
     ),
     outputType,
+    regressionContext,
   });
   const filePath = path.join(PPT_DIR, outputName);
 
@@ -1273,6 +1393,7 @@ async function writeReportPpt({
     filePath,
     outputType,
     outputLabel: outputTypeLabel(outputType),
+    artifactNaming: regressionArtifactNamingMeta(regressionContext),
     template: template || "default",
     report: pptReport,
     slideCount:
@@ -1439,6 +1560,7 @@ exports.exportReportJson = async (req, res) => {
       candidate,
       templateCandidate,
       executionResult,
+      regressionContext = null,
     } = req.body || {};
 
     if (!queryTablesKey || !message) {
@@ -1520,6 +1642,7 @@ exports.exportReportJson = async (req, res) => {
       message,
       result,
       templateCandidate,
+      regressionContext,
     });
     const outputType = exported.outputType || OUTPUT_TYPES.ANALYSIS_REPORT;
     await bumpTemplateGenerationUsage(req);
@@ -1537,6 +1660,7 @@ exports.exportReportJson = async (req, res) => {
       filePath: exported.filePath,
       outputType,
       outputLabel: outputTypeLabel(outputType),
+      artifactNaming: exported.artifactNaming,
       analysisReport: exported.report,
       report: exported.report,
       result,
@@ -1561,6 +1685,7 @@ exports.exportPptx = async (req, res) => {
       candidate,
       templateCandidate,
       executionResult,
+      regressionContext = null,
     } = req.body || {};
 
     if (!queryTablesKey || !message) {
@@ -1643,6 +1768,7 @@ exports.exportPptx = async (req, res) => {
       result,
       template,
       templateCandidate,
+      regressionContext,
     });
     const outputType = exported.outputType || OUTPUT_TYPES.PPT;
     await bumpTemplateGenerationUsage(req);
@@ -1660,6 +1786,7 @@ exports.exportPptx = async (req, res) => {
       filePath: exported.filePath,
       outputType,
       outputLabel: outputTypeLabel(outputType),
+      artifactNaming: exported.artifactNaming,
       template: exported.template,
       slideCount: exported.slideCount,
       pptQualityVersion:
@@ -2053,7 +2180,7 @@ exports.previewQueryTables = async (req, res, next) => {
 
 exports.saveQueryTables = async (req, res, next) => {
   try {
-    const { fileName } = req.body || {};
+    const { fileName, regressionContext = null } = req.body || {};
 
     if (!fileName) {
       return res.status(400).json({
@@ -2107,8 +2234,17 @@ exports.saveQueryTables = async (req, res, next) => {
     const now = new Date();
     const userId = req.user?.id || "local-dev";
     const rand = crypto.randomBytes(6).toString("hex");
+    const normalizedRegressionContext =
+      normalizeRegressionContext(regressionContext);
+    const stableRegressionKey = buildLocalRegressionQueryTablesKey({
+      regressionContext: normalizedRegressionContext,
+      localStorageEnabled: localStorageEnabled(),
+      nodeEnv: process.env.NODE_ENV,
+    });
 
-    const key = `query-tables/${userId}/${fileHash}/${Date.now()}_${rand}.json`;
+    const key =
+      stableRegressionKey ||
+      `query-tables/${userId}/${fileHash}/${Date.now()}_${rand}.json`;
 
     const payload = {
       version: "query_tables_v4_text_csv_encoding",
@@ -2117,6 +2253,8 @@ exports.saveQueryTables = async (req, res, next) => {
       sheetStateSig,
       tableCount: tables.length,
       createdAt: now.toISOString(),
+      regressionContext: normalizedRegressionContext,
+      artifactNaming: regressionArtifactNamingMeta(regressionContext),
       tables,
       normalizedQueryTables,
       analysisRecipeCandidates,
@@ -2144,6 +2282,7 @@ exports.saveQueryTables = async (req, res, next) => {
       sheetStateSig,
       tableCount: tables.length,
       queryTablesKey: key,
+      artifactNaming: regressionArtifactNamingMeta(regressionContext),
       normalizedQueryTables,
       analysisRecipeCandidates,
       categoryCandidates,
