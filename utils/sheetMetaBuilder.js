@@ -393,7 +393,8 @@ function summarizeExcludedRows(excludedRows = []) {
   return counts;
 }
 
-const TABLE_SEGMENTATION_VERSION = "table_segmentation_v1";
+const TABLE_SEGMENTATION_VERSION =
+  "table_segmentation_v3_scoped_contiguous_data_guard";
 const TABLE_SEGMENTATION_OPTIONS = Object.freeze({
   maxLookaheadRows: 5,
   maxBoundaryLookbackRows: 5,
@@ -515,10 +516,11 @@ function isSegmentHeaderCandidate(json = [], rowIndex = 0, options = {}) {
 
 function looksLikeHeaderFalsePositiveDataRow(row = [], analysis = {}) {
   const numericDateRatio = Number(analysis.numericDateRatio || 0);
-  const temporalCount = Number(analysis.temporalCount || 0);
+  const temporalCount = countTemporalHeaderTokens(row);
 
   return Boolean(
     isLikelyDataRow(row) ||
+    looksLikeContinuationDataCandidateRow(row) ||
     (numericDateRatio > 0.2 && temporalCount < 2 && numericDateCount(row) > 0),
   );
 }
@@ -693,7 +695,7 @@ function structurallyHeaderishRow(row = []) {
   const nonEmpty = nonEmptyCount(row);
   if (nonEmpty < 2) return false;
 
-  const temporalCount = nonEmptyCells(row).filter(isTemporalHeaderLike).length;
+  const temporalCount = countTemporalHeaderTokens(row);
   const headerLikeCount = nonEmptyCells(row).filter(isLikelyHeaderToken).length;
   const numericLike = row.filter(
     (cell) => cell != null && String(cell).trim() !== "" && isNumericLike(cell),
@@ -759,7 +761,7 @@ function analyzeHeaderRowCandidate(row = [], options = {}) {
   const textRatio = textLike / nonEmpty;
   const headerLike = cells.filter(isLikelyHeaderToken).length;
   const headerLikeRatio = headerLike / nonEmpty;
-  const temporalCount = cells.filter(isTemporalHeaderLike).length;
+  const temporalCount = countTemporalHeaderTokens(row);
   const temporalRatio = temporalCount / nonEmpty;
   const numericLike = row.filter(
     (cell) => cell != null && String(cell).trim() !== "" && isNumericLike(cell),
@@ -1138,8 +1140,24 @@ function joinHeaderParts(parts = []) {
   return safeParts.join("_");
 }
 
+function isBareYearHeaderToken(value) {
+  return /^(19|20)\d{2}$/.test(compactCellText(value));
+}
+
 function countTemporalHeaderTokens(row = []) {
   return nonEmptyCells(row).filter(isTemporalHeaderLike).length;
+}
+
+function countContinuationTemporalHeaderTokens(row = []) {
+  const cells = nonEmptyCells(row);
+  const bareYearCount = cells.filter(isBareYearHeaderToken).length;
+  const explicitTemporalCount = cells.filter(
+    (cell) => isTemporalHeaderLike(cell) && !isBareYearHeaderToken(cell),
+  ).length;
+
+  // 이 완화 규칙은 연속 데이터 행의 헤더 오탐 판정에만 사용한다.
+  // 일반 XLSX 헤더 탐지에는 기존 temporal count를 유지한다.
+  return explicitTemporalCount + (bareYearCount >= 2 ? bareYearCount : 0);
 }
 
 function countHeaderLikeTokens(row = []) {
@@ -1473,20 +1491,19 @@ function looksLikeContinuationDataCandidateRow(row = []) {
   const nonEmpty = cells.length;
   if (nonEmpty < 3) return false;
 
-  const temporalCount = cells.filter(isTemporalHeaderLike).length;
+  const temporalCount = countContinuationTemporalHeaderTokens(row);
   if (temporalCount >= 2) return false;
 
   const first = row[firstIdx];
   const firstText = compactCellText(first);
   if (!firstText) return false;
 
-  const firstIsDataValue =
+  const firstIsScalarDataValue =
     isNumericLike(first) ||
     isDateLike(first) ||
     isTimeLike(first) ||
-    isMissingValuePlaceholderCell(first) ||
-    isTemporalHeaderLike(first);
-  if (firstIsDataValue) return false;
+    isMissingValuePlaceholderCell(first);
+  const firstIsTemporalValue = isTemporalHeaderLike(first);
 
   const afterFirst = row
     .slice(firstIdx + 1)
@@ -1499,9 +1516,16 @@ function looksLikeContinuationDataCandidateRow(row = []) {
   ).length;
   const signalRatio = dataSignals / afterFirst.length;
 
+  // 기간값으로 시작하는 연속 데이터 행도 헤더로 승격시키지 않는다.
+  // 예: ["2026-01", "중앙창고", ..., 82, 50, ...]
+  // 반대로 ["구분", "2021", "2022", "2023"] 같은 wide header는
+  // temporalCount >= 2에서 이미 제외된다.
+  if ((firstIsScalarDataValue || firstIsTemporalValue) && signalRatio >= 0.45) {
+    return true;
+  }
+
   // blank row 뒤에 이어지는 실제 데이터 행이 헤더 후보로 승격되는 케이스 방지.
   // 예: ["지붕", "-", "-", ...], ["비상구", 45, 23, ...]
-  // 반대로 ["구분", "2021", "2022", "2023"] 같은 진짜 기간형 헤더는 temporalCount로 제외된다.
   if (placeholderSignals > 0 && signalRatio >= 0.45) return true;
 
   if (!isGenericDimensionHeaderToken(first) && signalRatio >= 0.65) {
