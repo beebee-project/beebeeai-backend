@@ -10,7 +10,7 @@ const {
   toNumber,
 } = require("../businessTemplates/commonTemplateHelpers");
 
-const INVENTORY_FLOW_REPORT_VERSION = "inventory_flow_report_builder_v1";
+const INVENTORY_FLOW_REPORT_VERSION = "inventory_flow_report_builder_v2";
 
 const DEFAULT_FLOW_TYPE_HINTS = [
   "입출고구분",
@@ -87,18 +87,33 @@ const DEFAULT_QUANTITY_HINTS = [
   "amount used",
 ];
 
-const DEFAULT_VALUE_HINTS = [
-  "금액",
+const DEFAULT_AMOUNT_HINTS = [
   "재고금액",
   "입고금액",
   "출고금액",
   "구매금액",
   "취득금액",
-  "단가",
   "평가금액",
+  "합계금액",
+  "총액",
+  "금액",
+  "inventory value",
+  "extended cost",
+  "total value",
   "value",
   "amount",
   "cost",
+];
+
+const DEFAULT_UNIT_PRICE_HINTS = [
+  "단가",
+  "개당가격",
+  "개당금액",
+  "개당원가",
+  "unit price",
+  "unit cost",
+  "price per unit",
+  "cost per unit",
   "price",
 ];
 
@@ -210,7 +225,15 @@ const OUTBOUND_KEYWORDS = [
   "rental",
 ];
 
-const ADJUSTMENT_KEYWORDS = ["조정", "이동", "전환", "실사", "adjust", "move", "transfer"];
+const ADJUSTMENT_KEYWORDS = [
+  "조정",
+  "이동",
+  "전환",
+  "실사",
+  "adjust",
+  "move",
+  "transfer",
+];
 
 function normalizeText(value = "") {
   return String(value ?? "")
@@ -280,15 +303,28 @@ function numericValuesForHeader(table = {}, header = "") {
     .filter((value) => value != null && Number.isFinite(Number(value)));
 }
 
-function findNumericHeaderByHints(table = {}, hints = []) {
-  const byHint = findColumnHeader(table, hints, { type: "number" });
-  if (byHint) return byHint;
-
+function findNumericHeaderByHints(
+  table = {},
+  hints = [],
+  { excludeHints = [] } = {},
+) {
   const columns = getColumns(table);
+
   const matched = columns.find((column) => {
     const header = getColumnHeader(column);
-    if (!includesAny(header, hints)) return false;
+
+    // 힌트가 실제로 일치한 열만 허용한다.
+    // 숫자형이라는 이유만으로 다른 열을 fallback하지 않는다.
+    if (!includesAny(header, hints)) {
+      return false;
+    }
+
+    if (includesAny(header, excludeHints)) {
+      return false;
+    }
+
     const values = numericValuesForHeader(table, header);
+
     return values.length > 0;
   });
 
@@ -327,10 +363,22 @@ function findInventoryFlowHeaders(table = {}, config = {}) {
       ...DEFAULT_QUANTITY_HINTS,
     ]);
 
-  const valueHeader = findNumericHeaderByHints(table, [
-    ...(hints.value || []),
-    ...DEFAULT_VALUE_HINTS,
+  const amountHeader = findNumericHeaderByHints(
+    table,
+    [...(hints.amount || []), ...(hints.value || []), ...DEFAULT_AMOUNT_HINTS],
+    {
+      // "단가"처럼 행 단위 가격인 열은 합계 금액으로 사용하지 않는다.
+      excludeHints: DEFAULT_UNIT_PRICE_HINTS,
+    },
+  );
+
+  const unitPriceHeader = findNumericHeaderByHints(table, [
+    ...(hints.unitPrice || []),
+    ...DEFAULT_UNIT_PRICE_HINTS,
   ]);
+
+  // 기존 호출부와의 호환을 위해 valueHeader는 직접 금액 열만 가리킨다.
+  const valueHeader = amountHeader;
 
   const categoryHeader = findColumnHeader(table, [
     ...(hints.category || []),
@@ -358,6 +406,8 @@ function findInventoryFlowHeaders(table = {}, config = {}) {
     outboundQuantityHeader,
     stockQuantityHeader,
     quantityHeader,
+    amountHeader,
+    unitPriceHeader,
     valueHeader,
     categoryHeader,
     locationHeader,
@@ -369,20 +419,29 @@ function findInventoryFlowHeaders(table = {}, config = {}) {
 function hasInventoryFlowEvidence(headers = {}) {
   return Boolean(
     headers.inboundQuantityHeader ||
-      headers.outboundQuantityHeader ||
-      headers.stockQuantityHeader ||
-      (headers.flowTypeHeader && headers.quantityHeader) ||
-      (headers.categoryHeader && headers.quantityHeader && headers.locationHeader),
+    headers.outboundQuantityHeader ||
+    headers.stockQuantityHeader ||
+    (headers.flowTypeHeader && headers.quantityHeader) ||
+    (headers.categoryHeader &&
+      headers.quantityHeader &&
+      headers.locationHeader),
   );
 }
 
 function rowFlowValues(row = {}, headers = {}) {
   const flowClass = classifyFlowType(getRowValue(row, headers.flowTypeHeader));
-  const directInbound = toNumber(getRowValue(row, headers.inboundQuantityHeader));
-  const directOutbound = toNumber(getRowValue(row, headers.outboundQuantityHeader));
+  const directInbound = toNumber(
+    getRowValue(row, headers.inboundQuantityHeader),
+  );
+  const directOutbound = toNumber(
+    getRowValue(row, headers.outboundQuantityHeader),
+  );
   const stockQty = toNumber(getRowValue(row, headers.stockQuantityHeader));
   const genericQty = toNumber(getRowValue(row, headers.quantityHeader));
-  const value = toNumber(getRowValue(row, headers.valueHeader));
+  const amount = toNumber(
+    getRowValue(row, headers.amountHeader || headers.valueHeader),
+  );
+  const unitPrice = toNumber(getRowValue(row, headers.unitPriceHeader));
 
   let inboundQty = directInbound || 0;
   let outboundQty = directOutbound || 0;
@@ -395,6 +454,11 @@ function rowFlowValues(row = {}, headers = {}) {
   }
 
   const netQty = inboundQty - outboundQty + adjustmentQty;
+  const derivedStockValue =
+    amount == null && stockQty != null && unitPrice != null
+      ? stockQty * unitPrice
+      : null;
+  const stockValue = amount != null ? amount : derivedStockValue;
 
   return {
     flowClass,
@@ -404,7 +468,17 @@ function rowFlowValues(row = {}, headers = {}) {
     stockQty: stockQty || 0,
     genericQty: genericQty || 0,
     netQty,
-    value: value || 0,
+    amount: amount || 0,
+    unitPrice: unitPrice || 0,
+    stockValue: stockValue || 0,
+    stockValueSource:
+      amount != null
+        ? "direct_amount"
+        : derivedStockValue != null
+          ? "stock_quantity_x_unit_price"
+          : "unavailable",
+    // 기존 집계 코드와의 호환 필드. 의미는 직접 금액 또는 파생 재고평가금액이다.
+    value: stockValue || 0,
   };
 }
 
@@ -462,27 +536,62 @@ function buildInventoryOverviewSection({ table, headers, config = {} }) {
   const flowValues = rows.map((row) => rowFlowValues(row, headers));
   const inboundQty = sumNumbers(flowValues.map((item) => item.inboundQty));
   const outboundQty = sumNumbers(flowValues.map((item) => item.outboundQty));
-  const adjustmentQty = sumNumbers(flowValues.map((item) => item.adjustmentQty));
+  const adjustmentQty = sumNumbers(
+    flowValues.map((item) => item.adjustmentQty),
+  );
   const stockQty = sumNumbers(flowValues.map((item) => item.stockQty));
-  const totalValue = sumNumbers(flowValues.map((item) => item.value));
+  const totalStockValue = sumNumbers(flowValues.map((item) => item.stockValue));
+  const stockValueSource = firstNonEmpty(
+    flowValues
+      .map((item) => item.stockValueSource)
+      .filter((value) => value && value !== "unavailable"),
+  );
   const netQty = inboundQty - outboundQty + adjustmentQty;
   const estimatedStock = stockQty || netQty;
 
   const resultRows = [
     { 지표: "전체 행 수", 값: rows.length, 보조값: null, 비율Percent: null },
-    { 지표: config.labels?.inbound || "입고 수량", 값: inboundQty, 보조값: null, 비율Percent: makePercent(safeRate(inboundQty, inboundQty + outboundQty)) },
-    { 지표: config.labels?.outbound || "출고 수량", 값: outboundQty, 보조값: null, 비율Percent: makePercent(safeRate(outboundQty, inboundQty + outboundQty)) },
+    {
+      지표: config.labels?.inbound || "입고 수량",
+      값: inboundQty,
+      보조값: null,
+      비율Percent: makePercent(safeRate(inboundQty, inboundQty + outboundQty)),
+    },
+    {
+      지표: config.labels?.outbound || "출고 수량",
+      값: outboundQty,
+      보조값: null,
+      비율Percent: makePercent(safeRate(outboundQty, inboundQty + outboundQty)),
+    },
     { 지표: "순증감 수량", 값: netQty, 보조값: null, 비율Percent: null },
   ];
 
   if (stockQty) {
-    resultRows.push({ 지표: "재고 수량 합계", 값: stockQty, 보조값: null, 비율Percent: null });
+    resultRows.push({
+      지표: "재고 수량 합계",
+      값: stockQty,
+      보조값: null,
+      비율Percent: null,
+    });
   } else {
-    resultRows.push({ 지표: "추정 재고 증감", 값: estimatedStock, 보조값: null, 비율Percent: null });
+    resultRows.push({
+      지표: "추정 재고 증감",
+      값: estimatedStock,
+      보조값: null,
+      비율Percent: null,
+    });
   }
 
-  if (totalValue) {
-    resultRows.push({ 지표: "금액 합계", 값: totalValue, 보조값: null, 비율Percent: null });
+  if (totalStockValue) {
+    resultRows.push({
+      지표:
+        stockValueSource === "stock_quantity_x_unit_price"
+          ? "총 재고평가금액"
+          : `${headers.amountHeader || "금액"} 합계`,
+      값: totalStockValue,
+      보조값: null,
+      비율Percent: null,
+    });
   }
 
   return makeCustomMetricSection({
@@ -496,6 +605,12 @@ function buildInventoryOverviewSection({ table, headers, config = {} }) {
       outboundQuantity: headers.outboundQuantityHeader,
       stockQuantity: headers.stockQuantityHeader,
       quantity: headers.quantityHeader,
+      amount: headers.amountHeader,
+      unitPrice: headers.unitPriceHeader,
+      stockValue:
+        stockValueSource === "stock_quantity_x_unit_price"
+          ? "현재재고 × 단가"
+          : headers.amountHeader,
       value: headers.valueHeader,
     },
     chartHint: {
@@ -547,7 +662,9 @@ function buildFlowTypeBreakdownSection({ table, headers, config = {} }) {
     item.금액 += values.value;
   });
 
-  const totalCount = sumNumbers(Array.from(map.values()).map((item) => item.건수));
+  const totalCount = sumNumbers(
+    Array.from(map.values()).map((item) => item.건수),
+  );
   const resultRows = Array.from(map.values())
     .map((item) => ({
       ...item,
@@ -559,7 +676,8 @@ function buildFlowTypeBreakdownSection({ table, headers, config = {} }) {
   if (!resultRows.length) return null;
 
   return makeCustomMetricSection({
-    sectionId: config.sectionIds?.flowBreakdown || "inventory_flow_type_breakdown",
+    sectionId:
+      config.sectionIds?.flowBreakdown || "inventory_flow_type_breakdown",
     sectionType: "inventory_flow_type_breakdown",
     title: config.titles?.flowBreakdown || "입출고 구분별 흐름",
     table,
@@ -584,7 +702,8 @@ function buildFlowTypeBreakdownSection({ table, headers, config = {} }) {
 
 function buildFlowByPeriodSection({ table, headers, config = {} }) {
   const { dateHeader } = headers || {};
-  if (!table?.tableId || !dateHeader || !hasInventoryFlowEvidence(headers)) return null;
+  if (!table?.tableId || !dateHeader || !hasInventoryFlowEvidence(headers))
+    return null;
 
   const map = new Map();
   getRows(table).forEach((row) => {
@@ -652,11 +771,13 @@ function buildInventoryByDimensionSection({
   title = "",
   sectionId = "",
 }) {
-  if (!table?.tableId || !dimensionHeader || !hasInventoryFlowEvidence(headers)) return null;
+  if (!table?.tableId || !dimensionHeader || !hasInventoryFlowEvidence(headers))
+    return null;
 
   const map = new Map();
   getRows(table).forEach((row) => {
-    const dimension = String(getRowValue(row, dimensionHeader) ?? "").trim() || "미입력";
+    const dimension =
+      String(getRowValue(row, dimensionHeader) ?? "").trim() || "미입력";
     const values = rowFlowValues(row, headers);
 
     if (!map.has(dimension)) {
@@ -685,11 +806,14 @@ function buildInventoryByDimensionSection({
   const resultRows = Array.from(map.values())
     .map((item) => ({
       ...item,
-      출고율: makePercent(safeRate(item.출고수량, item.입고수량 + item.재고수량)),
+      출고율: makePercent(
+        safeRate(item.출고수량, item.입고수량 + item.재고수량),
+      ),
     }))
-    .sort((a, b) =>
-      Number((b.재고수량 || 0) + (b.순증감수량 || 0)) -
-      Number((a.재고수량 || 0) + (a.순증감수량 || 0)),
+    .sort(
+      (a, b) =>
+        Number((b.재고수량 || 0) + (b.순증감수량 || 0)) -
+        Number((a.재고수량 || 0) + (a.순증감수량 || 0)),
     );
 
   if (!resultRows.length) return null;
@@ -731,10 +855,15 @@ function buildInventoryFlowCandidates({ table, headers, config = {} }) {
     flowTypeHeader,
     quantityHeader,
     stockQuantityHeader,
+    amountHeader,
     valueHeader,
   } = headers || {};
 
-  const metricHeader = stockQuantityHeader || quantityHeader || valueHeader;
+  // 단가는 합산 가능한 대표 metric이 아니다.
+  // 재고수량·수량·직접 금액 열만 일반 recipe 후보로 사용한다.
+  const metricHeader =
+    stockQuantityHeader || quantityHeader || amountHeader || valueHeader;
+
   const candidates = [];
   const tableId = table.tableId;
 
@@ -744,7 +873,8 @@ function buildInventoryFlowCandidates({ table, headers, config = {} }) {
         sectionId: config.sectionIds?.timeQuantity || "inventory_time_quantity",
         sectionType: "inventory_time_quantity",
         recipeType: "time_sum",
-        title: config.titles?.timeQuantity || `${dateHeader}별 ${metricHeader} 추이`,
+        title:
+          config.titles?.timeQuantity || `${dateHeader}별 ${metricHeader} 추이`,
         tableId,
         columns: {
           date: dateHeader,
@@ -764,9 +894,12 @@ function buildInventoryFlowCandidates({ table, headers, config = {} }) {
     );
   }
 
-  const dimensions = [categoryHeader, locationHeader, statusHeader, flowTypeHeader].filter(
-    (value, index, arr) => value && arr.indexOf(value) === index,
-  );
+  const dimensions = [
+    categoryHeader,
+    locationHeader,
+    statusHeader,
+    flowTypeHeader,
+  ].filter((value, index, arr) => value && arr.indexOf(value) === index);
 
   for (const dimensionHeader of dimensions) {
     candidates.push(
@@ -821,7 +954,8 @@ function buildInventoryFlowCandidates({ table, headers, config = {} }) {
   if (categoryHeader) {
     candidates.push(
       makeTemplateCandidate({
-        sectionId: config.sectionIds?.composition || "inventory_category_composition",
+        sectionId:
+          config.sectionIds?.composition || "inventory_category_composition",
         sectionType: "inventory_category_composition",
         recipeType: "composition_ratio",
         title: `${categoryHeader} 구성비`,

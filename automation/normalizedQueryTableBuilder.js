@@ -5,6 +5,13 @@ const {
 } = require("./config/columnRoleConfig");
 
 const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v1";
+const NUMERIC_MEASURE_ROLE_VERSION = "numeric_measure_role_v1";
+
+const NUMERIC_MEASURE_HEADER_PATTERN =
+  /(재고|잔고|잔량|잔여|보유|수량|입고|출고|사용량|생산량|판매량|금액|매출|매입|비용|원가|단가|가격|실적|목표|인원|건수|시간|거리|중량|무게|용량|stock|inventory|balance|quantity|qty|amount|value|price|cost|revenue|sales|count|total)/i;
+
+const EXPLICIT_DATE_HEADER_PATTERN =
+  /(일자|날짜|연월|년월|기준월|기준일|기간|시점|분기|년도|연도|date|month|period|quarter|year)/i;
 
 const DEFAULT_TABLE_USAGE = Object.freeze({
   version: "table_usage_quality_v1",
@@ -296,10 +303,48 @@ function inferColumnType(values = []) {
   return "string";
 }
 
-function inferColumnRole(header = "", type = "unknown") {
+function hasNumericMeasureEvidence(
+  header = "",
+  type = "unknown",
+  profile = {},
+) {
+  const normalizedHeader = normalizeHeaderForDiagnostics(header);
+  const numericRatio = Number(profile.numericRatio || 0);
+  const dateRatio = Number(profile.dateRatio || 0);
+
+  return Boolean(
+    type === "number" &&
+    numericRatio >= 0.7 &&
+    dateRatio < 0.5 &&
+    NUMERIC_MEASURE_HEADER_PATTERN.test(normalizedHeader),
+  );
+}
+
+function hasExplicitDateEvidence(header = "", type = "unknown", profile = {}) {
+  const normalizedHeader = normalizeHeaderForDiagnostics(header);
+  const dateRatio = Number(profile.dateRatio || 0);
+
+  return Boolean(
+    type === "date" ||
+    dateRatio >= 0.5 ||
+    EXPLICIT_DATE_HEADER_PATTERN.test(normalizedHeader),
+  );
+}
+
+function inferColumnRole(header = "", type = "unknown", profile = {}) {
   const t = String(header).toLowerCase();
 
-  if (type === "date" || COLUMN_ROLE_PATTERNS.date.test(t)) return "date";
+  // 숫자형 측정값은 헤더 일부에 "월" 등의 문자열이 포함돼도
+  // 실제 날짜값 증거가 없으면 metric으로 우선 판정한다.
+  if (hasNumericMeasureEvidence(header, type, profile)) return "metric";
+
+  if (
+    hasExplicitDateEvidence(header, type, profile) ||
+    COLUMN_ROLE_PATTERNS.date.test(t)
+  ) {
+    return "date";
+  }
+
   if (COLUMN_ROLE_PATTERNS.id.test(t)) return "id";
   if (COLUMN_ROLE_PATTERNS.status.test(t)) return "status";
   if (type === "number" && COLUMN_ROLE_PATTERNS.metric.test(t)) return "metric";
@@ -544,7 +589,8 @@ function normalizeColumn(column = {}, index = 0, table = {}) {
   const profile = analyzeColumnValues(values);
   const inferredType =
     column.type || column.valueType || inferColumnType(values);
-  const inferredRole = column.role || inferColumnRole(header, inferredType);
+  const inferredRole =
+    column.role || inferColumnRole(header, inferredType, profile);
   const confidence = confidenceFromColumnProfile(
     profile,
     inferredType,
@@ -581,6 +627,7 @@ function normalizeColumn(column = {}, index = 0, table = {}) {
     diagnostics: {
       typeConfidence: confidence.typeConfidence,
       roleConfidence: confidence.roleConfidence,
+      roleInferenceVersion: NUMERIC_MEASURE_ROLE_VERSION,
     },
   };
 }
