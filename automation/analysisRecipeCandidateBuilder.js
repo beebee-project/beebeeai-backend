@@ -4,7 +4,18 @@ const {
   ANALYSIS_RECIPE_OPTIONS,
 } = require("./config/analysisRecipeConfig");
 
-const BUILDER_VERSION = "general_analysis_recipe_candidates_v2";
+const BUILDER_VERSION =
+  "general_analysis_recipe_candidates_v2_2_core_count_preservation";
+const MEASURE_ISOLATION_VERSION = "multi_measure_candidate_isolation_v1";
+
+const COUNT_ONLY_RECIPE_TYPES = new Set([
+  ANALYSIS_RECIPE_TYPES.CATEGORY_COUNT,
+  ANALYSIS_RECIPE_TYPES.GROUP_COUNT,
+  ANALYSIS_RECIPE_TYPES.STATUS_COUNT,
+  ANALYSIS_RECIPE_TYPES.TIME_COUNT,
+  ANALYSIS_RECIPE_TYPES.CROSS_COUNT,
+  "category_count",
+]);
 
 function normalizeText(value = "") {
   return String(value || "")
@@ -107,6 +118,160 @@ function isVirtualTable(table = {}) {
   );
 }
 
+function uniqueTextValues(values = []) {
+  const seen = new Set();
+  const out = [];
+
+  for (const value of values) {
+    const text = String(value || "").trim();
+    const key = normalizeText(text);
+    if (!text || !key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+
+  return out;
+}
+
+function getCrossLongMeasureIsolation(table = {}) {
+  const transformation = table.transformation || {};
+  if (transformation.type !== "crossTableToLong") return null;
+
+  const outputHeaders = transformation.outputHeaders || {};
+  const declared = transformation.measureIsolation || {};
+  const identityHeader = String(
+    declared.identityHeader ||
+      outputHeaders.metricIdentity ||
+      outputHeaders.crossAxis ||
+      "",
+  ).trim();
+  const metricNameHeader = String(
+    declared.metricNameHeader || outputHeaders.metricName || "",
+  ).trim();
+  const metricValueHeader = String(
+    declared.metricValueHeader || outputHeaders.metricValue || "",
+  ).trim();
+  const declaredMeasures = Array.isArray(declared.measures)
+    ? declared.measures
+    : [];
+  const transformedMeasures = Array.isArray(transformation.crossMetricColumns)
+    ? transformation.crossMetricColumns.map((item) =>
+        typeof item === "string" ? item : item?.header,
+      )
+    : [];
+  const rowMeasures = Array.isArray(table.rows)
+    ? table.rows.map((row) => row?.[identityHeader])
+    : [];
+  const measures = uniqueTextValues([
+    ...declaredMeasures,
+    ...transformedMeasures,
+    ...rowMeasures,
+  ]);
+
+  if (!identityHeader || !metricValueHeader || measures.length <= 1) {
+    return null;
+  }
+
+  return {
+    version: MEASURE_ISOLATION_VERSION,
+    identityHeader,
+    metricNameHeader,
+    metricValueHeader,
+    measures,
+  };
+}
+
+function filterSignature(filters = []) {
+  return (Array.isArray(filters) ? filters : [])
+    .map((filter) =>
+      [
+        filter?.header || filter?.column || "",
+        filter?.operator || "equals",
+        Array.isArray(filter?.value)
+          ? filter.value.join("~")
+          : String(filter?.value ?? ""),
+      ].join(":"),
+    )
+    .join("|");
+}
+
+function isMetricBearingCandidate(candidate = {}, isolation = null) {
+  if (!isolation) return false;
+  const recipeType =
+    candidate.recipeType || candidate.recipeId || candidate.type || "";
+  if (COUNT_ONLY_RECIPE_TYPES.has(recipeType)) return false;
+
+  return (
+    normalizeText(candidate.columns?.metric || candidate.metricHeader || "") ===
+    normalizeText(isolation.metricValueHeader)
+  );
+}
+
+function isMeasureIdentityDimension(header = "", isolation = null) {
+  if (!header || !isolation) return false;
+  const normalized = normalizeText(header);
+  return [isolation.identityHeader, isolation.metricNameHeader]
+    .filter(Boolean)
+    .some((value) => normalizeText(value) === normalized);
+}
+
+function replaceMetricDisplayText(text = "", sourceHeader = "", label = "") {
+  const value = String(text || "");
+  const source = String(sourceHeader || "").trim();
+  const display = String(label || "").trim();
+  if (!display) return value;
+  if (source && value.includes(source))
+    return value.split(source).join(display);
+  return `${display} · ${value}`;
+}
+
+function expandMeasureIsolatedCandidate(table = {}, candidate = {}) {
+  const isolation = getCrossLongMeasureIsolation(table);
+  if (!isMetricBearingCandidate(candidate, isolation)) return [candidate];
+
+  // 동일한 metric identity 컬럼으로 다시 그룹화하는 후보는 필터 후 1행짜리
+  // 자명한 결과만 만들므로 제거한다. 실제 분석 dimension 후보만 유지한다.
+  if (
+    isMeasureIdentityDimension(candidate.columns?.dimension, isolation) ||
+    isMeasureIdentityDimension(candidate.columns?.dimension2, isolation)
+  ) {
+    return [];
+  }
+
+  return isolation.measures.map((measure) => ({
+    ...candidate,
+    id: `${candidate.id}_${stablePart(measure)}`,
+    title: replaceMetricDisplayText(
+      candidate.title,
+      isolation.metricValueHeader,
+      measure,
+    ),
+    description: replaceMetricDisplayText(
+      candidate.description,
+      isolation.metricValueHeader,
+      measure,
+    ),
+    filters: [
+      ...(Array.isArray(candidate.filters) ? candidate.filters : []),
+      {
+        header: isolation.identityHeader,
+        operator: "equals",
+        value: measure,
+      },
+    ],
+    metricDisplayHeader: measure,
+    measureIsolation: {
+      ...isolation,
+      selectedMeasure: measure,
+    },
+    reasonCodes: [
+      ...(candidate.reasonCodes || []),
+      "MULTI_MEASURE_ISOLATED",
+      MEASURE_ISOLATION_VERSION,
+    ],
+  }));
+}
+
 function isAnalysisEligibleTable(table = {}) {
   if (table.tableUsage?.analysisEligible === false) return false;
   if (table.diagnostics?.tableUsage?.analysisEligible === false) return false;
@@ -181,6 +346,21 @@ function isMetricColumn(column = {}) {
 function isDateColumn(column = {}) {
   const role = String(column.role || "").toLowerCase();
   const type = String(column.type || "").toLowerCase();
+  const header = normalizeText(getColumnHeader(column));
+
+  // `전월대비증감률`, `월간달성률`처럼 월 토큰을 포함한 숫자 지표를
+  // 기간 dimension으로 오인하지 않는다. 명시적 metric/rate 신호가 우선한다.
+  if (role === "metric") return false;
+  if (
+    ["number", "numeric", "integer", "float", "currency", "rate"].includes(
+      type,
+    ) &&
+    /(증감률|증가율|감소율|달성률|비율|점유율|마진율|rate|ratio|percent)/.test(
+      header,
+    )
+  ) {
+    return false;
+  }
   if (role === "date") return true;
   if (["date", "datetime", "period", "year", "month"].includes(type))
     return true;
@@ -438,6 +618,7 @@ function pushCandidate(candidates, candidate) {
     candidate.columns?.dimension2,
     candidate.columns?.date,
     candidate.columns?.metric,
+    filterSignature(candidate.filters),
   ].join("|");
   if (candidates.some((item) => item.__dedupeKey === key)) return;
   candidates.push({ ...candidate, __dedupeKey: key });
@@ -461,6 +642,7 @@ function candidateDedupeKey(candidate = {}) {
     candidate.columns?.dimension2,
     candidate.columns?.date,
     candidate.columns?.metric,
+    filterSignature(candidate.filters),
   ].join("|");
 }
 
@@ -769,13 +951,36 @@ function buildTableCandidates(table = {}) {
     }
   }
 
+  const measureIsolation = getCrossLongMeasureIsolation(table);
   const allCandidates = candidates
     .map(({ __dedupeKey, ...candidate }) => candidate)
+    .flatMap((candidate) => expandMeasureIsolatedCandidate(table, candidate))
     .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence);
+  const requiredRecipeTypes = [];
+
+  // 후보 상한 적용 전 생성된 기본 구조 분석이 후순위 구제 후보에 밀리지
+  // 않도록, 실제 구조 증거가 있는 count recipe를 일반 규칙으로 보존한다.
+  if (primaryDimension) {
+    requiredRecipeTypes.push(ANALYSIS_RECIPE_TYPES.CATEGORY_COUNT);
+  }
+  if (statuses.length) {
+    requiredRecipeTypes.push(ANALYSIS_RECIPE_TYPES.STATUS_COUNT);
+  }
+
+  requiredRecipeTypes.push(
+    ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO,
+    ANALYSIS_RECIPE_TYPES.TOP_BOTTOM,
+  );
+  if (primaryDate && primaryMetric) {
+    requiredRecipeTypes.push(ANALYSIS_RECIPE_TYPES.TIME_GROWTH);
+  }
+  if (measureIsolation) {
+    requiredRecipeTypes.push(ANALYSIS_RECIPE_TYPES.TIME_SUM);
+  }
   const sorted = ensureRecipeTypesWithinLimit(
     allCandidates,
     allCandidates,
-    [ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO, ANALYSIS_RECIPE_TYPES.TOP_BOTTOM],
+    requiredRecipeTypes,
     ANALYSIS_RECIPE_OPTIONS.maxCandidatesPerTable,
   );
 
@@ -803,8 +1008,9 @@ function buildAnalysisRecipeCandidates(normalizedQueryTables = []) {
 module.exports = {
   BUILDER_VERSION,
   buildAnalysisRecipeCandidates,
-  // exported for focused unit tests
   classifyColumns,
   isCompositionDimensionColumn,
   isNameLabelColumn,
+  getCrossLongMeasureIsolation,
+  expandMeasureIsolatedCandidate,
 };

@@ -55,6 +55,76 @@ function resolveCandidateColumn(candidate = {}, key = "") {
   );
 }
 
+function comparableText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function valuesEqual(left, right) {
+  const leftNumber = toNumber(left);
+  const rightNumber = toNumber(right);
+  if (leftNumber != null && rightNumber != null) {
+    return leftNumber === rightNumber;
+  }
+  return comparableText(left) === comparableText(right);
+}
+
+function matchesCandidateFilter(row = {}, filter = {}) {
+  const header = filter.header || filter.column || filter.field || "";
+  if (!header) return true;
+
+  const operator = String(filter.operator || "equals").toLowerCase();
+  const actual = getRowValue(row, header);
+  const expected = filter.value;
+  const expectedValues = Array.isArray(expected) ? expected : [expected];
+
+  if (operator === "isblank")
+    return actual == null || String(actual).trim() === "";
+  if (operator === "notblank")
+    return !(actual == null || String(actual).trim() === "");
+  if (operator === "equals" || operator === "eq") {
+    return expectedValues.some((value) => valuesEqual(actual, value));
+  }
+  if (operator === "notequals" || operator === "neq") {
+    return expectedValues.every((value) => !valuesEqual(actual, value));
+  }
+  if (operator === "in") {
+    return expectedValues.some((value) => valuesEqual(actual, value));
+  }
+  if (operator === "notin") {
+    return expectedValues.every((value) => !valuesEqual(actual, value));
+  }
+  if (operator === "includes" || operator === "contains") {
+    const actualText = comparableText(actual);
+    return expectedValues.some((value) =>
+      actualText.includes(comparableText(value)),
+    );
+  }
+
+  const actualNumber = toNumber(actual);
+  const expectedNumber = toNumber(expectedValues[0]);
+  if (actualNumber == null || expectedNumber == null) return false;
+  if (operator === "gt") return actualNumber > expectedNumber;
+  if (operator === "gte") return actualNumber >= expectedNumber;
+  if (operator === "lt") return actualNumber < expectedNumber;
+  if (operator === "lte") return actualNumber <= expectedNumber;
+
+  return false;
+}
+
+function applyCandidateFilters(rows = [], filters = []) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const safeFilters = Array.isArray(filters)
+    ? filters.filter((filter) => filter && typeof filter === "object")
+    : [];
+  if (!safeFilters.length) return safeRows;
+
+  return safeRows.filter((row) =>
+    safeFilters.every((filter) => matchesCandidateFilter(row, filter)),
+  );
+}
+
 function toNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (value == null || value === "") return null;
@@ -375,7 +445,9 @@ function executeAnalysisRecipeCandidate({
     };
   }
 
-  const rows = Array.isArray(table.rows) ? table.rows : [];
+  const sourceRows = Array.isArray(table.rows) ? table.rows : [];
+  const filters = Array.isArray(candidate.filters) ? candidate.filters : [];
+  const rows = applyCandidateFilters(sourceRows, filters);
   const metric = resolveCandidateColumn(candidate, "metric");
   const dimension = resolveCandidateColumn(candidate, "dimension");
   const dimension2 = resolveCandidateColumn(candidate, "dimension2");
@@ -500,8 +572,17 @@ function executeAnalysisRecipeCandidate({
     columns: candidate.columns,
     groupBy: dimension ? { header: dimension } : null,
     groupBy2: dimension2 ? { header: dimension2 } : null,
-    metric: metric ? { header: metric } : null,
+    metric: metric
+      ? {
+          header: metric,
+          displayHeader: candidate.metricDisplayHeader || metric,
+        }
+      : null,
     date: date ? { header: date } : null,
+    filters,
+    measureIsolation: candidate.measureIsolation || null,
+    sourceRowCount: sourceRows.length,
+    filteredRowCount: rows.length,
     rows: resultRows,
     rowCount: resultRows.length,
   };
@@ -509,9 +590,10 @@ function executeAnalysisRecipeCandidate({
 
 module.exports = {
   executeAnalysisRecipeCandidate,
-  // exported for tests
   aggregateRows,
   timeAggregate,
   compositionRatio,
   crossAggregate,
+  applyCandidateFilters,
+  matchesCandidateFilter,
 };

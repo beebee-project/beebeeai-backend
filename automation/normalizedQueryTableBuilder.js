@@ -6,6 +6,9 @@ const {
 
 const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v1";
 const NUMERIC_MEASURE_ROLE_VERSION = "numeric_measure_role_v1";
+const CROSS_TABLE_TO_LONG_VERSION =
+  "cross_table_to_long_normalization_v2_measure_identity";
+const CROSS_TABLE_MEASURE_ISOLATION_VERSION = "cross_table_measure_identity_v1";
 
 const NUMERIC_MEASURE_HEADER_PATTERN =
   /(재고|잔고|잔량|잔여|보유|수량|입고|출고|사용량|생산량|판매량|금액|매출|매입|비용|원가|단가|가격|실적|목표|인원|건수|시간|거리|중량|무게|용량|stock|inventory|balance|quantity|qty|amount|value|price|cost|revenue|sales|count|total)/i;
@@ -1125,6 +1128,56 @@ function findCrossDimensionColumns(table = {}, crossColumns = []) {
     .slice(0, 3);
 }
 
+function normalizeCrossAxisHeader(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[()\[\]{}]/g, "")
+    .trim();
+}
+
+function isPeriodCrossAxisHeader(value = "") {
+  const header = normalizeCrossAxisHeader(value);
+  if (!header) return false;
+
+  return (
+    /^(?:19|20)\d{2}(?:[.\-_/년]?(?:0?[1-9]|1[0-2])(?:월)?)?$/.test(header) ||
+    /^(?:0?[1-9]|1[0-2])월$/.test(header) ||
+    /^(?:q[1-4]|[1-4]분기)$/.test(header) ||
+    /^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)$/.test(header)
+  );
+}
+
+function crossAxisStem(value = "") {
+  return normalizeCrossAxisHeader(value)
+    .replace(/(?:19|20)\d{2}/g, "")
+    .replace(/(?:0?[1-9]|1[0-2])월/g, "")
+    .replace(/(?:q[1-4]|[1-4]분기)/g, "")
+    .replace(/\d+/g, "")
+    .replace(/[.\-_/:%]/g, "")
+    .trim();
+}
+
+function hasRepeatedCrossAxisEvidence(crossColumns = []) {
+  const headers = crossColumns
+    .map((item) => String(item.header || item.column?.header || "").trim())
+    .filter(Boolean);
+  if (headers.length < 2) return false;
+
+  const periodHeaderCount = headers.filter(isPeriodCrossAxisHeader).length;
+  if (periodHeaderCount >= 2) return true;
+
+  const stemCounts = new Map();
+  for (const header of headers) {
+    const stem = crossAxisStem(header);
+    if (!stem || stem.length < 2) continue;
+    stemCounts.set(stem, (stemCounts.get(stem) || 0) + 1);
+  }
+
+  const maxSharedStemCount = Math.max(0, ...stemCounts.values());
+  return maxSharedStemCount >= 2 && maxSharedStemCount / headers.length >= 0.6;
+}
+
 function isLikelyCrossTable(
   table = {},
   crossColumns = [],
@@ -1141,12 +1194,25 @@ function isLikelyCrossTable(
     (item) => String(item.header || "").trim().length <= 40,
   );
 
-  // 일반 테이블의 숫자 지표 2개를 모두 long 변환하는 오탐을 줄이기 위한 최소 구조 조건.
-  // - 숫자 값 영역이 전체 컬럼의 일정 비율 이상이거나
-  // - dimension 1~2개 + 값 컬럼 다수인 행렬형 구조여야 한다.
-  return (
-    allCrossHeadersShort && (crossRatio >= 0.4 || crossColumns.length >= 3)
-  );
+  if (!allCrossHeadersShort) return false;
+
+  // CROSS_LONG은 반복 축(월/분기/연도 또는 동일 지표의 기간별 컬럼)이거나
+  // dimension 1~2개에 값 컬럼이 집중된 실제 행렬형 표에만 생성한다.
+  // 일반 fact table의 서로 다른 숫자 지표(매출, 수량, 비용, 사용량 등)를
+  // 하나의 `지표값`으로 합치는 오탐을 여기서 우선 차단한다.
+  const repeatedAxisEvidence = hasRepeatedCrossAxisEvidence(crossColumns);
+  const semanticMeasureHeaderCount = crossColumns.filter((item) =>
+    NUMERIC_MEASURE_HEADER_PATTERN.test(
+      String(item.header || item.column?.header || ""),
+    ),
+  ).length;
+  const hasDistinctMeasureHeaders = semanticMeasureHeaderCount >= 2;
+  const compactMatrixShape =
+    dimensionColumns.length <= 2 &&
+    (crossRatio >= 0.5 || crossColumns.length >= 4) &&
+    !hasDistinctMeasureHeaders;
+
+  return repeatedAxisEvidence || compactMatrixShape;
 }
 
 function buildCrossTableToLongVirtualTable(table = {}, index = 0) {
@@ -1244,7 +1310,7 @@ function buildCrossTableToLongVirtualTable(table = {}, index = 0) {
     confidence: Math.min(0.9, Math.max(0.65, Number(table.confidence || 0.7))),
     tableUsage: inheritVirtualTableUsage(table, "cross_table_to_long"),
     transformation: {
-      version: "cross_table_to_long_normalization_v1",
+      version: CROSS_TABLE_TO_LONG_VERSION,
       type: "crossTableToLong",
       sourceTableId: table.tableId || null,
       sourceColumnCount: columns.length,
@@ -1257,8 +1323,19 @@ function buildCrossTableToLongVirtualTable(table = {}, index = 0) {
       })),
       outputHeaders: {
         crossAxis: crossAxisHeader,
+        metricIdentity: crossAxisHeader,
         metricName: metricNameHeader,
         metricValue: metricValueHeader,
+      },
+      measureIsolation: {
+        version: CROSS_TABLE_MEASURE_ISOLATION_VERSION,
+        required: crossColumns.length > 1,
+        identityHeader: crossAxisHeader,
+        metricNameHeader,
+        metricValueHeader,
+        measures: crossColumns.map((item) =>
+          String(item.header || item.column?.header || "").trim(),
+        ),
       },
     },
   };
