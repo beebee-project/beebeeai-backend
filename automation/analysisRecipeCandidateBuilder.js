@@ -5,8 +5,11 @@ const {
 } = require("./config/analysisRecipeConfig");
 
 const BUILDER_VERSION =
-  "general_analysis_recipe_candidates_v2_2_core_count_preservation";
+  "general_analysis_recipe_candidates_v2_3_semantic_priority";
 const MEASURE_ISOLATION_VERSION = "multi_measure_candidate_isolation_v1";
+const GENERAL_ANALYSIS_COLUMN_PRIORITY_VERSION =
+  ANALYSIS_RECIPE_OPTIONS.semanticColumnPriorityVersion ||
+  "general_analysis_column_priority_v1";
 
 const COUNT_ONLY_RECIPE_TYPES = new Set([
   ANALYSIS_RECIPE_TYPES.CATEGORY_COUNT,
@@ -73,6 +76,27 @@ function headerHasAny(column = {}, hints = []) {
       (header.includes(normalizedHint) || normalizedHint.includes(header))
     );
   });
+}
+
+function semanticColumnPriority(column = {}, kind = "dimension") {
+  const groups =
+    ANALYSIS_RECIPE_OPTIONS.semanticColumnPriorityGroups?.[kind] || [];
+  if (!groups.length) return 0;
+
+  const header = normalizeText(getColumnHeader(column));
+  if (!header) return 0;
+
+  return groups.reduce((best, group) => {
+    const matched = (group.hints || []).some((hint) => {
+      const normalizedHint = normalizeText(hint);
+      return (
+        normalizedHint &&
+        (header.includes(normalizedHint) || normalizedHint.includes(header))
+      );
+    });
+
+    return matched ? Math.max(best, Number(group.score || 0)) : best;
+  }, 0);
 }
 
 function isNameLabelColumn(column = {}) {
@@ -433,10 +457,15 @@ function uniqueColumns(columns = []) {
 
 function sortColumns(columns = [], kind = "dimension") {
   return uniqueColumns(columns)
-    .map((column) => ({ column, score: columnScore(column, kind) }))
+    .map((column) => ({
+      column,
+      score: columnScore(column, kind),
+      semanticPriority: semanticColumnPriority(column, kind),
+    }))
     .sort(
       (a, b) =>
         b.score - a.score ||
+        b.semanticPriority - a.semanticPriority ||
         getColumnHeader(a.column).localeCompare(
           getColumnHeader(b.column),
           "ko",
@@ -496,6 +525,45 @@ function stablePart(value = "") {
   return normalizeText(value).slice(0, 48) || "x";
 }
 
+function candidateColumnPriorities({
+  metric = null,
+  dimension = null,
+  dimension2 = null,
+  date = null,
+} = {}) {
+  return {
+    metric: semanticColumnPriority(metric, "metric"),
+    dimension: semanticColumnPriority(dimension, "dimension"),
+    dimension2: semanticColumnPriority(dimension2, "dimension"),
+    date: semanticColumnPriority(date, "date"),
+  };
+}
+
+function candidateSelectionPriority(columns = {}) {
+  return (
+    Number(columns.metric || 0) * 4 +
+    Number(columns.dimension || 0) * 3 +
+    Number(columns.date || 0) * 2 +
+    Number(columns.dimension2 || 0)
+  );
+}
+
+function compareCandidatePriority(a = {}, b = {}) {
+  return (
+    Number(b.priority || 0) - Number(a.priority || 0) ||
+    Number(b.selectionPriority || 0) - Number(a.selectionPriority || 0) ||
+    Number(b.confidence || 0) - Number(a.confidence || 0)
+  );
+}
+
+function candidateRetentionScore(candidate = {}) {
+  return (
+    Number(candidate.priority || 0) +
+    Number(candidate.selectionPriority || 0) / 1000 +
+    Number(candidate.confidence || 0)
+  );
+}
+
 function makeCandidate({
   table,
   recipeType,
@@ -535,6 +603,13 @@ function makeCandidate({
             dateScore * 0.17,
         )
       : confidence;
+  const columnPriorities = candidateColumnPriorities({
+    metric,
+    dimension,
+    dimension2,
+    date,
+  });
+  const selectionPriority = candidateSelectionPriority(columnPriorities);
 
   return {
     id: idParts.map(stablePart).join("_"),
@@ -547,6 +622,8 @@ function makeCandidate({
     sourceTableId: table.sourceTableId || table.tableId,
     confidence: Number(resolvedConfidence.toFixed(4)),
     priority,
+    selectionPriority,
+    columnPriorities,
     operation,
     categoryId,
     tableUsage: table.tableUsage || null,
@@ -565,7 +642,11 @@ function makeCandidate({
     recommendationReason: reasonCodes.length
       ? reasonCodes.join(", ")
       : `${title} 후보를 생성했습니다.`,
-    reasonCodes: [BUILDER_VERSION, ...reasonCodes].filter(Boolean),
+    reasonCodes: [
+      BUILDER_VERSION,
+      GENERAL_ANALYSIS_COLUMN_PRIORITY_VERSION,
+      ...reasonCodes,
+    ].filter(Boolean),
   };
 }
 
@@ -662,9 +743,7 @@ function ensureRecipeTypesWithinLimit(
 
     const rescue = allCandidates
       .filter((candidate) => candidate.recipeType === recipeType)
-      .sort(
-        (a, b) => b.priority - a.priority || b.confidence - a.confidence,
-      )[0];
+      .sort(compareCandidatePriority)[0];
 
     if (!rescue) continue;
 
@@ -687,8 +766,7 @@ function ensureRecipeTypesWithinLimit(
     let replaceScore = Infinity;
     result.forEach((candidate, index) => {
       if (requiredRecipeTypes.includes(candidate.recipeType)) return;
-      const score =
-        Number(candidate.priority || 0) + Number(candidate.confidence || 0);
+      const score = candidateRetentionScore(candidate);
       if (score < replaceScore) {
         replaceScore = score;
         replaceIndex = index;
@@ -699,9 +777,7 @@ function ensureRecipeTypesWithinLimit(
     result[replaceIndex] = rescue;
   }
 
-  return result.sort(
-    (a, b) => b.priority - a.priority || b.confidence - a.confidence,
-  );
+  return result.sort(compareCandidatePriority);
 }
 
 function buildTableCandidates(table = {}) {
@@ -955,7 +1031,7 @@ function buildTableCandidates(table = {}) {
   const allCandidates = candidates
     .map(({ __dedupeKey, ...candidate }) => candidate)
     .flatMap((candidate) => expandMeasureIsolatedCandidate(table, candidate))
-    .sort((a, b) => b.priority - a.priority || b.confidence - a.confidence);
+    .sort(compareCandidatePriority);
   const requiredRecipeTypes = [];
 
   // 후보 상한 적용 전 생성된 기본 구조 분석이 후순위 구제 후보에 밀리지
@@ -1013,4 +1089,6 @@ module.exports = {
   isNameLabelColumn,
   getCrossLongMeasureIsolation,
   expandMeasureIsolatedCandidate,
+  semanticColumnPriority,
+  GENERAL_ANALYSIS_COLUMN_PRIORITY_VERSION,
 };
