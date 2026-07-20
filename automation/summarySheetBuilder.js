@@ -43,6 +43,13 @@ const {
   SUMMARY_SHEET_RECIPE_MANIFEST_VERSION,
   appendSummarySheetRecipeManifest,
 } = require("./summarySheetRecipeManifest");
+const {
+  isTimeTrendSummaryResult,
+  resolveResultGroupHeader,
+  buildWorkbookRowsFromAnalysisResult,
+  buildChartDataRowsFromAnalysisResult,
+  buildInsightValueRowsFromAnalysisResult,
+} = require("./analysisResultOutputSchema");
 
 const AUTOMATION_SHEET_V2_VERSION = "automation_sheet_v2";
 const WORKBOOK_RECALCULATION_FLAG_VERSION = "workbook_recalculation_flag_v1";
@@ -82,43 +89,6 @@ function summarizeSectionForWorkbookDiagnostic(section = {}, index = 0) {
   };
 }
 
-function isTopBottomLikeResult(result = {}) {
-  const recipeType = String(
-    result.recipeType || result.recipeId || "",
-  ).toLowerCase();
-  const operation = String(result.operation || "").toLowerCase();
-
-  return (
-    recipeType === "top_bottom" ||
-    operation === "topbottom" ||
-    operation === "top_bottom"
-  );
-}
-
-function resolveGroupedResultLabel(result = {}, row = {}, groupHeader = "") {
-  return row?.[groupHeader] ?? row?.label ?? row?.item ?? row?.name ?? "";
-}
-
-function resolveGroupedResultOperation(result = {}, row = {}) {
-  return row?.operation ?? row?.type ?? result.operation ?? "";
-}
-
-function resolveGroupedResultMetric(result = {}, row = {}, metricHeader = "") {
-  return (
-    row?.metric ??
-    result.metric?.displayHeader ??
-    result.metric?.header ??
-    metricHeader ??
-    ""
-  );
-}
-
-function resolveGroupedResultRowCount(result = {}, row = {}) {
-  const direct = row?.rowCount ?? row?.count;
-  if (direct != null && direct !== "") return direct;
-  return isTopBottomLikeResult(result) ? 1 : "";
-}
-
 function runWorkbookDiagnosticStep(diagnostic, stage, fn, meta = {}) {
   emitSummarySheetDiagnostic(diagnostic, stage, "START", meta);
   const startedAt = Date.now();
@@ -139,29 +109,7 @@ function runWorkbookDiagnosticStep(diagnostic, stage, fn, meta = {}) {
 }
 
 function buildChartDataRows(result = {}) {
-  if (result.resultType === "grouped") {
-    if (
-      result.resultType === "grouped" &&
-      (result.operation === "multiAggregate" ||
-        result.operation === "pipelineCombine")
-    ) {
-      return result.rows || [];
-    }
-    const groupHeader = result.groupBy?.header || "그룹";
-    const metricHeader = result.metric?.header || "값";
-
-    return (result.rows || []).map((r) => ({
-      [groupHeader]: resolveGroupedResultLabel(result, r, groupHeader),
-      [metricHeader]: r.value,
-      행수: resolveGroupedResultRowCount(result, r),
-    }));
-  }
-
-  if (result.resultType === "pivot") {
-    return result.rows || [];
-  }
-
-  return [];
+  return buildChartDataRowsFromAnalysisResult(result);
 }
 
 const XLSX_MAX_SHEET_NAME_LENGTH = 31;
@@ -356,14 +304,9 @@ function buildInsightRows(result = {}) {
     return rows;
   }
 
-  if (result.resultType === "grouped") {
-    const groupHeader = result.groupBy?.header || "그룹";
-    const valueRows = result.rows
-      .filter((r) => Number.isFinite(Number(r.value)))
-      .map((r) => ({
-        label: resolveGroupedResultLabel(result, r, groupHeader),
-        value: Number(r.value),
-      }));
+  if (result.resultType === "grouped" || isTimeTrendSummaryResult(result)) {
+    const groupHeader = resolveResultGroupHeader(result);
+    const valueRows = buildInsightValueRowsFromAnalysisResult(result);
 
     if (valueRows.length) {
       const max = valueRows.reduce((a, b) => (b.value > a.value ? b : a));
@@ -384,7 +327,9 @@ function buildInsightRows(result = {}) {
 
       rows.push([
         "최대 증감률",
-        `${maxGrowth[groupHeader]}: ${Number(maxGrowth["증감률"]).toFixed(2)}%`,
+        `${maxGrowth[groupHeader] ?? maxGrowth.period ?? ""}: ${Number(
+          maxGrowth["증감률"],
+        ).toFixed(2)}%`,
       ]);
     }
   }
@@ -600,56 +545,7 @@ function applyDefaultSheetOptions(ws) {
 }
 
 function resultToRows(result = {}) {
-  if (result.resultType === "grouped") {
-    if (
-      result.operation === "multiAggregate" ||
-      result.operation === "pipelineCombine"
-    ) {
-      return result.rows || [];
-    }
-    const groupHeader = result.groupBy?.header || "그룹";
-    const extraKeys = ["기준값", "비교값", "증감률"].filter((k) =>
-      (result.rows || []).some((r) =>
-        Object.prototype.hasOwnProperty.call(r, k),
-      ),
-    );
-
-    return (result.rows || []).map((r) => {
-      const base = {
-        [groupHeader]: resolveGroupedResultLabel(result, r, groupHeader),
-        작업: resolveGroupedResultOperation(result, r),
-        지표: resolveGroupedResultMetric(
-          result,
-          r,
-          result.metric?.header || "값",
-        ),
-        값: r.value,
-        행수: resolveGroupedResultRowCount(result, r),
-      };
-
-      for (const key of extraKeys) {
-        base[key] = r[key];
-      }
-
-      return base;
-    });
-  }
-
-  if (result.resultType === "scalar") {
-    return [
-      {
-        지표: result.metric?.header || result.operation,
-        값: result.value,
-        행수: result.rowCount,
-      },
-    ];
-  }
-
-  if (result.resultType === "pivot") {
-    return result.rows || [];
-  }
-
-  return result.rows || [];
+  return buildWorkbookRowsFromAnalysisResult(result);
 }
 
 function getWorksheetHeaderInfo(ws) {
@@ -1158,7 +1054,9 @@ function buildSectionFormulaPlan({
   const sectionResult = section.result || {};
   const groupHeader =
     sectionResult.groupBy?.header ||
+    sectionResult.date?.header ||
     section.candidate?.columns?.dimension ||
+    section.candidate?.columns?.date ||
     section.chartHint?.categoryField ||
     "";
 

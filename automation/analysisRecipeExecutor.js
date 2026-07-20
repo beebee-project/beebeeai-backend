@@ -1,5 +1,9 @@
 const { ANALYSIS_OUTPUT_LABELS } = require("./analysisOutputLabelConfig");
 const { ANALYSIS_RECIPE_TYPES } = require("./config/analysisRecipeConfig");
+const {
+  AGGREGATE_SUMMARY_OUTPUT_SCHEMA_VERSION,
+  buildAggregateSummaryResultRow,
+} = require("./analysisResultOutputSchema");
 
 const TOP_BOTTOM_OUTPUT_SCHEMA_VERSION = "top_bottom_output_schema_v1";
 
@@ -252,7 +256,18 @@ function aggregateRows({
     }));
   }
 
-  return result;
+  return result.map((item) =>
+    buildAggregateSummaryResultRow({
+      labelHeader: dimension || "그룹",
+      label: item[dimension],
+      operation: "summary",
+      metric,
+      sum: item.sum,
+      average: item.average,
+      count: item.count,
+      numericCount: item.numericCount,
+    }),
+  );
 }
 
 function categoryCount({ rows = [], dimension = "" }) {
@@ -369,7 +384,21 @@ function timeAggregate({
     return result.map((item) => ({ ...item, value: item.count }));
   }
 
-  return result;
+  return result.map((item) =>
+    buildAggregateSummaryResultRow({
+      labelHeader: date || "기간",
+      label: item.period,
+      operation: "timeSummary",
+      metric,
+      sum: item.sum,
+      average: item.average,
+      count: item.count,
+      numericCount: item.numericCount,
+      extra: {
+        period: item.period,
+      },
+    }),
+  );
 }
 
 function timeGrowth(args = {}) {
@@ -621,6 +650,18 @@ function executeAnalysisRecipeCandidate({
       recipeType === ANALYSIS_RECIPE_TYPES.TOP_BOTTOM ||
       recipeType === "top_bottom"
         ? TOP_BOTTOM_OUTPUT_SCHEMA_VERSION
+        : recipeType === ANALYSIS_RECIPE_TYPES.GROUP_SUMMARY ||
+            recipeType === "group_summary" ||
+            recipeType === ANALYSIS_RECIPE_TYPES.TIME_TREND ||
+            recipeType === "time_trend"
+          ? AGGREGATE_SUMMARY_OUTPUT_SCHEMA_VERSION
+          : null,
+    summaryValuePolicy:
+      recipeType === ANALYSIS_RECIPE_TYPES.GROUP_SUMMARY ||
+      recipeType === "group_summary" ||
+      recipeType === ANALYSIS_RECIPE_TYPES.TIME_TREND ||
+      recipeType === "time_trend"
+        ? "value-is-sum-explicit-sum-average-count"
         : null,
     sourceRowCount: sourceRows.length,
     filteredRowCount: rows.length,

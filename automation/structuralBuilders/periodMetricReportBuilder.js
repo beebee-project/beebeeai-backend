@@ -11,6 +11,8 @@ const {
   createVirtualTable,
   toNumber,
 } = require("../businessTemplates/commonTemplateHelpers");
+const PERIOD_METRIC_ROLE_BINDING_VERSION =
+  "period_metric_role_binding_v2_ordered_numeric_hints";
 
 function isYearHeader(header = "") {
   return /^(19|20)\d{2}\s*년?$/.test(String(header || "").trim());
@@ -349,10 +351,60 @@ function selectExecutionTable({
   };
 }
 
+function isNumericMeasureColumn(column = {}) {
+  const type = String(
+    column.type || column.dominantType || column.semanticType || "",
+  ).toLowerCase();
+  const role = String(
+    column.role || column.inferredRole || column.semanticRole || "",
+  ).toLowerCase();
+
+  return type === "number" || role === "metric";
+}
+
+function findNumericHeaderByOrderedHints(
+  table = {},
+  hints = [],
+  { allowNumericFallback = false } = {},
+) {
+  const numericColumns = getColumns(table).filter(isNumericMeasureColumn);
+  const orderedHints = (hints || [])
+    .map((hint) => ({
+      raw: hint,
+      normalized: normalizeHeaderLocal(hint),
+    }))
+    .filter((item) => item.normalized);
+
+  // 1. 힌트 배열의 의미 우선순위를 보존하면서 정확 일치를 먼저 찾는다.
+  for (const hint of orderedHints) {
+    const matched = numericColumns.find(
+      (column) =>
+        normalizeHeaderLocal(getColumnHeader(column)) === hint.normalized,
+    );
+
+    if (matched) return getColumnHeader(matched);
+  }
+
+  // 2. 정확 일치가 없을 때만 같은 힌트 순서로 부분 일치를 허용한다.
+  for (const hint of orderedHints) {
+    const matched = numericColumns.find((column) =>
+      headerMatches(getColumnHeader(column), [hint.raw]),
+    );
+
+    if (matched) return getColumnHeader(matched);
+  }
+
+  if (!allowNumericFallback) return "";
+  return numericColumns.length ? getColumnHeader(numericColumns[0]) : "";
+}
+
 function findMetricHeader(table = {}, hints = []) {
   return (
-    findColumnHeader(table, hints, { type: "number" }) ||
-    findColumnHeader(table, ["지표값"], { type: "number" })
+    findNumericHeaderByOrderedHints(table, hints) ||
+    findNumericHeaderByOrderedHints(table, ["지표값"]) ||
+    findNumericHeaderByOrderedHints(table, [], {
+      allowNumericFallback: true,
+    })
   );
 }
 
@@ -626,7 +678,7 @@ function buildPeriodMetricCandidates({ table, config = {} }) {
   const quantityHeader = config.quantityHeader
     ? config.quantityHeader
     : hints.quantity
-      ? findColumnHeader(table, hints.quantity, { type: "number" })
+      ? findNumericHeaderByOrderedHints(table, hints.quantity)
       : "";
 
   const yearHeader = findColumnHeader(table, [
@@ -806,7 +858,7 @@ function createAveragePerUnitSection({ table, config = {} }) {
   const hints = config.hints || {};
   const quantityHeader =
     config.quantityHeader ||
-    findColumnHeader(table, hints.quantity || [], { type: "number" });
+    findNumericHeaderByOrderedHints(table, hints.quantity || []);
   const metricHeader =
     config.metricHeader || findMetricHeader(table, hints.metric || []);
 
@@ -912,4 +964,7 @@ module.exports = {
   buildYearWideVirtualTable,
   buildMonthWideVirtualTable,
   buildLongYearMonthVirtualTable,
+  findMetricHeader,
+  findNumericHeaderByOrderedHints,
+  PERIOD_METRIC_ROLE_BINDING_VERSION,
 };
