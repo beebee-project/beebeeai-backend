@@ -2669,7 +2669,8 @@
           "aliases": ["과제", "사업명", "프로젝트", "project", "program"],
           "dataType": "string",
           "required": true,
-          "semanticType": "dimension"
+          "semanticType": "dimension",
+          "preferredAliases": ["과제명", "세부과제명", "연구과제명"]
         },
         {
           "role": "budgetItem",
@@ -3561,7 +3562,8 @@
           "aliases": ["과제명", "과제", "사업명", "project", "program"],
           "dataType": "string",
           "required": true,
-          "semanticType": "dimension"
+          "semanticType": "dimension",
+          "preferredAliases": ["과제명", "세부과제명", "연구과제명"]
         },
         {
           "role": "fundingCategory",

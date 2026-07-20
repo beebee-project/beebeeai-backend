@@ -141,6 +141,19 @@ function findHeader(table = {}, aliases = []) {
   return best?.header || "";
 }
 
+function findPreferredExactHeader(table = {}, preferredAliases = []) {
+  const headers = tableHeaders(table);
+  for (const alias of preferredAliases || []) {
+    const target = normalizeHeader(alias);
+    if (!target) continue;
+    const matched = headers.find(
+      (header) => normalizeHeader(header) === target,
+    );
+    if (matched) return matched;
+  }
+  return "";
+}
+
 function allHeaders(tables = []) {
   return tables.flatMap(tableHeaders);
 }
@@ -252,6 +265,18 @@ function resolveRoleMapping(table = {}, role = {}, templateId = "") {
       return { kind: "compositePeriod", yearHeader, monthHeader };
     }
   }
+  const preferred = findPreferredExactHeader(
+    table,
+    role.preferredAliases || [],
+  );
+  if (preferred) {
+    return {
+      kind: "column",
+      header: preferred,
+      resolutionPolicy: "preferred-exact-alias",
+    };
+  }
+
   const aliases = [
     ...(ROLE_ALIAS_OVERRIDES[templateId]?.[role.role] || []),
     ...(role.aliases || []),
@@ -852,6 +877,7 @@ module.exports = {
   usesDistinctFallbackSemantics,
   normalizeHeader,
   normalizePeriod,
+  findPreferredExactHeader,
   chooseContract,
   resolveContractSource,
   computeContractMetrics,
