@@ -4,6 +4,11 @@ const {
   getClusterRole,
   inferClusterType,
 } = require("./clusterSchema");
+const {
+  STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
+  analyzeHeaderDataStructure,
+  analyzeFlattenedHeaderBand,
+} = require("./structuralHeaderDataClassifier");
 
 function nonEmptyCount(row = []) {
   let n = 0;
@@ -393,8 +398,7 @@ function summarizeExcludedRows(excludedRows = []) {
   return counts;
 }
 
-const TABLE_SEGMENTATION_VERSION =
-  "table_segmentation_v3_scoped_contiguous_data_guard";
+const TABLE_SEGMENTATION_VERSION = "table_segmentation_v1";
 const TABLE_SEGMENTATION_OPTIONS = Object.freeze({
   maxLookaheadRows: 5,
   maxBoundaryLookbackRows: 5,
@@ -516,11 +520,10 @@ function isSegmentHeaderCandidate(json = [], rowIndex = 0, options = {}) {
 
 function looksLikeHeaderFalsePositiveDataRow(row = [], analysis = {}) {
   const numericDateRatio = Number(analysis.numericDateRatio || 0);
-  const temporalCount = countTemporalHeaderTokens(row);
+  const temporalCount = Number(analysis.temporalCount || 0);
 
   return Boolean(
     isLikelyDataRow(row) ||
-    looksLikeContinuationDataCandidateRow(row) ||
     (numericDateRatio > 0.2 && temporalCount < 2 && numericDateCount(row) > 0),
   );
 }
@@ -695,7 +698,7 @@ function structurallyHeaderishRow(row = []) {
   const nonEmpty = nonEmptyCount(row);
   if (nonEmpty < 2) return false;
 
-  const temporalCount = countTemporalHeaderTokens(row);
+  const temporalCount = nonEmptyCells(row).filter(isTemporalHeaderLike).length;
   const headerLikeCount = nonEmptyCells(row).filter(isLikelyHeaderToken).length;
   const numericLike = row.filter(
     (cell) => cell != null && String(cell).trim() !== "" && isNumericLike(cell),
@@ -761,7 +764,7 @@ function analyzeHeaderRowCandidate(row = [], options = {}) {
   const textRatio = textLike / nonEmpty;
   const headerLike = cells.filter(isLikelyHeaderToken).length;
   const headerLikeRatio = headerLike / nonEmpty;
-  const temporalCount = countTemporalHeaderTokens(row);
+  const temporalCount = cells.filter(isTemporalHeaderLike).length;
   const temporalRatio = temporalCount / nonEmpty;
   const numericLike = row.filter(
     (cell) => cell != null && String(cell).trim() !== "" && isNumericLike(cell),
@@ -778,6 +781,10 @@ function analyzeHeaderRowCandidate(row = [], options = {}) {
   const prevRow = Array.isArray(options.prevRow) ? options.prevRow : null;
   const prevLooksHeader = prevRow ? structurallyHeaderishRow(prevRow) : false;
   const metaOrProse = looksLikeMetaOrProseRow(row);
+  const structuralAnalysis = analyzeHeaderDataStructure(
+    row,
+    options.nextRows || [],
+  );
 
   let score = 0;
   const reasons = [];
@@ -836,9 +843,13 @@ function analyzeHeaderRowCandidate(row = [], options = {}) {
     reasons.push("LIKELY_DATA_ROW_PENALTY");
   }
 
+  score += Number(structuralAnalysis.scoreAdjustment || 0);
+  reasons.push(...(structuralAnalysis.reasons || []));
+
   const isCandidate =
     nonEmpty >= 2 &&
     score >= 30 &&
+    !structuralAnalysis.likelyDataRecord &&
     (headerLikeRatio >= 0.5 || temporalCount >= 2 || textRatio >= 0.6);
 
   return {
@@ -853,6 +864,11 @@ function analyzeHeaderRowCandidate(row = [], options = {}) {
     numericDateRatio: Math.round(numericDateRatio * 1000) / 1000,
     nextDataEvidence: Math.round(nextDataEvidence * 1000) / 1000,
     fillRatio: Math.round(bounds.fillRatio * 1000) / 1000,
+    structuralClassificationVersion: STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
+    likelyDataRecord: structuralAnalysis.likelyDataRecord,
+    likelySchemaHeader: structuralAnalysis.likelySchemaHeader,
+    structuralProfile: structuralAnalysis.profile,
+    rowTypeRepeatability: structuralAnalysis.repeatability,
     reasons,
   };
 }
@@ -1140,24 +1156,8 @@ function joinHeaderParts(parts = []) {
   return safeParts.join("_");
 }
 
-function isBareYearHeaderToken(value) {
-  return /^(19|20)\d{2}$/.test(compactCellText(value));
-}
-
 function countTemporalHeaderTokens(row = []) {
   return nonEmptyCells(row).filter(isTemporalHeaderLike).length;
-}
-
-function countContinuationTemporalHeaderTokens(row = []) {
-  const cells = nonEmptyCells(row);
-  const bareYearCount = cells.filter(isBareYearHeaderToken).length;
-  const explicitTemporalCount = cells.filter(
-    (cell) => isTemporalHeaderLike(cell) && !isBareYearHeaderToken(cell),
-  ).length;
-
-  // 이 완화 규칙은 연속 데이터 행의 헤더 오탐 판정에만 사용한다.
-  // 일반 XLSX 헤더 탐지에는 기존 temporal count를 유지한다.
-  return explicitTemporalCount + (bareYearCount >= 2 ? bareYearCount : 0);
 }
 
 function countHeaderLikeTokens(row = []) {
@@ -1190,6 +1190,9 @@ function rowLooksLikeHeaderLayer(row = [], lowerRow = []) {
   const nonEmpty = nonEmptyCount(row);
   if (!nonEmpty) return false;
   if (looksLikeMetaOrProseRow(row)) return false;
+
+  const structuralAnalysis = analyzeHeaderDataStructure(row, [lowerRow]);
+  if (structuralAnalysis.likelyDataRecord) return false;
 
   if (rowLooksLikeSparseHeaderLayer(row, lowerRow)) return true;
 
@@ -1302,10 +1305,17 @@ function shouldSkipUpperHeaderLayer(
 
 function effectiveHeaderRowIndexes(json = [], headerRowIndexes = []) {
   const sorted = [...headerRowIndexes].sort((a, b) => a - b);
+  const structurallyEligible = sorted.filter((idx) => {
+    const structuralAnalysis = analyzeHeaderDataStructure(
+      json[idx] || [],
+      json.slice(idx + 1, Math.min(json.length, idx + 5)),
+    );
+    return !structuralAnalysis.likelyDataRecord;
+  });
 
-  return sorted.filter((idx, pos) => {
-    const later = sorted.slice(pos + 1);
-    return !shouldSkipUpperHeaderLayer(json, idx, later, sorted);
+  return structurallyEligible.filter((idx, pos) => {
+    const later = structurallyEligible.slice(pos + 1);
+    return !shouldSkipUpperHeaderLayer(json, idx, later, structurallyEligible);
   });
 }
 
@@ -1363,6 +1373,9 @@ function mergeHeaderRows(json = [], headerRowIndexes = [], headerIndex) {
   const mergedNonEmpty = nonEmptyCount(merged);
   if (mergedNonEmpty < 2) return null;
 
+  const flattenedBandAnalysis = analyzeFlattenedHeaderBand(rows, merged);
+  if (flattenedBandAnalysis.rejectAsDataBand) return null;
+
   return {
     headerRows: bandRows.map((idx) => idx + 1),
     merged,
@@ -1370,6 +1383,8 @@ function mergeHeaderRows(json = [], headerRowIndexes = [], headerIndex) {
     depth: bandRows.length,
     strategy:
       bandRows.length > 1 ? "merged_header_flatten_v2" : "single_header_row",
+    structuralClassificationVersion: STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
+    flattenedBandAnalysis,
   };
 }
 
@@ -1491,19 +1506,20 @@ function looksLikeContinuationDataCandidateRow(row = []) {
   const nonEmpty = cells.length;
   if (nonEmpty < 3) return false;
 
-  const temporalCount = countContinuationTemporalHeaderTokens(row);
+  const temporalCount = cells.filter(isTemporalHeaderLike).length;
   if (temporalCount >= 2) return false;
 
   const first = row[firstIdx];
   const firstText = compactCellText(first);
   if (!firstText) return false;
 
-  const firstIsScalarDataValue =
+  const firstIsDataValue =
     isNumericLike(first) ||
     isDateLike(first) ||
     isTimeLike(first) ||
-    isMissingValuePlaceholderCell(first);
-  const firstIsTemporalValue = isTemporalHeaderLike(first);
+    isMissingValuePlaceholderCell(first) ||
+    isTemporalHeaderLike(first);
+  if (firstIsDataValue) return false;
 
   const afterFirst = row
     .slice(firstIdx + 1)
@@ -1516,16 +1532,9 @@ function looksLikeContinuationDataCandidateRow(row = []) {
   ).length;
   const signalRatio = dataSignals / afterFirst.length;
 
-  // 기간값으로 시작하는 연속 데이터 행도 헤더로 승격시키지 않는다.
-  // 예: ["2026-01", "중앙창고", ..., 82, 50, ...]
-  // 반대로 ["구분", "2021", "2022", "2023"] 같은 wide header는
-  // temporalCount >= 2에서 이미 제외된다.
-  if ((firstIsScalarDataValue || firstIsTemporalValue) && signalRatio >= 0.45) {
-    return true;
-  }
-
   // blank row 뒤에 이어지는 실제 데이터 행이 헤더 후보로 승격되는 케이스 방지.
   // 예: ["지붕", "-", "-", ...], ["비상구", 45, 23, ...]
+  // 반대로 ["구분", "2021", "2022", "2023"] 같은 진짜 기간형 헤더는 temporalCount로 제외된다.
   if (placeholderSignals > 0 && signalRatio >= 0.45) return true;
 
   if (!isGenericDimensionHeaderToken(first) && signalRatio >= 0.65) {
@@ -1727,6 +1736,12 @@ function detectTableBlocks(
     if (headerIndex <= previousBlockEnd) continue;
 
     const headerRow = json[headerIndex] || [];
+    const headerStructuralAnalysis = analyzeHeaderDataStructure(
+      headerRow,
+      json.slice(headerIndex + 1, Math.min(json.length, headerIndex + 5)),
+    );
+    if (headerStructuralAnalysis.likelyDataRecord) continue;
+
     const mergedHeaderInfo = mergeHeaderRows(
       json,
       segmentationHeaderRowIndexes,
@@ -1924,6 +1939,15 @@ function detectTableBlocks(
       dataRange: `'${sheetName}'!${indexToColumnLetter(minCol)}${dataStart + 1}:${indexToColumnLetter(maxCol)}${blockEnd + 1}`,
       columns,
       headerPartsByColumn: mergedHeaderInfo?.partsByColumn || {},
+      headerQuality: {
+        version: STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
+        selectedRow: headerIndex + 1,
+        likelyDataRecord: headerStructuralAnalysis.likelyDataRecord,
+        likelySchemaHeader: headerStructuralAnalysis.likelySchemaHeader,
+        profile: headerStructuralAnalysis.profile,
+        repeatability: headerStructuralAnalysis.repeatability,
+        flattenedBand: mergedHeaderInfo?.flattenedBandAnalysis || null,
+      },
       excludedRows,
       summaryRows,
       dataQuality: {
@@ -2052,6 +2076,13 @@ function buildAllSheetsData(workbook) {
           numericDateRatio: scanned?.numericDateRatio ?? null,
           nextDataEvidence: scanned?.nextDataEvidence ?? null,
           fillRatio: scanned?.fillRatio ?? null,
+          structuralClassificationVersion:
+            scanned?.structuralClassificationVersion ||
+            STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
+          likelyDataRecord: scanned?.likelyDataRecord === true,
+          likelySchemaHeader: scanned?.likelySchemaHeader === true,
+          structuralProfile: scanned?.structuralProfile || null,
+          rowTypeRepeatability: scanned?.rowTypeRepeatability || null,
           reasons: scanned?.reasons || [],
         };
       })
@@ -2266,7 +2297,7 @@ function buildAllSheetsData(workbook) {
       tableBlocks,
       dataQuality,
       headerDetection: {
-        version: "header_detector_v2_score_based",
+        version: "header_detector_v3_structural_rows",
         scannedRows: headerScan.length,
         selectedRows: tableSegmentation.headerRowIndexes.map((idx) => idx + 1),
         originallyDetectedRows: headerRowIndexes.map((idx) => idx + 1),
@@ -2301,6 +2332,10 @@ function buildAllSheetsData(workbook) {
             temporalCount: item.temporalCount,
             numericDateRatio: item.numericDateRatio,
             nextDataEvidence: item.nextDataEvidence,
+            likelyDataRecord: item.likelyDataRecord === true,
+            likelySchemaHeader: item.likelySchemaHeader === true,
+            structuralProfile: item.structuralProfile || null,
+            rowTypeRepeatability: item.rowTypeRepeatability || null,
             reasons: item.reasons,
           })),
       },
@@ -2315,4 +2350,10 @@ function buildAllSheetsData(workbook) {
   return allSheetsData;
 }
 
-module.exports = { buildAllSheetsData, detectCellType };
+module.exports = {
+  buildAllSheetsData,
+  detectCellType,
+  analyzeHeaderRowCandidate,
+  detectTableBlocks,
+  STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
+};

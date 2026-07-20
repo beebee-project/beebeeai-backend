@@ -2,6 +2,7 @@ const catalog = require("./summarySheetContractCatalog.json");
 
 const CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION =
   "contract_driven_summary_recipe_v1";
+const DISTINCT_FALLBACK_SEMANTICS_VERSION = "distinct_fallback_semantics_v1";
 
 const ROLE_ALIAS_OVERRIDES = Object.freeze({
   inventory_stock_status: Object.freeze({
@@ -378,14 +379,42 @@ function stableKey(parts = []) {
   return JSON.stringify(parts);
 }
 
+function distinctRoleValues(rows = [], roleName = "", context = {}) {
+  if (!roleName || !context.source.mappings?.[roleName]) return [];
+
+  return rows
+    .map((row) => typedRoleValue(row, roleName, context))
+    .filter((entry) => entry.valid && !entry.blank)
+    .map((entry) => stableKey([entry.value]));
+}
+
+function countDistinctWithFallback(metric = {}, rows = [], context = {}) {
+  const orderedRoles = Array.from(
+    new Set(
+      [...(metric.valueRoles || []), metric.valueRole || ""].filter(Boolean),
+    ),
+  );
+
+  for (const roleName of orderedRoles) {
+    const values = distinctRoleValues(rows, roleName, context);
+    if (values.length) return new Set(values).size;
+  }
+
+  if (metric.fallbackAggregation === "countRows") {
+    return rows.length;
+  }
+
+  return null;
+}
+
 function aggregateScalar(metric = {}, rows = [], context = {}) {
   if (metric.aggregation === "countRows") return rows.length;
   if (metric.aggregation === "countDistinct") {
-    const values = rows
-      .map((row) => typedRoleValue(row, metric.valueRole, context))
-      .filter((entry) => entry.valid && !entry.blank)
-      .map((entry) => stableKey([entry.value]));
+    const values = distinctRoleValues(rows, metric.valueRole, context);
     return new Set(values).size;
+  }
+  if (metric.aggregation === "countDistinctFallback") {
+    return countDistinctWithFallback(metric, rows, context);
   }
   const values = rows
     .map((row) => typedRoleValue(row, metric.valueRole, context))
@@ -746,6 +775,12 @@ function sectionsFromComputedMetrics(computed = [], source = {}) {
   ].filter(Boolean);
 }
 
+function usesDistinctFallbackSemantics(computed = []) {
+  return (computed || []).some(
+    (entry) => entry?.metric?.aggregation === "countDistinctFallback",
+  );
+}
+
 function buildContractDrivenSummarySections({
   normalizedQueryTables = [],
   templateId = "",
@@ -794,6 +829,9 @@ function buildContractDrivenSummarySections({
     version: CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION,
     contractCatalogVersion: catalog.version,
     sourceContractsVersion: catalog.sourceContractsVersion,
+    distinctFallbackSemanticsVersion: usesDistinctFallbackSemantics(computed)
+      ? DISTINCT_FALLBACK_SEMANTICS_VERSION
+      : "",
     templateId,
     contractId: contract.contractId,
     status: errorMetricIds.length ? "PARTIAL" : "PASS",
@@ -810,6 +848,8 @@ function buildContractDrivenSummarySections({
 
 module.exports = {
   CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION,
+  DISTINCT_FALLBACK_SEMANTICS_VERSION,
+  usesDistinctFallbackSemantics,
   normalizeHeader,
   normalizePeriod,
   chooseContract,

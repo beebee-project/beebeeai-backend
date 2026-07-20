@@ -9,14 +9,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연월",
-            "월",
-            "일자",
-            "date",
-            "period"
-          ],
+          "aliases": ["기간", "연월", "월", "일자", "date", "period"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -24,14 +17,7 @@
         {
           "role": "product",
           "label": "product",
-          "aliases": [
-            "품목",
-            "제품",
-            "상품",
-            "서비스",
-            "product",
-            "item"
-          ],
+          "aliases": ["품목", "제품", "상품", "서비스", "product", "item"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -54,13 +40,7 @@
         {
           "role": "cost",
           "label": "cost",
-          "aliases": [
-            "비용",
-            "원가",
-            "매입금액",
-            "cost",
-            "expense"
-          ],
+          "aliases": ["비용", "원가", "매입금액", "cost", "expense"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -90,9 +70,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue"
-            ],
+            "requiresRoles": ["revenue"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -110,9 +88,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "cost"
-            ],
+            "requiresRoles": ["cost"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -140,10 +116,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "revenue.total",
-              "revenue.total_cost"
-            ]
+            "requiresMetricIds": ["revenue.total", "revenue.total_cost"]
           },
           "rounding": {
             "digits": 2,
@@ -170,10 +143,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "revenue.total_profit",
-              "revenue.total"
-            ]
+            "requiresMetricIds": ["revenue.total_profit", "revenue.total"]
           },
           "rounding": {
             "digits": 2,
@@ -187,15 +157,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "revenue",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue",
-              "product"
-            ],
+            "requiresRoles": ["revenue", "product"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -210,15 +175,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "revenue",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue",
-              "product"
-            ],
+            "requiresRoles": ["revenue", "product"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -233,15 +193,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "revenue",
-          "groupByRoles": [
-            "period"
-          ],
+          "groupByRoles": ["period"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue",
-              "period"
-            ],
+            "requiresRoles": ["revenue", "period"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -259,9 +214,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "revenue.by_product"
-            ]
+            "requiresMetricIds": ["revenue.by_product"]
           },
           "rounding": {
             "digits": 2,
@@ -277,13 +230,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "부서",
-            "조직",
-            "팀",
-            "department",
-            "team"
-          ],
+          "aliases": ["부서", "조직", "팀", "department", "team"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -291,13 +238,7 @@
         {
           "role": "metricName",
           "label": "metricName",
-          "aliases": [
-            "지표명",
-            "KPI",
-            "성과지표",
-            "metric",
-            "metricName"
-          ],
+          "aliases": ["지표명", "KPI", "성과지표", "metric", "metricName"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -305,12 +246,7 @@
         {
           "role": "target",
           "label": "target",
-          "aliases": [
-            "목표",
-            "목표값",
-            "target",
-            "goal"
-          ],
+          "aliases": ["목표", "목표값", "target", "goal"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -318,13 +254,7 @@
         {
           "role": "actual",
           "label": "actual",
-          "aliases": [
-            "실적",
-            "실적값",
-            "현재값",
-            "actual",
-            "value"
-          ],
+          "aliases": ["실적", "실적값", "현재값", "actual", "value"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -332,12 +262,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "상태",
-            "달성상태",
-            "status",
-            "result"
-          ],
+          "aliases": ["상태", "달성상태", "status", "result"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -345,13 +270,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연월",
-            "분기",
-            "period",
-            "date"
-          ],
+          "aliases": ["기간", "연월", "분기", "period", "date"],
           "dataType": "period",
           "required": false,
           "semanticType": "dimension"
@@ -365,15 +284,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "actual",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "actual",
-              "department"
-            ],
+            "requiresRoles": ["actual", "department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -388,15 +302,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "target",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "target",
-              "department"
-            ],
+            "requiresRoles": ["target", "department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -409,9 +318,7 @@
           "label": "부서별 달성률",
           "criticality": "core",
           "kind": "derived",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "operator": "percentage",
           "operands": [
@@ -446,9 +353,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "actual"
-            ],
+            "requiresRoles": ["actual"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -466,9 +371,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "kpi.actual_by_department"
-            ]
+            "requiresMetricIds": ["kpi.actual_by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -482,14 +385,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "status"
-          ],
+          "groupByRoles": ["status"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "status"
-            ],
+            "requiresRoles": ["status"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -504,14 +403,29 @@
       "contractId": "accuracy_contract.survey_satisfaction_analysis.v1",
       "sourceRoles": [
         {
+          "role": "responseId",
+          "label": "responseId",
+          "aliases": [
+            "응답ID",
+            "응답번호",
+            "설문응답ID",
+            "responseId",
+            "responseKey"
+          ],
+          "dataType": "string",
+          "required": false,
+          "semanticType": "identifier"
+        },
+        {
           "role": "respondentId",
           "label": "respondentId",
           "aliases": [
             "응답자ID",
-            "응답자",
-            "responseId",
+            "참여자ID",
+            "사용자ID",
             "respondentId",
-            "id"
+            "participantId",
+            "userId"
           ],
           "dataType": "string",
           "required": false,
@@ -520,13 +434,7 @@
         {
           "role": "question",
           "label": "question",
-          "aliases": [
-            "문항",
-            "질문",
-            "항목",
-            "question",
-            "item"
-          ],
+          "aliases": ["문항", "질문", "항목", "question", "item"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -534,13 +442,7 @@
         {
           "role": "score",
           "label": "score",
-          "aliases": [
-            "점수",
-            "만족도",
-            "평점",
-            "score",
-            "rating"
-          ],
+          "aliases": ["점수", "만족도", "평점", "score", "rating"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -548,13 +450,7 @@
         {
           "role": "program",
           "label": "program",
-          "aliases": [
-            "프로그램",
-            "과정",
-            "행사",
-            "program",
-            "course"
-          ],
+          "aliases": ["프로그램", "과정", "행사", "program", "course"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -562,12 +458,7 @@
         {
           "role": "category",
           "label": "category",
-          "aliases": [
-            "분류",
-            "영역",
-            "category",
-            "section"
-          ],
+          "aliases": ["분류", "영역", "category", "section"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -579,7 +470,7 @@
           "label": "응답 건수",
           "criticality": "core",
           "kind": "aggregate",
-          "aggregation": "countRows",
+          "aggregation": "countDistinctFallback",
           "valueRole": "",
           "groupByRoles": [],
           "filters": [],
@@ -590,27 +481,29 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "valueRoles": ["responseId"],
+          "fallbackAggregation": "countRows"
         },
         {
           "metricId": "survey.respondent_count",
           "label": "응답자 수",
           "criticality": "conditional",
           "kind": "aggregate",
-          "aggregation": "countDistinct",
-          "valueRole": "respondentId",
+          "aggregation": "countDistinctFallback",
+          "valueRole": "",
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "respondentId"
-            ],
+            "requiresRoles": [],
             "requiresMetricIds": []
           },
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "valueRoles": ["respondentId", "responseId"],
+          "fallbackAggregation": "countRows"
         },
         {
           "metricId": "survey.average_score",
@@ -622,9 +515,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "score"
-            ],
+            "requiresRoles": ["score"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -639,15 +530,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "score",
-          "groupByRoles": [
-            "question"
-          ],
+          "groupByRoles": ["question"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "score",
-              "question"
-            ],
+            "requiresRoles": ["score", "question"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -662,15 +548,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "score",
-          "groupByRoles": [
-            "program"
-          ],
+          "groupByRoles": ["program"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "score",
-              "program"
-            ],
+            "requiresRoles": ["score", "program"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -688,9 +569,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "survey.score_by_question"
-            ]
+            "requiresMetricIds": ["survey.score_by_question"]
           },
           "rounding": {
             "digits": 2,
@@ -706,13 +585,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연월",
-            "일자",
-            "date",
-            "period"
-          ],
+          "aliases": ["기간", "연월", "일자", "date", "period"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -720,13 +593,7 @@
         {
           "role": "item",
           "label": "item",
-          "aliases": [
-            "품목",
-            "상품",
-            "자재",
-            "item",
-            "product"
-          ],
+          "aliases": ["품목", "상품", "자재", "item", "product"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -734,13 +601,7 @@
         {
           "role": "inQuantity",
           "label": "inQuantity",
-          "aliases": [
-            "입고수량",
-            "입고",
-            "inQty",
-            "inQuantity",
-            "received"
-          ],
+          "aliases": ["입고수량", "입고", "inQty", "inQuantity", "received"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -748,13 +609,7 @@
         {
           "role": "outQuantity",
           "label": "outQuantity",
-          "aliases": [
-            "출고수량",
-            "출고",
-            "outQty",
-            "outQuantity",
-            "issued"
-          ],
+          "aliases": ["출고수량", "출고", "outQty", "outQuantity", "issued"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -762,12 +617,7 @@
         {
           "role": "warehouse",
           "label": "warehouse",
-          "aliases": [
-            "창고",
-            "보관소",
-            "warehouse",
-            "location"
-          ],
+          "aliases": ["창고", "보관소", "warehouse", "location"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -784,9 +634,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "inQuantity"
-            ],
+            "requiresRoles": ["inQuantity"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -804,9 +652,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "outQuantity"
-            ],
+            "requiresRoles": ["outQuantity"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -851,15 +697,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "inQuantity",
-          "groupByRoles": [
-            "period"
-          ],
+          "groupByRoles": ["period"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "inQuantity",
-              "period"
-            ],
+            "requiresRoles": ["inQuantity", "period"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -874,15 +715,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "outQuantity",
-          "groupByRoles": [
-            "period"
-          ],
+          "groupByRoles": ["period"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "outQuantity",
-              "period"
-            ],
+            "requiresRoles": ["outQuantity", "period"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -897,15 +733,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "outQuantity",
-          "groupByRoles": [
-            "item"
-          ],
+          "groupByRoles": ["item"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "outQuantity",
-              "item"
-            ],
+            "requiresRoles": ["outQuantity", "item"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -923,9 +754,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "inventory_flow.out_by_item"
-            ]
+            "requiresMetricIds": ["inventory_flow.out_by_item"]
           },
           "rounding": {
             "digits": 2,
@@ -941,13 +770,7 @@
         {
           "role": "item",
           "label": "item",
-          "aliases": [
-            "품목",
-            "상품",
-            "자재",
-            "item",
-            "product"
-          ],
+          "aliases": ["품목", "상품", "자재", "item", "product"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -955,12 +778,7 @@
         {
           "role": "warehouse",
           "label": "warehouse",
-          "aliases": [
-            "창고",
-            "보관소",
-            "warehouse",
-            "location"
-          ],
+          "aliases": ["창고", "보관소", "warehouse", "location"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -983,12 +801,7 @@
         {
           "role": "safetyStock",
           "label": "safetyStock",
-          "aliases": [
-            "안전재고",
-            "최소재고",
-            "safetyStock",
-            "minimumStock"
-          ],
+          "aliases": ["안전재고", "최소재고", "safetyStock", "minimumStock"],
           "dataType": "number",
           "required": false,
           "semanticType": "measure"
@@ -1005,9 +818,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "stockQuantity"
-            ],
+            "requiresRoles": ["stockQuantity"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1025,9 +836,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "stockQuantity"
-            ],
+            "requiresRoles": ["stockQuantity"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1042,15 +851,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "stockQuantity",
-          "groupByRoles": [
-            "item"
-          ],
+          "groupByRoles": ["item"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "stockQuantity",
-              "item"
-            ],
+            "requiresRoles": ["stockQuantity", "item"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1065,15 +869,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "stockQuantity",
-          "groupByRoles": [
-            "warehouse"
-          ],
+          "groupByRoles": ["warehouse"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "stockQuantity",
-              "warehouse"
-            ],
+            "requiresRoles": ["stockQuantity", "warehouse"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1106,10 +905,7 @@
             }
           ],
           "activation": {
-            "requiresRoles": [
-              "stockQuantity",
-              "safetyStock"
-            ],
+            "requiresRoles": ["stockQuantity", "safetyStock"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1127,9 +923,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "inventory_stock.by_item"
-            ]
+            "requiresMetricIds": ["inventory_stock.by_item"]
           },
           "rounding": {
             "digits": 2,
@@ -1145,13 +939,7 @@
         {
           "role": "date",
           "label": "date",
-          "aliases": [
-            "사용일자",
-            "결제일",
-            "일자",
-            "date",
-            "transactionDate"
-          ],
+          "aliases": ["사용일자", "결제일", "일자", "date", "transactionDate"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -1159,12 +947,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "부서",
-            "사용부서",
-            "department",
-            "team"
-          ],
+          "aliases": ["부서", "사용부서", "department", "team"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1172,13 +955,7 @@
         {
           "role": "category",
           "label": "category",
-          "aliases": [
-            "사용항목",
-            "비목",
-            "업종",
-            "category",
-            "expenseType"
-          ],
+          "aliases": ["사용항목", "비목", "업종", "category", "expenseType"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1186,13 +963,7 @@
         {
           "role": "merchant",
           "label": "merchant",
-          "aliases": [
-            "가맹점",
-            "사용처",
-            "상호",
-            "merchant",
-            "vendor"
-          ],
+          "aliases": ["가맹점", "사용처", "상호", "merchant", "vendor"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -1200,13 +971,7 @@
         {
           "role": "amount",
           "label": "amount",
-          "aliases": [
-            "사용금액",
-            "결제금액",
-            "금액",
-            "amount",
-            "expense"
-          ],
+          "aliases": ["사용금액", "결제금액", "금액", "amount", "expense"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -1223,9 +988,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount"
-            ],
+            "requiresRoles": ["amount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1243,9 +1006,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount"
-            ],
+            "requiresRoles": ["amount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1278,15 +1039,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "amount",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount",
-              "department"
-            ],
+            "requiresRoles": ["amount", "department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1301,15 +1057,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "amount",
-          "groupByRoles": [
-            "category"
-          ],
+          "groupByRoles": ["category"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount",
-              "category"
-            ],
+            "requiresRoles": ["amount", "category"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1324,15 +1075,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "amount",
-          "groupByRoles": [
-            "merchant"
-          ],
+          "groupByRoles": ["merchant"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount",
-              "merchant"
-            ],
+            "requiresRoles": ["amount", "merchant"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1350,9 +1096,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "card.by_department"
-            ]
+            "requiresMetricIds": ["card.by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -1368,12 +1112,7 @@
         {
           "role": "orderId",
           "label": "orderId",
-          "aliases": [
-            "발주번호",
-            "주문번호",
-            "orderId",
-            "purchaseOrder"
-          ],
+          "aliases": ["발주번호", "주문번호", "orderId", "purchaseOrder"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -1381,13 +1120,7 @@
         {
           "role": "date",
           "label": "date",
-          "aliases": [
-            "발주일",
-            "주문일",
-            "일자",
-            "date",
-            "orderDate"
-          ],
+          "aliases": ["발주일", "주문일", "일자", "date", "orderDate"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -1395,12 +1128,7 @@
         {
           "role": "vendor",
           "label": "vendor",
-          "aliases": [
-            "거래처",
-            "공급업체",
-            "vendor",
-            "supplier"
-          ],
+          "aliases": ["거래처", "공급업체", "vendor", "supplier"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1408,12 +1136,7 @@
         {
           "role": "item",
           "label": "item",
-          "aliases": [
-            "품목",
-            "자재",
-            "item",
-            "product"
-          ],
+          "aliases": ["품목", "자재", "item", "product"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -1421,13 +1144,7 @@
         {
           "role": "amount",
           "label": "amount",
-          "aliases": [
-            "발주금액",
-            "주문금액",
-            "금액",
-            "amount",
-            "orderAmount"
-          ],
+          "aliases": ["발주금액", "주문금액", "금액", "amount", "orderAmount"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -1435,13 +1152,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "발주상태",
-            "처리상태",
-            "상태",
-            "status",
-            "orderStatus"
-          ],
+          "aliases": ["발주상태", "처리상태", "상태", "status", "orderStatus"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1458,9 +1169,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount"
-            ],
+            "requiresRoles": ["amount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1478,9 +1187,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount"
-            ],
+            "requiresRoles": ["amount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1513,15 +1220,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "amount",
-          "groupByRoles": [
-            "vendor"
-          ],
+          "groupByRoles": ["vendor"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount",
-              "vendor"
-            ],
+            "requiresRoles": ["amount", "vendor"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1536,14 +1238,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "status"
-          ],
+          "groupByRoles": ["status"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "status"
-            ],
+            "requiresRoles": ["status"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1561,9 +1259,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "purchase.by_vendor"
-            ]
+            "requiresMetricIds": ["purchase.by_vendor"]
           },
           "rounding": {
             "digits": 2,
@@ -1579,13 +1275,7 @@
         {
           "role": "participantId",
           "label": "participantId",
-          "aliases": [
-            "연구원ID",
-            "사번",
-            "학번",
-            "participantId",
-            "id"
-          ],
+          "aliases": ["연구원ID", "사번", "학번", "participantId", "id"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -1593,11 +1283,7 @@
         {
           "role": "name",
           "label": "name",
-          "aliases": [
-            "성명",
-            "이름",
-            "name"
-          ],
+          "aliases": ["성명", "이름", "name"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1605,13 +1291,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "소속",
-            "부서",
-            "연구실",
-            "department",
-            "lab"
-          ],
+          "aliases": ["소속", "부서", "연구실", "department", "lab"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1619,13 +1299,7 @@
         {
           "role": "role",
           "label": "role",
-          "aliases": [
-            "참여역할",
-            "직급",
-            "구분",
-            "role",
-            "position"
-          ],
+          "aliases": ["참여역할", "직급", "구분", "role", "position"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1633,12 +1307,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "참여상태",
-            "재직상태",
-            "상태",
-            "status"
-          ],
+          "aliases": ["참여상태", "재직상태", "상태", "status"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1686,9 +1355,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "participantId"
-            ],
+            "requiresRoles": ["participantId"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1703,14 +1370,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "department"
-            ],
+            "requiresRoles": ["department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1725,14 +1388,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "role"
-          ],
+          "groupByRoles": ["role"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "role"
-            ],
+            "requiresRoles": ["role"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1747,14 +1406,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "status"
-          ],
+          "groupByRoles": ["status"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "status"
-            ],
+            "requiresRoles": ["status"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1772,9 +1427,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "participationRate"
-            ],
+            "requiresRoles": ["participationRate"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1792,9 +1445,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "participant.by_department"
-            ]
+            "requiresMetricIds": ["participant.by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -1810,13 +1461,7 @@
         {
           "role": "applicantId",
           "label": "applicantId",
-          "aliases": [
-            "신청자ID",
-            "사번",
-            "학번",
-            "applicantId",
-            "id"
-          ],
+          "aliases": ["신청자ID", "사번", "학번", "applicantId", "id"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -1824,13 +1469,7 @@
         {
           "role": "program",
           "label": "program",
-          "aliases": [
-            "행사명",
-            "프로그램",
-            "워크숍",
-            "program",
-            "event"
-          ],
+          "aliases": ["행사명", "프로그램", "워크숍", "program", "event"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1838,12 +1477,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "소속",
-            "부서",
-            "department",
-            "organization"
-          ],
+          "aliases": ["소속", "부서", "department", "organization"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1851,12 +1485,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "신청상태",
-            "승인상태",
-            "상태",
-            "status"
-          ],
+          "aliases": ["신청상태", "승인상태", "상태", "status"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -1864,12 +1493,7 @@
         {
           "role": "attendance",
           "label": "attendance",
-          "aliases": [
-            "참석여부",
-            "출석",
-            "attendance",
-            "attended"
-          ],
+          "aliases": ["참석여부", "출석", "attendance", "attended"],
           "dataType": "boolean",
           "required": false,
           "semanticType": "measure"
@@ -1904,9 +1528,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "applicantId"
-            ],
+            "requiresRoles": ["applicantId"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1921,14 +1543,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "status"
-          ],
+          "groupByRoles": ["status"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "status"
-            ],
+            "requiresRoles": ["status"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1943,14 +1561,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "department"
-            ],
+            "requiresRoles": ["department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1965,14 +1579,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "program"
-          ],
+          "groupByRoles": ["program"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "program"
-            ],
+            "requiresRoles": ["program"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -1990,9 +1600,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "attendance"
-            ],
+            "requiresRoles": ["attendance"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2010,9 +1618,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "event.by_department"
-            ]
+            "requiresMetricIds": ["event.by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -2028,13 +1634,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "분기",
-            "연월",
-            "period",
-            "date"
-          ],
+          "aliases": ["기간", "분기", "연월", "period", "date"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -2042,12 +1642,7 @@
         {
           "role": "branch",
           "label": "branch",
-          "aliases": [
-            "지점",
-            "영업점",
-            "branch",
-            "office"
-          ],
+          "aliases": ["지점", "영업점", "branch", "office"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2055,12 +1650,7 @@
         {
           "role": "revenue",
           "label": "revenue",
-          "aliases": [
-            "매출액",
-            "실적",
-            "revenue",
-            "sales"
-          ],
+          "aliases": ["매출액", "실적", "revenue", "sales"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -2068,12 +1658,7 @@
         {
           "role": "target",
           "label": "target",
-          "aliases": [
-            "목표",
-            "목표액",
-            "target",
-            "goal"
-          ],
+          "aliases": ["목표", "목표액", "target", "goal"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -2081,12 +1666,7 @@
         {
           "role": "cost",
           "label": "cost",
-          "aliases": [
-            "비용",
-            "원가",
-            "cost",
-            "expense"
-          ],
+          "aliases": ["비용", "원가", "cost", "expense"],
           "dataType": "number",
           "required": false,
           "semanticType": "measure"
@@ -2094,12 +1674,7 @@
         {
           "role": "customerCount",
           "label": "customerCount",
-          "aliases": [
-            "고객수",
-            "거래건수",
-            "customerCount",
-            "transactions"
-          ],
+          "aliases": ["고객수", "거래건수", "customerCount", "transactions"],
           "dataType": "number",
           "required": false,
           "semanticType": "measure"
@@ -2116,9 +1691,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue"
-            ],
+            "requiresRoles": ["revenue"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2136,9 +1709,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "target"
-            ],
+            "requiresRoles": ["target"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2166,10 +1737,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "branch.total_revenue",
-              "branch.total_target"
-            ]
+            "requiresMetricIds": ["branch.total_revenue", "branch.total_target"]
           },
           "rounding": {
             "digits": 2,
@@ -2183,15 +1751,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "revenue",
-          "groupByRoles": [
-            "branch"
-          ],
+          "groupByRoles": ["branch"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue",
-              "branch"
-            ],
+            "requiresRoles": ["revenue", "branch"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2206,15 +1769,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "revenue",
-          "groupByRoles": [
-            "branch"
-          ],
+          "groupByRoles": ["branch"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "revenue",
-              "branch"
-            ],
+            "requiresRoles": ["revenue", "branch"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2232,9 +1790,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "cost"
-            ],
+            "requiresRoles": ["cost"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2262,10 +1818,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "branch.total_revenue",
-              "branch.total_cost"
-            ]
+            "requiresMetricIds": ["branch.total_revenue", "branch.total_cost"]
           },
           "rounding": {
             "digits": 2,
@@ -2282,9 +1835,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "branch.revenue_by_branch"
-            ]
+            "requiresMetricIds": ["branch.revenue_by_branch"]
           },
           "rounding": {
             "digits": 2,
@@ -2300,13 +1851,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연월",
-            "월",
-            "period",
-            "date"
-          ],
+          "aliases": ["기간", "연월", "월", "period", "date"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -2314,13 +1859,7 @@
         {
           "role": "facility",
           "label": "facility",
-          "aliases": [
-            "시설",
-            "건물",
-            "사업장",
-            "facility",
-            "building"
-          ],
+          "aliases": ["시설", "건물", "사업장", "facility", "building"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2328,12 +1867,7 @@
         {
           "role": "energyType",
           "label": "energyType",
-          "aliases": [
-            "에너지원",
-            "종류",
-            "energyType",
-            "type"
-          ],
+          "aliases": ["에너지원", "종류", "energyType", "type"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -2341,12 +1875,7 @@
         {
           "role": "usage",
           "label": "usage",
-          "aliases": [
-            "사용량",
-            "소비량",
-            "usage",
-            "consumption"
-          ],
+          "aliases": ["사용량", "소비량", "usage", "consumption"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -2354,12 +1883,7 @@
         {
           "role": "cost",
           "label": "cost",
-          "aliases": [
-            "요금",
-            "비용",
-            "cost",
-            "charge"
-          ],
+          "aliases": ["요금", "비용", "cost", "charge"],
           "dataType": "number",
           "required": false,
           "semanticType": "measure"
@@ -2376,9 +1900,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "usage"
-            ],
+            "requiresRoles": ["usage"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2396,9 +1918,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "usage"
-            ],
+            "requiresRoles": ["usage"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2413,15 +1933,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "usage",
-          "groupByRoles": [
-            "facility"
-          ],
+          "groupByRoles": ["facility"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "usage",
-              "facility"
-            ],
+            "requiresRoles": ["usage", "facility"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2436,15 +1951,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "usage",
-          "groupByRoles": [
-            "period"
-          ],
+          "groupByRoles": ["period"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "usage",
-              "period"
-            ],
+            "requiresRoles": ["usage", "period"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2459,15 +1969,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "usage",
-          "groupByRoles": [
-            "energyType"
-          ],
+          "groupByRoles": ["energyType"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "usage",
-              "energyType"
-            ],
+            "requiresRoles": ["usage", "energyType"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2485,9 +1990,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "cost"
-            ],
+            "requiresRoles": ["cost"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2505,9 +2008,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "energy.by_facility"
-            ]
+            "requiresMetricIds": ["energy.by_facility"]
           },
           "rounding": {
             "digits": 2,
@@ -2523,13 +2024,7 @@
         {
           "role": "employeeId",
           "label": "employeeId",
-          "aliases": [
-            "사번",
-            "직원ID",
-            "학번",
-            "employeeId",
-            "id"
-          ],
+          "aliases": ["사번", "직원ID", "학번", "employeeId", "id"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -2537,11 +2032,7 @@
         {
           "role": "name",
           "label": "name",
-          "aliases": [
-            "성명",
-            "이름",
-            "name"
-          ],
+          "aliases": ["성명", "이름", "name"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2549,13 +2040,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "부서",
-            "소속",
-            "연구실",
-            "department",
-            "lab"
-          ],
+          "aliases": ["부서", "소속", "연구실", "department", "lab"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2563,13 +2048,7 @@
         {
           "role": "position",
           "label": "position",
-          "aliases": [
-            "직급",
-            "직책",
-            "구분",
-            "position",
-            "role"
-          ],
+          "aliases": ["직급", "직책", "구분", "position", "role"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2577,12 +2056,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "재직상태",
-            "상태",
-            "status",
-            "employmentStatus"
-          ],
+          "aliases": ["재직상태", "상태", "status", "employmentStatus"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2617,9 +2091,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "employeeId"
-            ],
+            "requiresRoles": ["employeeId"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2634,14 +2106,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "department"
-            ],
+            "requiresRoles": ["department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2656,14 +2124,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "position"
-          ],
+          "groupByRoles": ["position"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "position"
-            ],
+            "requiresRoles": ["position"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2678,14 +2142,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "status"
-          ],
+          "groupByRoles": ["status"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "status"
-            ],
+            "requiresRoles": ["status"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2703,9 +2163,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "roster.by_department"
-            ]
+            "requiresMetricIds": ["roster.by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -2721,13 +2179,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기준월",
-            "연월",
-            "기간",
-            "period",
-            "month"
-          ],
+          "aliases": ["기준월", "연월", "기간", "period", "month"],
           "dataType": "period",
           "required": false,
           "semanticType": "dimension"
@@ -2735,12 +2187,7 @@
         {
           "role": "employeeId",
           "label": "employeeId",
-          "aliases": [
-            "사번",
-            "직원ID",
-            "employeeId",
-            "id"
-          ],
+          "aliases": ["사번", "직원ID", "employeeId", "id"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -2748,12 +2195,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "부서",
-            "소속",
-            "department",
-            "team"
-          ],
+          "aliases": ["부서", "소속", "department", "team"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2761,12 +2203,7 @@
         {
           "role": "position",
           "label": "position",
-          "aliases": [
-            "직급",
-            "직책",
-            "position",
-            "role"
-          ],
+          "aliases": ["직급", "직책", "position", "role"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2774,11 +2211,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "재직상태",
-            "상태",
-            "status"
-          ],
+          "aliases": ["재직상태", "상태", "status"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -2786,12 +2219,7 @@
         {
           "role": "hireFlag",
           "label": "hireFlag",
-          "aliases": [
-            "입사여부",
-            "신규입사",
-            "hireFlag",
-            "joined"
-          ],
+          "aliases": ["입사여부", "신규입사", "hireFlag", "joined"],
           "dataType": "boolean",
           "required": false,
           "semanticType": "measure"
@@ -2799,12 +2227,7 @@
         {
           "role": "leaveFlag",
           "label": "leaveFlag",
-          "aliases": [
-            "퇴사여부",
-            "퇴사",
-            "leaveFlag",
-            "left"
-          ],
+          "aliases": ["퇴사여부", "퇴사", "leaveFlag", "left"],
           "dataType": "boolean",
           "required": false,
           "semanticType": "measure"
@@ -2812,12 +2235,7 @@
         {
           "role": "salary",
           "label": "salary",
-          "aliases": [
-            "연봉",
-            "급여",
-            "salary",
-            "pay"
-          ],
+          "aliases": ["연봉", "급여", "salary", "pay"],
           "dataType": "number",
           "required": false,
           "semanticType": "measure"
@@ -2852,9 +2270,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "employeeId"
-            ],
+            "requiresRoles": ["employeeId"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2882,9 +2298,7 @@
             }
           ],
           "activation": {
-            "requiresRoles": [
-              "hireFlag"
-            ],
+            "requiresRoles": ["hireFlag"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2912,9 +2326,7 @@
             }
           ],
           "activation": {
-            "requiresRoles": [
-              "leaveFlag"
-            ],
+            "requiresRoles": ["leaveFlag"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2942,10 +2354,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "hr.hire_count",
-              "hr.leave_count"
-            ]
+            "requiresMetricIds": ["hr.hire_count", "hr.leave_count"]
           },
           "rounding": {
             "digits": 2,
@@ -2959,14 +2368,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "department"
-            ],
+            "requiresRoles": ["department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -2981,14 +2386,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "position"
-          ],
+          "groupByRoles": ["position"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "position"
-            ],
+            "requiresRoles": ["position"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3006,9 +2407,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salary"
-            ],
+            "requiresRoles": ["salary"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3023,15 +2422,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "salary",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salary",
-              "department"
-            ],
+            "requiresRoles": ["salary", "department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3049,9 +2443,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "hr.by_department"
-            ]
+            "requiresMetricIds": ["hr.by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -3067,14 +2459,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연월",
-            "월",
-            "일자",
-            "period",
-            "date"
-          ],
+          "aliases": ["기간", "연월", "월", "일자", "period", "date"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -3082,13 +2467,7 @@
         {
           "role": "product",
           "label": "product",
-          "aliases": [
-            "품목",
-            "제품",
-            "상품",
-            "product",
-            "item"
-          ],
+          "aliases": ["품목", "제품", "상품", "product", "item"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -3096,12 +2475,7 @@
         {
           "role": "quantity",
           "label": "quantity",
-          "aliases": [
-            "판매수량",
-            "수량",
-            "quantity",
-            "units"
-          ],
+          "aliases": ["판매수량", "수량", "quantity", "units"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -3124,11 +2498,7 @@
         {
           "role": "customerType",
           "label": "customerType",
-          "aliases": [
-            "고객유형",
-            "거래처유형",
-            "customerType"
-          ],
+          "aliases": ["고객유형", "거래처유형", "customerType"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -3145,9 +2515,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount"
-            ],
+            "requiresRoles": ["salesAmount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3165,9 +2533,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "quantity"
-            ],
+            "requiresRoles": ["quantity"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3185,9 +2551,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount"
-            ],
+            "requiresRoles": ["salesAmount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3202,15 +2566,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "salesAmount",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount",
-              "product"
-            ],
+            "requiresRoles": ["salesAmount", "product"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3225,15 +2584,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "salesAmount",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount",
-              "product"
-            ],
+            "requiresRoles": ["salesAmount", "product"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3248,15 +2602,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "salesAmount",
-          "groupByRoles": [
-            "period"
-          ],
+          "groupByRoles": ["period"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount",
-              "period"
-            ],
+            "requiresRoles": ["salesAmount", "period"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3269,9 +2618,7 @@
           "label": "품목별 매출 구성비",
           "criticality": "core",
           "kind": "derived",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "operator": "percentage",
           "operands": [
@@ -3286,10 +2633,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "sales.by_product",
-              "sales.total_amount"
-            ]
+            "requiresMetricIds": ["sales.by_product", "sales.total_amount"]
           },
           "rounding": {
             "digits": 2,
@@ -3306,9 +2650,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "sales.by_product"
-            ]
+            "requiresMetricIds": ["sales.by_product"]
           },
           "rounding": {
             "digits": 2,
@@ -3324,13 +2666,7 @@
         {
           "role": "project",
           "label": "project",
-          "aliases": [
-            "과제",
-            "사업명",
-            "프로젝트",
-            "project",
-            "program"
-          ],
+          "aliases": ["과제", "사업명", "프로젝트", "project", "program"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -3338,13 +2674,7 @@
         {
           "role": "budgetItem",
           "label": "budgetItem",
-          "aliases": [
-            "비목",
-            "예산항목",
-            "집행항목",
-            "budgetItem",
-            "category"
-          ],
+          "aliases": ["비목", "예산항목", "집행항목", "budgetItem", "category"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -3352,12 +2682,7 @@
         {
           "role": "institution",
           "label": "institution",
-          "aliases": [
-            "기관",
-            "수행기관",
-            "institution",
-            "organization"
-          ],
+          "aliases": ["기관", "수행기관", "institution", "organization"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -3379,12 +2704,7 @@
         {
           "role": "executedAmount",
           "label": "executedAmount",
-          "aliases": [
-            "집행액",
-            "사용액",
-            "executedAmount",
-            "spent"
-          ],
+          "aliases": ["집행액", "사용액", "executedAmount", "spent"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -3392,13 +2712,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연도",
-            "연월",
-            "period",
-            "date"
-          ],
+          "aliases": ["기간", "연도", "연월", "period", "date"],
           "dataType": "period",
           "required": false,
           "semanticType": "dimension"
@@ -3415,9 +2729,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "allocatedBudget"
-            ],
+            "requiresRoles": ["allocatedBudget"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3435,9 +2747,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "executedAmount"
-            ],
+            "requiresRoles": ["executedAmount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3512,15 +2822,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "executedAmount",
-          "groupByRoles": [
-            "project"
-          ],
+          "groupByRoles": ["project"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "executedAmount",
-              "project"
-            ],
+            "requiresRoles": ["executedAmount", "project"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3535,15 +2840,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "executedAmount",
-          "groupByRoles": [
-            "budgetItem"
-          ],
+          "groupByRoles": ["budgetItem"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "executedAmount",
-              "budgetItem"
-            ],
+            "requiresRoles": ["executedAmount", "budgetItem"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3558,15 +2858,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "executedAmount",
-          "groupByRoles": [
-            "project"
-          ],
+          "groupByRoles": ["project"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "executedAmount",
-              "project"
-            ],
+            "requiresRoles": ["executedAmount", "project"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3584,9 +2879,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "budget.executed_by_project"
-            ]
+            "requiresMetricIds": ["budget.executed_by_project"]
           },
           "rounding": {
             "digits": 2,
@@ -3604,12 +2897,7 @@
         {
           "role": "orderId",
           "label": "orderId",
-          "aliases": [
-            "발주번호",
-            "요청번호",
-            "orderId",
-            "purchaseOrder"
-          ],
+          "aliases": ["발주번호", "요청번호", "orderId", "purchaseOrder"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -3644,13 +2932,7 @@
         {
           "role": "item",
           "label": "item",
-          "aliases": [
-            "구분",
-            "품목",
-            "자재",
-            "item",
-            "product"
-          ],
+          "aliases": ["구분", "품목", "자재", "item", "product"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -3658,13 +2940,7 @@
         {
           "role": "amount",
           "label": "amount",
-          "aliases": [
-            "발주금액",
-            "요청금액",
-            "금액",
-            "amount",
-            "orderAmount"
-          ],
+          "aliases": ["발주금액", "요청금액", "금액", "amount", "orderAmount"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -3672,13 +2948,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "발주상태",
-            "처리상태",
-            "상태",
-            "status",
-            "orderStatus"
-          ],
+          "aliases": ["발주상태", "처리상태", "상태", "status", "orderStatus"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -3695,9 +2965,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount"
-            ],
+            "requiresRoles": ["amount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3715,9 +2983,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount"
-            ],
+            "requiresRoles": ["amount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3750,15 +3016,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "amount",
-          "groupByRoles": [
-            "requestingOrganization"
-          ],
+          "groupByRoles": ["requestingOrganization"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "amount",
-              "requestingOrganization"
-            ],
+            "requiresRoles": ["amount", "requestingOrganization"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3773,14 +3034,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "status"
-          ],
+          "groupByRoles": ["status"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "status"
-            ],
+            "requiresRoles": ["status"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3798,9 +3055,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "purchase.by_requesting_organization"
-            ]
+            "requiresMetricIds": ["purchase.by_requesting_organization"]
           },
           "rounding": {
             "digits": 2,
@@ -3816,13 +3071,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기준월",
-            "연월",
-            "기간",
-            "period",
-            "month"
-          ],
+          "aliases": ["기준월", "연월", "기간", "period", "month"],
           "dataType": "period",
           "required": false,
           "semanticType": "dimension"
@@ -3830,12 +3079,7 @@
         {
           "role": "employeeId",
           "label": "employeeId",
-          "aliases": [
-            "사번",
-            "직원ID",
-            "employeeId",
-            "id"
-          ],
+          "aliases": ["사번", "직원ID", "employeeId", "id"],
           "dataType": "string",
           "required": false,
           "semanticType": "identifier"
@@ -3843,12 +3087,7 @@
         {
           "role": "department",
           "label": "department",
-          "aliases": [
-            "부서",
-            "소속",
-            "department",
-            "team"
-          ],
+          "aliases": ["부서", "소속", "department", "team"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -3856,12 +3095,7 @@
         {
           "role": "position",
           "label": "position",
-          "aliases": [
-            "직급",
-            "직책",
-            "position",
-            "role"
-          ],
+          "aliases": ["직급", "직책", "position", "role"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -3869,11 +3103,7 @@
         {
           "role": "status",
           "label": "status",
-          "aliases": [
-            "재직상태",
-            "상태",
-            "status"
-          ],
+          "aliases": ["재직상태", "상태", "status"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -3881,12 +3111,7 @@
         {
           "role": "hireFlag",
           "label": "hireFlag",
-          "aliases": [
-            "입사여부",
-            "신규입사",
-            "hireFlag",
-            "joined"
-          ],
+          "aliases": ["입사여부", "신규입사", "hireFlag", "joined"],
           "dataType": "boolean",
           "required": false,
           "semanticType": "measure"
@@ -3894,12 +3119,7 @@
         {
           "role": "leaveFlag",
           "label": "leaveFlag",
-          "aliases": [
-            "퇴사여부",
-            "퇴사",
-            "leaveFlag",
-            "left"
-          ],
+          "aliases": ["퇴사여부", "퇴사", "leaveFlag", "left"],
           "dataType": "boolean",
           "required": false,
           "semanticType": "measure"
@@ -3907,12 +3127,7 @@
         {
           "role": "salary",
           "label": "salary",
-          "aliases": [
-            "연봉",
-            "급여",
-            "salary",
-            "pay"
-          ],
+          "aliases": ["연봉", "급여", "salary", "pay"],
           "dataType": "number",
           "required": false,
           "semanticType": "measure"
@@ -3947,9 +3162,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "employeeId"
-            ],
+            "requiresRoles": ["employeeId"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -3977,9 +3190,7 @@
             }
           ],
           "activation": {
-            "requiresRoles": [
-              "hireFlag"
-            ],
+            "requiresRoles": ["hireFlag"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4007,9 +3218,7 @@
             }
           ],
           "activation": {
-            "requiresRoles": [
-              "leaveFlag"
-            ],
+            "requiresRoles": ["leaveFlag"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4037,10 +3246,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "hr.hire_count",
-              "hr.leave_count"
-            ]
+            "requiresMetricIds": ["hr.hire_count", "hr.leave_count"]
           },
           "rounding": {
             "digits": 2,
@@ -4054,14 +3260,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "department"
-            ],
+            "requiresRoles": ["department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4076,14 +3278,10 @@
           "kind": "aggregate",
           "aggregation": "countRows",
           "valueRole": "",
-          "groupByRoles": [
-            "position"
-          ],
+          "groupByRoles": ["position"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "position"
-            ],
+            "requiresRoles": ["position"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4101,9 +3299,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salary"
-            ],
+            "requiresRoles": ["salary"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4118,15 +3314,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "salary",
-          "groupByRoles": [
-            "department"
-          ],
+          "groupByRoles": ["department"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salary",
-              "department"
-            ],
+            "requiresRoles": ["salary", "department"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4144,9 +3335,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "hr.by_department"
-            ]
+            "requiresMetricIds": ["hr.by_department"]
           },
           "rounding": {
             "digits": 2,
@@ -4162,14 +3351,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "기간",
-            "연월",
-            "월",
-            "일자",
-            "period",
-            "date"
-          ],
+          "aliases": ["기간", "연월", "월", "일자", "period", "date"],
           "dataType": "period",
           "required": true,
           "semanticType": "dimension"
@@ -4177,13 +3359,7 @@
         {
           "role": "product",
           "label": "product",
-          "aliases": [
-            "품목",
-            "제품",
-            "상품",
-            "product",
-            "item"
-          ],
+          "aliases": ["품목", "제품", "상품", "product", "item"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -4191,12 +3367,7 @@
         {
           "role": "quantity",
           "label": "quantity",
-          "aliases": [
-            "판매수량",
-            "수량",
-            "quantity",
-            "units"
-          ],
+          "aliases": ["판매수량", "수량", "quantity", "units"],
           "dataType": "number",
           "required": true,
           "semanticType": "measure"
@@ -4219,11 +3390,7 @@
         {
           "role": "customerType",
           "label": "customerType",
-          "aliases": [
-            "고객유형",
-            "거래처유형",
-            "customerType"
-          ],
+          "aliases": ["고객유형", "거래처유형", "customerType"],
           "dataType": "string",
           "required": false,
           "semanticType": "dimension"
@@ -4240,9 +3407,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount"
-            ],
+            "requiresRoles": ["salesAmount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4260,9 +3425,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "quantity"
-            ],
+            "requiresRoles": ["quantity"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4280,9 +3443,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount"
-            ],
+            "requiresRoles": ["salesAmount"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4297,15 +3458,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "salesAmount",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount",
-              "product"
-            ],
+            "requiresRoles": ["salesAmount", "product"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4320,15 +3476,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "salesAmount",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount",
-              "product"
-            ],
+            "requiresRoles": ["salesAmount", "product"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4343,15 +3494,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "salesAmount",
-          "groupByRoles": [
-            "period"
-          ],
+          "groupByRoles": ["period"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "salesAmount",
-              "period"
-            ],
+            "requiresRoles": ["salesAmount", "period"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4364,9 +3510,7 @@
           "label": "품목별 매출 구성비",
           "criticality": "conditional",
           "kind": "derived",
-          "groupByRoles": [
-            "product"
-          ],
+          "groupByRoles": ["product"],
           "filters": [],
           "operator": "percentage",
           "operands": [
@@ -4381,10 +3525,7 @@
           ],
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "sales.by_product",
-              "sales.total_amount"
-            ]
+            "requiresMetricIds": ["sales.by_product", "sales.total_amount"]
           },
           "rounding": {
             "digits": 2,
@@ -4401,9 +3542,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "sales.by_product"
-            ]
+            "requiresMetricIds": ["sales.by_product"]
           },
           "rounding": {
             "digits": 2,
@@ -4419,13 +3558,7 @@
         {
           "role": "project",
           "label": "project",
-          "aliases": [
-            "과제명",
-            "과제",
-            "사업명",
-            "project",
-            "program"
-          ],
+          "aliases": ["과제명", "과제", "사업명", "project", "program"],
           "dataType": "string",
           "required": true,
           "semanticType": "dimension"
@@ -4488,13 +3621,7 @@
         {
           "role": "period",
           "label": "period",
-          "aliases": [
-            "예산년도",
-            "연도",
-            "기간",
-            "period",
-            "year"
-          ],
+          "aliases": ["예산년도", "연도", "기간", "period", "year"],
           "dataType": "period",
           "required": false,
           "semanticType": "dimension"
@@ -4511,9 +3638,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "totalBudget"
-            ],
+            "requiresRoles": ["totalBudget"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4531,9 +3656,7 @@
           "groupByRoles": [],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "governmentFunding"
-            ],
+            "requiresRoles": ["governmentFunding"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4608,15 +3731,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "totalBudget",
-          "groupByRoles": [
-            "project"
-          ],
+          "groupByRoles": ["project"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "totalBudget",
-              "project"
-            ],
+            "requiresRoles": ["totalBudget", "project"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4631,15 +3749,10 @@
           "kind": "aggregate",
           "aggregation": "sum",
           "valueRole": "totalBudget",
-          "groupByRoles": [
-            "fundingCategory"
-          ],
+          "groupByRoles": ["fundingCategory"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "totalBudget",
-              "fundingCategory"
-            ],
+            "requiresRoles": ["totalBudget", "fundingCategory"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4654,15 +3767,10 @@
           "kind": "aggregate",
           "aggregation": "average",
           "valueRole": "totalBudget",
-          "groupByRoles": [
-            "project"
-          ],
+          "groupByRoles": ["project"],
           "filters": [],
           "activation": {
-            "requiresRoles": [
-              "totalBudget",
-              "project"
-            ],
+            "requiresRoles": ["totalBudget", "project"],
             "requiresMetricIds": []
           },
           "rounding": {
@@ -4680,9 +3788,7 @@
           "limit": 1,
           "activation": {
             "requiresRoles": [],
-            "requiresMetricIds": [
-              "funding.by_project"
-            ]
+            "requiresMetricIds": ["funding.by_project"]
           },
           "rounding": {
             "digits": 2,
