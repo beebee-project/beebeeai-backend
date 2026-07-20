@@ -50,6 +50,10 @@ const {
   buildChartDataRowsFromAnalysisResult,
   buildInsightValueRowsFromAnalysisResult,
 } = require("./analysisResultOutputSchema");
+const {
+  inferPercentageCellFormat,
+  applyPercentageCellFormat,
+} = require("./percentageValueContract");
 
 const AUTOMATION_SHEET_V2_VERSION = "automation_sheet_v2";
 const WORKBOOK_RECALCULATION_FLAG_VERSION = "workbook_recalculation_flag_v1";
@@ -434,41 +438,13 @@ function setAoaColumnWidths(ws, aoa = []) {
   });
 }
 
-function hasBusinessTemplateRatioScale(result = {}) {
-  const meta = result?.meta || {};
-  const recipeType = String(
-    result?.recipeType || result?.candidate?.recipeType || "",
-  );
-  const explicitScale = String(
-    meta.rateValueScale ||
-      meta.percentageValueScale ||
-      result.rateValueScale ||
-      "",
-  ).toLowerCase();
-
-  if (explicitScale === "ratio" || explicitScale === "fraction") return true;
-  if (meta.salesReportVersion || meta.researchBudgetReportVersion) return true;
-  if (
-    /sales_report_v2_custom|research_budget_report_v2_custom/.test(recipeType)
-  )
-    return true;
-
-  return false;
-}
-
 function inferNumberFormat(header = "", result = {}) {
-  const h = String(header || "");
-
-  if (
-    h.includes("%") ||
-    h.includes("률") ||
-    h.includes("비율") ||
-    (result.metric?.type === "rate" && h === "값")
-  ) {
-    const alreadyRatio = hasBusinessTemplateRatioScale(result);
+  const percentageFormat = inferPercentageCellFormat(header, result);
+  if (percentageFormat) {
     return {
-      z: "0.00%",
-      divideBy100: !alreadyRatio,
+      z: percentageFormat.z,
+      divideBy100: false,
+      percentageScale: percentageFormat.scale,
     };
   }
 
@@ -476,12 +452,14 @@ function inferNumberFormat(header = "", result = {}) {
     return {
       z: Number.isInteger(result.value) ? "#,##0" : "#,##0.00",
       divideBy100: false,
+      percentageScale: "",
     };
   }
 
   return {
     z: "#,##0.00",
     divideBy100: false,
+    percentageScale: "",
   };
 }
 
@@ -500,12 +478,11 @@ function formatNumberCells(ws, result = {}) {
       const headerAddr = XLSX.utils.encode_cell({ r: range.s.r, c });
       const header = ws[headerAddr]?.v || "";
 
+      const percentageFormat = applyPercentageCellFormat(cell, header, result);
+      if (percentageFormat) continue;
+
       const fmt = inferNumberFormat(header, result);
       cell.z = fmt.z;
-
-      if (fmt.divideBy100) {
-        cell.v = cell.v / 100;
-      }
     }
   }
 }

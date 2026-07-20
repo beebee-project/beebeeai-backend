@@ -8,7 +8,9 @@ const {
   toNumber,
 } = require("../businessTemplates/commonTemplateHelpers");
 
-const STATUS_RATE_REPORT_VERSION = "status_rate_report_builder_v1";
+const STATUS_RATE_REPORT_VERSION =
+  "status_rate_report_builder_v2_percentage_contract";
+const PERCENTAGE_VALUE_CONTRACT_VERSION = "percentage_value_contract_v1";
 
 const DEFAULT_STATUS_HINTS = [
   "상태",
@@ -319,6 +321,7 @@ function makeCustomMetricSection({
       meta: {
         ...meta,
         statusRateReportVersion: STATUS_RATE_REPORT_VERSION,
+        percentageValueContractVersion: PERCENTAGE_VALUE_CONTRACT_VERSION,
       },
     },
     result: {
@@ -334,6 +337,7 @@ function makeCustomMetricSection({
       meta: {
         ...meta,
         statusRateReportVersion: STATUS_RATE_REPORT_VERSION,
+        percentageValueContractVersion: PERCENTAGE_VALUE_CONTRACT_VERSION,
       },
     },
     chartHint,
@@ -354,7 +358,8 @@ function buildStatusCounts(rows = [], statusHeader = "") {
   };
 
   rows.forEach((row) => {
-    const rawStatus = String(getRowValue(row, statusHeader) ?? "").trim() || "미입력";
+    const rawStatus =
+      String(getRowValue(row, statusHeader) ?? "").trim() || "미입력";
     const normalizedClass = classifyStatus(rawStatus);
 
     classCounts[normalizedClass] = (classCounts[normalizedClass] || 0) + 1;
@@ -504,7 +509,8 @@ function buildDimensionStatusRateSection({
   const map = new Map();
 
   getRows(table).forEach((row) => {
-    const dimension = String(getRowValue(row, dimensionHeader) ?? "").trim() || "미입력";
+    const dimension =
+      String(getRowValue(row, dimensionHeader) ?? "").trim() || "미입력";
     const statusClass = classifyStatus(getRowValue(row, statusHeader));
 
     if (!map.has(dimension)) {
@@ -528,17 +534,24 @@ function buildDimensionStatusRateSection({
   });
 
   const resultRows = Array.from(map.values())
-    .map((item) => ({
-      ...item,
-      완료율: safeRate(item.완료승인건수, item.전체건수),
-      완료율Percent: makePercent(safeRate(item.완료승인건수, item.전체건수)),
-      미완료율: makePercent(
-        safeRate(item.진행대기건수 + item.지연건수, item.전체건수),
-      ),
-      취소반려율Percent: makePercent(
-        safeRate(item.취소반려건수, item.전체건수),
-      ),
-    }))
+    .map((item) => {
+      const completionRate = safeRate(item.완료승인건수, item.전체건수);
+      const incompleteRate = safeRate(
+        item.진행대기건수 + item.지연건수,
+        item.전체건수,
+      );
+      const cancelledRate = safeRate(item.취소반려건수, item.전체건수);
+
+      return {
+        ...item,
+        완료율: completionRate,
+        완료율Percent: makePercent(completionRate),
+        미완료율: incompleteRate,
+        미완료율Percent: makePercent(incompleteRate),
+        취소반려율: cancelledRate,
+        취소반려율Percent: makePercent(cancelledRate),
+      };
+    })
     .sort((a, b) => Number(b.전체건수 || 0) - Number(a.전체건수 || 0));
 
   if (!resultRows.length) return null;
@@ -719,12 +732,14 @@ function buildStatusRateCandidates({ table, headers, config = {} }) {
         title: `${metricHeader} 상위·하위 항목`,
         tableId,
         columns: {
-          dimension: categoryHeader || ownerHeader || departmentHeader || statusHeader,
+          dimension:
+            categoryHeader || ownerHeader || departmentHeader || statusHeader,
           metric: metricHeader,
         },
         chartHint: {
           preferredType: "bar",
-          categoryField: categoryHeader || ownerHeader || departmentHeader || statusHeader,
+          categoryField:
+            categoryHeader || ownerHeader || departmentHeader || statusHeader,
           valueField: metricHeader,
         },
         narrativeHint: {

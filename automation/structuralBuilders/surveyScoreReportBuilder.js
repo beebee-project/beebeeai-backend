@@ -10,7 +10,9 @@ const {
   toNumber,
 } = require("../businessTemplates/commonTemplateHelpers");
 
-const SURVEY_SCORE_REPORT_VERSION = "survey_score_report_builder_v1";
+const SURVEY_SCORE_REPORT_VERSION =
+  "survey_score_report_builder_v2_percentage_contract";
+const PERCENTAGE_VALUE_CONTRACT_VERSION = "percentage_value_contract_v1";
 
 const DEFAULT_SCORE_HINTS = [
   "점수",
@@ -210,10 +212,17 @@ function scoreValuesForHeader(table = {}, header = "") {
     .filter((value) => value != null && Number.isFinite(Number(value)));
 }
 
-function isLikelyScoreHeader({ table = {}, header = "", scoreHints = [] } = {}) {
+function isLikelyScoreHeader({
+  table = {},
+  header = "",
+  scoreHints = [],
+} = {}) {
   if (!header) return false;
   const normalizedHeader = normalizeText(header);
-  const hasScoreHint = includesAny(header, [...scoreHints, ...DEFAULT_SCORE_HINTS]);
+  const hasScoreHint = includesAny(header, [
+    ...scoreHints,
+    ...DEFAULT_SCORE_HINTS,
+  ]);
   const hasNonScoreHint = includesAny(header, NON_SCORE_HINTS);
 
   if (hasNonScoreHint && !hasScoreHint) return false;
@@ -242,7 +251,9 @@ function findScoreHeaders(table = {}, hints = []) {
   const headers = columns
     .map(getColumnHeader)
     .filter(Boolean)
-    .filter((header) => isLikelyScoreHeader({ table, header, scoreHints: hints }));
+    .filter((header) =>
+      isLikelyScoreHeader({ table, header, scoreHints: hints }),
+    );
 
   return [...new Set(headers)].slice(0, 12);
 }
@@ -282,8 +293,9 @@ function findSurveyScoreHeaders(table = {}, config = {}) {
   ]);
 
   const npsHeader =
-    scoreHeaders.find((header) => includesAny(header, ["nps", "추천", "재추천"])) ||
-    "";
+    scoreHeaders.find((header) =>
+      includesAny(header, ["nps", "추천", "재추천"]),
+    ) || "";
 
   return {
     scoreHeaders,
@@ -321,6 +333,7 @@ function makeCustomSurveySection({
       meta: {
         ...meta,
         surveyScoreReportVersion: SURVEY_SCORE_REPORT_VERSION,
+        percentageValueContractVersion: PERCENTAGE_VALUE_CONTRACT_VERSION,
       },
     },
     result: {
@@ -336,6 +349,7 @@ function makeCustomSurveySection({
       meta: {
         ...meta,
         surveyScoreReportVersion: SURVEY_SCORE_REPORT_VERSION,
+        percentageValueContractVersion: PERCENTAGE_VALUE_CONTRACT_VERSION,
       },
     },
     chartHint,
@@ -347,7 +361,9 @@ function summarizeScore(table = {}, scoreHeader = "") {
   const values = scoreValuesForHeader(table, scoreHeader);
   const scaleMax = detectScaleMax(values);
   const threshold = positiveThreshold(scaleMax);
-  const positiveCount = values.filter((value) => Number(value) >= threshold).length;
+  const positiveCount = values.filter(
+    (value) => Number(value) >= threshold,
+  ).length;
 
   return {
     scoreHeader,
@@ -416,7 +432,8 @@ function buildQuestionAverageSection({ table, headers, config = {} }) {
   if (questionHeader && primaryScoreHeader) {
     const map = new Map();
     getRows(table).forEach((row) => {
-      const question = String(getRowValue(row, questionHeader) ?? "").trim() || "미입력";
+      const question =
+        String(getRowValue(row, questionHeader) ?? "").trim() || "미입력";
       const score = toNumber(getRowValue(row, primaryScoreHeader));
       if (score == null) return;
       if (!map.has(question)) map.set(question, []);
@@ -509,7 +526,8 @@ function buildScoreDistributionSection({ table, headers, config = {} }) {
     .sort((a, b) => Number(a.점수) - Number(b.점수));
 
   return makeCustomSurveySection({
-    sectionId: config.sectionIds?.scoreDistribution || "survey_score_distribution",
+    sectionId:
+      config.sectionIds?.scoreDistribution || "survey_score_distribution",
     sectionType: "survey_score_distribution",
     title: config.titles?.scoreDistribution || `${scoreHeader} 응답 분포`,
     table,
@@ -543,7 +561,8 @@ function buildDimensionScoreSection({
 
   const map = new Map();
   getRows(table).forEach((row) => {
-    const dimension = String(getRowValue(row, dimensionHeader) ?? "").trim() || "미입력";
+    const dimension =
+      String(getRowValue(row, dimensionHeader) ?? "").trim() || "미입력";
     const score = toNumber(getRowValue(row, scoreHeader));
     if (score == null) return;
     if (!map.has(dimension)) map.set(dimension, []);
@@ -782,7 +801,10 @@ function buildSurveyScoreCandidates({ table, headers, config = {} }) {
     );
   }
 
-  if (scoreHeaders?.length && (categoryHeader || respondentHeader || questionHeader)) {
+  if (
+    scoreHeaders?.length &&
+    (categoryHeader || respondentHeader || questionHeader)
+  ) {
     candidates.push(
       makeTemplateCandidate({
         sectionId: "survey_score_top_bottom",

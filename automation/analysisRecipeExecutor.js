@@ -2,7 +2,10 @@ const { ANALYSIS_OUTPUT_LABELS } = require("./analysisOutputLabelConfig");
 const { ANALYSIS_RECIPE_TYPES } = require("./config/analysisRecipeConfig");
 const {
   AGGREGATE_SUMMARY_OUTPUT_SCHEMA_VERSION,
+  COMPOSITION_RATIO_OUTPUT_SCHEMA_VERSION,
+  PERCENTAGE_VALUE_CONTRACT_VERSION,
   buildAggregateSummaryResultRow,
+  buildCompositionRatioResultRow,
 } = require("./analysisResultOutputSchema");
 
 const TOP_BOTTOM_OUTPUT_SCHEMA_VERSION = "top_bottom_output_schema_v1";
@@ -442,15 +445,17 @@ function compositionRatio({ rows = [], dimension = "", metric = "" }) {
     .map((row) => {
       const value = Number(row.value || row.sum || row.count || 0);
       const ratio = total ? value / total : null;
-      return {
-        ...row,
-        value,
+      return buildCompositionRatioResultRow({
+        row: {
+          ...row,
+          value,
+        },
+        metric: metric || "건수",
         total,
         ratio,
-        ratioPercent: ratio == null ? null : ratio * 100,
-      };
+      });
     })
-    .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    .sort((a, b) => Number(b.baseValue || 0) - Number(a.baseValue || 0));
 }
 
 function crossAggregate({
@@ -655,7 +660,30 @@ function executeAnalysisRecipeCandidate({
             recipeType === ANALYSIS_RECIPE_TYPES.TIME_TREND ||
             recipeType === "time_trend"
           ? AGGREGATE_SUMMARY_OUTPUT_SCHEMA_VERSION
-          : null,
+          : recipeType === ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO ||
+              recipeType === "composition_ratio"
+            ? COMPOSITION_RATIO_OUTPUT_SCHEMA_VERSION
+            : null,
+    percentageValueContractVersion:
+      recipeType === ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO ||
+      recipeType === "composition_ratio" ||
+      recipeType === ANALYSIS_RECIPE_TYPES.TIME_GROWTH ||
+      recipeType === "time_growth"
+        ? PERCENTAGE_VALUE_CONTRACT_VERSION
+        : null,
+    percentageValueScale:
+      recipeType === ANALYSIS_RECIPE_TYPES.TIME_GROWTH ||
+      recipeType === "time_growth"
+        ? "percent-points"
+        : null,
+    percentageColumnScales:
+      recipeType === ANALYSIS_RECIPE_TYPES.COMPOSITION_RATIO ||
+      recipeType === "composition_ratio"
+        ? {
+            ratio: "ratio",
+            ratioPercent: "percent-points",
+          }
+        : null,
     summaryValuePolicy:
       recipeType === ANALYSIS_RECIPE_TYPES.GROUP_SUMMARY ||
       recipeType === "group_summary" ||

@@ -1,5 +1,11 @@
+const {
+  PERCENTAGE_VALUE_CONTRACT_VERSION,
+} = require("./percentageValueContract");
+
 const AGGREGATE_SUMMARY_OUTPUT_SCHEMA_VERSION =
   "aggregate_summary_output_schema_v1";
+const COMPOSITION_RATIO_OUTPUT_SCHEMA_VERSION =
+  "composition_ratio_output_schema_v1";
 
 function normalizeToken(value = "") {
   return String(value || "")
@@ -45,6 +51,13 @@ function isTimeTrendSummaryResult(result = {}) {
 
 function isAggregateSummaryResult(result = {}) {
   return isGroupSummaryResult(result) || isTimeTrendSummaryResult(result);
+}
+
+function isCompositionRatioResult(result = {}) {
+  const recipeType = normalizeToken(result.recipeType || result.recipeId || "");
+  const operation = normalizeToken(result.operation || "");
+
+  return recipeType === "compositionratio" || operation === "compositionratio";
 }
 
 function resolveResultGroupHeader(result = {}) {
@@ -121,6 +134,38 @@ function resolvePrimaryResultValue(result = {}, row = {}) {
   return finiteOrBlank(row.value);
 }
 
+function buildCompositionRatioResultRow({
+  row = {},
+  metric = "",
+  total = 0,
+  ratio = null,
+} = {}) {
+  const value = finiteOrBlank(
+    row.baseValue ?? row.value ?? row.sum ?? row.count,
+  );
+  const safeTotal = finiteOrBlank(total);
+  const safeRatio =
+    ratio == null || ratio === ""
+      ? null
+      : Number.isFinite(Number(ratio))
+        ? Number(ratio)
+        : null;
+  const rowCount = row.rowCount ?? row.count ?? "";
+
+  return {
+    ...row,
+    operation: "compositionRatio",
+    metric: metric || row.metric || "건수",
+    value,
+    baseValue: value,
+    valueKind: metric ? "sum" : "count",
+    total: safeTotal,
+    ratio: safeRatio,
+    ratioPercent: safeRatio == null ? null : safeRatio * 100,
+    rowCount,
+  };
+}
+
 function buildAggregateSummaryResultRow({
   labelHeader = "그룹",
   label = "",
@@ -157,6 +202,25 @@ function buildAggregateSummaryResultRow({
     numericCount: safeNumericCount,
     rowCount: safeCount,
   };
+}
+
+function buildCompositionRatioWorkbookRows(result = {}) {
+  const groupHeader = result.groupBy?.header || "그룹";
+  const metricHeader = resolveResultMetric(result, {}, "건수");
+
+  return (result.rows || []).map((row) => ({
+    [groupHeader]: resolveResultLabel(result, row, groupHeader),
+    작업: resolveResultOperation(result, row),
+    지표: resolveResultMetric(result, row, metricHeader),
+    기준값: finiteOrBlank(row.baseValue ?? row.value ?? row.sum ?? row.count),
+    전체값: finiteOrBlank(row.total),
+    비율: row.ratio == null || row.ratio === "" ? "" : finiteOrBlank(row.ratio),
+    백분율:
+      row.ratioPercent == null || row.ratioPercent === ""
+        ? ""
+        : finiteOrBlank(row.ratioPercent),
+    행수: resolveResultRowCount(result, row),
+  }));
 }
 
 function buildAggregateSummaryWorkbookRows(result = {}) {
@@ -202,6 +266,9 @@ function buildGenericGroupedWorkbookRows(result = {}) {
 }
 
 function buildWorkbookRowsFromAnalysisResult(result = {}) {
+  if (isCompositionRatioResult(result)) {
+    return buildCompositionRatioWorkbookRows(result);
+  }
   if (isAggregateSummaryResult(result)) {
     return buildAggregateSummaryWorkbookRows(result);
   }
@@ -278,10 +345,13 @@ function buildInsightValueRowsFromAnalysisResult(result = {}) {
 
 module.exports = {
   AGGREGATE_SUMMARY_OUTPUT_SCHEMA_VERSION,
+  COMPOSITION_RATIO_OUTPUT_SCHEMA_VERSION,
+  PERCENTAGE_VALUE_CONTRACT_VERSION,
   isTopBottomLikeResult,
   isGroupSummaryResult,
   isTimeTrendSummaryResult,
   isAggregateSummaryResult,
+  isCompositionRatioResult,
   resolveResultGroupHeader,
   resolveResultLabel,
   resolveResultOperation,
@@ -289,7 +359,9 @@ module.exports = {
   resolveResultRowCount,
   resolveResultNumericCount,
   resolvePrimaryResultValue,
+  buildCompositionRatioResultRow,
   buildAggregateSummaryResultRow,
+  buildCompositionRatioWorkbookRows,
   buildAggregateSummaryWorkbookRows,
   buildWorkbookRowsFromAnalysisResult,
   buildChartDataRowsFromAnalysisResult,
