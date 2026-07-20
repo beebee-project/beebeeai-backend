@@ -1,5 +1,3 @@
-"use strict";
-
 let xlsxModule = null;
 
 function getXlsxModule() {

@@ -82,6 +82,43 @@ function summarizeSectionForWorkbookDiagnostic(section = {}, index = 0) {
   };
 }
 
+function isTopBottomLikeResult(result = {}) {
+  const recipeType = String(
+    result.recipeType || result.recipeId || "",
+  ).toLowerCase();
+  const operation = String(result.operation || "").toLowerCase();
+
+  return (
+    recipeType === "top_bottom" ||
+    operation === "topbottom" ||
+    operation === "top_bottom"
+  );
+}
+
+function resolveGroupedResultLabel(result = {}, row = {}, groupHeader = "") {
+  return row?.[groupHeader] ?? row?.label ?? row?.item ?? row?.name ?? "";
+}
+
+function resolveGroupedResultOperation(result = {}, row = {}) {
+  return row?.operation ?? row?.type ?? result.operation ?? "";
+}
+
+function resolveGroupedResultMetric(result = {}, row = {}, metricHeader = "") {
+  return (
+    row?.metric ??
+    result.metric?.displayHeader ??
+    result.metric?.header ??
+    metricHeader ??
+    ""
+  );
+}
+
+function resolveGroupedResultRowCount(result = {}, row = {}) {
+  const direct = row?.rowCount ?? row?.count;
+  if (direct != null && direct !== "") return direct;
+  return isTopBottomLikeResult(result) ? 1 : "";
+}
+
 function runWorkbookDiagnosticStep(diagnostic, stage, fn, meta = {}) {
   emitSummarySheetDiagnostic(diagnostic, stage, "START", meta);
   const startedAt = Date.now();
@@ -114,9 +151,9 @@ function buildChartDataRows(result = {}) {
     const metricHeader = result.metric?.header || "값";
 
     return (result.rows || []).map((r) => ({
-      [groupHeader]: r[groupHeader] ?? "",
+      [groupHeader]: resolveGroupedResultLabel(result, r, groupHeader),
       [metricHeader]: r.value,
-      행수: r.rowCount,
+      행수: resolveGroupedResultRowCount(result, r),
     }));
   }
 
@@ -324,7 +361,7 @@ function buildInsightRows(result = {}) {
     const valueRows = result.rows
       .filter((r) => Number.isFinite(Number(r.value)))
       .map((r) => ({
-        label: r[groupHeader],
+        label: resolveGroupedResultLabel(result, r, groupHeader),
         value: Number(r.value),
       }));
 
@@ -579,11 +616,15 @@ function resultToRows(result = {}) {
 
     return (result.rows || []).map((r) => {
       const base = {
-        [groupHeader]: r[groupHeader] ?? "",
-        작업: r.operation,
-        지표: r.metric,
+        [groupHeader]: resolveGroupedResultLabel(result, r, groupHeader),
+        작업: resolveGroupedResultOperation(result, r),
+        지표: resolveGroupedResultMetric(
+          result,
+          r,
+          result.metric?.header || "값",
+        ),
         값: r.value,
-        행수: r.rowCount,
+        행수: resolveGroupedResultRowCount(result, r),
       };
 
       for (const key of extraKeys) {

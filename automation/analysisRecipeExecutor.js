@@ -1,6 +1,8 @@
 const { ANALYSIS_OUTPUT_LABELS } = require("./analysisOutputLabelConfig");
 const { ANALYSIS_RECIPE_TYPES } = require("./config/analysisRecipeConfig");
 
+const TOP_BOTTOM_OUTPUT_SCHEMA_VERSION = "top_bottom_output_schema_v1";
+
 function normalizeText(value = "") {
   return String(value || "").trim();
 }
@@ -257,6 +259,28 @@ function categoryCount({ rows = [], dimension = "" }) {
   return aggregateRows({ rows, dimension, operation: "count" });
 }
 
+function makeTopBottomResultRow({
+  item = {},
+  type = "",
+  rank = 0,
+  metric = "",
+  dimension = "",
+} = {}) {
+  const dimensionHeader = dimension || "항목";
+
+  return {
+    [dimensionHeader]: item.label,
+    type,
+    label: item.label,
+    operation: type,
+    metric,
+    value: item.value,
+    rowCount: 1,
+    rank,
+    sourceOrder: item.sourceOrder,
+  };
+}
+
 function topBottom({ rows = [], metric = "", dimension = "" }) {
   const values = rows
     .map((row, index) => ({
@@ -264,25 +288,37 @@ function topBottom({ rows = [], metric = "", dimension = "" }) {
         normalizeText(getRowValue(row, dimension)) ||
         `${ANALYSIS_OUTPUT_LABELS.itemLabel}_${index + 1}`,
       value: toNumber(getRowValue(row, metric)),
-      row,
+      sourceOrder: index,
     }))
     .filter((item) => item.value != null)
-    .sort((a, b) => b.value - a.value);
+    .sort(
+      (a, b) =>
+        b.value - a.value ||
+        Number(a.sourceOrder || 0) - Number(b.sourceOrder || 0),
+    );
 
   return [
-    ...values.slice(0, 5).map((item) => ({
-      type: ANALYSIS_OUTPUT_LABELS.top,
-      label: item.label,
-      value: item.value,
-    })),
+    ...values.slice(0, 5).map((item, index) =>
+      makeTopBottomResultRow({
+        item,
+        type: ANALYSIS_OUTPUT_LABELS.top,
+        rank: index + 1,
+        metric,
+        dimension,
+      }),
+    ),
     ...values
       .slice(-5)
       .reverse()
-      .map((item) => ({
-        type: ANALYSIS_OUTPUT_LABELS.bottom,
-        label: item.label,
-        value: item.value,
-      })),
+      .map((item, index) =>
+        makeTopBottomResultRow({
+          item,
+          type: ANALYSIS_OUTPUT_LABELS.bottom,
+          rank: index + 1,
+          metric,
+          dimension,
+        }),
+      ),
   ];
 }
 
@@ -581,6 +617,11 @@ function executeAnalysisRecipeCandidate({
     date: date ? { header: date } : null,
     filters,
     measureIsolation: candidate.measureIsolation || null,
+    outputSchemaVersion:
+      recipeType === ANALYSIS_RECIPE_TYPES.TOP_BOTTOM ||
+      recipeType === "top_bottom"
+        ? TOP_BOTTOM_OUTPUT_SCHEMA_VERSION
+        : null,
     sourceRowCount: sourceRows.length,
     filteredRowCount: rows.length,
     rows: resultRows,

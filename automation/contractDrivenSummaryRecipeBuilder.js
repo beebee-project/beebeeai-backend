@@ -1,5 +1,3 @@
-"use strict";
-
 const catalog = require("./summarySheetContractCatalog.json");
 
 const CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION =
@@ -24,7 +22,9 @@ function normalizeHeader(value = "") {
 }
 
 function compactText(value = "") {
-  return String(value == null ? "" : value).normalize("NFKC").trim();
+  return String(value == null ? "" : value)
+    .normalize("NFKC")
+    .trim();
 }
 
 function getRows(table = {}) {
@@ -32,7 +32,8 @@ function getRows(table = {}) {
 }
 
 function getColumns(table = {}) {
-  if (Array.isArray(table.columns) && table.columns.length) return table.columns;
+  if (Array.isArray(table.columns) && table.columns.length)
+    return table.columns;
   const first = getRows(table)[0];
   if (first && !Array.isArray(first) && typeof first === "object") {
     return Object.keys(first).map((header) => ({ header }));
@@ -63,7 +64,8 @@ function getRowValue(row = {}, header = "", table = {}) {
     );
     return index >= 0 ? row[index] : undefined;
   }
-  if (Object.prototype.hasOwnProperty.call(row || {}, header)) return row[header];
+  if (Object.prototype.hasOwnProperty.call(row || {}, header))
+    return row[header];
   const target = normalizeHeader(header);
   const key = Object.keys(row || {}).find(
     (candidate) => normalizeHeader(candidate) === target,
@@ -120,7 +122,8 @@ function headerMatchScore(header = "", aliases = []) {
     const target = normalizeHeader(alias);
     if (!target) continue;
     if (normalized === target) best = Math.max(best, 1000 + target.length);
-    else if (normalized.includes(target)) best = Math.max(best, 700 + target.length);
+    else if (normalized.includes(target))
+      best = Math.max(best, 700 + target.length);
     else if (target.includes(normalized) && normalized.length >= 2) {
       best = Math.max(best, 450 + normalized.length);
     }
@@ -211,7 +214,11 @@ function buildSurveyLongTable(table = {}) {
     }
   }
   if (!rows.length) return null;
-  const headers = [...tableHeaders(table).filter((h) => !scoreHeaders.includes(h)), "문항", "점수"];
+  const headers = [
+    ...tableHeaders(table).filter((h) => !scoreHeaders.includes(h)),
+    "문항",
+    "점수",
+  ];
   return {
     ...table,
     tableId: `${table.tableId || "table"}#CONTRACT_SURVEY_LONG`,
@@ -236,7 +243,11 @@ function resolveRoleMapping(table = {}, role = {}, templateId = "") {
   if (role.role === "period") {
     const yearHeader = findHeader(table, ["연도", "년도", "year"]);
     const monthHeader = findHeader(table, ["월", "월구분", "month"]);
-    if (yearHeader && monthHeader && normalizeHeader(yearHeader) !== normalizeHeader(monthHeader)) {
+    if (
+      yearHeader &&
+      monthHeader &&
+      normalizeHeader(yearHeader) !== normalizeHeader(monthHeader)
+    ) {
       return { kind: "compositePeriod", yearHeader, monthHeader };
     }
   }
@@ -266,7 +277,8 @@ function resolveContractSource(contract = {}, tables = []) {
     const requiredCount = (contract.sourceRoles || []).filter(
       (role) => role.required !== false,
     ).length;
-    const score = requiredResolved * 1000 + optionalResolved * 100 + getRows(table).length;
+    const score =
+      requiredResolved * 1000 + optionalResolved * 100 + getRows(table).length;
     if (!best || score > best.score) {
       best = { table, mappings, requiredResolved, requiredCount, score };
     }
@@ -278,10 +290,15 @@ function mappedValue(row = {}, mapping = null, table = {}) {
   if (!mapping) return undefined;
   if (mapping.kind === "column") return getRowValue(row, mapping.header, table);
   if (mapping.kind === "compositePeriod") {
-    const year = compactText(getRowValue(row, mapping.yearHeader, table)).match(/(?:19|20)\d{2}/)?.[0] || "";
+    const year =
+      compactText(getRowValue(row, mapping.yearHeader, table)).match(
+        /(?:19|20)\d{2}/,
+      )?.[0] || "";
     const monthRaw = compactText(getRowValue(row, mapping.monthHeader, table));
     const month = monthRaw.match(/^(1[0-2]|0?[1-9])(?:월)?$/)?.[1] || "";
-    return year && month ? `${year}-${String(Number(month)).padStart(2, "0")}` : year;
+    return year && month
+      ? `${year}-${String(Number(month)).padStart(2, "0")}`
+      : year;
   }
   return undefined;
 }
@@ -295,7 +312,8 @@ function typedRoleValue(row = {}, roleName = "", context = {}) {
   const mapping = context.source.mappings[roleName];
   if (!role || !mapping) return { valid: false, blank: true, value: null };
   const raw = mappedValue(row, mapping, context.source.table);
-  if (raw == null || compactText(raw) === "") return { valid: true, blank: true, value: null };
+  if (raw == null || compactText(raw) === "")
+    return { valid: true, blank: true, value: null };
   if (role.dataType === "number") {
     const value = toNumber(raw);
     return { valid: value != null, blank: false, value };
@@ -316,7 +334,9 @@ function rowPassesFilter(row = {}, filter = {}, context = {}) {
   }
   if (filter.operator === "ltRole") {
     const left = toNumber(typedRoleValue(row, filter.leftRole, context).value);
-    const right = toNumber(typedRoleValue(row, filter.rightRole, context).value);
+    const right = toNumber(
+      typedRoleValue(row, filter.rightRole, context).value,
+    );
     return left != null && right != null && left < right;
   }
   return true;
@@ -333,8 +353,7 @@ function roundHalfUp(value, digits = 2) {
   if (!Number.isFinite(value)) return value;
   const factor = 10 ** digits;
   return (
-    Math.sign(value) *
-    Math.round(Math.abs(value) * factor + Number.EPSILON) /
+    (Math.sign(value) * Math.round(Math.abs(value) * factor + Number.EPSILON)) /
     factor
   );
 }
@@ -342,7 +361,8 @@ function roundHalfUp(value, digits = 2) {
 function roundMetricValue(value, rounding = {}) {
   const digits = Number.isInteger(rounding.digits) ? rounding.digits : 2;
   if (typeof value === "number") return roundHalfUp(value, digits);
-  if (Array.isArray(value)) return value.map((entry) => roundMetricValue(entry, rounding));
+  if (Array.isArray(value))
+    return value.map((entry) => roundMetricValue(entry, rounding));
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([key, nested]) => [
@@ -372,7 +392,8 @@ function aggregateScalar(metric = {}, rows = [], context = {}) {
     .filter((entry) => entry.valid && !entry.blank)
     .map((entry) => Number(entry.value));
   if (!values.length) return null;
-  if (metric.aggregation === "sum") return values.reduce((sum, value) => sum + value, 0);
+  if (metric.aggregation === "sum")
+    return values.reduce((sum, value) => sum + value, 0);
   if (metric.aggregation === "average") {
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }
@@ -387,15 +408,21 @@ function computeAggregate(metric = {}, context = {}) {
   );
   const groupByRoles = metric.groupByRoles || [];
   if (!groupByRoles.length) {
-    return { valueType: "scalar", value: aggregateScalar(metric, rows, context) };
+    return {
+      valueType: "scalar",
+      value: aggregateScalar(metric, rows, context),
+    };
   }
   const groups = new Map();
   rows.forEach((row, sourceOrder) => {
-    const parts = groupByRoles.map((roleName) => typedRoleValue(row, roleName, context));
+    const parts = groupByRoles.map((roleName) =>
+      typedRoleValue(row, roleName, context),
+    );
     if (parts.some((part) => !part.valid || part.blank)) return;
     const keyParts = parts.map((part) => part.value);
     const key = stableKey(keyParts);
-    if (!groups.has(key)) groups.set(key, { key: keyParts, rows: [], sourceOrder });
+    if (!groups.has(key))
+      groups.set(key, { key: keyParts, rows: [], sourceOrder });
     groups.get(key).rows.push(row);
   });
   return {
@@ -403,7 +430,9 @@ function computeAggregate(metric = {}, context = {}) {
     groupByRoles,
     entries: [...groups.values()].map((group) => ({
       key: group.key,
-      keyObject: Object.fromEntries(groupByRoles.map((role, index) => [role, group.key[index]])),
+      keyObject: Object.fromEntries(
+        groupByRoles.map((role, index) => [role, group.key[index]]),
+      ),
       value: aggregateScalar(metric, group.rows, context),
       sourceOrder: group.sourceOrder,
     })),
@@ -411,7 +440,9 @@ function computeAggregate(metric = {}, context = {}) {
 }
 
 function groupedMap(value = {}) {
-  return new Map((value.entries || []).map((entry) => [stableKey(entry.key), entry]));
+  return new Map(
+    (value.entries || []).map((entry) => [stableKey(entry.key), entry]),
+  );
 }
 
 function computeDerived(metric = {}, context = {}) {
@@ -426,8 +457,10 @@ function computeDerived(metric = {}, context = {}) {
     };
   }
   const operands = (metric.operands || []).map((operand) => {
-    if (operand.type === "metric") return context.metricValues.get(operand.ref) || null;
-    if (operand.type === "constant") return { valueType: "scalar", value: operand.value };
+    if (operand.type === "metric")
+      return context.metricValues.get(operand.ref) || null;
+    if (operand.type === "constant")
+      return { valueType: "scalar", value: operand.value };
     return null;
   });
   if (operands.length < 2 || operands.some((operand) => !operand)) return null;
@@ -450,7 +483,10 @@ function computeDerived(metric = {}, context = {}) {
         .filter((entry) => rightByKey.has(stableKey(entry.key)))
         .map((entry) => ({
           ...entry,
-          value: operation(entry.value, rightByKey.get(stableKey(entry.key)).value),
+          value: operation(
+            entry.value,
+            rightByKey.get(stableKey(entry.key)).value,
+          ),
         })),
     };
   }
@@ -486,19 +522,37 @@ function computeRank(metric = {}, context = {}) {
     return delta || Number(a.sourceOrder || 0) - Number(b.sourceOrder || 0);
   });
   const limit = Number(metric.limit || 1);
-  if (!sorted.length) return { valueType: "rank", sourceMetricId: metric.sourceMetricId, direction: metric.direction, limit, items: [] };
+  if (!sorted.length)
+    return {
+      valueType: "rank",
+      sourceMetricId: metric.sourceMetricId,
+      direction: metric.direction,
+      limit,
+      items: [],
+    };
   const cutoff = sorted[Math.min(limit, sorted.length) - 1]?.value;
   const items = sorted
-    .filter((entry, index) => index < limit || Number(entry.value) === Number(cutoff))
+    .filter(
+      (entry, index) => index < limit || Number(entry.value) === Number(cutoff),
+    )
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
-  return { valueType: "rank", sourceMetricId: metric.sourceMetricId, direction: metric.direction, limit, items };
+  return {
+    valueType: "rank",
+    sourceMetricId: metric.sourceMetricId,
+    direction: metric.direction,
+    limit,
+    items,
+  };
 }
 
 function metricActive(metric = {}, context = {}) {
   const requiresRoles = metric.activation?.requiresRoles || [];
-  if (requiresRoles.some((role) => !context.source.mappings[role])) return false;
+  if (requiresRoles.some((role) => !context.source.mappings[role]))
+    return false;
   const requiresMetrics = metric.activation?.requiresMetricIds || [];
-  return requiresMetrics.every((metricId) => context.metricValues.has(metricId));
+  return requiresMetrics.every((metricId) =>
+    context.metricValues.has(metricId),
+  );
 }
 
 function computeContractMetrics(contract = {}, source = {}) {
@@ -516,7 +570,11 @@ function computeContractMetrics(contract = {}, source = {}) {
     for (let index = 0; index < pending.length; index += 1) {
       const metric = pending[index];
       const dependencies = metric.activation?.requiresMetricIds || [];
-      if (dependencies.some((metricId) => pending.some((candidate) => candidate.metricId === metricId))) {
+      if (
+        dependencies.some((metricId) =>
+          pending.some((candidate) => candidate.metricId === metricId),
+        )
+      ) {
         continue;
       }
       pending.splice(index, 1);
@@ -527,8 +585,10 @@ function computeContractMetrics(contract = {}, source = {}) {
         continue;
       }
       let value = null;
-      if (metric.kind === "aggregate") value = computeAggregate(metric, context);
-      else if (metric.kind === "derived") value = computeDerived(metric, context);
+      if (metric.kind === "aggregate")
+        value = computeAggregate(metric, context);
+      else if (metric.kind === "derived")
+        value = computeDerived(metric, context);
       else if (metric.kind === "rank") value = computeRank(metric, context);
       if (!value) {
         metrics.push({ metric, status: "ERROR", value: null });
@@ -639,7 +699,9 @@ function rankCoverageSection(entry = {}, source = {}) {
   const value = entry.value;
   const sourceMetric = value.sourceMetricId || metric.sourceMetricId;
   const sourceValue = sourceMetric ? null : null;
-  const role = (value.items?.[0]?.keyObject && Object.keys(value.items[0].keyObject)[0]) || "item";
+  const role =
+    (value.items?.[0]?.keyObject && Object.keys(value.items[0].keyObject)[0]) ||
+    "item";
   const groupHeader = roleDisplayLabel(role, source);
   const rows = (value.items || []).map((item) => ({
     [groupHeader]: item.key?.[0] ?? "",
@@ -673,7 +735,9 @@ function rankCoverageSection(entry = {}, source = {}) {
 function sectionsFromComputedMetrics(computed = [], source = {}) {
   const active = computed.filter((entry) => entry.status === "COMPUTED");
   const scalar = active.filter((entry) => entry.value?.valueType === "scalar");
-  const grouped = active.filter((entry) => entry.value?.valueType === "grouped");
+  const grouped = active.filter(
+    (entry) => entry.value?.valueType === "grouped",
+  );
   const rank = active.filter((entry) => entry.value?.valueType === "rank");
   return [
     scalarCoverageSection(scalar),
