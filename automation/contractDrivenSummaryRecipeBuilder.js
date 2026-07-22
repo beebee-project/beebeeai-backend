@@ -1,8 +1,15 @@
 const catalog = require("./summarySheetContractCatalog.json");
+const {
+  COMMON_RANK_POLICY_VERSION,
+  DEFAULT_RANK_TIE_POLICY,
+  DEFAULT_RANK_NUMBERING_POLICY,
+  buildRankValue,
+} = require("./commonRankPolicy");
 
 const CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION =
-  "contract_driven_summary_recipe_v1";
+  "contract_driven_summary_recipe_v1_1_common_rank_contract";
 const DISTINCT_FALLBACK_SEMANTICS_VERSION = "distinct_fallback_semantics_v1";
+const BOOLEAN_ROLE_SEMANTICS_VERSION = "boolean_role_semantics_v1";
 
 const ROLE_ALIAS_OVERRIDES = Object.freeze({
   inventory_stock_status: Object.freeze({
@@ -88,18 +95,58 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function toBoolean(value) {
+const COMMON_BOOLEAN_TRUE_VALUES = Object.freeze([
+  "true",
+  "yes",
+  "y",
+  "1",
+  "예",
+  "해당",
+  "입사",
+  "퇴사",
+]);
+
+const COMMON_BOOLEAN_FALSE_VALUES = Object.freeze([
+  "false",
+  "no",
+  "n",
+  "0",
+  "아니오",
+  "미해당",
+]);
+
+function normalizedBooleanValues(values = []) {
+  return new Set((values || []).map(normalizeHeader).filter(Boolean));
+}
+
+function parseBooleanValue(value, role = {}) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value !== 0;
+
   const text = normalizeHeader(value);
-  if (!text) return false;
-  if (["true", "yes", "y", "1", "예", "해당", "입사", "퇴사"].includes(text)) {
-    return true;
+  if (!text) return null;
+
+  const roleTrueValues = normalizedBooleanValues(role.booleanTrueValues || []);
+  const roleFalseValues = normalizedBooleanValues(
+    role.booleanFalseValues || [],
+  );
+
+  if (roleTrueValues.has(text)) return true;
+  if (roleFalseValues.has(text)) return false;
+  if (COMMON_BOOLEAN_TRUE_VALUES.includes(text)) return true;
+  if (COMMON_BOOLEAN_FALSE_VALUES.includes(text)) return false;
+
+  if (role.booleanUnknownPolicy === "invalid") {
+    return null;
   }
-  if (["false", "no", "n", "0", "아니오", "미해당"].includes(text)) {
-    return false;
-  }
+
+  // Backward compatibility for boolean roles that have not yet declared
+  // an explicit value dictionary.
   return true;
+}
+
+function toBoolean(value) {
+  return parseBooleanValue(value);
 }
 
 function normalizePeriod(value) {
@@ -349,14 +396,20 @@ function typedRoleValue(row = {}, roleName = "", context = {}) {
     return { valid: Boolean(value), blank: !value, value };
   }
   if (role.dataType === "boolean") {
-    return { valid: true, blank: false, value: toBoolean(raw) };
+    const value = parseBooleanValue(raw, role);
+    return {
+      valid: value != null,
+      blank: false,
+      value,
+    };
   }
   return { valid: true, blank: false, value: compactText(raw) };
 }
 
 function rowPassesFilter(row = {}, filter = {}, context = {}) {
   if (filter.operator === "truthy") {
-    return toBoolean(typedRoleValue(row, filter.role, context).value);
+    const parsed = typedRoleValue(row, filter.role, context);
+    return parsed.valid && !parsed.blank && parsed.value === true;
   }
   if (filter.operator === "ltRole") {
     const left = toNumber(typedRoleValue(row, filter.leftRole, context).value);
@@ -569,34 +622,20 @@ function computeDerived(metric = {}, context = {}) {
 
 function computeRank(metric = {}, context = {}) {
   const source = context.metricValues.get(metric.sourceMetricId);
-  if (!source || source.valueType !== "grouped") return null;
-  const direction = metric.direction === "asc" ? 1 : -1;
-  const sorted = [...(source.entries || [])].sort((a, b) => {
-    const delta = (Number(a.value) - Number(b.value)) * direction;
-    return delta || Number(a.sourceOrder || 0) - Number(b.sourceOrder || 0);
-  });
-  const limit = Number(metric.limit || 1);
-  if (!sorted.length)
-    return {
-      valueType: "rank",
-      sourceMetricId: metric.sourceMetricId,
-      direction: metric.direction,
-      limit,
-      items: [],
-    };
-  const cutoff = sorted[Math.min(limit, sorted.length) - 1]?.value;
-  const items = sorted
-    .filter(
-      (entry, index) => index < limit || Number(entry.value) === Number(cutoff),
-    )
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
-  return {
-    valueType: "rank",
+
+  if (!source || source.valueType !== "grouped") {
+    return null;
+  }
+
+  return buildRankValue({
+    entries: source.entries || [],
     sourceMetricId: metric.sourceMetricId,
     direction: metric.direction,
-    limit,
-    items,
-  };
+    limit: metric.limit,
+    tiePolicy: metric.tiePolicy || DEFAULT_RANK_TIE_POLICY,
+    rankNumberingPolicy:
+      metric.rankNumberingPolicy || DEFAULT_RANK_NUMBERING_POLICY,
+  });
 }
 
 function metricActive(metric = {}, context = {}) {
@@ -780,6 +819,10 @@ function rankCoverageSection(entry = {}, source = {}) {
         contractCoverageVersion: CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION,
         metricIds: [metric.metricId],
         sourceMetricId: sourceMetric,
+        rankPolicyVersion: COMMON_RANK_POLICY_VERSION,
+        tiePolicy: metric.tiePolicy || DEFAULT_RANK_TIE_POLICY,
+        rankNumberingPolicy:
+          metric.rankNumberingPolicy || DEFAULT_RANK_NUMBERING_POLICY,
         complete: true,
       },
     },
@@ -803,6 +846,21 @@ function sectionsFromComputedMetrics(computed = [], source = {}) {
 function usesDistinctFallbackSemantics(computed = []) {
   return (computed || []).some(
     (entry) => entry?.metric?.aggregation === "countDistinctFallback",
+  );
+}
+
+function usesBooleanRoleSemantics(contract = {}) {
+  return (contract.sourceRoles || []).some(
+    (role) =>
+      role?.dataType === "boolean" &&
+      ((role.booleanTrueValues || []).length > 0 ||
+        (role.booleanFalseValues || []).length > 0),
+  );
+}
+
+function usesCommonRankPolicy(computed = []) {
+  return (computed || []).some(
+    (entry) => entry?.metric?.kind === "rank" && entry?.status === "COMPUTED",
   );
 }
 
@@ -857,6 +915,12 @@ function buildContractDrivenSummarySections({
     distinctFallbackSemanticsVersion: usesDistinctFallbackSemantics(computed)
       ? DISTINCT_FALLBACK_SEMANTICS_VERSION
       : "",
+    booleanRoleSemanticsVersion: usesBooleanRoleSemantics(contract)
+      ? BOOLEAN_ROLE_SEMANTICS_VERSION
+      : "",
+    rankPolicyVersion: usesCommonRankPolicy(computed)
+      ? COMMON_RANK_POLICY_VERSION
+      : "",
     templateId,
     contractId: contract.contractId,
     status: errorMetricIds.length ? "PARTIAL" : "PASS",
@@ -874,12 +938,18 @@ function buildContractDrivenSummarySections({
 module.exports = {
   CONTRACT_DRIVEN_SUMMARY_RECIPE_VERSION,
   DISTINCT_FALLBACK_SEMANTICS_VERSION,
+  BOOLEAN_ROLE_SEMANTICS_VERSION,
+  COMMON_RANK_POLICY_VERSION,
   usesDistinctFallbackSemantics,
+  usesBooleanRoleSemantics,
+  usesCommonRankPolicy,
+  parseBooleanValue,
   normalizeHeader,
   normalizePeriod,
   findPreferredExactHeader,
   chooseContract,
   resolveContractSource,
+  computeRank,
   computeContractMetrics,
   buildContractDrivenSummarySections,
 };

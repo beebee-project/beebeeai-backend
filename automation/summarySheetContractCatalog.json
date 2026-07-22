@@ -1,6 +1,6 @@
 {
-  "version": "summary_sheet_contract_catalog_v1",
-  "sourceContractsVersion": "real_world_template_accuracy_contracts_v1_1",
+  "version": "summary_sheet_contract_catalog_v1_1_common_rank_contract",
+  "sourceContractsVersion": "real_world_template_accuracy_contracts_v1_2_common_rank_contract",
   "contracts": {
     "revenue_cost_profit_report": {
       "templateId": "revenue_cost_profit_report",
@@ -219,7 +219,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -376,7 +378,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         },
         {
           "metricId": "kpi.status_distribution",
@@ -574,7 +578,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -759,7 +765,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -928,7 +936,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -1101,7 +1111,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -1264,7 +1276,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -1450,7 +1464,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -1461,10 +1477,23 @@
         {
           "role": "applicantId",
           "label": "applicantId",
-          "aliases": ["신청자ID", "사번", "학번", "applicantId", "id"],
+          "aliases": [
+            "신청자",
+            "신청자명",
+            "참가자",
+            "참가자명",
+            "신청자ID",
+            "사번",
+            "학번",
+            "applicant",
+            "applicantName",
+            "applicantId",
+            "id"
+          ],
           "dataType": "string",
           "required": false,
-          "semanticType": "identifier"
+          "semanticType": "identifier",
+          "preferredAliases": ["신청자", "신청자명", "참가자", "참가자명"]
         },
         {
           "role": "program",
@@ -1496,13 +1525,30 @@
           "aliases": ["참석여부", "출석", "attendance", "attended"],
           "dataType": "boolean",
           "required": false,
-          "semanticType": "measure"
+          "semanticType": "measure",
+          "booleanTrueValues": [
+            "참석",
+            "출석",
+            "참가",
+            "참여",
+            "present",
+            "attended"
+          ],
+          "booleanFalseValues": [
+            "불참",
+            "결석",
+            "미참석",
+            "불참석",
+            "absent",
+            "not attended"
+          ],
+          "booleanUnknownPolicy": "invalid"
         }
       ],
       "metrics": [
         {
           "metricId": "event.applicant_count",
-          "label": "신청자 수",
+          "label": "신청 건수",
           "criticality": "core",
           "kind": "aggregate",
           "aggregation": "countRows",
@@ -1623,7 +1669,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -1840,7 +1888,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -2013,7 +2063,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -2168,7 +2220,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -2448,7 +2502,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -2655,7 +2711,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -2885,7 +2943,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     }
@@ -3061,7 +3121,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -3341,7 +3403,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -3548,7 +3612,9 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     },
@@ -3795,9 +3861,18 @@
           "rounding": {
             "digits": 2,
             "mode": "half-up"
-          }
+          },
+          "tiePolicy": "include-all-ties-then-stable-source-order",
+          "rankNumberingPolicy": "competition"
         }
       ]
     }
+  },
+  "rankPolicy": {
+    "version": "common_rank_contract_v1",
+    "tiePolicy": "include-all-ties-then-stable-source-order",
+    "rankNumberingPolicy": "competition",
+    "tieRankSequenceExample": [1, 1, 3],
+    "stableTieOrder": "sourceOrder"
   }
 }
