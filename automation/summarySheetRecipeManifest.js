@@ -8,6 +8,8 @@ function getXlsxModule() {
   return xlsxModule;
 }
 
+const { collectSectionMetricIds } = require("./metricIdContract");
+
 const SUMMARY_SHEET_RECIPE_MANIFEST_VERSION =
   "summary_sheet_recipe_manifest_v2";
 const SUMMARY_SHEET_RECIPE_MANIFEST_SHEET = "_beebee_recipe_manifest";
@@ -57,19 +59,7 @@ function buildSectionManifest(section = {}, resolvedSheetName = "", index = 0) {
           .map((item) => normalizeText(item?.header || item?.label || item))
           .filter(Boolean)
       : [],
-    metricIds: Array.from(
-      new Set(
-        [
-          ...(Array.isArray(section.metricIds) ? section.metricIds : []),
-          ...(Array.isArray(result.metricIds) ? result.metricIds : []),
-          ...(Array.isArray(result.meta?.metricIds)
-            ? result.meta.metricIds
-            : []),
-        ]
-          .map(normalizeText)
-          .filter(Boolean),
-      ),
-    ),
+    metricIds: collectSectionMetricIds(section),
     contractCoverageVersion: normalizeText(
       result.meta?.contractCoverageVersion ||
         section.contractCoverageVersion ||
@@ -87,6 +77,7 @@ function buildSummarySheetRecipeManifest({
   const resolvedByIndex = new Map(
     (resolvedSections || []).map((entry) => [Number(entry.index), entry]),
   );
+
   const sections = (businessSections || []).map((section, index) =>
     buildSectionManifest(
       section,
@@ -94,11 +85,13 @@ function buildSummarySheetRecipeManifest({
       index,
     ),
   );
+
   const renderedMetricIds = Array.from(
     new Set(
       sections.flatMap((section) => section.metricIds || []).filter(Boolean),
     ),
   );
+
   const coverage = result.contractSummaryCoverage || {};
   const expectedMetricIds = Array.from(
     new Set(
@@ -107,9 +100,11 @@ function buildSummarySheetRecipeManifest({
         .filter(Boolean),
     ),
   );
+
   const missingMetricIds = expectedMetricIds.filter(
     (metricId) => !renderedMetricIds.includes(metricId),
   );
+
   return {
     version: SUMMARY_SHEET_RECIPE_MANIFEST_VERSION,
     complete: true,
@@ -198,9 +193,14 @@ function ensureHiddenSheet(wb, sheetName) {
   wb.Workbook.Sheets = Array.isArray(wb.Workbook.Sheets)
     ? wb.Workbook.Sheets
     : [];
+
   const index = (wb.SheetNames || []).indexOf(sheetName);
   if (index < 0) return;
-  while (wb.Workbook.Sheets.length <= index) wb.Workbook.Sheets.push({});
+
+  while (wb.Workbook.Sheets.length <= index) {
+    wb.Workbook.Sheets.push({});
+  }
+
   wb.Workbook.Sheets[index] = {
     ...(wb.Workbook.Sheets[index] || {}),
     name: sheetName,
@@ -212,8 +212,10 @@ function appendSummarySheetRecipeManifest(wb, args = {}) {
   const manifest = buildSummarySheetRecipeManifest(args);
   const XLSX = getXlsxModule();
   const ws = XLSX.utils.aoa_to_sheet(manifestToAoa(manifest));
+
   XLSX.utils.book_append_sheet(wb, ws, SUMMARY_SHEET_RECIPE_MANIFEST_SHEET);
   ensureHiddenSheet(wb, SUMMARY_SHEET_RECIPE_MANIFEST_SHEET);
+
   wb["!beebeeSummaryRecipeManifest"] = manifest;
   return manifest;
 }
@@ -231,16 +233,20 @@ function readSummarySheetRecipeManifest(workbook = {}) {
   if (workbook["!beebeeSummaryRecipeManifest"]?.version) {
     return workbook["!beebeeSummaryRecipeManifest"];
   }
+
   const ws = workbook.Sheets?.[SUMMARY_SHEET_RECIPE_MANIFEST_SHEET];
   if (!ws) return null;
+
   const XLSX = getXlsxModule();
   const rows = XLSX.utils.sheet_to_json(ws, {
     header: 1,
     raw: false,
     defval: "",
   });
+
   const meta = {};
   let sectionHeaderIndex = -1;
+
   for (let index = 1; index < rows.length; index += 1) {
     const row = rows[index] || [];
     if (String(row[0] || "") === "sectionIndex") {
@@ -249,11 +255,13 @@ function readSummarySheetRecipeManifest(workbook = {}) {
     }
     if (row[0]) meta[String(row[0])] = row[1];
   }
+
   const sections = [];
   if (sectionHeaderIndex >= 0) {
     for (let index = sectionHeaderIndex + 1; index < rows.length; index += 1) {
       const row = rows[index] || [];
       if (row.every((value) => value === "")) continue;
+
       sections.push({
         sectionIndex: Number(row[0] || 0),
         sectionId: String(row[1] || ""),
@@ -273,6 +281,7 @@ function readSummarySheetRecipeManifest(workbook = {}) {
       });
     }
   }
+
   return {
     version: String(meta.manifestVersion || ""),
     complete: String(meta.complete || "").toUpperCase() === "TRUE",

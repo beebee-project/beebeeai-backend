@@ -1,20 +1,9 @@
-const {
-  COLUMN_ROLE_PATTERNS,
-  BOOLEAN_VALUES,
-  COLUMN_INFERENCE_THRESHOLDS,
-} = require("./config/columnRoleConfig");
-
-const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v1";
-const NUMERIC_MEASURE_ROLE_VERSION = "numeric_measure_role_v1";
-const CROSS_TABLE_TO_LONG_VERSION =
-  "cross_table_to_long_normalization_v2_measure_identity";
-const CROSS_TABLE_MEASURE_ISOLATION_VERSION = "cross_table_measure_identity_v1";
-
-const NUMERIC_MEASURE_HEADER_PATTERN =
-  /(재고|잔고|잔량|잔여|보유|수량|입고|출고|사용량|생산량|판매량|금액|매출|매입|비용|원가|단가|가격|실적|목표|인원|건수|시간|거리|중량|무게|용량|stock|inventory|balance|quantity|qty|amount|value|price|cost|revenue|sales|count|total)/i;
-
-const EXPLICIT_DATE_HEADER_PATTERN =
-  /(일자|날짜|연월|년월|기준월|기준일|기간|시점|분기|년도|연도|date|month|period|quarter|year)/i;
+const NORMALIZATION_VERSION = "normalized_query_table_common_v4_residual";
+const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v3";
+const WIDE_TO_LONG_VERSION = "wide_to_long_normalization_v4_semantic_context";
+const CROSS_TO_LONG_VERSION =
+  "cross_table_to_long_normalization_v4_measure_identity";
+const ROW_CLASSIFICATION_VERSION = "normalized_row_classification_v3";
 
 const DEFAULT_TABLE_USAGE = Object.freeze({
   version: "table_usage_quality_v1",
@@ -24,6 +13,90 @@ const DEFAULT_TABLE_USAGE = Object.freeze({
   reasons: ["TABLE_USAGE_NOT_PROVIDED"],
   metrics: {},
 });
+
+const SUMMARY_LABEL_PATTERN =
+  /^(?:합계|소계|총계|전체|전국|세계|계|total|subtotal|grand\s*total)$/i;
+const SUMMARY_SUFFIX_PATTERN = /(?:합계|소계|총계)\s*$/;
+const UNIT_HEADER_PATTERN = /^(?:단위|측정단위|unit|measure\s*unit)$/i;
+const METRIC_IDENTITY_HEADER_PATTERN =
+  /^(?:항목|지표|지표명|측정항목|세부항목|metric|measure|indicator)$/i;
+const IDENTIFIER_HEADER_PATTERN =
+  /(?:^|[\s_\-])(id|code)(?:$|[\s_\-])|번호|코드|순번|연번/i;
+const DIMENSION_HEADER_PATTERN =
+  /구분|분류|유형|종류|항목|명칭|이름|지역|국가|산업|업종|사업|학교|학년|성별|죄종|침입구|특성|대분류|소분류|category|dimension|group|type|name/i;
+const NON_ADDITIVE_METRIC_PATTERN =
+  /%|퍼센트|백분율|비율|비중|구성비|점유율|증감률|달성률|순이동률|지수|평균|평점|점수|기대수명|수명|시간|기록|속도|성향|분포|rate|ratio|share|percent|index|average|avg|score|life\s*expectancy|duration|time/i;
+const NON_ADDITIVE_UNIT_PATTERN =
+  /^(?:%|퍼센트|백분율|지수|점|평점|초|분|분\s*,\s*초|분초|시간|일|개월|년|세|cm|mm|m|km\/h|명\s*\/\s*천명)$/i;
+const AVERAGE_CONTEXT_PATTERN =
+  /월평균|일평균|주평균|분기평균|연평균|기간평균|평균값|가구당|1인당|인당|단위당|평균\s*(?:실적|소득|지출|금액|수량)/i;
+const MEASUREMENT_CONTEXT_PATTERN =
+  /체력|평가|측정|검사|테스트|기록|달리기|걷기|뛰기|굽히기|악력|유연성|신체|성적/i;
+const COUNT_CONTEXT_PATTERN =
+  /건수|개수|수량|횟수|인원수|기업수|사업수|기관수|업체수|시설수|count|number\s+of/i;
+const COMMON_UNIT_PATTERN =
+  /^(?:원|천원|만원|억원|개|건|명|세|년|월|일|회|점|대|곳|식|건수|명\/천명|명\s*\/\s*천명|%|퍼센트|초|분|분\s*,\s*초|cm|mm|m|km|kg|g|톤|t|kwh|mwh|kw|mw|㎡|㎥|원\/\S+|\S+\/\S+)$/i;
+
+function isBlank(value) {
+  return value == null || String(value).trim() === "";
+}
+
+function asText(value = "") {
+  return String(value ?? "");
+}
+
+function normalizeWhitespace(value = "") {
+  return asText(value).replace(/\s+/g, " ").trim();
+}
+
+function normalizeHeader(value = "") {
+  return normalizeWhitespace(value);
+}
+
+function normalizedHeaderKey(value = "") {
+  return normalizeHeader(value)
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>（）]+/g, "")
+    .trim();
+}
+
+function canonicalKeyFromHeader(value = "", fallback = "") {
+  const key = normalizeHeader(value)
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+  return key || fallback;
+}
+
+function cloneValue(value) {
+  if (value instanceof Date) return new Date(value.getTime());
+  if (Array.isArray(value)) return value.map(cloneValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, cloneValue(item)]),
+    );
+  }
+  return value;
+}
+
+function toNumberOrNull(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+
+  const normalized = value
+    .normalize("NFKC")
+    .replace(/,/g, "")
+    .replace(/%$/g, "")
+    .trim();
+
+  if (!normalized || normalized === "-") return null;
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(normalized)) return null;
+
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+}
 
 function normalizeTableUsage(table = {}) {
   const usage = table.tableUsage || table.usage || null;
@@ -36,9 +109,9 @@ function normalizeTableUsage(table = {}) {
     templateEligible: usage.templateEligible !== false,
     reasons:
       Array.isArray(usage.reasons) && usage.reasons.length
-        ? usage.reasons
-        : DEFAULT_TABLE_USAGE.reasons,
-    metrics: usage.metrics || {},
+        ? [...usage.reasons]
+        : [...DEFAULT_TABLE_USAGE.reasons],
+    metrics: cloneValue(usage.metrics || {}),
   };
 }
 
@@ -46,227 +119,1062 @@ function isAnalysisEligibleTable(table = {}) {
   return normalizeTableUsage(table).analysisEligible !== false;
 }
 
-function inheritVirtualTableUsage(
-  sourceTable = {},
-  transformationType = "virtual",
-) {
-  const sourceUsage = normalizeTableUsage(sourceTable);
+function inheritVirtualTableUsage(sourceTable = {}, transformationType = "") {
+  const usage = normalizeTableUsage(sourceTable);
+  const reason = `VIRTUAL_TABLE_FROM_${String(
+    transformationType || "NORMALIZATION",
+  ).toUpperCase()}`;
+
   return {
-    ...sourceUsage,
-    queryable: true,
-    analysisEligible: sourceUsage.analysisEligible !== false,
-    templateEligible: sourceUsage.templateEligible !== false,
-    reasons: [
-      ...(sourceUsage.reasons || []),
-      `VIRTUAL_TABLE_FROM_${String(transformationType || "virtual").toUpperCase()}`,
-    ],
+    ...usage,
+    reasons: [...new Set([...(usage.reasons || []), reason])],
   };
 }
 
-function isBlank(value) {
-  return value == null || String(value).trim() === "";
+function rowValue(row, column = {}, index = 0) {
+  if (Array.isArray(row)) return row[index];
+  if (!row || typeof row !== "object") return undefined;
+
+  const candidates = [
+    column.key,
+    column.canonicalKey,
+    column.accessor,
+    column.name,
+    column.header,
+    column.originalHeader,
+  ].filter(Boolean);
+
+  for (const key of candidates) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) return row[key];
+  }
+
+  const targets = new Set(candidates.map(normalizedHeaderKey).filter(Boolean));
+  for (const [key, value] of Object.entries(row)) {
+    if (targets.has(normalizedHeaderKey(key))) return value;
+  }
+
+  return Object.values(row)[index];
 }
 
-function text(value = "") {
-  return String(value ?? "");
+function columnValues(table = {}, column = {}, index = 0) {
+  const rows = Array.isArray(table.rows) ? table.rows : [];
+  return rows.map((row) => rowValue(row, column, column.index ?? index));
 }
 
-function toNumberOrNull(value) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+function analyzeValues(values = []) {
+  const nonBlank = values.filter((value) => !isBlank(value));
+  const numericCount = nonBlank.filter(
+    (value) => toNumberOrNull(value) != null,
+  ).length;
+  const dateCount = nonBlank.filter(isStrictTemporalValue).length;
+  const booleanCount = nonBlank.filter(
+    (value) =>
+      typeof value === "boolean" ||
+      /^(?:true|false|yes|no|y|n|예|아니오)$/i.test(normalizeWhitespace(value)),
+  ).length;
+  const unique = new Set(nonBlank.map((value) => normalizeWhitespace(value)));
+  const total = nonBlank.length;
 
-  if (typeof value !== "string") return null;
-
-  const normalized = value.replace(/,/g, "").trim();
-  if (!normalized) return null;
-
-  const num = Number(normalized);
-  return Number.isFinite(num) ? num : null;
+  return {
+    totalRows: values.length,
+    nonEmptyCount: total,
+    emptyRatio: values.length ? 1 - total / values.length : 1,
+    numericRatio: total ? numericCount / total : 0,
+    dateRatio: total ? dateCount / total : 0,
+    booleanRatio: total ? booleanCount / total : 0,
+    uniqueCount: unique.size,
+    uniqueRatio: total ? unique.size / total : 0,
+    sampleValues: [...unique].slice(0, 10),
+  };
 }
 
-function isDateLike(value) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return true;
+function extractHeaderUnit(value = "") {
+  const header = normalizeHeader(value);
+  const matches = [
+    ...header.matchAll(/(?:\(|\[|（)\s*([^()[\]（）]{1,24})\s*(?:\)|\]|）)/g),
+  ];
 
-  if (typeof value !== "string") return false;
+  if (!matches.length) return "";
+  const candidate = normalizeWhitespace(matches[matches.length - 1][1]);
 
-  const t = value.trim();
-  if (!t) return false;
-
-  return (
-    /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(t) ||
-    /^\d{4}[-/.]\d{1,2}$/.test(t) ||
-    /^\d{4}\s*년\s*\d{1,2}\s*월?$/.test(t)
-  );
-}
-
-function normalizeHeader(value = "") {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function stripHeaderUnitSuffix(value = "") {
-  return normalizeHeader(value)
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\[[^\]]*\]/g, "")
-    .replace(/（[^）]*）/g, "")
-    .trim();
-}
-
-function normalizeHeaderForDiagnostics(value = "") {
-  return stripHeaderUnitSuffix(value)
-    .toLowerCase()
-    .replace(/[\s_\-./\\|:;,'"‘’“”()[\]{}<>]+/g, "")
-    .trim();
-}
-
-function canonicalKeyFromHeader(value = "", fallback = "") {
-  const normalized = normalizeHeaderForDiagnostics(value)
-    .replace(/[^\p{Letter}\p{Number}]+/gu, "_")
-    .replace(/^_+|_+$/g, "");
-  return normalized || fallback;
-}
-
-function compactText(value = "") {
-  return String(value ?? "")
-    .replace(/[_|/\\]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeMonthNumber(value = "") {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 1 || n > 12) return "";
-  return String(n).padStart(2, "0");
-}
-
-function extractYear(value = "") {
-  const matched = compactText(value).match(
-    /(?:^|[^\d])((?:19|20)\d{2})(?:[^\d]|$)/,
-  );
-  return matched ? matched[1] : "";
-}
-
-function extractMonth(value = "") {
-  const s = compactText(value);
-  const explicit = s.match(/(?:^|[^\d])(0?[1-9]|1[0-2])\s*월/);
-  if (explicit) return normalizeMonthNumber(explicit[1]);
-
-  const yearMonth = s.match(
-    /(?:19|20)\d{2}\s*[-./년]\s*(0?[1-9]|1[0-2])(?:\D|$)/,
-  );
-  if (yearMonth) return normalizeMonthNumber(yearMonth[1]);
-
+  if (candidate.length > 16) return "";
+  if (COMMON_UNIT_PATTERN.test(candidate)) return candidate;
   return "";
 }
 
-function extractQuarter(value = "") {
-  const s = compactText(value).toUpperCase();
-  const q = s.match(/(?:^|\s)Q\s*([1-4])(?:\s|$)/);
-  if (q) return `Q${q[1]}`;
+function stripUnitSuffix(value = "") {
+  const unit = extractHeaderUnit(value);
+  if (!unit) return normalizeHeader(value);
 
-  const korean = s.match(/(?:^|\s)([1-4])\s*분기(?:\s|$)/);
-  return korean ? `Q${korean[1]}` : "";
-}
-
-function removeTemporalTokens(value = "") {
-  return compactText(value)
-    .replace(/(?:19|20)\d{2}\s*[-./년]?\s*(0?[1-9]|1[0-2])?\s*월?/g, " ")
-    .replace(/(?:^|\s)Q\s*[1-4](?:\s|$)/gi, " ")
-    .replace(/(?:^|\s)[1-4]\s*분기(?:\s|$)/g, " ")
-    .replace(/(?:^|\s)(0?[1-9]|1[0-2])\s*월(?:\s|$)/g, " ")
-    .replace(/\s+/g, " ")
+  return normalizeHeader(value)
+    .replace(
+      new RegExp(
+        `(?:\\(|\\[|（)\\s*${escapeRegExp(unit)}\\s*(?:\\)|\\]|）)\\s*$`,
+      ),
+      "",
+    )
     .trim();
 }
 
-function parseTemporalHeader(header = "") {
-  const raw = compactText(header);
-  if (!raw) return null;
-
-  const year = extractYear(raw);
-  const month = extractMonth(raw);
-  const quarter = extractQuarter(raw);
-
-  if (!year && !month && !quarter) return null;
-
-  let periodLabel = raw;
-  if (year && month) periodLabel = `${year}-${month}`;
-  else if (year && quarter) periodLabel = `${year}-${quarter}`;
-  else if (year) periodLabel = year;
-  else if (month) periodLabel = `${month}월`;
-  else if (quarter) periodLabel = quarter;
-
-  const metricLabel = removeTemporalTokens(raw) || "지표값";
-
-  return {
-    raw,
-    year,
-    month,
-    quarter,
-    periodLabel,
-    metricLabel,
-  };
+function escapeRegExp(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function parseTemporalValue(value = "") {
-  const raw = compactText(value);
+function strictTemporalMatch(value = "") {
+  const raw = normalizeHeader(value).normalize("NFKC");
   if (!raw) return null;
-  const parsed = parseTemporalHeader(raw);
-  if (parsed) return parsed;
 
-  const date = value instanceof Date ? value : new Date(raw);
-  if (!Number.isNaN(date.getTime())) {
-    const year = String(date.getFullYear());
-    const month = String(date.getMonth() + 1).padStart(2, "0");
+  const patterns = [
+    {
+      type: "date",
+      regex:
+        /(?:^|[^\d])((?:19|20|21)\d{2})[-./]\s*(0?[1-9]|1[0-2])[-./]\s*(0?[1-9]|[12]\d|3[01])(?:[^\d]|$)/,
+      period: (m) =>
+        `${m[1]}-${String(Number(m[2])).padStart(2, "0")}-${String(
+          Number(m[3]),
+        ).padStart(2, "0")}`,
+    },
+    {
+      type: "month",
+      regex:
+        /(?:^|[^\d])((?:19|20|21)\d{2})\s*년\s*(0?[1-9]|1[0-2])\s*월(?:[^\d]|$)/,
+      period: (m) => `${m[1]}-${String(Number(m[2])).padStart(2, "0")}`,
+    },
+    {
+      type: "month",
+      regex:
+        /(?:^|[^\d])((?:19|20|21)\d{2})[-./]\s*(0?[1-9]|1[0-2])(?:[^\d]|$)/,
+      period: (m) => `${m[1]}-${String(Number(m[2])).padStart(2, "0")}`,
+    },
+    {
+      type: "quarter",
+      regex:
+        /(?:^|[^\d])((?:19|20|21)\d{2})\s*(?:년\s*)?(?:Q\s*([1-4])|([1-4])\s*분기)(?:[^\d]|$)/i,
+      period: (m) => `${m[1]}-Q${m[2] || m[3]}`,
+    },
+    {
+      type: "year",
+      regex: /(?:^|[^\d])((?:19|20|21)\d{2})\s*년?(?:[^\d]|$)/,
+      period: (m) => m[1],
+    },
+    {
+      type: "month",
+      regex: /(?:^|[^\d])(0?[1-9]|1[0-2])\s*월(?:[^\d]|$)/,
+      period: (m) => `${String(Number(m[1])).padStart(2, "0")}월`,
+    },
+  ];
+
+  for (const spec of patterns) {
+    const match = raw.match(spec.regex);
+    if (!match) continue;
+
+    const matchIndex = Number(match.index || 0);
+    const before = raw.slice(0, matchIndex);
+    const after = raw.slice(matchIndex + match[0].length);
+    const metricLabel = normalizeHeader(`${before} ${after}`)
+      .replace(/^[\s_|/\\:;,\-–—]+|[\s_|/\\:;,\-–—]+$/g, "")
+      .trim();
+
     return {
       raw,
-      year,
-      month,
-      quarter: "",
-      periodLabel: `${year}-${month}`,
-      metricLabel: "지표값",
+      type: spec.type,
+      period: spec.period(match),
+      matchedText: match[0].trim(),
+      year: match[1] && /^(?:19|20|21)\d{2}$/.test(match[1]) ? match[1] : "",
+      metricLabel,
     };
   }
 
   return null;
 }
 
-function isTemporalHeaderColumn(column = {}) {
-  return Boolean(
-    parseTemporalHeader(column.header || column.originalHeader || ""),
+function parseTemporalHeader(value = "") {
+  const unit = extractHeaderUnit(value);
+  const withoutUnit = stripUnitSuffix(value);
+  const parsed = strictTemporalMatch(withoutUnit);
+  if (!parsed) return null;
+
+  return {
+    ...parsed,
+    metricLabel: normalizeHeader(parsed.metricLabel) || "지표값",
+    unit,
+  };
+}
+
+function isStrictTemporalValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return true;
+  if (typeof value !== "string" && typeof value !== "number") return false;
+
+  const raw = normalizeWhitespace(value);
+  if (!raw) return false;
+
+  return (
+    /^(?:19|20|21)\d{2}$/.test(raw) ||
+    /^(?:19|20|21)\d{2}[-./](?:0?[1-9]|1[0-2])$/.test(raw) ||
+    /^(?:19|20|21)\d{2}\s*년\s*(?:0?[1-9]|1[0-2])\s*월$/.test(raw) ||
+    /^(?:19|20|21)\d{2}[-./](?:0?[1-9]|1[0-2])[-./](?:0?[1-9]|[12]\d|3[01])$/.test(
+      raw,
+    ) ||
+    /^(?:19|20|21)\d{2}\s*(?:Q[1-4]|[1-4]\s*분기)$/i.test(raw)
   );
+}
+
+function parseTemporalValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = String(value.getFullYear());
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return {
+      raw: value,
+      type: "date",
+      period: `${year}-${month}-${day}`,
+      year,
+    };
+  }
+
+  if (!isStrictTemporalValue(value)) return null;
+  return strictTemporalMatch(normalizeWhitespace(value));
+}
+
+function collectTextFragments(value, output = [], depth = 0) {
+  if (depth > 4 || value == null) return output;
+
+  if (typeof value === "string" || typeof value === "number") {
+    const text = normalizeWhitespace(value);
+    if (text) output.push(text);
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    value
+      .slice(0, 100)
+      .forEach((item) => collectTextFragments(item, output, depth + 1));
+    return output;
+  }
+
+  if (typeof value === "object") {
+    Object.values(value)
+      .slice(0, 100)
+      .forEach((item) => collectTextFragments(item, output, depth + 1));
+  }
+
+  return output;
+}
+
+function tableContextText(table = {}) {
+  return [
+    table.sheetName,
+    table.tableName,
+    table.title,
+    table.name,
+    table.source,
+    table.description,
+    table.caption,
+    table.meta,
+    table.metadata,
+    table.headerRows,
+    (table.columns || []).map(
+      (column) => column.header || column.originalHeader || "",
+    ),
+  ]
+    .flatMap((value) => collectTextFragments(value))
+    .join(" ");
+}
+
+function parseMetricUnitPairs(text = "") {
+  const source = normalizeWhitespace(text);
+  if (!source || !/[:：]/.test(source)) return [];
+
+  return source
+    .split(/\s*\/\s*(?=[^/:：]{1,80}\s*[:：])/)
+    .map((part) => {
+      const match = part.match(
+        /^\s*([^:：]{1,80}?)\s*[:：]\s*([^:：]{1,40})\s*$/,
+      );
+      if (!match) return null;
+
+      const metric = normalizeHeader(match[1])
+        .replace(/^(?:단위|unit)\s*/i, "")
+        .trim();
+      const unit = normalizeHeader(match[2]);
+
+      if (!metric || !unit || metric.length > 60 || unit.length > 24) {
+        return null;
+      }
+
+      return { metric, unit };
+    })
+    .filter(Boolean);
+}
+
+function buildNormalizationContext(tables = []) {
+  const unitCandidates = new Map();
+  const conflicts = new Set();
+
+  for (const table of tables || []) {
+    const fragments = collectTextFragments({
+      sheetName: table.sheetName,
+      tableName: table.tableName,
+      title: table.title,
+      name: table.name,
+      meta: table.meta,
+      metadata: table.metadata,
+      headerRows: table.headerRows,
+      columns: table.columns,
+      rows:
+        Array.isArray(table.rows) && table.rows.length <= 20 ? table.rows : [],
+    });
+
+    for (const fragment of fragments) {
+      for (const pair of parseMetricUnitPairs(fragment)) {
+        const key = normalizedHeaderKey(pair.metric);
+        if (!key) continue;
+
+        if (
+          unitCandidates.has(key) &&
+          normalizedHeaderKey(unitCandidates.get(key)) !==
+            normalizedHeaderKey(pair.unit)
+        ) {
+          conflicts.add(key);
+          continue;
+        }
+        unitCandidates.set(key, pair.unit);
+      }
+    }
+  }
+
+  for (const key of conflicts) unitCandidates.delete(key);
+
+  return {
+    metricUnitMap: Object.fromEntries(unitCandidates),
+  };
+}
+
+function contextUnitForMetric(metricLabel = "", context = {}) {
+  const key = normalizedHeaderKey(metricLabel);
+  if (!key) return "";
+
+  const direct = context.metricUnitMap?.[key];
+  if (direct) return direct;
+
+  const candidates = Object.entries(context.metricUnitMap || {})
+    .filter(
+      ([candidate]) =>
+        candidate.length >= 3 &&
+        (key.includes(candidate) || candidate.includes(key)),
+    )
+    .sort((left, right) => right[0].length - left[0].length);
+
+  return candidates[0]?.[1] || "";
+}
+
+function numericProfileForColumn(rows = [], column = {}) {
+  const values = rows
+    .map((row) => rowValue(row, column, column.index ?? 0))
+    .filter((value) => !isBlank(value));
+
+  const numbers = values.map(toNumberOrNull).filter((value) => value != null);
+
+  const fractionalCount = numbers.filter(
+    (value) => !Number.isInteger(value),
+  ).length;
+  const exactHundredCount = numbers.filter((value) => value === 100).length;
+
+  return {
+    nonBlankCount: values.length,
+    numericCount: numbers.length,
+    numericRatio: values.length ? numbers.length / values.length : 0,
+    min: numbers.length ? Math.min(...numbers) : null,
+    max: numbers.length ? Math.max(...numbers) : null,
+    fractionalCount,
+    fractionalRatio: numbers.length ? fractionalCount / numbers.length : 0,
+    exactHundredCount,
+    integerRatio: numbers.length
+      ? numbers.filter(Number.isInteger).length / numbers.length
+      : 0,
+  };
+}
+
+function looksLikePercentageProfile(profile = {}) {
+  return (
+    profile.numericCount >= 2 &&
+    profile.min != null &&
+    profile.max != null &&
+    profile.min >= 0 &&
+    profile.max <= 100 &&
+    profile.fractionalCount > 0 &&
+    (profile.exactHundredCount > 0 || profile.fractionalRatio >= 0.5)
+  );
+}
+
+function normalizeDeclaredAggregation(value = "") {
+  const text = normalizeWhitespace(value).toLowerCase();
+  if (["average", "avg", "mean", "평균"].includes(text)) {
+    return "average";
+  }
+  if (["sum", "total", "합계", "합산"].includes(text)) {
+    return "sum";
+  }
+  return "";
+}
+
+function metricCountEntity(text = "") {
+  const normalized = normalizeHeader(text);
+  const match = normalized.match(/\d[\d,]*\s*대\s*([가-힣A-Za-z]{1,20})/);
+  if (!match) return "";
+  return `${match[1]}수`;
+}
+
+function dimensionEntityName(header = "") {
+  return normalizeHeader(header)
+    .replace(/(?:\(|\[)?\d+(?:\)|\])?/g, "")
+    .replace(/별\s*$/g, "")
+    .replace(/정보|구분|분류|유형/g, "")
+    .trim();
+}
+
+function inferGenericCountMetricLabel({
+  metricLabel = "",
+  sourceHeader = "",
+  dimensions = [],
+  profile = {},
+} = {}) {
+  const label = normalizeHeader(metricLabel);
+  const generic =
+    !label || /^(?:지표값|값|수치|실적|기간(?:\(|$))/i.test(label);
+
+  if (!generic) return label;
+
+  const countEntity =
+    metricCountEntity(sourceHeader) || metricCountEntity(label);
+  if (countEntity) return countEntity;
+
+  if (
+    profile.numericCount >= 2 &&
+    profile.min != null &&
+    profile.min >= 0 &&
+    profile.integerRatio >= 0.95
+  ) {
+    const entities = dimensions
+      .map((column) =>
+        dimensionEntityName(column.header || column.originalHeader || ""),
+      )
+      .filter(Boolean);
+
+    if (entities.length >= 2 && new Set(entities).size === 1) {
+      return `${entities[0]}수`;
+    }
+  }
+
+  return label || "지표값";
+}
+
+function inferMetricUnit({
+  metricLabel = "",
+  localUnit = "",
+  context = {},
+  profile = {},
+} = {}) {
+  const explicit = normalizeHeader(localUnit);
+  if (explicit) return explicit;
+
+  const contextual = contextUnitForMetric(metricLabel, context);
+  if (contextual) return contextual;
+
+  if (looksLikePercentageProfile(profile)) return "%";
+  return "";
+}
+
+function inferType(values = [], declared = "") {
+  if (declared && declared !== "unknown") return declared;
+
+  const profile = analyzeValues(values);
+  if (profile.dateRatio >= 0.7) return "date";
+  if (profile.numericRatio >= 0.7) return "number";
+  if (profile.booleanRatio >= 0.7) return "boolean";
+  if (profile.nonEmptyCount) return "string";
+  return "unknown";
+}
+
+function pairedDimensionEvidence(columns = [], index = 0) {
+  const current = normalizeHeader(columns[index]?.header || "");
+  const next = normalizeHeader(columns[index + 1]?.header || "");
+  const match = current.match(/^(.*?)(?:\(|\[)?1(?:\)|\])?$/);
+  if (!match || !next) return false;
+
+  const base = normalizedHeaderKey(match[1]);
+  const nextMatch = next.match(/^(.*?)(?:\(|\[)?2(?:\)|\])?$/);
+  return Boolean(nextMatch && normalizedHeaderKey(nextMatch[1]) === base);
+}
+
+function inferRole({
+  header = "",
+  type = "unknown",
+  profile = {},
+  column = {},
+  columns = [],
+  index = 0,
+} = {}) {
+  const declared = String(
+    column.role || column.semanticRole || "",
+  ).toLowerCase();
+  if (declared) return declared;
+
+  const normalized = normalizeHeader(header);
+  const temporal = parseTemporalHeader(normalized);
+
+  if (
+    column.semanticType === "date" ||
+    type === "date" ||
+    profile.dateRatio >= 0.7 ||
+    temporal
+  ) {
+    return "date";
+  }
+
+  if (UNIT_HEADER_PATTERN.test(normalized)) return "dimension";
+  if (METRIC_IDENTITY_HEADER_PATTERN.test(normalized)) return "dimension";
+  if (IDENTIFIER_HEADER_PATTERN.test(normalized)) return "id";
+
+  if (
+    pairedDimensionEvidence(columns, index) &&
+    profile.numericRatio >= 0.5 &&
+    profile.uniqueRatio <= 0.5
+  ) {
+    return "id";
+  }
+
+  if (DIMENSION_HEADER_PATTERN.test(normalized)) {
+    if (
+      type === "number" &&
+      profile.uniqueRatio >= 0.95 &&
+      profile.nonEmptyCount >= 3 &&
+      !pairedDimensionEvidence(columns, index)
+    ) {
+      return "metric";
+    }
+    return "dimension";
+  }
+
+  if (type === "number" && profile.numericRatio >= 0.7) return "metric";
+  if (type === "string" || type === "boolean") return "dimension";
+  return "unknown";
+}
+
+function normalizeColumn(column = {}, index = 0, table = {}) {
+  const header = normalizeHeader(
+    column.header ||
+      column.name ||
+      column.key ||
+      column.label ||
+      `column_${index + 1}`,
+  );
+  const values = columnValues(table, column, column.index ?? index);
+  const profile = analyzeValues(values);
+  const type = inferType(values, column.type || column.valueType || "");
+  const role = inferRole({
+    header,
+    type,
+    profile,
+    column,
+    columns: Array.isArray(table.columns) ? table.columns : [],
+    index,
+  });
+
+  return {
+    ...cloneValue(column),
+    header,
+    originalHeader: column.originalHeader || header,
+    normalizedHeader: normalizedHeaderKey(header),
+    canonicalKey:
+      column.canonicalKey ||
+      column.key ||
+      canonicalKeyFromHeader(header, `column_${index + 1}`),
+    index: column.index ?? index,
+    type,
+    role,
+    unit: column.unit || column.measureUnit || extractHeaderUnit(header) || "",
+    profile: {
+      ...cloneValue(column.profile || {}),
+      emptyRatio: Number(profile.emptyRatio.toFixed(3)),
+      nonEmptyCount: profile.nonEmptyCount,
+      uniqueCount: profile.uniqueCount,
+      uniqueRatio: Number(profile.uniqueRatio.toFixed(3)),
+      numericRatio: Number(profile.numericRatio.toFixed(3)),
+      dateRatio: Number(profile.dateRatio.toFixed(3)),
+      booleanRatio: Number(profile.booleanRatio.toFixed(3)),
+      sampleValues: profile.sampleValues,
+    },
+    diagnostics: {
+      ...cloneValue(column.diagnostics || {}),
+      normalizationVersion: NORMALIZATION_VERSION,
+    },
+  };
+}
+
+function rowValues(row, columns = []) {
+  return columns.map((column, index) => rowValue(row, column, index));
+}
+
+function isRepeatedHeaderRow(row, columns = []) {
+  if (!row || !columns.length) return false;
+
+  const values = rowValues(row, columns);
+  let comparable = 0;
+  let matched = 0;
+
+  values.forEach((value, index) => {
+    const actualText = normalizeWhitespace(value);
+    const expectedText = normalizeHeader(
+      columns[index]?.header || columns[index]?.originalHeader || "",
+    );
+    const actual = normalizedHeaderKey(actualText);
+    const expected = normalizedHeaderKey(expectedText);
+    if (!actual || !expected) return;
+
+    if (
+      toNumberOrNull(actualText) != null &&
+      toNumberOrNull(expectedText) == null
+    ) {
+      return;
+    }
+
+    comparable += 1;
+    if (
+      actual === expected ||
+      (actual.length >= 3 &&
+        expected.length >= 3 &&
+        (expected.includes(actual) || actual.includes(expected)))
+    ) {
+      matched += 1;
+    }
+  });
+
+  return comparable >= 2 && matched / comparable >= 0.6;
+}
+
+function isSummaryLabel(value = "") {
+  const normalized = normalizeWhitespace(value);
+  if (!normalized) return false;
+  return (
+    SUMMARY_LABEL_PATTERN.test(normalized) ||
+    SUMMARY_SUFFIX_PATTERN.test(normalized)
+  );
+}
+
+function leadingIndent(value = "") {
+  const source = asText(value);
+  const match = source.match(/^[\s\u3000]+/);
+  return match ? match[0].length : 0;
+}
+
+function dimensionColumns(columns = []) {
+  return columns.filter((column) =>
+    ["dimension", "status", "id"].includes(String(column.role || "")),
+  );
+}
+
+function explicitHierarchyLevel(
+  table = {},
+  row = {},
+  rowIndex = 0,
+  primaryDimension = null,
+) {
+  const metadataCandidates = [
+    row?.hierarchyLevel,
+    row?.outlineLevel,
+    row?.indentLevel,
+    row?.meta?.hierarchyLevel,
+    row?.meta?.outlineLevel,
+    table?.rowMeta?.[rowIndex]?.hierarchyLevel,
+    table?.rowMeta?.[rowIndex]?.outlineLevel,
+    table?.rowMetadata?.[rowIndex]?.hierarchyLevel,
+    table?.rowMetadata?.[rowIndex]?.outlineLevel,
+  ];
+
+  for (const value of metadataCandidates) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number >= 0) return number;
+  }
+
+  if (!primaryDimension) return 0;
+  return leadingIndent(
+    rowValue(row, primaryDimension, primaryDimension.index ?? 0),
+  );
+}
+
+function classifyRows(
+  table = {},
+  columns = [],
+  valueColumns = [],
+  { context = {} } = {},
+) {
+  const rows = Array.isArray(table.rows) ? table.rows.map(cloneValue) : [];
+  const dimensions = dimensionColumns(columns);
+  const primaryDimension =
+    dimensions.find((column) => String(column.role || "") !== "id") ||
+    columns[0] ||
+    null;
+  const classifications = rows.map(() => ({
+    kind: "detail",
+    reasons: [],
+  }));
+
+  rows.forEach((row, index) => {
+    if (isRepeatedHeaderRow(row, columns)) {
+      classifications[index] = {
+        kind: "excluded",
+        reasons: ["REPEATED_HEADER_ROW"],
+      };
+      return;
+    }
+
+    const labels = dimensions
+      .map((column) =>
+        normalizeWhitespace(rowValue(row, column, column.index ?? 0)),
+      )
+      .filter(Boolean);
+
+    if (labels.some(isSummaryLabel)) {
+      classifications[index] = {
+        kind: "summary",
+        reasons: ["SUMMARY_LABEL_ROW"],
+      };
+    }
+  });
+
+  if (primaryDimension) {
+    for (let index = 0; index < rows.length - 1; index += 1) {
+      if (classifications[index].kind !== "detail") continue;
+
+      const currentLevel = explicitHierarchyLevel(
+        table,
+        rows[index],
+        index,
+        primaryDimension,
+      );
+      let nextIndex = index + 1;
+      while (
+        nextIndex < rows.length &&
+        rowValues(rows[nextIndex], columns).every(isBlank)
+      ) {
+        nextIndex += 1;
+      }
+      if (nextIndex >= rows.length) continue;
+
+      const nextLevel = explicitHierarchyLevel(
+        table,
+        rows[nextIndex],
+        nextIndex,
+        primaryDimension,
+      );
+      if (nextLevel <= currentLevel) continue;
+
+      let childCount = 0;
+      for (let scanIndex = nextIndex; scanIndex < rows.length; scanIndex += 1) {
+        if (rowValues(rows[scanIndex], columns).every(isBlank)) {
+          continue;
+        }
+
+        const scanLevel = explicitHierarchyLevel(
+          table,
+          rows[scanIndex],
+          scanIndex,
+          primaryDimension,
+        );
+        if (scanLevel <= currentLevel) break;
+        childCount += 1;
+      }
+
+      if (childCount >= 2) {
+        classifications[index] = {
+          kind: "summary",
+          reasons: ["HIERARCHY_PARENT_ROW"],
+        };
+      }
+    }
+  }
+
+  const averageValueColumns = valueColumns.filter((entry) => {
+    const temporal =
+      entry.temporal ||
+      parseTemporalHeader(
+        entry.column?.header || entry.column?.originalHeader || "",
+      );
+    if (!temporal) return false;
+
+    const unit =
+      entry.column?.unit ||
+      temporal.unit ||
+      extractHeaderUnit(
+        entry.column?.header || entry.column?.originalHeader || "",
+      );
+    return (
+      aggregationForMetric(temporal.metricLabel, unit, entry.column || {}, {
+        table,
+        profile: entry.profile || {},
+        context,
+      }) === "average"
+    );
+  });
+
+  if (
+    averageValueColumns.length >= 3 &&
+    averageValueColumns.length === valueColumns.length
+  ) {
+    const allDetailValues = rows
+      .flatMap((row, rowIndex) => {
+        if (classifications[rowIndex].kind !== "detail") return [];
+        return averageValueColumns
+          .map((entry) =>
+            toNumberOrNull(
+              rowValue(row, entry.column, entry.column.index ?? 0),
+            ),
+          )
+          .filter((value) => value != null);
+      })
+      .map(Math.abs)
+      .sort((left, right) => left - right);
+
+    const median = allDetailValues.length
+      ? allDetailValues[Math.floor(allDetailValues.length / 2)]
+      : 0;
+
+    const placeholderCandidates = [];
+
+    rows.forEach((row, rowIndex) => {
+      if (classifications[rowIndex].kind !== "detail") return;
+
+      const values = averageValueColumns
+        .map((entry) =>
+          toNumberOrNull(rowValue(row, entry.column, entry.column.index ?? 0)),
+        )
+        .filter((value) => value != null);
+
+      if (values.length < 3) return;
+      const first = values[0];
+      const repeated = values.every((value) => value === first);
+
+      if (
+        repeated &&
+        Number.isInteger(first) &&
+        Math.abs(first) >= 3 &&
+        Math.abs(first) >= Math.max(3, median * 4)
+      ) {
+        placeholderCandidates.push(rowIndex);
+      }
+    });
+
+    if (placeholderCandidates.length >= 2) {
+      placeholderCandidates.forEach((rowIndex) => {
+        classifications[rowIndex] = {
+          kind: "summary",
+          reasons: ["HIERARCHY_PLACEHOLDER_ROW"],
+        };
+      });
+    }
+  }
+
+  return { rows, classifications };
+}
+
+function buildDiagnostics(table = {}, columns = [], rows = []) {
+  const profiles = columns.map((column) => column.profile || {});
+  const emptyRatio = rows.length
+    ? rows.reduce((sum, row) => {
+        const values = rowValues(row, columns);
+        return sum + values.filter(isBlank).length / Math.max(1, values.length);
+      }, 0) / rows.length
+    : 1;
+  const headerConfidence = columns.length
+    ? columns.filter(
+        (column) =>
+          normalizeHeader(column.header) &&
+          !/^column_\d+$/i.test(normalizeHeader(column.header)),
+      ).length / columns.length
+    : 0;
+  const typeConsistency = columns.length
+    ? columns.filter((column) => column.type && column.type !== "unknown")
+        .length / columns.length
+    : 0;
+  const roleCounts = columns.reduce((acc, column) => {
+    const role = column.role || "unknown";
+    acc[role] = (acc[role] || 0) + 1;
+    return acc;
+  }, {});
+
+  const hasMetric = Number(roleCounts.metric || 0) > 0;
+  const hasDimension =
+    Number(roleCounts.dimension || 0) +
+      Number(roleCounts.status || 0) +
+      Number(roleCounts.id || 0) >
+    0;
+  const hasDate = Number(roleCounts.date || 0) > 0;
+
+  const analysisReadiness = {
+    groupSummary: {
+      ready: hasMetric && hasDimension,
+      reasons: [
+        hasMetric ? "HAS_METRIC" : "MISSING_METRIC",
+        hasDimension ? "HAS_DIMENSION" : "MISSING_DIMENSION",
+      ],
+    },
+    timeTrend: {
+      ready: hasMetric && hasDate,
+      reasons: [
+        hasMetric ? "HAS_METRIC" : "MISSING_METRIC",
+        hasDate ? "HAS_DATE" : "MISSING_DATE",
+      ],
+    },
+    categoryCount: {
+      ready: hasDimension,
+      reasons: [hasDimension ? "HAS_DIMENSION" : "MISSING_DIMENSION"],
+    },
+    topBottom: {
+      ready: hasMetric && hasDimension,
+      reasons: [
+        hasMetric ? "HAS_METRIC" : "MISSING_METRIC",
+        hasDimension ? "HAS_LABEL" : "MISSING_LABEL",
+      ],
+    },
+  };
+
+  const readyCount = Object.values(analysisReadiness).filter(
+    (item) => item.ready,
+  ).length;
+  const confidence = Number(
+    (
+      headerConfidence * 0.4 +
+      typeConsistency * 0.35 +
+      (1 - emptyRatio) * 0.25
+    ).toFixed(2),
+  );
+
+  let queryabilityGrade = "Q2";
+  const queryabilityReasons = [];
+  if (!rows.length || columns.length <= 1 || confidence < 0.35) {
+    queryabilityGrade = "Q0";
+    queryabilityReasons.push("INSUFFICIENT_QUERY_STRUCTURE");
+  } else if (!readyCount || headerConfidence < 0.5) {
+    queryabilityGrade = "Q1";
+    queryabilityReasons.push("LOW_ANALYSIS_READINESS");
+  } else if (confidence >= 0.72 && readyCount >= 2) {
+    queryabilityGrade = "Q3";
+    queryabilityReasons.push("HIGH_CONFIDENCE_MULTI_RECIPE_READY");
+  } else {
+    queryabilityReasons.push("QUERYABLE_ANALYSIS_READY");
+  }
+
+  return {
+    version: DIAGNOSTICS_VERSION,
+    queryabilityGrade,
+    queryabilityReasons,
+    metrics: {
+      rowCount: rows.length,
+      columnCount: columns.length,
+      emptyRatio: Number(emptyRatio.toFixed(3)),
+      headerConfidence: Number(headerConfidence.toFixed(3)),
+      typeConsistency: Number(typeConsistency.toFixed(3)),
+      confidence,
+      excludedRowCount: Array.isArray(table.excludedRows)
+        ? table.excludedRows.length
+        : 0,
+      summaryRowCount: Array.isArray(table.summaryRows)
+        ? table.summaryRows.length
+        : 0,
+      isVirtual: Boolean(table.isVirtual),
+      transformationType: table.transformation?.type || null,
+      tableUsage: normalizeTableUsage(table),
+    },
+    transformation: cloneValue(table.transformation || null),
+    tableUsage: normalizeTableUsage(table),
+    roleCounts,
+    analysisReadiness,
+    structureSignals: {
+      periodMetric: hasMetric && hasDate,
+      categorySummary: hasMetric && hasDimension,
+      analysisRecipeCount: readyCount,
+      supportedAnalysisTypes: Object.entries(analysisReadiness)
+        .filter(([, item]) => item.ready)
+        .map(([key]) => key),
+    },
+    inheritedQuality: {
+      tableBlockScore: table.score ?? table.blockScore ?? null,
+      dataQuality: cloneValue(table.dataQuality || null),
+      headerQuality: cloneValue(table.headerQuality || null),
+    },
+  };
+}
+
+function normalizeTable(table = {}, index = 0) {
+  const sourceColumns = Array.isArray(table.columns) ? table.columns : [];
+  const tableForColumns = {
+    ...table,
+    rows: Array.isArray(table.rows) ? table.rows : [],
+    columns: sourceColumns,
+  };
+  const columns = sourceColumns.map((column, columnIndex) =>
+    normalizeColumn(column, columnIndex, tableForColumns),
+  );
+  const rows = Array.isArray(table.rows) ? table.rows.map(cloneValue) : [];
+  const diagnostics = buildDiagnostics(table, columns, rows);
+
+  return {
+    ...cloneValue(table),
+    tableId: table.tableId || table.id || `table_${index + 1}`,
+    sheetName: table.sheetName || table.sheet || "",
+    tableType: table.tableType || "tabular",
+    source: table.source || null,
+    sourceTableId: table.sourceTableId || null,
+    isVirtual: Boolean(table.isVirtual),
+    transformation: cloneValue(table.transformation || null),
+    tableUsage: normalizeTableUsage(table),
+    headerRows: cloneValue(table.headerRows || []),
+    dataStartRow: table.dataStartRow ?? null,
+    range: table.range || null,
+    dataRange: table.dataRange || null,
+    columns,
+    rows,
+    excludedRows: Array.isArray(table.excludedRows)
+      ? table.excludedRows.map(cloneValue)
+      : [],
+    summaryRows: Array.isArray(table.summaryRows)
+      ? table.summaryRows.map(cloneValue)
+      : [],
+    dataQuality: cloneValue(table.dataQuality || null),
+    warnings: Array.isArray(table.warnings) ? [...table.warnings] : [],
+    confidence: Number.isFinite(Number(table.confidence))
+      ? Number(table.confidence)
+      : diagnostics.metrics.confidence,
+    queryabilityGrade: diagnostics.queryabilityGrade,
+    queryabilityReasons: diagnostics.queryabilityReasons,
+    diagnostics,
+    normalization: {
+      version: NORMALIZATION_VERSION,
+      physicalSourcePreserved: !table.isVirtual,
+    },
+  };
 }
 
 function numericRatioForColumn(rows = [], column = {}) {
   const values = rows
-    .map((row) => getRowValueByColumn(row, column, column.index ?? 0))
+    .map((row) => rowValue(row, column, column.index ?? 0))
     .filter((value) => !isBlank(value));
 
   if (!values.length) return 0;
-
-  const numeric = values.filter(
-    (value) => toNumberOrNull(value) != null,
-  ).length;
-  return numeric / values.length;
-}
-
-function uniqueHeader(base = "", used = new Set()) {
-  const fallback = String(base || "값").trim() || "값";
-  let candidate = fallback;
-  let index = 2;
-
-  while (used.has(candidate)) {
-    candidate = `${fallback}_${index}`;
-    index += 1;
-  }
-
-  used.add(candidate);
-  return candidate;
+  return (
+    values.filter((value) => toNumberOrNull(value) != null).length /
+    values.length
+  );
 }
 
 function makeVirtualColumn({
   header,
   type = "string",
   role = "dimension",
+  unit = "",
+  semanticType = "",
+  aggregation = "",
   sourceColumn = null,
 } = {}) {
   return {
@@ -276,697 +1184,416 @@ function makeVirtualColumn({
     canonicalKey: canonicalKeyFromHeader(header, header),
     type,
     role,
+    unit,
+    semanticType,
+    aggregation,
     sourceColumnHeader: sourceColumn?.header || null,
     sourceColumnKey: sourceColumn?.canonicalKey || sourceColumn?.key || null,
   };
 }
 
-function inferColumnType(values = []) {
-  const sample = values
-    .filter((v) => !isBlank(v))
-    .slice(0, COLUMN_INFERENCE_THRESHOLDS.sampleSize);
-  if (!sample.length) return "unknown";
+function uniqueHeader(base = "", used = new Set()) {
+  const fallback = normalizeHeader(base) || "값";
+  let candidate = fallback;
+  let suffix = 2;
 
-  const numberCount = sample.filter((v) => toNumberOrNull(v) != null).length;
-  const dateCount = sample.filter(isDateLike).length;
-  const booleanCount = sample.filter(
-    (v) =>
-      typeof v === "boolean" ||
-      BOOLEAN_VALUES.includes(String(v).trim().toLowerCase()),
-  ).length;
-
-  const ratio = (count) => count / sample.length;
-
-  if (ratio(dateCount) >= COLUMN_INFERENCE_THRESHOLDS.dateRatio) return "date";
-  if (ratio(numberCount) >= COLUMN_INFERENCE_THRESHOLDS.numberRatio)
-    return "number";
-  if (ratio(booleanCount) >= COLUMN_INFERENCE_THRESHOLDS.booleanRatio)
-    return "boolean";
-
-  return "string";
-}
-
-function hasNumericMeasureEvidence(
-  header = "",
-  type = "unknown",
-  profile = {},
-) {
-  const normalizedHeader = normalizeHeaderForDiagnostics(header);
-  const numericRatio = Number(profile.numericRatio || 0);
-  const dateRatio = Number(profile.dateRatio || 0);
-
-  return Boolean(
-    type === "number" &&
-    numericRatio >= 0.7 &&
-    dateRatio < 0.5 &&
-    NUMERIC_MEASURE_HEADER_PATTERN.test(normalizedHeader),
-  );
-}
-
-function hasExplicitDateEvidence(header = "", type = "unknown", profile = {}) {
-  const normalizedHeader = normalizeHeaderForDiagnostics(header);
-  const dateRatio = Number(profile.dateRatio || 0);
-
-  return Boolean(
-    type === "date" ||
-    dateRatio >= 0.5 ||
-    EXPLICIT_DATE_HEADER_PATTERN.test(normalizedHeader),
-  );
-}
-
-function inferColumnRole(header = "", type = "unknown", profile = {}) {
-  const t = String(header).toLowerCase();
-
-  // 숫자형 측정값은 헤더 일부에 "월" 등의 문자열이 포함돼도
-  // 실제 날짜값 증거가 없으면 metric으로 우선 판정한다.
-  if (hasNumericMeasureEvidence(header, type, profile)) return "metric";
-
-  if (
-    hasExplicitDateEvidence(header, type, profile) ||
-    COLUMN_ROLE_PATTERNS.date.test(t)
-  ) {
-    return "date";
+  while (used.has(candidate)) {
+    candidate = `${fallback}_${suffix}`;
+    suffix += 1;
   }
-
-  if (COLUMN_ROLE_PATTERNS.id.test(t)) return "id";
-  if (COLUMN_ROLE_PATTERNS.status.test(t)) return "status";
-  if (type === "number" && COLUMN_ROLE_PATTERNS.metric.test(t)) return "metric";
-  if (type === "category") return "dimension";
-  if (type === "string" || type === "boolean") return "dimension";
-
-  return "unknown";
+  used.add(candidate);
+  return candidate;
 }
 
-function getRowValueByColumn(row = {}, column = {}, index = 0) {
-  if (!row) return undefined;
-
-  if (Array.isArray(row)) {
-    return row[index];
-  }
-
-  const keys = [
-    column.key,
-    column.canonicalKey,
-    column.accessor,
-    column.name,
-    column.header,
-    column.originalHeader,
-  ].filter(Boolean);
-
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(row, key)) return row[key];
-  }
-
-  const normalizedTargets = keys
-    .map(normalizeHeaderForDiagnostics)
-    .filter(Boolean);
-  if (!normalizedTargets.length) return undefined;
-
-  const matchedKey = Object.keys(row).find((key) =>
-    normalizedTargets.includes(normalizeHeaderForDiagnostics(key)),
-  );
-
-  return matchedKey ? row[matchedKey] : undefined;
-}
-
-function getColumnValues(table = {}, header = "", index = 0, column = {}) {
-  const rows = Array.isArray(table.rows) ? table.rows : [];
-  const resolvedColumn = { ...column, header: column.header || header };
-
-  return rows.map((row) => getRowValueByColumn(row, resolvedColumn, index));
-}
-
-function calculateEmptyRatio(rows = []) {
-  if (!rows.length) return 1;
-
-  let total = 0;
-  let empty = 0;
-
-  rows.forEach((row) => {
-    Object.values(row || {}).forEach((value) => {
-      total += 1;
-
-      if (isBlank(value)) {
-        empty += 1;
-      }
-    });
-  });
-
-  if (!total) return 1;
-
-  return empty / total;
-}
-
-function calculateTypeConsistency(columns = []) {
-  if (!columns.length) return 0;
-
-  const valid = columns.filter(
-    (column) => column.type && column.type !== "unknown",
-  );
-
-  return valid.length / columns.length;
-}
-
-function calculateHeaderConfidence(columns = []) {
-  if (!columns.length) return 0;
-
-  const validHeaders = columns.filter((column) => {
-    const header = String(column.header || "").trim();
-
-    return header && !/^column_\d+$/i.test(header) && header.length >= 2;
-  });
-
-  return validHeaders.length / columns.length;
-}
-
-function countDuplicateHeaders(columns = []) {
-  const seen = new Map();
-  let duplicateCount = 0;
-
-  for (const column of columns) {
-    const key = normalizeHeaderForDiagnostics(
-      column.header || column.originalHeader || "",
-    );
-    if (!key) continue;
-    const count = seen.get(key) || 0;
-    if (count > 0) duplicateCount += 1;
-    seen.set(key, count + 1);
-  }
-
-  return duplicateCount;
-}
-
-function buildWarnings({
-  rows = [],
-  columns = [],
-  emptyRatio = 0,
-  headerConfidence = 0,
-  typeConsistency = 0,
-}) {
-  const warnings = [];
-
-  if (!rows.length) {
-    warnings.push("EMPTY_TABLE");
-  }
-
-  if (emptyRatio >= COLUMN_INFERENCE_THRESHOLDS.emptyRatioWarning) {
-    warnings.push("MANY_EMPTY_CELLS");
-  }
-
-  if (headerConfidence < COLUMN_INFERENCE_THRESHOLDS.headerConfidenceWarning) {
-    warnings.push("LOW_CONFIDENCE_HEADER");
-  }
-
-  if (typeConsistency < COLUMN_INFERENCE_THRESHOLDS.typeConsistencyWarning) {
-    warnings.push("LOW_TYPE_CONSISTENCY");
-  }
-
-  if (columns.length <= 1) {
-    warnings.push("TOO_FEW_COLUMNS");
-  }
-
-  if (countDuplicateHeaders(columns) > 0) {
-    warnings.push("DUPLICATE_NORMALIZED_HEADERS");
-  }
-
-  return warnings;
-}
-
-function calculateConfidence({
-  emptyRatio = 0,
-  headerConfidence = 0,
-  typeConsistency = 0,
-}) {
-  const weights = COLUMN_INFERENCE_THRESHOLDS.confidenceWeights;
-  const score =
-    headerConfidence * weights.headerConfidence +
-    typeConsistency * weights.typeConsistency +
-    (1 - emptyRatio) * weights.nonEmptyRatio;
-
-  return Number(score.toFixed(2));
-}
-
-function analyzeColumnValues(values = []) {
-  const sample = values.filter((v) => !isBlank(v));
-  const totalRows = values.length;
-  const nonEmptyCount = sample.length;
-  const emptyRatio = totalRows > 0 ? 1 - nonEmptyCount / totalRows : 1;
-
-  const numberCount = sample.filter((v) => toNumberOrNull(v) != null).length;
-  const dateCount = sample.filter(isDateLike).length;
-  const booleanCount = sample.filter(
-    (v) =>
-      typeof v === "boolean" ||
-      BOOLEAN_VALUES.includes(String(v).trim().toLowerCase()),
-  ).length;
-  const textCount = Math.max(
-    0,
-    nonEmptyCount - numberCount - dateCount - booleanCount,
-  );
-
-  const ratio = (count) => (nonEmptyCount > 0 ? count / nonEmptyCount : 0);
-  const normalizedValues = sample.map((v) => text(v).trim()).filter(Boolean);
-  const uniqueValues = Array.from(new Set(normalizedValues));
-  const uniqueCount = uniqueValues.length;
-  const uniqueRatio = nonEmptyCount > 0 ? uniqueCount / nonEmptyCount : 0;
-
-  const typeRatios = {
-    number: ratio(numberCount),
-    date: ratio(dateCount),
-    boolean: ratio(booleanCount),
-    text: ratio(textCount),
-  };
-  const dominantTypeRatio = Math.max(...Object.values(typeRatios), 0);
-
-  return {
-    totalRows,
-    nonEmptyCount,
-    emptyRatio: Number(emptyRatio.toFixed(3)),
-    uniqueCount,
-    uniqueRatio: Number(uniqueRatio.toFixed(3)),
-    numericRatio: Number(typeRatios.number.toFixed(3)),
-    dateRatio: Number(typeRatios.date.toFixed(3)),
-    booleanRatio: Number(typeRatios.boolean.toFixed(3)),
-    textRatio: Number(typeRatios.text.toFixed(3)),
-    dominantTypeRatio: Number(dominantTypeRatio.toFixed(3)),
-    sampleValues: uniqueValues.slice(0, 10),
-  };
-}
-
-function confidenceFromColumnProfile(
-  profile = {},
-  type = "unknown",
-  role = "unknown",
-) {
-  let typeConfidence = Number(profile.dominantTypeRatio || 0);
-  let roleConfidence = 0.35;
-
-  if (type && type !== "unknown") roleConfidence += 0.25;
-  if (role && role !== "unknown") roleConfidence += 0.25;
-  if (Number(profile.emptyRatio || 0) <= 0.2) roleConfidence += 0.1;
-  if (Number(profile.uniqueRatio || 0) <= 0.6 && role === "dimension") {
-    roleConfidence += 0.05;
-  }
-  if (role === "metric" && Number(profile.numericRatio || 0) >= 0.7) {
-    roleConfidence += 0.1;
-  }
-  if (role === "date" && Number(profile.dateRatio || 0) >= 0.5) {
-    roleConfidence += 0.1;
-  }
-
-  return {
-    typeConfidence: Number(Math.min(1, typeConfidence).toFixed(2)),
-    roleConfidence: Number(Math.min(1, roleConfidence).toFixed(2)),
-  };
-}
-
-function normalizeColumn(column = {}, index = 0, table = {}) {
-  const header =
-    column.header ||
-    column.name ||
-    column.key ||
-    column.label ||
-    `column_${index + 1}`;
-
-  const values = getColumnValues(table, header, column.index ?? index, column);
-  const profile = analyzeColumnValues(values);
-  const inferredType =
-    column.type || column.valueType || inferColumnType(values);
-  const inferredRole =
-    column.role || inferColumnRole(header, inferredType, profile);
-  const confidence = confidenceFromColumnProfile(
-    profile,
-    inferredType,
-    inferredRole,
-  );
-  const normalizedHeader = normalizeHeaderForDiagnostics(header);
-
-  return {
-    header,
-    originalHeader: column.originalHeader || header,
-    normalizedHeader,
-    canonicalKey:
-      column.canonicalKey ||
-      column.key ||
-      canonicalKeyFromHeader(header, `column_${index + 1}`),
-    index: column.index ?? index,
-    type: inferredType,
-    role: inferredRole,
-    quality: Number.isFinite(Number(column.quality))
-      ? Number(column.quality)
-      : null,
-    profile: {
-      emptyRatio: profile.emptyRatio,
-      nonEmptyCount: profile.nonEmptyCount,
-      uniqueCount: profile.uniqueCount,
-      uniqueRatio: profile.uniqueRatio,
-      numericRatio: profile.numericRatio,
-      dateRatio: profile.dateRatio,
-      booleanRatio: profile.booleanRatio,
-      textRatio: profile.textRatio,
-      dominantTypeRatio: profile.dominantTypeRatio,
-      sampleValues: profile.sampleValues,
-    },
-    diagnostics: {
-      typeConfidence: confidence.typeConfidence,
-      roleConfidence: confidence.roleConfidence,
-      roleInferenceVersion: NUMERIC_MEASURE_ROLE_VERSION,
-    },
-  };
-}
-
-function countByRole(columns = []) {
-  return columns.reduce((acc, column) => {
-    const role = column.role || "unknown";
-    acc[role] = (acc[role] || 0) + 1;
-    return acc;
-  }, {});
-}
-
-function hasRole(columns = [], role = "") {
-  return columns.some((column) => column.role === role);
-}
-
-function countRoles(columns = [], roles = []) {
-  return columns.filter((column) => roles.includes(column.role)).length;
-}
-
-function readyState(ready, reasons = []) {
-  return {
-    ready: Boolean(ready),
-    reasons,
-  };
-}
-
-function buildAnalysisReadiness(columns = []) {
-  const hasMetric = hasRole(columns, "metric");
-  const hasDate = hasRole(columns, "date");
-  const hasDimension = hasRole(columns, "dimension");
-  const hasStatus = hasRole(columns, "status");
-  const dimensionLikeCount = countRoles(columns, ["dimension", "status"]);
-
-  return {
-    groupSummary: readyState(hasMetric && hasDimension, [
-      hasMetric ? "HAS_METRIC" : "MISSING_METRIC",
-      hasDimension ? "HAS_DIMENSION" : "MISSING_DIMENSION",
-    ]),
-    timeTrend: readyState(hasMetric && hasDate, [
-      hasMetric ? "HAS_METRIC" : "MISSING_METRIC",
-      hasDate ? "HAS_DATE" : "MISSING_DATE",
-    ]),
-    categoryCount: readyState(hasDimension || hasStatus, [
-      hasDimension || hasStatus
-        ? "HAS_CATEGORY_OR_STATUS"
-        : "MISSING_CATEGORY_OR_STATUS",
-    ]),
-    topBottom: readyState(hasMetric && dimensionLikeCount >= 1, [
-      hasMetric ? "HAS_METRIC" : "MISSING_METRIC",
-      dimensionLikeCount >= 1 ? "HAS_LABEL" : "MISSING_LABEL",
-    ]),
-  };
-}
-
-function readinessKeys(readiness = {}) {
-  return Object.entries(readiness)
-    .filter(([, value]) => value?.ready)
-    .map(([key]) => key);
-}
-
-function buildStructureSignals(columns = [], readiness = {}) {
-  const roleCounts = countByRole(columns);
-  const ready = readinessKeys(readiness);
-
-  return {
-    periodMetric: Boolean(readiness.timeTrend?.ready),
-    categorySummary: Boolean(readiness.groupSummary?.ready),
-    rosterStatus: Boolean(
-      (roleCounts.dimension || 0) >= 2 ||
-      ((roleCounts.dimension || 0) >= 1 && (roleCounts.status || 0) >= 1),
+function unitColumn(table = {}) {
+  return (table.columns || []).find((column) =>
+    UNIT_HEADER_PATTERN.test(
+      normalizeHeader(column.header || column.originalHeader || ""),
     ),
-    analysisRecipeCount: ready.length,
-    supportedAnalysisTypes: ready,
-  };
+  );
 }
 
-function buildQueryabilityGrade({
-  rows = [],
-  columns = [],
-  warnings = [],
-  confidence = 0,
-  readiness = {},
-}) {
-  const reasons = [];
-  const supported = readinessKeys(readiness);
-
-  if (!rows.length) reasons.push("NO_DATA_ROWS");
-  if (columns.length <= 1) reasons.push("TOO_FEW_COLUMNS");
-  if (warnings.includes("LOW_CONFIDENCE_HEADER"))
-    reasons.push("LOW_CONFIDENCE_HEADER");
-  if (warnings.includes("LOW_TYPE_CONSISTENCY"))
-    reasons.push("LOW_TYPE_CONSISTENCY");
-  if (!supported.length) reasons.push("NO_ANALYSIS_READY_RECIPE");
-
-  if (!rows.length || columns.length <= 1 || Number(confidence || 0) < 0.35) {
-    return { grade: "Q0", reasons };
-  }
-
-  if (warnings.includes("LOW_CONFIDENCE_HEADER") || !supported.length) {
-    return { grade: "Q1", reasons };
-  }
-
-  if (Number(confidence || 0) >= 0.72 && supported.length >= 2) {
-    return {
-      grade: "Q3",
-      reasons: reasons.length
-        ? reasons
-        : ["HIGH_CONFIDENCE_MULTI_RECIPE_READY"],
-    };
-  }
-
-  return {
-    grade: "Q2",
-    reasons: reasons.length ? reasons : ["QUERYABLE_ANALYSIS_READY"],
-  };
+function metricIdentityColumn(table = {}) {
+  return (table.columns || []).find((column) =>
+    METRIC_IDENTITY_HEADER_PATTERN.test(
+      normalizeHeader(column.header || column.originalHeader || ""),
+    ),
+  );
 }
 
-function buildDiagnostics({
-  table = {},
-  rows = [],
-  columns = [],
-  warnings = [],
-  emptyRatio = 0,
-  headerConfidence = 0,
-  typeConsistency = 0,
-  confidence = 0,
-}) {
-  const roleCounts = countByRole(columns);
-  const readiness = buildAnalysisReadiness(columns);
-  const structureSignals = buildStructureSignals(columns, readiness);
-  const grade = buildQueryabilityGrade({
-    rows,
-    columns,
-    warnings,
-    confidence,
-    readiness,
-  });
-  const excludedRows = Array.isArray(table.excludedRows)
-    ? table.excludedRows
-    : [];
-
-  return {
-    version: DIAGNOSTICS_VERSION,
-    queryabilityGrade: grade.grade,
-    queryabilityReasons: grade.reasons,
-    metrics: {
-      rowCount: rows.length,
-      columnCount: columns.length,
-      emptyRatio: Number(emptyRatio.toFixed(3)),
-      headerConfidence: Number(headerConfidence.toFixed(3)),
-      typeConsistency: Number(typeConsistency.toFixed(3)),
-      confidence,
-      excludedRowCount: excludedRows.length,
-      summaryRowCount: Array.isArray(table.summaryRows)
-        ? table.summaryRows.length
-        : 0,
-      isFallback: Boolean(table.isFallback),
-      source: table.source || (table.isFallback ? "fallback" : "tableBlock"),
-      isVirtual: Boolean(table.isVirtual),
-      transformationType: table.transformation?.type || null,
-      tableUsage: normalizeTableUsage(table),
-    },
-    transformation: table.transformation || null,
-    tableUsage: normalizeTableUsage(table),
-    roleCounts,
-    analysisReadiness: readiness,
-    structureSignals,
-    inheritedQuality: {
-      tableBlockScore: table.score ?? table.blockScore ?? null,
-      dataQuality: table.dataQuality || null,
-      headerQuality: table.headerQuality || null,
-    },
-  };
-}
-
-function findWideTemporalMetricColumns(table = {}) {
+function temporalMetricColumns(table = {}) {
   const rows = Array.isArray(table.rows) ? table.rows : [];
-  const columns = Array.isArray(table.columns) ? table.columns : [];
-
-  return columns
-    .map((column) => ({
-      column,
-      temporal: parseTemporalHeader(
-        column.header || column.originalHeader || "",
-      ),
-      numericRatio: numericRatioForColumn(rows, column),
-    }))
+  return (table.columns || [])
+    .map((column) => {
+      const profile = numericProfileForColumn(rows, column);
+      return {
+        column,
+        temporal: parseTemporalHeader(
+          column.header || column.originalHeader || "",
+        ),
+        numericRatio: profile.numericRatio,
+        profile,
+      };
+    })
     .filter(
       (item) =>
         item.temporal &&
-        item.numericRatio >= 0.6 &&
+        item.profile.numericCount >= 1 &&
+        (item.profile.numericRatio >= 0.2 || item.column.role === "metric") &&
         !["id", "status"].includes(String(item.column.role || "")),
     );
 }
 
-function findTemporalContextColumns(table = {}, wideColumns = []) {
-  const wideSet = new Set(wideColumns.map((item) => item.column));
+function temporalContextColumns(table = {}, temporalColumns = []) {
+  const temporalSet = new Set(temporalColumns.map((item) => item.column));
   return (table.columns || []).filter((column) => {
-    if (wideSet.has(column)) return false;
-    const header = column.header || column.originalHeader || "";
-    const role = String(column.role || "");
-    const parsed = parseTemporalHeader(header);
+    if (temporalSet.has(column)) return false;
+    const header = normalizeHeader(
+      column.header || column.originalHeader || "",
+    );
     return (
-      role === "date" ||
-      Boolean(parsed) ||
-      /연도|년도|년월|연월|날짜|일자|date|year|period/i.test(header)
+      column.role === "date" ||
+      /^(?:기간|연도|년도|년월|연월|날짜|일자|date|year|month|period)$/i.test(
+        header,
+      )
     );
   });
 }
 
-function selectWideDimensionColumns(
+function preferredDimensionColumns(
   table = {},
-  wideColumns = [],
-  contextColumns = [],
+  valueColumns = [],
+  excludedColumns = [],
 ) {
-  const wideSet = new Set(wideColumns.map((item) => item.column));
-  const contextSet = new Set(contextColumns);
-  const columns = Array.isArray(table.columns) ? table.columns : [];
+  const valueSet = new Set(valueColumns.map((item) => item.column || item));
+  const excluded = new Set(excludedColumns.filter(Boolean));
 
-  const preferred = columns.filter((column) => {
-    if (wideSet.has(column) || contextSet.has(column)) return false;
-    const role = String(column.role || "");
-    if (["metric"].includes(role)) return false;
-    return (
-      ["dimension", "status", "id"].includes(role) ||
-      ["string", "category", "boolean"].includes(String(column.type || ""))
+  return (table.columns || [])
+    .filter((column) => {
+      if (valueSet.has(column) || excluded.has(column)) return false;
+      return ["dimension", "status"].includes(String(column.role || ""));
+    })
+    .sort((left, right) => {
+      const leftScore =
+        (left.role === "dimension" ? 10 : 0) +
+        (DIMENSION_HEADER_PATTERN.test(left.header || "") ? 5 : 0) +
+        Number(left.index || 0) / 100;
+      const rightScore =
+        (right.role === "dimension" ? 10 : 0) +
+        (DIMENSION_HEADER_PATTERN.test(right.header || "") ? 5 : 0) +
+        Number(right.index || 0) / 100;
+      return rightScore - leftScore;
+    })
+    .slice(0, 6);
+}
+
+function pairedDimensionGroupKey(header = "") {
+  const normalized = normalizeHeader(header);
+  const match = normalized.match(/^(.*?)(?:\(|\[)?[12](?:\)|\])?$/);
+  return match ? normalizedHeaderKey(match[1]) : "";
+}
+
+function buildDimensionResolvers(table = {}, dimensionSpecs = []) {
+  const rows = Array.isArray(table.rows) ? table.rows : [];
+  const groupCounts = new Map();
+
+  for (const spec of dimensionSpecs) {
+    const groupKey = pairedDimensionGroupKey(
+      spec.column.header || spec.column.originalHeader || "",
     );
+    if (groupKey) {
+      groupCounts.set(groupKey, (groupCounts.get(groupKey) || 0) + 1);
+    }
+  }
+
+  return dimensionSpecs.map((spec) => {
+    const values = rows
+      .map((row) => rowValue(row, spec.column, spec.column.index ?? 0))
+      .filter((value) => !isBlank(value));
+    const normalizedValues = values.map(normalizeWhitespace);
+    const numericFrequencies = new Map();
+    const textValues = [];
+
+    normalizedValues.forEach((value) => {
+      if (toNumberOrNull(value) != null) {
+        numericFrequencies.set(value, (numericFrequencies.get(value) || 0) + 1);
+      } else {
+        textValues.push(value);
+      }
+    });
+
+    const groupKey = pairedDimensionGroupKey(
+      spec.column.header || spec.column.originalHeader || "",
+    );
+    const pairedGroup = groupKey && (groupCounts.get(groupKey) || 0) >= 2;
+
+    const placeholderValues = new Set(
+      [...numericFrequencies.entries()]
+        .filter(
+          ([, frequency]) =>
+            pairedGroup && textValues.length >= 2 && frequency >= 2,
+        )
+        .map(([value]) => value),
+    );
+
+    return {
+      ...spec,
+      placeholderValues,
+      fillDown: placeholderValues.size > 0 && textValues.length >= 2,
+      lastAnchor: "",
+    };
   });
-
-  if (preferred.length) return preferred.slice(0, 4);
-
-  return columns
-    .filter((column) => !wideSet.has(column) && !contextSet.has(column))
-    .slice(0, 3);
 }
 
-function mergeTemporalContext(headerTemporal = {}, rowTemporal = null) {
-  const merged = {
-    ...headerTemporal,
-  };
+function resolvedDimensionValue(resolver = {}, rawValue) {
+  const normalized = normalizeWhitespace(rawValue);
+  const isPlaceholder = resolver.placeholderValues?.has(normalized);
 
-  if (rowTemporal?.year && !merged.year) merged.year = rowTemporal.year;
-  if (rowTemporal?.month && !merged.month) merged.month = rowTemporal.month;
-  if (rowTemporal?.quarter && !merged.quarter)
-    merged.quarter = rowTemporal.quarter;
+  if (
+    resolver.fillDown &&
+    (isBlank(rawValue) || isPlaceholder) &&
+    resolver.lastAnchor
+  ) {
+    return resolver.lastAnchor;
+  }
 
-  if (merged.year && merged.month)
-    merged.periodLabel = `${merged.year}-${merged.month}`;
-  else if (merged.year && merged.quarter)
-    merged.periodLabel = `${merged.year}-${merged.quarter}`;
-  else if (merged.year) merged.periodLabel = merged.year;
-  else if (merged.month) merged.periodLabel = `${merged.month}월`;
-  else if (merged.quarter) merged.periodLabel = merged.quarter;
+  if (normalized && !isPlaceholder && toNumberOrNull(normalized) == null) {
+    resolver.lastAnchor = normalized;
+  }
 
-  return merged;
+  return rawValue ?? "";
 }
 
-function getRowTemporalContext(row = {}, contextColumns = []) {
+function tableHasAverageContext(table = {}) {
+  const context = tableContextText(table);
+  if (AVERAGE_CONTEXT_PATTERN.test(context)) return true;
+
+  return (table.columns || []).some((column) =>
+    /기간평균|평균값|요약.*평균/i.test(
+      normalizeHeader(column.header || column.originalHeader || ""),
+    ),
+  );
+}
+
+function isMeasurementContext(metricLabel = "", table = {}) {
+  return MEASUREMENT_CONTEXT_PATTERN.test(
+    `${metricLabel} ${tableContextText(table)}`,
+  );
+}
+
+function aggregationForMetric(
+  metricLabel = "",
+  unit = "",
+  column = {},
+  { table = {}, profile = {} } = {},
+) {
+  const declared = normalizeDeclaredAggregation(
+    column.aggregation || column.metricKind || column.meta?.aggregation || "",
+  );
+  if (declared) return declared;
+
+  const normalizedUnit = normalizeHeader(unit);
+  const evidence = [metricLabel, column.semanticType, column.metricKind]
+    .filter(Boolean)
+    .join(" ");
+
+  if (NON_ADDITIVE_UNIT_PATTERN.test(normalizedUnit)) {
+    return "average";
+  }
+
+  if (NON_ADDITIVE_METRIC_PATTERN.test(evidence)) {
+    return "average";
+  }
+
+  if (
+    /^회$/i.test(normalizedUnit) &&
+    isMeasurementContext(metricLabel, table)
+  ) {
+    return "average";
+  }
+
+  if (tableHasAverageContext(table)) {
+    return "average";
+  }
+
+  if (
+    looksLikePercentageProfile(profile) &&
+    !COUNT_CONTEXT_PATTERN.test(metricLabel)
+  ) {
+    return "average";
+  }
+
+  return "sum";
+}
+
+function getRowTemporalContext(row, contextColumns = []) {
   for (const column of contextColumns) {
-    const value = getRowValueByColumn(row, column, column.index ?? 0);
-    const parsed = parseTemporalValue(value);
+    const parsed = parseTemporalValue(rowValue(row, column, column.index ?? 0));
     if (parsed) return parsed;
   }
   return null;
 }
 
-function buildWideToLongVirtualTable(table = {}, index = 0) {
+function mergeTemporal(headerTemporal = {}, rowTemporal = null) {
+  if (!rowTemporal) return { ...headerTemporal };
+
+  if (
+    headerTemporal.type === "month" &&
+    /^\d{2}월$/.test(headerTemporal.period)
+  ) {
+    const month = headerTemporal.period.slice(0, 2);
+    if (rowTemporal.year) {
+      return {
+        ...headerTemporal,
+        year: rowTemporal.year,
+        period: `${rowTemporal.year}-${month}`,
+      };
+    }
+  }
+
+  if (headerTemporal.type === "year" && rowTemporal?.period) {
+    return { ...headerTemporal };
+  }
+
+  return { ...headerTemporal };
+}
+
+function buildWideToLongVirtualTable(table = {}, index = 0, context = {}) {
+  table =
+    table?.normalization?.version === NORMALIZATION_VERSION
+      ? table
+      : normalizeTable(table, index);
+
+  if (!isAnalysisEligibleTable(table)) return null;
+  if (table?.transformation?.type) return null;
+
   const rows = Array.isArray(table.rows) ? table.rows : [];
   const columns = Array.isArray(table.columns) ? table.columns : [];
   if (!rows.length || columns.length < 3) return null;
-  if (table?.transformation?.type === "wideToLong") return null;
 
-  const wideColumns = findWideTemporalMetricColumns(table);
-  if (wideColumns.length < 2) return null;
+  const temporalColumns = temporalMetricColumns(table);
+  if (temporalColumns.length < 2) return null;
 
-  const contextColumns = findTemporalContextColumns(table, wideColumns);
-  const dimensionColumns = selectWideDimensionColumns(
-    table,
-    wideColumns,
-    contextColumns,
-  );
+  const contextColumns = temporalContextColumns(table, temporalColumns);
+  const rowUnitColumn = unitColumn(table);
+  const rowMetricColumn = metricIdentityColumn(table);
+  const dimensions = preferredDimensionColumns(table, temporalColumns, [
+    rowUnitColumn,
+    rowMetricColumn,
+    ...contextColumns,
+  ]);
 
-  if (!dimensionColumns.length && !contextColumns.length) return null;
+  if (!dimensions.length && !rowMetricColumn) return null;
 
+  const classification = classifyRows(table, columns, temporalColumns, {
+    context,
+  });
   const usedHeaders = new Set();
-  const dimensionSpecs = dimensionColumns.map((column) => ({
-    column,
-    outputHeader: uniqueHeader(
-      column.header || column.originalHeader || "항목",
-      usedHeaders,
-    ),
-  }));
+  const dimensionSpecs = buildDimensionResolvers(
+    table,
+    dimensions.map((column) => ({
+      column,
+      outputHeader: uniqueHeader(
+        column.header || column.originalHeader || "구분",
+        usedHeaders,
+      ),
+    })),
+  );
 
   const periodHeader = uniqueHeader("기간", usedHeaders);
   const yearHeader = uniqueHeader("연도", usedHeaders);
-  const monthHeader = uniqueHeader("월", usedHeaders);
-  const quarterHeader = uniqueHeader("분기", usedHeaders);
-  const metricNameHeader = uniqueHeader("지표명", usedHeaders);
-  const metricValueHeader = uniqueHeader("지표값", usedHeaders);
+  const metricHeader = uniqueHeader("지표명", usedHeaders);
+  const unitHeader = uniqueHeader("단위", usedHeaders);
+  const valueHeader = uniqueHeader("지표값", usedHeaders);
+  const aggregationHeader = uniqueHeader("집계유형", usedHeaders);
 
   const outputRows = [];
-  const metricLabels = new Set();
+  const summaryRows = [];
+  const excludedRows = [];
 
-  for (const row of rows) {
+  rows.forEach((row, rowIndex) => {
+    const rowClass = classification.classifications[rowIndex];
+
+    if (rowClass.kind === "excluded") {
+      excludedRows.push({
+        row: cloneValue(row),
+        reason: rowClass.reasons.join(","),
+        sourceRowIndex: rowIndex,
+      });
+      return;
+    }
+
+    if (rowClass.kind === "summary") {
+      summaryRows.push({
+        row: cloneValue(row),
+        reason: rowClass.reasons.join(","),
+        sourceRowIndex: rowIndex,
+      });
+      return;
+    }
+
     const rowTemporal = getRowTemporalContext(row, contextColumns);
+    const rowMetric = rowMetricColumn
+      ? normalizeWhitespace(
+          rowValue(row, rowMetricColumn, rowMetricColumn.index ?? 0),
+        )
+      : "";
+    const rowUnit = rowUnitColumn
+      ? normalizeWhitespace(
+          rowValue(row, rowUnitColumn, rowUnitColumn.index ?? 0),
+        )
+      : "";
 
-    for (const item of wideColumns) {
-      const rawValue = getRowValueByColumn(
-        row,
-        item.column,
-        item.column.index ?? 0,
+    for (const item of temporalColumns) {
+      const value = toNumberOrNull(
+        rowValue(row, item.column, item.column.index ?? 0),
       );
-      const value = toNumberOrNull(rawValue);
       if (value == null) continue;
 
-      const temporal = mergeTemporalContext(item.temporal, rowTemporal);
-      const metricLabel = temporal.metricLabel || "지표값";
-      metricLabels.add(metricLabel);
+      const temporal = mergeTemporal(item.temporal, rowTemporal);
+      const rawMetricLabel =
+        rowMetric ||
+        normalizeHeader(item.temporal.metricLabel) ||
+        stripUnitSuffix(item.column.header || "") ||
+        "지표값";
+      const metricLabel = inferGenericCountMetricLabel({
+        metricLabel: rawMetricLabel,
+        sourceHeader: item.column.header || item.column.originalHeader || "",
+        dimensions,
+        profile: item.profile,
+      });
+      const unit = inferMetricUnit({
+        metricLabel,
+        localUnit:
+          rowUnit ||
+          item.temporal.unit ||
+          item.column.unit ||
+          extractHeaderUnit(item.column.header || ""),
+        context,
+        profile: item.profile,
+      });
+      const aggregation = aggregationForMetric(metricLabel, unit, item.column, {
+        table,
+        profile: item.profile,
+        context,
+      });
 
-      const out = {};
+      const output = {};
       for (const spec of dimensionSpecs) {
-        out[spec.outputHeader] =
-          getRowValueByColumn(row, spec.column, spec.column.index ?? 0) ?? "";
+        output[spec.outputHeader] = resolvedDimensionValue(
+          spec,
+          rowValue(row, spec.column, spec.column.index ?? 0),
+        );
       }
-
-      out[periodHeader] = temporal.periodLabel || item.temporal.raw;
-      if (temporal.year) out[yearHeader] = temporal.year;
-      if (temporal.month) out[monthHeader] = temporal.month;
-      if (temporal.quarter) out[quarterHeader] = temporal.quarter;
-      out[metricNameHeader] = metricLabel;
-      out[metricValueHeader] = value;
-
-      outputRows.push(out);
+      output[periodHeader] = temporal.period || item.temporal.raw;
+      if (temporal.year) output[yearHeader] = temporal.year;
+      output[metricHeader] = metricLabel;
+      if (unit) output[unitHeader] = unit;
+      output[valueHeader] = value;
+      output[aggregationHeader] = aggregation;
+      outputRows.push(output);
     }
-  }
+  });
 
   if (!outputRows.length) return null;
 
@@ -979,23 +1606,41 @@ function buildWideToLongVirtualTable(table = {}, index = 0) {
         sourceColumn: spec.column,
       }),
     ),
-    makeVirtualColumn({ header: periodHeader, type: "date", role: "date" }),
-    makeVirtualColumn({ header: yearHeader, type: "string", role: "date" }),
-    makeVirtualColumn({ header: monthHeader, type: "category", role: "date" }),
     makeVirtualColumn({
-      header: quarterHeader,
-      type: "category",
+      header: periodHeader,
+      type: "date",
       role: "date",
+      semanticType: "period",
     }),
     makeVirtualColumn({
-      header: metricNameHeader,
+      header: yearHeader,
+      type: "string",
+      role: "date",
+      semanticType: "year",
+    }),
+    makeVirtualColumn({
+      header: metricHeader,
       type: "category",
       role: "dimension",
+      semanticType: "metricIdentity",
     }),
     makeVirtualColumn({
-      header: metricValueHeader,
+      header: unitHeader,
+      type: "category",
+      role: "dimension",
+      semanticType: "unit",
+    }),
+    makeVirtualColumn({
+      header: valueHeader,
       type: "number",
       role: "metric",
+      semanticType: "measure",
+    }),
+    makeVirtualColumn({
+      header: aggregationHeader,
+      type: "category",
+      role: "dimension",
+      semanticType: "aggregation",
     }),
   ].filter((column) =>
     outputRows.some((row) =>
@@ -1003,266 +1648,225 @@ function buildWideToLongVirtualTable(table = {}, index = 0) {
     ),
   );
 
-  return {
-    tableId: `${table.tableId || `table_${index + 1}`}#WIDE_LONG`,
-    sourceTableId: table.tableId || null,
-    sheetName: table.sheetName || "",
-    tableType: "wide_to_long",
-    source: "normalizedWideToLong",
-    isVirtual: true,
-    range: table.range || null,
-    dataRange: table.dataRange || null,
-    headerRows: table.headerRows || [],
-    dataStartRow: table.dataStartRow ?? null,
-    columns: virtualColumns,
-    rows: outputRows,
-    excludedRows: [],
-    warnings: [],
-    confidence: Math.min(
-      0.92,
-      Math.max(0.68, Number(table.confidence || 0.72)),
-    ),
-    tableUsage: inheritVirtualTableUsage(table, "wide_to_long"),
-    transformation: {
-      version: "wide_to_long_normalization_v1",
-      type: "wideToLong",
+  return normalizeTable(
+    {
+      tableId: `${table.tableId || `table_${index + 1}`}#WIDE_LONG`,
       sourceTableId: table.tableId || null,
-      sourceColumnCount: columns.length,
-      sourceRowCount: rows.length,
-      generatedRowCount: outputRows.length,
-      dimensionColumns: dimensionSpecs.map((spec) => spec.column.header),
-      temporalMetricColumns: wideColumns.map((item) => ({
-        header: item.column.header,
-        periodLabel: item.temporal.periodLabel,
-        numericRatio: Number(item.numericRatio.toFixed(3)),
-      })),
-      metricLabels: Array.from(metricLabels).slice(0, 20),
+      sheetName: table.sheetName || "",
+      tableType: "wide_to_long",
+      source: "normalizedWideToLong",
+      isVirtual: true,
+      range: table.range || null,
+      dataRange: table.dataRange || null,
+      headerRows: cloneValue(table.headerRows || []),
+      dataStartRow: table.dataStartRow ?? null,
+      columns: virtualColumns,
+      rows: outputRows,
+      excludedRows,
+      summaryRows,
+      warnings: [],
+      confidence: Math.min(
+        0.94,
+        Math.max(0.7, Number(table.confidence || 0.75)),
+      ),
+      tableUsage: inheritVirtualTableUsage(table, "wide_to_long"),
+      transformation: {
+        version: WIDE_TO_LONG_VERSION,
+        type: "wideToLong",
+        sourceTableId: table.tableId || null,
+        sourceColumnCount: columns.length,
+        sourceRowCount: rows.length,
+        generatedRowCount: outputRows.length,
+        excludedRowCount: excludedRows.length,
+        summaryRowCount: summaryRows.length,
+        dimensionColumns: dimensionSpecs.map((spec) => spec.column.header),
+        temporalMetricColumns: temporalColumns.map((item) => ({
+          header: item.column.header,
+          period: item.temporal.period,
+          metricLabel: item.temporal.metricLabel,
+          unit: item.temporal.unit || item.column.unit || "",
+          numericRatio: Number(item.numericRatio.toFixed(3)),
+        })),
+        outputHeaders: {
+          period: periodHeader,
+          year: yearHeader,
+          metricName: metricHeader,
+          unit: unitHeader,
+          metricValue: valueHeader,
+          aggregation: aggregationHeader,
+        },
+        sourcePreserved: true,
+      },
     },
-  };
+    index,
+  );
 }
 
-function buildWideToLongVirtualTables(normalizedTables = []) {
-  const out = [];
-
-  for (let i = 0; i < normalizedTables.length; i += 1) {
-    if (!isAnalysisEligibleTable(normalizedTables[i])) continue;
-    const virtualTable = buildWideToLongVirtualTable(normalizedTables[i], i);
-    if (virtualTable)
-      out.push(
-        normalizeTable(virtualTable, normalizedTables.length + out.length),
-      );
-  }
-
-  return out;
-}
-
-function isCrossMetricHeaderCandidate(header = "") {
-  const value = normalizeHeader(header);
-  if (!value) return false;
-  if (parseTemporalHeader(value)) return false;
-
-  // 문장/주석형 긴 헤더는 cross axis라기보다 설명 컬럼일 가능성이 높다.
-  if (value.length > 40) return false;
-  if (/[.!?。]|입니다|합니다/.test(value)) return false;
-
-  return true;
-}
-
-function findCrossMetricColumns(table = {}) {
+function crossMetricColumns(table = {}) {
   const rows = Array.isArray(table.rows) ? table.rows : [];
-  const columns = Array.isArray(table.columns) ? table.columns : [];
 
-  return columns
+  return (table.columns || [])
     .map((column) => {
-      const header = column.header || column.originalHeader || "";
-      const role = String(column.role || "");
-      const type = String(column.type || "");
-      const numericRatio = numericRatioForColumn(rows, column);
+      const header = normalizeHeader(
+        column.header || column.originalHeader || "",
+      );
+      const profile = numericProfileForColumn(rows, column);
       return {
         column,
         header,
-        role,
-        type,
-        numericRatio,
+        numericRatio: profile.numericRatio,
+        profile,
       };
     })
     .filter((item) => {
-      if (!isCrossMetricHeaderCandidate(item.header)) return false;
-      if (["id", "status", "date"].includes(item.role)) return false;
+      if (!item.header || item.header.length > 120) return false;
       if (parseTemporalHeader(item.header)) return false;
-
-      // cross table의 값 영역은 숫자 비율이 높아야 한다.
-      // role/type은 참고만 하고 실제 값이 숫자로 읽혀야 변환한다.
-      return item.numericRatio >= 0.6;
+      if (UNIT_HEADER_PATTERN.test(item.header)) return false;
+      if (METRIC_IDENTITY_HEADER_PATTERN.test(item.header)) return false;
+      if (["id", "status", "date"].includes(String(item.column.role || ""))) {
+        return false;
+      }
+      if (item.column.role === "dimension" && item.profile.numericRatio < 0.9) {
+        return false;
+      }
+      return item.profile.numericCount >= 1 && item.profile.numericRatio >= 0.2;
     });
 }
 
-function findCrossDimensionColumns(table = {}, crossColumns = []) {
-  const crossSet = new Set(crossColumns.map((item) => item.column));
-  const rows = Array.isArray(table.rows) ? table.rows : [];
-  const columns = Array.isArray(table.columns) ? table.columns : [];
-
-  const preferred = columns.filter((column) => {
-    if (crossSet.has(column)) return false;
-    const header = column.header || column.originalHeader || "";
-    const role = String(column.role || "");
-    const type = String(column.type || "");
-    const numericRatio = numericRatioForColumn(rows, column);
-
-    if (parseTemporalHeader(header)) return false;
-    if (role === "metric" || type === "number") return false;
-    if (numericRatio >= 0.5) return false;
-
-    return (
-      ["dimension", "status", "id"].includes(role) ||
-      ["string", "category", "boolean", "text"].includes(type)
-    );
-  });
-
-  if (preferred.length) return preferred.slice(0, 5);
-
-  // 역할 추론이 약한 테이블을 위한 보수적 fallback.
-  return columns
-    .filter((column) => !crossSet.has(column))
-    .filter((column) => numericRatioForColumn(rows, column) < 0.5)
-    .slice(0, 3);
+function crossDimensionColumns(table = {}, metricColumns = []) {
+  const metricSet = new Set(metricColumns.map((item) => item.column));
+  return (table.columns || [])
+    .filter((column) => !metricSet.has(column))
+    .filter((column) => !UNIT_HEADER_PATTERN.test(column.header || ""))
+    .filter((column) =>
+      ["dimension", "status", "id"].includes(String(column.role || "")),
+    )
+    .slice(0, 6);
 }
 
-function normalizeCrossAxisHeader(value = "") {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[()\[\]{}]/g, "")
-    .trim();
+function likelyCrossTable(table = {}, metrics = [], dimensions = []) {
+  if (metrics.length < 2 || !dimensions.length) return false;
+  if (metrics.some((item) => parseTemporalHeader(item.header))) return false;
+
+  const total = Math.max(1, (table.columns || []).length);
+  const metricRatio = metrics.length / total;
+  return metricRatio >= 0.35 || metrics.length >= 3;
 }
 
-function isPeriodCrossAxisHeader(value = "") {
-  const header = normalizeCrossAxisHeader(value);
-  if (!header) return false;
-
-  return (
-    /^(?:19|20)\d{2}(?:[.\-_/년]?(?:0?[1-9]|1[0-2])(?:월)?)?$/.test(header) ||
-    /^(?:0?[1-9]|1[0-2])월$/.test(header) ||
-    /^(?:q[1-4]|[1-4]분기)$/.test(header) ||
-    /^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)$/.test(header)
-  );
-}
-
-function crossAxisStem(value = "") {
-  return normalizeCrossAxisHeader(value)
-    .replace(/(?:19|20)\d{2}/g, "")
-    .replace(/(?:0?[1-9]|1[0-2])월/g, "")
-    .replace(/(?:q[1-4]|[1-4]분기)/g, "")
-    .replace(/\d+/g, "")
-    .replace(/[.\-_/:%]/g, "")
-    .trim();
-}
-
-function hasRepeatedCrossAxisEvidence(crossColumns = []) {
-  const headers = crossColumns
-    .map((item) => String(item.header || item.column?.header || "").trim())
-    .filter(Boolean);
-  if (headers.length < 2) return false;
-
-  const periodHeaderCount = headers.filter(isPeriodCrossAxisHeader).length;
-  if (periodHeaderCount >= 2) return true;
-
-  const stemCounts = new Map();
-  for (const header of headers) {
-    const stem = crossAxisStem(header);
-    if (!stem || stem.length < 2) continue;
-    stemCounts.set(stem, (stemCounts.get(stem) || 0) + 1);
-  }
-
-  const maxSharedStemCount = Math.max(0, ...stemCounts.values());
-  return maxSharedStemCount >= 2 && maxSharedStemCount / headers.length >= 0.6;
-}
-
-function isLikelyCrossTable(
+function buildCrossTableToLongVirtualTable(
   table = {},
-  crossColumns = [],
-  dimensionColumns = [],
+  index = 0,
+  context = {},
 ) {
-  const rows = Array.isArray(table.rows) ? table.rows : [];
-  const columns = Array.isArray(table.columns) ? table.columns : [];
+  table =
+    table?.normalization?.version === NORMALIZATION_VERSION
+      ? table
+      : normalizeTable(table, index);
 
-  if (!rows.length || columns.length < 3) return false;
-  if (crossColumns.length < 2 || !dimensionColumns.length) return false;
+  if (!isAnalysisEligibleTable(table)) return null;
+  if (table?.transformation?.type) return null;
 
-  const crossRatio = crossColumns.length / columns.length;
-  const allCrossHeadersShort = crossColumns.every(
-    (item) => String(item.header || "").trim().length <= 40,
-  );
-
-  if (!allCrossHeadersShort) return false;
-
-  // CROSS_LONG은 반복 축(월/분기/연도 또는 동일 지표의 기간별 컬럼)이거나
-  // dimension 1~2개에 값 컬럼이 집중된 실제 행렬형 표에만 생성한다.
-  // 일반 fact table의 서로 다른 숫자 지표(매출, 수량, 비용, 사용량 등)를
-  // 하나의 `지표값`으로 합치는 오탐을 여기서 우선 차단한다.
-  const repeatedAxisEvidence = hasRepeatedCrossAxisEvidence(crossColumns);
-  const semanticMeasureHeaderCount = crossColumns.filter((item) =>
-    NUMERIC_MEASURE_HEADER_PATTERN.test(
-      String(item.header || item.column?.header || ""),
-    ),
-  ).length;
-  const hasDistinctMeasureHeaders = semanticMeasureHeaderCount >= 2;
-  const compactMatrixShape =
-    dimensionColumns.length <= 2 &&
-    (crossRatio >= 0.5 || crossColumns.length >= 4) &&
-    !hasDistinctMeasureHeaders;
-
-  return repeatedAxisEvidence || compactMatrixShape;
-}
-
-function buildCrossTableToLongVirtualTable(table = {}, index = 0) {
   const rows = Array.isArray(table.rows) ? table.rows : [];
   const columns = Array.isArray(table.columns) ? table.columns : [];
   if (!rows.length || columns.length < 3) return null;
-  if (table?.transformation?.type) return null;
 
-  const crossColumns = findCrossMetricColumns(table);
-  const dimensionColumns = findCrossDimensionColumns(table, crossColumns);
+  if (temporalMetricColumns(table).length >= 2) return null;
 
-  if (!isLikelyCrossTable(table, crossColumns, dimensionColumns)) return null;
+  const metrics = crossMetricColumns(table);
+  const dimensions = crossDimensionColumns(table, metrics);
+  if (!likelyCrossTable(table, metrics, dimensions)) return null;
 
+  const classification = classifyRows(table, columns, metrics, { context });
+  const rowUnitColumn = unitColumn(table);
   const usedHeaders = new Set();
-  const dimensionSpecs = dimensionColumns.map((column) => ({
-    column,
-    outputHeader: uniqueHeader(
-      column.header || column.originalHeader || "행 항목",
-      usedHeaders,
-    ),
-  }));
+  const dimensionSpecs = buildDimensionResolvers(
+    table,
+    dimensions.map((column) => ({
+      column,
+      outputHeader: uniqueHeader(
+        column.header || column.originalHeader || "구분",
+        usedHeaders,
+      ),
+    })),
+  );
 
-  const crossAxisHeader = uniqueHeader("교차항목", usedHeaders);
-  const metricNameHeader = uniqueHeader("지표명", usedHeaders);
-  const metricValueHeader = uniqueHeader("지표값", usedHeaders);
+  const metricHeader = uniqueHeader("지표명", usedHeaders);
+  const unitHeader = uniqueHeader("단위", usedHeaders);
+  const valueHeader = uniqueHeader("지표값", usedHeaders);
+  const aggregationHeader = uniqueHeader("집계유형", usedHeaders);
 
   const outputRows = [];
+  const summaryRows = [];
+  const excludedRows = [];
 
-  for (const row of rows) {
-    for (const item of crossColumns) {
-      const rawValue = getRowValueByColumn(
-        row,
-        item.column,
-        item.column.index ?? 0,
+  rows.forEach((row, rowIndex) => {
+    const rowClass = classification.classifications[rowIndex];
+
+    if (rowClass.kind === "excluded") {
+      excludedRows.push({
+        row: cloneValue(row),
+        reason: rowClass.reasons.join(","),
+        sourceRowIndex: rowIndex,
+      });
+      return;
+    }
+
+    if (rowClass.kind === "summary") {
+      summaryRows.push({
+        row: cloneValue(row),
+        reason: rowClass.reasons.join(","),
+        sourceRowIndex: rowIndex,
+      });
+      return;
+    }
+
+    const rowUnit = rowUnitColumn
+      ? normalizeWhitespace(
+          rowValue(row, rowUnitColumn, rowUnitColumn.index ?? 0),
+        )
+      : "";
+
+    for (const item of metrics) {
+      const value = toNumberOrNull(
+        rowValue(row, item.column, item.column.index ?? 0),
       );
-      const value = toNumberOrNull(rawValue);
       if (value == null) continue;
 
-      const out = {};
-      for (const spec of dimensionSpecs) {
-        out[spec.outputHeader] =
-          getRowValueByColumn(row, spec.column, spec.column.index ?? 0) ?? "";
-      }
+      const rawMetricLabel =
+        stripUnitSuffix(item.header) || item.header || "지표값";
+      const metricLabel = inferGenericCountMetricLabel({
+        metricLabel: rawMetricLabel,
+        sourceHeader: item.header,
+        dimensions,
+        profile: item.profile,
+      });
+      const unit = inferMetricUnit({
+        metricLabel,
+        localUnit:
+          rowUnit || item.column.unit || extractHeaderUnit(item.header),
+        context,
+        profile: item.profile,
+      });
+      const aggregation = aggregationForMetric(metricLabel, unit, item.column, {
+        table,
+        profile: item.profile,
+        context,
+      });
 
-      out[crossAxisHeader] = item.header || item.column.header || "항목";
-      out[metricNameHeader] = "지표값";
-      out[metricValueHeader] = value;
-      outputRows.push(out);
+      const output = {};
+      for (const spec of dimensionSpecs) {
+        output[spec.outputHeader] = resolvedDimensionValue(
+          spec,
+          rowValue(row, spec.column, spec.column.index ?? 0),
+        );
+      }
+      output[metricHeader] = metricLabel;
+      if (unit) output[unitHeader] = unit;
+      output[valueHeader] = value;
+      output[aggregationHeader] = aggregation;
+      outputRows.push(output);
     }
-  }
+  });
 
   if (!outputRows.length) return null;
 
@@ -1276,153 +1880,83 @@ function buildCrossTableToLongVirtualTable(table = {}, index = 0) {
       }),
     ),
     makeVirtualColumn({
-      header: crossAxisHeader,
+      header: metricHeader,
       type: "category",
       role: "dimension",
+      semanticType: "metricIdentity",
     }),
     makeVirtualColumn({
-      header: metricNameHeader,
+      header: unitHeader,
       type: "category",
       role: "dimension",
+      semanticType: "unit",
     }),
     makeVirtualColumn({
-      header: metricValueHeader,
+      header: valueHeader,
       type: "number",
       role: "metric",
+      semanticType: "measure",
     }),
-  ];
+    makeVirtualColumn({
+      header: aggregationHeader,
+      type: "category",
+      role: "dimension",
+      semanticType: "aggregation",
+    }),
+  ].filter((column) =>
+    outputRows.some((row) =>
+      Object.prototype.hasOwnProperty.call(row, column.header),
+    ),
+  );
 
-  return {
-    tableId: `${table.tableId || `table_${index + 1}`}#CROSS_LONG`,
-    sourceTableId: table.tableId || null,
-    sheetName: table.sheetName || "",
-    tableType: "cross_table_long",
-    source: "normalizedCrossTableToLong",
-    isVirtual: true,
-    range: table.range || null,
-    dataRange: table.dataRange || null,
-    headerRows: table.headerRows || [],
-    dataStartRow: table.dataStartRow ?? null,
-    columns: virtualColumns,
-    rows: outputRows,
-    excludedRows: [],
-    warnings: [],
-    confidence: Math.min(0.9, Math.max(0.65, Number(table.confidence || 0.7))),
-    tableUsage: inheritVirtualTableUsage(table, "cross_table_to_long"),
-    transformation: {
-      version: CROSS_TABLE_TO_LONG_VERSION,
-      type: "crossTableToLong",
+  return normalizeTable(
+    {
+      tableId: `${table.tableId || `table_${index + 1}`}#CROSS_LONG`,
       sourceTableId: table.tableId || null,
-      sourceColumnCount: columns.length,
-      sourceRowCount: rows.length,
-      generatedRowCount: outputRows.length,
-      dimensionColumns: dimensionSpecs.map((spec) => spec.column.header),
-      crossMetricColumns: crossColumns.map((item) => ({
-        header: item.header,
-        numericRatio: Number(item.numericRatio.toFixed(3)),
-      })),
-      outputHeaders: {
-        crossAxis: crossAxisHeader,
-        metricIdentity: crossAxisHeader,
-        metricName: metricNameHeader,
-        metricValue: metricValueHeader,
-      },
-      measureIsolation: {
-        version: CROSS_TABLE_MEASURE_ISOLATION_VERSION,
-        required: crossColumns.length > 1,
-        identityHeader: crossAxisHeader,
-        metricNameHeader,
-        metricValueHeader,
-        measures: crossColumns.map((item) =>
-          String(item.header || item.column?.header || "").trim(),
-        ),
+      sheetName: table.sheetName || "",
+      tableType: "cross_table_long",
+      source: "normalizedCrossTableToLong",
+      isVirtual: true,
+      range: table.range || null,
+      dataRange: table.dataRange || null,
+      headerRows: cloneValue(table.headerRows || []),
+      dataStartRow: table.dataStartRow ?? null,
+      columns: virtualColumns,
+      rows: outputRows,
+      excludedRows,
+      summaryRows,
+      warnings: [],
+      confidence: Math.min(
+        0.92,
+        Math.max(0.68, Number(table.confidence || 0.72)),
+      ),
+      tableUsage: inheritVirtualTableUsage(table, "cross_table_to_long"),
+      transformation: {
+        version: CROSS_TO_LONG_VERSION,
+        type: "crossTableToLong",
+        sourceTableId: table.tableId || null,
+        sourceColumnCount: columns.length,
+        sourceRowCount: rows.length,
+        generatedRowCount: outputRows.length,
+        excludedRowCount: excludedRows.length,
+        summaryRowCount: summaryRows.length,
+        dimensionColumns: dimensionSpecs.map((spec) => spec.column.header),
+        measures: metrics.map((item) => ({
+          header: item.header,
+          unit: item.column.unit || extractHeaderUnit(item.header) || "",
+          numericRatio: Number(item.numericRatio.toFixed(3)),
+        })),
+        outputHeaders: {
+          metricName: metricHeader,
+          unit: unitHeader,
+          metricValue: valueHeader,
+          aggregation: aggregationHeader,
+        },
+        sourcePreserved: true,
       },
     },
-  };
-}
-
-function buildCrossTableToLongVirtualTables(normalizedTables = []) {
-  const out = [];
-
-  for (let i = 0; i < normalizedTables.length; i += 1) {
-    if (!isAnalysisEligibleTable(normalizedTables[i])) continue;
-    const virtualTable = buildCrossTableToLongVirtualTable(
-      normalizedTables[i],
-      i,
-    );
-    if (virtualTable)
-      out.push(
-        normalizeTable(virtualTable, normalizedTables.length + out.length),
-      );
-  }
-
-  return out;
-}
-
-function normalizeTable(table = {}, index = 0) {
-  const columns = Array.isArray(table.columns)
-    ? table.columns.map((column, columnIndex) =>
-        normalizeColumn(column, columnIndex, table),
-      )
-    : [];
-
-  const rows = Array.isArray(table.rows) ? table.rows : [];
-
-  const emptyRatio = calculateEmptyRatio(rows);
-
-  const headerConfidence = calculateHeaderConfidence(columns);
-
-  const typeConsistency = calculateTypeConsistency(columns);
-
-  const warnings = buildWarnings({
-    rows,
-    columns,
-    emptyRatio,
-    headerConfidence,
-    typeConsistency,
-  });
-
-  const confidence = calculateConfidence({
-    emptyRatio,
-    headerConfidence,
-    typeConsistency,
-  });
-
-  const diagnostics = buildDiagnostics({
-    table,
-    rows,
-    columns,
-    warnings,
-    emptyRatio,
-    headerConfidence,
-    typeConsistency,
-    confidence,
-  });
-
-  return {
-    tableId: table.tableId || table.id || `table_${index + 1}`,
-    sheetName: table.sheetName || table.sheet || "",
-    tableType: table.tableType || "tabular",
-    source: table.source || null,
-    sourceTableId: table.sourceTableId || null,
-    isVirtual: Boolean(table.isVirtual),
-    transformation: table.transformation || null,
-    tableUsage: normalizeTableUsage(table),
-    headerRows: table.headerRows || [],
-    dataStartRow: table.dataStartRow ?? null,
-    range: table.range || null,
-    dataRange: table.dataRange || null,
-    columns,
-    rows,
-    excludedRows: Array.isArray(table.excludedRows) ? table.excludedRows : [],
-    summaryRows: Array.isArray(table.summaryRows) ? table.summaryRows : [],
-    dataQuality: table.dataQuality || null,
-    warnings,
-    confidence,
-    queryabilityGrade: diagnostics.queryabilityGrade,
-    queryabilityReasons: diagnostics.queryabilityReasons,
-    diagnostics,
-  };
+    index,
+  );
 }
 
 function buildNormalizedQueryTables(queryTables = []) {
@@ -1431,14 +1965,34 @@ function buildNormalizedQueryTables(queryTables = []) {
   const normalizedTables = queryTables.map((table, index) =>
     normalizeTable(table, index),
   );
-  const wideLongTables = buildWideToLongVirtualTables(normalizedTables);
-  const crossLongTables = buildCrossTableToLongVirtualTables(normalizedTables);
+  const context = buildNormalizationContext(normalizedTables);
 
-  return [...normalizedTables, ...wideLongTables, ...crossLongTables];
+  const virtualTables = [];
+
+  normalizedTables.forEach((table, index) => {
+    if (!isAnalysisEligibleTable(table)) return;
+
+    const wide = buildWideToLongVirtualTable(table, index, context);
+    if (wide) {
+      virtualTables.push(wide);
+      return;
+    }
+
+    const cross = buildCrossTableToLongVirtualTable(table, index, context);
+    if (cross) virtualTables.push(cross);
+  });
+
+  return [...normalizedTables, ...virtualTables];
 }
 
 module.exports = {
+  NORMALIZATION_VERSION,
   buildNormalizedQueryTables,
   buildWideToLongVirtualTable,
   buildCrossTableToLongVirtualTable,
+  parseTemporalHeader,
+  parseTemporalValue,
+  isStrictTemporalValue,
+  buildNormalizationContext,
+  aggregationForMetric,
 };
