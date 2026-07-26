@@ -1,8 +1,8 @@
-const NORMALIZATION_VERSION = "normalized_query_table_common_v4_residual";
-const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v3";
-const WIDE_TO_LONG_VERSION = "wide_to_long_normalization_v4_semantic_context";
+const NORMALIZATION_VERSION = "normalized_query_table_common_v5_final_three";
+const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v4";
+const WIDE_TO_LONG_VERSION = "wide_to_long_normalization_v5_unit_hierarchy";
 const CROSS_TO_LONG_VERSION =
-  "cross_table_to_long_normalization_v4_measure_identity";
+  "cross_table_to_long_normalization_v5_unit_hierarchy";
 const ROW_CLASSIFICATION_VERSION = "normalized_row_classification_v3";
 
 const DEFAULT_TABLE_USAGE = Object.freeze({
@@ -381,6 +381,22 @@ function tableContextText(table = {}) {
     .join(" ");
 }
 
+function normalizeUnitCandidate(value = "") {
+  const text = normalizeHeader(value);
+  if (!text) return "";
+  if (toNumberOrNull(text) != null) return "";
+  if (isStrictTemporalValue(text)) return "";
+  if (text.length > 30) return "";
+  if (!/[A-Za-z가-힣%‰℃℉₩$€¥㎡㎥㎏㎞㎝㎜\\/·,]/.test(text)) return "";
+  const normalized = text.replace(/^[=:：,\\s]+|[=:：,\\s]+$/g, "").trim();
+  if (
+    !normalized ||
+    /^(?:값|수치|지표값|기간|연도|년도|월|분기)$/i.test(normalized)
+  )
+    return "";
+  return normalized;
+}
+
 function parseMetricUnitPairs(text = "") {
   const source = normalizeWhitespace(text);
   if (!source || !/[:：]/.test(source)) return [];
@@ -396,7 +412,7 @@ function parseMetricUnitPairs(text = "") {
       const metric = normalizeHeader(match[1])
         .replace(/^(?:단위|unit)\s*/i, "")
         .trim();
-      const unit = normalizeHeader(match[2]);
+      const unit = normalizeUnitCandidate(match[2]);
 
       if (!metric || !unit || metric.length > 60 || unit.length > 24) {
         return null;
@@ -454,7 +470,7 @@ function contextUnitForMetric(metricLabel = "", context = {}) {
   const key = normalizedHeaderKey(metricLabel);
   if (!key) return "";
 
-  const direct = context.metricUnitMap?.[key];
+  const direct = normalizeUnitCandidate(context.metricUnitMap?.[key]);
   if (direct) return direct;
 
   const candidates = Object.entries(context.metricUnitMap || {})
@@ -465,7 +481,7 @@ function contextUnitForMetric(metricLabel = "", context = {}) {
     )
     .sort((left, right) => right[0].length - left[0].length);
 
-  return candidates[0]?.[1] || "";
+  return normalizeUnitCandidate(candidates[0]?.[1]);
 }
 
 function numericProfileForColumn(rows = [], column = {}) {
@@ -575,10 +591,12 @@ function inferMetricUnit({
   context = {},
   profile = {},
 } = {}) {
-  const explicit = normalizeHeader(localUnit);
+  const explicit = normalizeUnitCandidate(localUnit);
   if (explicit) return explicit;
 
-  const contextual = contextUnitForMetric(metricLabel, context);
+  const contextual = normalizeUnitCandidate(
+    contextUnitForMetric(metricLabel, context),
+  );
   if (contextual) return contextual;
 
   if (looksLikePercentageProfile(profile)) return "%";
@@ -955,12 +973,13 @@ function classifyRows(
       const first = values[0];
       const repeated = values.every((value) => value === first);
 
-      if (
-        repeated &&
-        Number.isInteger(first) &&
-        Math.abs(first) >= 3 &&
-        Math.abs(first) >= Math.max(3, median * 4)
-      ) {
+      const absolute = Math.abs(first);
+      const distributionOutlier =
+        median > 0
+          ? absolute >= Math.max(3, median * 4) ||
+            (absolute >= 1 && absolute <= median / 4)
+          : absolute >= 3;
+      if (repeated && Number.isInteger(first) && distributionOutlier) {
         placeholderCandidates.push(rowIndex);
       }
     });
@@ -1995,4 +2014,5 @@ module.exports = {
   isStrictTemporalValue,
   buildNormalizationContext,
   aggregationForMetric,
+  normalizeUnitCandidate,
 };

@@ -5,7 +5,7 @@ const {
 } = require("./metricIdContract");
 
 const SEMANTIC_OUTPUT_PLANNER_VERSION =
-  "semantic_output_planner_common_v1_2_total_series";
+  "semantic_output_planner_common_v1_3_structural_totals";
 const SEMANTIC_OUTPUT_CONTRACT_VERSION = "semantic_output_contract_v1";
 
 const SUMMARY_LABEL_PATTERN =
@@ -240,10 +240,38 @@ function isSummaryLabel(value = "") {
   return SUMMARY_LABEL_PATTERN.test(text) || SUMMARY_SUFFIX_PATTERN.test(text);
 }
 
-function isSummaryMetricLabel(value = "") {
+function summaryMetricBase(value = "") {
+  return normalizeText(value)
+    .replace(/(?:[_/|>:\-]\s*|\s+)(?:계|합계|소계|총계)\s*$/i, "")
+    .trim();
+}
+function officialTotalHasDetailSiblings(value = "", allLabels = []) {
+  const text = normalizeText(value);
+  if (!/\s+합계\s*$/i.test(text)) return false;
+  if (/[_/|>:\-]\s*합계\s*$/i.test(text)) return false;
+  const base = summaryMetricBase(text);
+  if (!base) return false;
+  return (
+    (allLabels || []).filter((candidate) => {
+      const label = normalizeText(candidate);
+      return (
+        label &&
+        label !== text &&
+        label.startsWith(`${base} `) &&
+        !/(?:계|합계|소계|총계)\s*$/i.test(label)
+      );
+    }).length >= 2
+  );
+}
+function isSummaryMetricLabel(value = "", allLabels = []) {
   const text = normalizeText(value);
   if (!text) return false;
-  return SUMMARY_LABEL_PATTERN.test(text);
+  if (SUMMARY_LABEL_PATTERN.test(text)) return true;
+  if (/(?:[_/|>:\-]\s*|\s+)(?:소계|총계)\s*$/i.test(text)) return true;
+  if (/(?:[_/|>:\-]\s*)(?:계|합계)\s*$/i.test(text)) return true;
+  if (/\s+합계\s*$/i.test(text))
+    return !officialTotalHasDetailSiblings(text, allLabels);
+  return false;
 }
 
 function isIdentifierColumn(column = {}, header = "") {
@@ -447,8 +475,9 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
     if (label) distinctMetricLabels.add(label);
   }
 
-  const hasDetailMetric = [...distinctMetricLabels].some(
-    (label) => !isSummaryMetricLabel(label),
+  const metricLabels = [...distinctMetricLabels];
+  const hasDetailMetric = metricLabels.some(
+    (label) => !isSummaryMetricLabel(label, metricLabels),
   );
   const seriesMap = new Map();
 
@@ -461,7 +490,8 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
       ),
     );
     if (!metricLabel) continue;
-    if (hasDetailMetric && isSummaryMetricLabel(metricLabel)) continue;
+    if (hasDetailMetric && isSummaryMetricLabel(metricLabel, metricLabels))
+      continue;
 
     const value = numericValue(
       rowValue(row, contract.metricValue.column, contract.metricValue.index),
@@ -609,7 +639,7 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
     return temporal.metricLabel || fallbackMetricLabel(table, entry.header);
   });
   const hasDetailMetric = measureLabels.some(
-    (label) => !isSummaryMetricLabel(label),
+    (label) => !isSummaryMetricLabel(label, measureLabels),
   );
   const seriesMap = new Map();
 
@@ -619,7 +649,8 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
       temporal.metricLabel || fallbackMetricLabel(table, measure.header);
 
     if (!metricLabel) return;
-    if (hasDetailMetric && isSummaryMetricLabel(metricLabel)) return;
+    if (hasDetailMetric && isSummaryMetricLabel(metricLabel, measureLabels))
+      return;
 
     const unit =
       normalizeText(
