@@ -1,6 +1,8 @@
-const NORMALIZATION_VERSION = "normalized_query_table_common_v5_final_three";
-const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v4";
-const WIDE_TO_LONG_VERSION = "wide_to_long_normalization_v5_unit_hierarchy";
+const NORMALIZATION_VERSION =
+  "normalized_query_table_common_v6_metric_family_unit";
+const DIAGNOSTICS_VERSION = "normalized_query_diagnostics_v5";
+const WIDE_TO_LONG_VERSION =
+  "wide_to_long_normalization_v6_dense_metric_family";
 const CROSS_TO_LONG_VERSION =
   "cross_table_to_long_normalization_v5_unit_hierarchy";
 const ROW_CLASSIFICATION_VERSION = "normalized_row_classification_v3";
@@ -511,16 +513,41 @@ function numericProfileForColumn(rows = [], column = {}) {
   };
 }
 
-function looksLikePercentageProfile(profile = {}) {
+function isPercentageRangeProfile(profile = {}) {
   return (
     profile.numericCount >= 2 &&
     profile.min != null &&
     profile.max != null &&
     profile.min >= 0 &&
-    profile.max <= 100 &&
+    profile.max <= 100
+  );
+}
+
+function looksLikePercentageProfile(profile = {}) {
+  return (
+    isPercentageRangeProfile(profile) &&
     profile.fractionalCount > 0 &&
     (profile.exactHundredCount > 0 || profile.fractionalRatio >= 0.5)
   );
+}
+
+function inferMetricFamilyUnit(metricItems = []) {
+  const eligible = (metricItems || []).filter((item) =>
+    isPercentageRangeProfile(item.profile || {}),
+  );
+  const strongPercentage = eligible.filter((item) =>
+    looksLikePercentageProfile(item.profile || {}),
+  );
+
+  if (
+    eligible.length >= 3 &&
+    strongPercentage.length >= 2 &&
+    strongPercentage.length / eligible.length >= 0.6
+  ) {
+    return "%";
+  }
+
+  return "";
 }
 
 function normalizeDeclaredAggregation(value = "") {
@@ -590,6 +617,7 @@ function inferMetricUnit({
   localUnit = "",
   context = {},
   profile = {},
+  familyUnit = "",
 } = {}) {
   const explicit = normalizeUnitCandidate(localUnit);
   if (explicit) return explicit;
@@ -600,6 +628,12 @@ function inferMetricUnit({
   if (contextual) return contextual;
 
   if (looksLikePercentageProfile(profile)) return "%";
+
+  const normalizedFamilyUnit = normalizeUnitCandidate(familyUnit);
+  if (normalizedFamilyUnit && isPercentageRangeProfile(profile)) {
+    return normalizedFamilyUnit;
+  }
+
   return "";
 }
 
@@ -1493,6 +1527,7 @@ function buildWideToLongVirtualTable(table = {}, index = 0, context = {}) {
   const temporalColumns = temporalMetricColumns(table);
   if (temporalColumns.length < 2) return null;
 
+  const metricFamilyUnit = inferMetricFamilyUnit(temporalColumns);
   const contextColumns = temporalContextColumns(table, temporalColumns);
   const rowUnitColumn = unitColumn(table);
   const rowMetricColumn = metricIdentityColumn(table);
@@ -1590,6 +1625,7 @@ function buildWideToLongVirtualTable(table = {}, index = 0, context = {}) {
           extractHeaderUnit(item.column.header || ""),
         context,
         profile: item.profile,
+        familyUnit: metricFamilyUnit,
       });
       const aggregation = aggregationForMetric(metricLabel, unit, item.column, {
         table,
@@ -1604,10 +1640,10 @@ function buildWideToLongVirtualTable(table = {}, index = 0, context = {}) {
           rowValue(row, spec.column, spec.column.index ?? 0),
         );
       }
-      output[periodHeader] = temporal.period || item.temporal.raw;
-      if (temporal.year) output[yearHeader] = temporal.year;
+      output[periodHeader] = temporal.period || item.temporal.raw || "";
+      output[yearHeader] = temporal.year || "";
       output[metricHeader] = metricLabel;
-      if (unit) output[unitHeader] = unit;
+      output[unitHeader] = unit || "";
       output[valueHeader] = value;
       output[aggregationHeader] = aggregation;
       outputRows.push(output);
@@ -1880,7 +1916,7 @@ function buildCrossTableToLongVirtualTable(
         );
       }
       output[metricHeader] = metricLabel;
-      if (unit) output[unitHeader] = unit;
+      output[unitHeader] = unit || "";
       output[valueHeader] = value;
       output[aggregationHeader] = aggregation;
       outputRows.push(output);
@@ -2015,4 +2051,6 @@ module.exports = {
   buildNormalizationContext,
   aggregationForMetric,
   normalizeUnitCandidate,
+  isPercentageRangeProfile,
+  inferMetricFamilyUnit,
 };
