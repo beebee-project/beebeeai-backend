@@ -1,14 +1,104 @@
+const { executeAnalysisRecipeCandidate } = require("./analysisRecipeExecutor");
 const {
-  getBusinessTemplateExecutor,
-  findBusinessTemplateDefinition,
-} = require("./businessTemplates/templateRegistry");
-const {
-  normalizeBusinessTemplateResult,
-  validateBusinessTemplateResultContract,
-} = require("./businessTemplateContract");
-const {
-  buildContractDrivenSummarySections,
-} = require("./contractDrivenSummaryRecipeBuilder");
+  SEMANTIC_OUTPUT_PLANNER_VERSION,
+  augmentBusinessTemplateResult,
+} = require("./semanticOutputPlanner");
+
+const BUSINESS_SEMANTIC_AUGMENTATION_VERSION =
+  "business_semantic_augmentation_v1";
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
+function semanticAugmentationEnabled(templateCandidate = {}) {
+  if (templateCandidate.semanticPlannerAugment === false) return false;
+  return process.env.SEMANTIC_PLANNER_BUSINESS_AUGMENT !== "0";
+}
+
+function executeTemplateSections({
+  normalizedQueryTables = [],
+  templateCandidate = {},
+}) {
+  const candidates = Array.isArray(templateCandidate.candidates)
+    ? templateCandidate.candidates
+    : [];
+
+  return candidates
+    .map((candidate, index) => {
+      const result = executeAnalysisRecipeCandidate({
+        normalizedQueryTables,
+        candidate,
+      });
+
+      if (!result?.ok) return null;
+
+      return {
+        sectionId:
+          candidate.recipeType ||
+          candidate.type ||
+          candidate.recipeId ||
+          `section_${index + 1}`,
+        title:
+          candidate.title ||
+          candidate.name ||
+          candidate.label ||
+          `섹션 ${index + 1}`,
+        candidate,
+        result,
+      };
+    })
+    .filter(Boolean);
+}
+
+function executeHrMonthlyReport(args) {
+  return executeTemplateSections(args);
+}
+
+function augmentResult({ result, normalizedQueryTables, templateCandidate }) {
+  if (!semanticAugmentationEnabled(templateCandidate)) return result;
+
+  try {
+    return augmentBusinessTemplateResult({
+      executionResult: result,
+      tables: normalizedQueryTables,
+      templateCandidate,
+      options: {
+        maxDimensionsPerSeries: positiveInteger(
+          process.env.SEMANTIC_PLANNER_BUSINESS_MAX_DIMENSIONS,
+          8,
+        ),
+        maxAddedSections: positiveInteger(
+          process.env.SEMANTIC_PLANNER_BUSINESS_MAX_ADDED_SECTIONS,
+          64,
+        ),
+        maxPlannedSections: positiveInteger(
+          process.env.SEMANTIC_PLANNER_BUSINESS_MAX_PLANNED_SECTIONS,
+          120,
+        ),
+      },
+      context: {
+        augmentationVersion: BUSINESS_SEMANTIC_AUGMENTATION_VERSION,
+      },
+    });
+  } catch (error) {
+    console.warn(
+      "[semantic-planner] business augmentation failed:",
+      error?.message || error,
+    );
+
+    return {
+      ...result,
+      executionMeta: {
+        ...(result.executionMeta || {}),
+        semanticBusinessAugmentation: false,
+        semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+        semanticAugmentationError: error?.message || String(error),
+      },
+    };
+  }
+}
 
 function executeBusinessTemplate({
   normalizedQueryTables = [],
@@ -24,14 +114,23 @@ function executeBusinessTemplate({
     };
   }
 
-  const definition = findBusinessTemplateDefinition(templateId);
-  const executeTemplate = getBusinessTemplateExecutor(templateId);
+  let sections = [];
 
-  const sections = executeTemplate({
-    normalizedQueryTables,
-    templateCandidate,
-    definition,
-  });
+  switch (templateId) {
+    case "hr_monthly_report":
+      sections = executeHrMonthlyReport({
+        normalizedQueryTables,
+        templateCandidate,
+      });
+      break;
+
+    default:
+      sections = executeTemplateSections({
+        normalizedQueryTables,
+        templateCandidate,
+      });
+      break;
+  }
 
   if (!sections.length) {
     return {
@@ -41,45 +140,25 @@ function executeBusinessTemplate({
     };
   }
 
-  const contractCoverage = buildContractDrivenSummarySections({
-    normalizedQueryTables,
+  const result = {
+    ok: true,
+    resultType: "businessTemplate",
     templateId,
-  });
-  const coverageSections = Array.isArray(contractCoverage.sections)
-    ? contractCoverage.sections
-    : [];
+    title: templateCandidate.title || templateId,
+    description: templateCandidate.description || "",
+    sections,
+  };
 
-  const normalized = normalizeBusinessTemplateResult(
-    {
-      ok: true,
-      resultType: "businessTemplate",
-      templateId,
-      title: templateCandidate.title || definition?.title || templateId,
-      description:
-        templateCandidate.description || definition?.description || "",
-      outputTypes: templateCandidate.outputTypes || definition?.outputTypes,
-      sections: [...sections, ...coverageSections],
-      contractSummaryCoverage: {
-        ...contractCoverage,
-        sections: undefined,
-      },
-    },
+  return augmentResult({
+    result,
+    normalizedQueryTables,
     templateCandidate,
-  );
-
-  normalized.contractSummaryCoverage = {
-    ...contractCoverage,
-    sections: undefined,
-  };
-
-  const contract = validateBusinessTemplateResultContract(normalized);
-
-  return {
-    ...normalized,
-    contract,
-  };
+  });
 }
 
 module.exports = {
+  BUSINESS_SEMANTIC_AUGMENTATION_VERSION,
   executeBusinessTemplate,
+  executeTemplateSections,
+  semanticAugmentationEnabled,
 };

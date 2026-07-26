@@ -1,11 +1,14 @@
 const crypto = require("crypto");
 const {
   METRIC_ID_CONTRACT_VERSION,
+  applySectionMetricIds,
+  collectSectionMetricIds,
   normalizeSectionMetricIds,
+  uniqueMetricIds,
 } = require("./metricIdContract");
 
 const SEMANTIC_OUTPUT_PLANNER_VERSION =
-  "semantic_output_planner_common_v1_3_structural_totals";
+  "semantic_output_planner_common_v2_business_coverage";
 const SEMANTIC_OUTPUT_CONTRACT_VERSION = "semantic_output_contract_v1";
 
 const SUMMARY_LABEL_PATTERN =
@@ -25,6 +28,14 @@ const AGGREGATION_HEADER_PATTERN =
 const PERIOD_HEADER_PATTERN =
   /^(?:기간|기준기간|년월|연월|날짜|일자|period|date|month|quarter)$/i;
 const YEAR_HEADER_PATTERN = /^(?:연도|년도|year)$/i;
+const GENERIC_METRIC_LABEL_PATTERN =
+  /^(?:지표값|값|수치|실적|metric|measure|value)$/i;
+const BUSINESS_TIME_HEADER_PATTERN =
+  /기간|년월|연월|월|일자|날짜|date|month|quarter/i;
+const BUSINESS_SUM_HEADER_PATTERN =
+  /금액|매출|매출액|비용|지출|예산|지원금|수량|건수|인원|횟수|amount|cost|revenue|budget|count|quantity/i;
+const BUSINESS_AVERAGE_HEADER_PATTERN =
+  /점수|만족도|진행률|비율|평균|평점|내용연수|수명|score|rate|ratio|average/i;
 
 function normalizeText(value = "") {
   return String(value == null ? "" : value)
@@ -57,6 +68,150 @@ function tableLabel(table = {}, index = 0) {
       table.tableName || table.sheetName || table.title || table.tableId || "",
     ) || `표 ${index + 1}`
   );
+}
+
+function semanticContextText(table = {}, context = {}) {
+  return [
+    tableLabel(table),
+    table.fileName,
+    table.sourceFileName,
+    table.description,
+    context.templateId,
+    context.templateTitle,
+    context.templateDescription,
+    context.message,
+  ]
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(" ");
+}
+
+function isVirtualSemanticTable(table = {}) {
+  return Boolean(
+    table.isVirtual === true ||
+    table.virtual === true ||
+    table.transformation?.type ||
+    table.sourceTableId,
+  );
+}
+
+function semanticSourceTableId(table = {}) {
+  return normalizeText(
+    table.sourceTableId ||
+      table.transformation?.sourceTableId ||
+      table.meta?.sourceTableId ||
+      "",
+  );
+}
+
+function semanticTableId(table = {}) {
+  return normalizeText(table.tableId || table.id || "");
+}
+
+function isSemanticAnalysisEligible(table = {}) {
+  if (table.tableUsage?.analysisEligible === false) return false;
+  if (table.analysisEligible === false) return false;
+  return tableRows(table).length > 0 && tableColumns(table).length > 0;
+}
+
+function semanticDimensionHeaderSet(table = {}) {
+  const canonical = canonicalLongContract(table);
+  if (canonical) {
+    return new Set(
+      canonical.dimensions.map((entry) => normalizeKey(entry.header)),
+    );
+  }
+
+  const physical = physicalWideContract(table);
+  if (physical) {
+    return new Set(
+      physical.dimensions.map((entry) => normalizeKey(entry.header)),
+    );
+  }
+
+  return new Set();
+}
+
+function selectPreferredSemanticTables(tables = [], options = {}) {
+  const eligible = (Array.isArray(tables) ? tables : []).filter(
+    isSemanticAnalysisEligible,
+  );
+  const virtual = eligible.filter(isVirtualSemanticTable);
+  if (!virtual.length) return eligible;
+
+  const virtualBySource = new Map();
+  for (const table of virtual) {
+    const sourceId = semanticSourceTableId(table);
+    if (!sourceId) continue;
+    if (!virtualBySource.has(sourceId)) {
+      virtualBySource.set(sourceId, []);
+    }
+    virtualBySource.get(sourceId).push(table);
+  }
+
+  const physicalPreferredSources = new Set();
+
+  if (options.preferDimensionCompletePhysical === true) {
+    for (const table of eligible) {
+      if (isVirtualSemanticTable(table)) continue;
+      const tableId = semanticTableId(table);
+      const representedBy = virtualBySource.get(tableId) || [];
+      if (!tableId || !representedBy.length) continue;
+
+      const physicalDimensions = semanticDimensionHeaderSet(table);
+      const virtualDimensions = new Set(
+        representedBy.flatMap((item) => [...semanticDimensionHeaderSet(item)]),
+      );
+      const losesDimension = [...physicalDimensions].some(
+        (header) => !virtualDimensions.has(header),
+      );
+
+      if (losesDimension) {
+        physicalPreferredSources.add(tableId);
+      }
+    }
+  }
+
+  return eligible.filter((table) => {
+    if (isVirtualSemanticTable(table)) {
+      const sourceId = semanticSourceTableId(table);
+      return !sourceId || !physicalPreferredSources.has(sourceId);
+    }
+
+    const id = semanticTableId(table);
+    if (!id || !virtualBySource.has(id)) return true;
+    return physicalPreferredSources.has(id);
+  });
+}
+
+function inferContextualMetricLabel({
+  metricLabel = "",
+  unit = "",
+  table = {},
+  context = {},
+} = {}) {
+  const label = normalizeText(metricLabel);
+  if (label && !GENERIC_METRIC_LABEL_PATTERN.test(label)) return label;
+
+  const evidence = semanticContextText(table, context);
+  const moneyLike = /원|만원|억원|천원|금액|amount|revenue|cost/i.test(
+    `${unit} ${evidence}`,
+  );
+
+  if (/매출|판매|sales|revenue/i.test(evidence)) return "매출액";
+  if (/월간\s*지출|지출\s*리포트|expense/i.test(evidence)) {
+    return "지출금액";
+  }
+  if (/회의비|meeting\s*expense/i.test(evidence)) return "사용금액";
+  if (/거래처|업체|vendor|거래\s*실적/i.test(evidence) && moneyLike) {
+    return "거래금액";
+  }
+  if (/지원사업|신청|grant|application/i.test(evidence) && moneyLike) {
+    return "신청금액";
+  }
+  if (/자산|취득|asset/i.test(evidence) && moneyLike) return "취득금액";
+
+  return label || "지표값";
 }
 
 function columnHeader(column = {}, index = 0) {
@@ -153,6 +308,14 @@ function strictPeriodValue(value) {
 
   if (/^(?:19|20|21)\d{2}$/.test(source)) return source;
 
+  let yearOnly = source.match(/^((?:19|20|21)\d{2})\s*년$/);
+  if (yearOnly) return yearOnly[1];
+
+  let monthOnly = source.match(/^(0?[1-9]|1[0-2])\s*월$/);
+  if (monthOnly) {
+    return `${String(Number(monthOnly[1])).padStart(2, "0")}월`;
+  }
+
   let match = source.match(/^((?:19|20|21)\d{2})[-./]\s*(0?[1-9]|1[0-2])$/);
   if (match) {
     return `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`;
@@ -178,6 +341,17 @@ function strictPeriodValue(value) {
   }
 
   return "";
+}
+
+function canonicalPeriodValue(periodValue = "", yearValue = "") {
+  const period = strictPeriodValue(periodValue);
+  const year = strictPeriodValue(yearValue);
+
+  if (/^\d{2}월$/.test(period) && /^\d{4}$/.test(year)) {
+    return `${year}-${period.slice(0, 2)}`;
+  }
+
+  return period || year;
 }
 
 function parseTemporalMeasureHeader(header = "") {
@@ -356,7 +530,10 @@ function inferAggregation({ metricLabel = "", unit = "", column = {} } = {}) {
     .map(normalizeText)
     .join(" ");
 
-  return /%|퍼센트|백분율|비율|비중|구성비|점유율|증감률|달성률|지수|평균|평점|점수|시간|기록|속도|초|분초|cm|세|명\/천명|rate|ratio|share|percent|index|average|avg|score|duration|time/i.test(
+  if (BUSINESS_AVERAGE_HEADER_PATTERN.test(evidence)) return "average";
+  if (BUSINESS_SUM_HEADER_PATTERN.test(evidence)) return "sum";
+
+  return /%|퍼센트|백분율|비율|비중|구성비|점유율|증감률|달성률|지수|평균|평점|점수|시간|기록|속도|초|분초|cm|명\/천명|rate|ratio|share|percent|index|average|avg|score|duration|time/i.test(
     evidence,
   )
     ? "average"
@@ -399,6 +576,17 @@ function canonicalLongContract(table = {}) {
   );
 
   if (!metricIdentity || !metricValue) return null;
+
+  const explicitMetricIdentity =
+    semanticType(metricIdentity.column) === "metricidentity" ||
+    columnRole(metricIdentity.column) === "metricidentity";
+  const canonicalMetricValueHeader = METRIC_VALUE_HEADER_PATTERN.test(
+    metricValue.header,
+  );
+
+  if (!explicitMetricIdentity && !canonicalMetricValueHeader) {
+    return null;
+  }
 
   const unit = columns.find((entry) =>
     isUnitColumn(entry.column, entry.header),
@@ -460,7 +648,12 @@ function shouldSkipDimensionRow(dimensionValues = {}) {
   return Object.values(dimensionValues).some(isSummaryLabel);
 }
 
-function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
+function canonicalLongSeries(
+  table = {},
+  tableIndex = 0,
+  contract = null,
+  context = {},
+) {
   const rows = tableRows(table);
   const distinctMetricLabels = new Set();
 
@@ -482,7 +675,7 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
   const seriesMap = new Map();
 
   for (const row of rows) {
-    const metricLabel = normalizeText(
+    let metricLabel = normalizeText(
       rowValue(
         row,
         contract.metricIdentity.column,
@@ -509,6 +702,13 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
             "",
         );
 
+    metricLabel = inferContextualMetricLabel({
+      metricLabel,
+      unit,
+      table,
+      context,
+    });
+
     const declaredAggregation = contract.aggregation
       ? normalizeAggregation(
           rowValue(
@@ -527,12 +727,14 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
         column: contract.metricValue.column,
       });
 
-    const rawPeriod = contract.period
-      ? rowValue(row, contract.period.column, contract.period.index)
-      : contract.year
+    const period = canonicalPeriodValue(
+      contract.period
+        ? rowValue(row, contract.period.column, contract.period.index)
+        : "",
+      contract.year
         ? rowValue(row, contract.year.column, contract.year.index)
-        : "";
-    const period = strictPeriodValue(rawPeriod);
+        : "",
+    );
 
     const key = [normalizeKey(metricLabel), normalizeKey(unit), operation].join(
       "::",
@@ -565,6 +767,12 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null) {
 
 function physicalWideContract(table = {}) {
   const columns = indexedColumns(table);
+  const period = columns.find((entry) =>
+    isPeriodColumn(entry.column, entry.header),
+  );
+  const year = columns.find((entry) =>
+    isYearColumn(entry.column, entry.header),
+  );
 
   const dimensions = columns.filter((entry) => {
     if (isIdentifierColumn(entry.column, entry.header)) return false;
@@ -604,6 +812,8 @@ function physicalWideContract(table = {}) {
     columns,
     dimensions,
     measures,
+    period,
+    year,
     protectedHeaders: columns
       .filter(
         (entry) =>
@@ -632,7 +842,12 @@ function fallbackMetricLabel(table = {}, header = "") {
   return "지표값";
 }
 
-function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
+function physicalWideSeries(
+  table = {},
+  tableIndex = 0,
+  contract = null,
+  context = {},
+) {
   const rows = tableRows(table);
   const measureLabels = contract.measures.map((entry) => {
     const temporal = parseTemporalMeasureHeader(entry.header);
@@ -645,7 +860,7 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
 
   contract.measures.forEach((measure, measureIndex) => {
     const temporal = parseTemporalMeasureHeader(measure.header);
-    const metricLabel =
+    let metricLabel =
       temporal.metricLabel || fallbackMetricLabel(table, measure.header);
 
     if (!metricLabel) return;
@@ -659,6 +874,13 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
           measure.column.meta?.unit ||
           "",
       ) || temporal.unit;
+
+    metricLabel = inferContextualMetricLabel({
+      metricLabel,
+      unit,
+      table,
+      context,
+    });
 
     const operation = inferAggregation({
       metricLabel,
@@ -692,9 +914,19 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
       const dimensions = dimensionValuesForRow(row, contract.dimensions);
       if (shouldSkipDimensionRow(dimensions)) continue;
 
+      const rowPeriod =
+        temporal.period ||
+        strictPeriodValue(
+          contract.period
+            ? rowValue(row, contract.period.column, contract.period.index)
+            : contract.year
+              ? rowValue(row, contract.year.column, contract.year.index)
+              : "",
+        );
+
       seriesMap.get(key).records.push({
         value,
-        period: temporal.period,
+        period: rowPeriod,
         dimensions,
         measureIndex,
       });
@@ -704,12 +936,12 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null) {
   return [...seriesMap.values()].filter((series) => series.records.length);
 }
 
-function buildSemanticSeries(table = {}, tableIndex = 0) {
+function buildSemanticSeries(table = {}, tableIndex = 0, context = {}) {
   const canonical = canonicalLongContract(table);
   if (canonical) {
     return {
       contract: canonical,
-      series: canonicalLongSeries(table, tableIndex, canonical),
+      series: canonicalLongSeries(table, tableIndex, canonical, context),
     };
   }
 
@@ -720,15 +952,16 @@ function buildSemanticSeries(table = {}, tableIndex = 0) {
 
   return {
     contract: physical,
-    series: physicalWideSeries(table, tableIndex, physical),
+    series: physicalWideSeries(table, tableIndex, physical, context),
   };
 }
 
-function canPlanSemanticOutput(tables = []) {
+function canPlanSemanticOutput(tables = [], context = {}) {
   return (
     Array.isArray(tables) &&
     tables.some(
-      (table, index) => buildSemanticSeries(table, index).series.length > 0,
+      (table, index) =>
+        buildSemanticSeries(table, index, context).series.length > 0,
     )
   );
 }
@@ -897,11 +1130,16 @@ function overviewSection(table = {}, tableIndex = 0, contract = null) {
   };
 }
 
-function seriesSections(table = {}, tableIndex = 0, series = {}) {
+function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
   const label = tableLabel(table, tableIndex);
   const displayMetric = series.unit
     ? `${series.metricLabel} (${series.unit})`
     : series.metricLabel;
+  const titlePrefix = options.compactTitles ? "" : `${label} · `;
+  const maxDimensionsPerSeries = Math.max(
+    0,
+    Number(options.maxDimensionsPerSeries ?? 3),
+  );
   const baseId = metricId(
     tableIndex,
     series.metricLabel,
@@ -913,7 +1151,7 @@ function seriesSections(table = {}, tableIndex = 0, series = {}) {
   const sections = [
     {
       sectionId: `${baseId}.summary`,
-      title: `${label} · ${displayMetric} 통계`,
+      title: `${titlePrefix}${displayMetric} 통계`,
       sectionType: additive
         ? "semantic_additive_summary"
         : "semantic_non_additive_summary",
@@ -967,7 +1205,7 @@ function seriesSections(table = {}, tableIndex = 0, series = {}) {
     }))
     .filter((entry) => entry.distinctCount >= 2 && entry.distinctCount <= 200)
     .sort((left, right) => right.distinctCount - left.distinctCount)
-    .slice(0, 3);
+    .slice(0, maxDimensionsPerSeries);
 
   for (const dimension of dimensionHeaders) {
     const rows = groupRows({
@@ -982,7 +1220,7 @@ function seriesSections(table = {}, tableIndex = 0, series = {}) {
 
     sections.push({
       sectionId: `${baseId}.by_${safeId(dimension.header)}`,
-      title: `${label} · ${dimension.header}별 ${displayMetric}`,
+      title: `${titlePrefix}${dimension.header}별 ${displayMetric}`,
       sectionType: additive ? "semantic_group_sum" : "semantic_group_average",
       metricIds: [`${baseId}.by_${safeId(dimension.header)}`],
       result: {
@@ -1020,7 +1258,7 @@ function seriesSections(table = {}, tableIndex = 0, series = {}) {
   if (periodRows.length) {
     sections.push({
       sectionId: `${baseId}.by_period`,
-      title: `${label} · 기간별 ${displayMetric}`,
+      title: `${titlePrefix}기간별 ${displayMetric}`,
       sectionType: additive ? "semantic_period_sum" : "semantic_period_average",
       metricIds: [`${baseId}.by_period`],
       result: {
@@ -1049,6 +1287,275 @@ function seriesSections(table = {}, tableIndex = 0, series = {}) {
   }
 
   return sections;
+}
+
+function semanticScalarText(value, output = [], depth = 0) {
+  if (depth > 5 || value == null) return output;
+  if (["string", "number", "boolean"].includes(typeof value)) {
+    const text = normalizeText(value);
+    if (text) output.push(text);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    value
+      .slice(0, 100)
+      .forEach((item) => semanticScalarText(item, output, depth + 1));
+    return output;
+  }
+  if (typeof value === "object") {
+    Object.entries(value)
+      .slice(0, 100)
+      .forEach(([key, item]) => {
+        output.push(normalizeText(key));
+        semanticScalarText(item, output, depth + 1);
+      });
+  }
+  return output;
+}
+
+function semanticSectionText(section = {}) {
+  return semanticScalarText({
+    sectionId: section.sectionId,
+    title: section.title,
+    sectionType: section.sectionType,
+    candidate: section.candidate,
+    operation: section.result?.operation,
+    metric: section.result?.metric,
+    metrics: section.result?.metrics,
+    groupBy: section.result?.groupBy,
+    rowHeaders: Array.isArray(section.result?.rows)
+      ? Array.from(
+          new Set(
+            section.result.rows
+              .slice(0, 30)
+              .flatMap((row) =>
+                row && typeof row === "object" ? Object.keys(row) : [],
+              ),
+          ),
+        )
+      : [],
+  })
+    .map(normalizeKey)
+    .filter(Boolean)
+    .join(" ");
+}
+
+function semanticOperationFamily(section = {}) {
+  const text = normalizeText(
+    `${section.sectionType || ""} ${section.result?.operation || ""}`,
+  ).toLowerCase();
+  if (/composition|ratio|비율|구성비/.test(text)) return "ratio";
+  if (/top|bottom|rank|상위|하위|순위/.test(text)) return "rank";
+  if (/count|건수|응답\s*수/.test(text)) return "count";
+  if (/average|mean|평균/.test(text)) return "average";
+  if (/sum|aggregate|합계|합산/.test(text)) return "sum";
+  if (/summary|overview|통계|요약/.test(text)) return "summary";
+  return "other";
+}
+
+function semanticGroupAliases(header = "") {
+  const normalized = normalizeText(header);
+  if (!normalized) return [];
+  if (normalized === "기간" || BUSINESS_TIME_HEADER_PATTERN.test(normalized)) {
+    return [
+      "기간",
+      "월",
+      "연월",
+      "년월",
+      "일자",
+      "날짜",
+      "기준월",
+      "응답일",
+      "평가일",
+      "거래일",
+      "취득일",
+    ];
+  }
+  return [normalized];
+}
+
+function sectionContainsToken(sectionText = "", token = "") {
+  const normalized = normalizeKey(token);
+  return Boolean(normalized && sectionText.includes(normalized));
+}
+
+function existingSectionCoversPlanned(existing = {}, planned = {}) {
+  const metric = normalizeText(planned.result?.metric?.header || "");
+  const group = normalizeText(planned.result?.groupBy?.header || "");
+  const text = semanticSectionText(existing);
+  if (!metric || !sectionContainsToken(text, metric)) return false;
+
+  if (group) {
+    const groupCovered = semanticGroupAliases(group).some((alias) =>
+      sectionContainsToken(text, alias),
+    );
+    if (!groupCovered) return false;
+  }
+
+  const plannedFamily = semanticOperationFamily(planned);
+  const existingFamily = semanticOperationFamily(existing);
+
+  if (["ratio", "rank", "count"].includes(existingFamily)) return false;
+  if (plannedFamily === "average") {
+    return (
+      ["average", "summary"].includes(existingFamily) ||
+      /평균|점수\s*요약/.test(normalizeText(existing.title))
+    );
+  }
+  if (plannedFamily === "sum") {
+    return (
+      ["sum", "summary"].includes(existingFamily) ||
+      /합계|금액\s*요약|수량\s*요약/.test(normalizeText(existing.title))
+    );
+  }
+  if (!group) {
+    return (
+      ["summary", "average", "sum"].includes(existingFamily) ||
+      /요약|통계/.test(normalizeText(existing.title))
+    );
+  }
+  return true;
+}
+
+function annotateExistingSection(existing = {}, planned = {}) {
+  const metricIds = uniqueMetricIds([
+    collectSectionMetricIds(existing),
+    collectSectionMetricIds(planned),
+  ]);
+  const annotated = applySectionMetricIds(existing, metricIds);
+  annotated.result = {
+    ...(annotated.result || {}),
+    meta: {
+      ...(annotated.result?.meta || {}),
+      semanticCoverage: {
+        plannerSectionId: planned.sectionId,
+        plannerSectionType: planned.sectionType,
+        matchedExistingSection: true,
+      },
+    },
+  };
+  return annotated;
+}
+
+function augmentBusinessTemplateResult({
+  executionResult = {},
+  tables = [],
+  templateCandidate = {},
+  context = {},
+  options = {},
+} = {}) {
+  const inputSnapshot = JSON.stringify(tables);
+  const baseSections = Array.isArray(executionResult.sections)
+    ? cloneValue(executionResult.sections)
+    : [];
+  const preferredTables = selectPreferredSemanticTables(tables, {
+    preferDimensionCompletePhysical: true,
+  });
+  const plannerContext = {
+    ...cloneValue(context),
+    templateId:
+      executionResult.templateId || templateCandidate.templateId || "",
+    templateTitle: executionResult.title || templateCandidate.title || "",
+    templateDescription:
+      executionResult.description || templateCandidate.description || "",
+  };
+
+  const plan = buildSemanticOutputPlan({
+    tables: preferredTables,
+    templateId:
+      executionResult.templateId ||
+      templateCandidate.templateId ||
+      "business_template",
+    title: executionResult.title || templateCandidate.title || "업무 템플릿",
+    context: plannerContext,
+    options: {
+      includeOverview: false,
+      includeDiagnostics: false,
+      compactTitles: true,
+      maxDimensionsPerSeries: options.maxDimensionsPerSeries ?? 8,
+      maxSections: options.maxPlannedSections ?? 120,
+      preferVirtualTables: false,
+    },
+  });
+
+  const plannedSections = (plan.sections || []).filter(
+    (section) =>
+      !String(section.sectionType || "").startsWith(
+        "semantic_table_overview",
+      ) && !String(section.sectionType || "").startsWith("semanticSource"),
+  );
+
+  const merged = [...baseSections];
+  const renderedPlannerIds = [];
+  let matchedExistingSectionCount = 0;
+  let addedSectionCount = 0;
+  const maxAddedSections = Math.max(0, Number(options.maxAddedSections ?? 64));
+
+  for (const planned of plannedSections) {
+    const existingIndex = merged.findIndex((section) =>
+      existingSectionCoversPlanned(section, planned),
+    );
+
+    if (existingIndex >= 0) {
+      merged[existingIndex] = annotateExistingSection(
+        merged[existingIndex],
+        planned,
+      );
+      renderedPlannerIds.push(...collectSectionMetricIds(planned));
+      matchedExistingSectionCount += 1;
+      continue;
+    }
+
+    if (addedSectionCount >= maxAddedSections) continue;
+
+    const added = applySectionMetricIds(planned);
+    added.result = {
+      ...(added.result || {}),
+      meta: {
+        ...(added.result?.meta || {}),
+        semanticCoverage: {
+          plannerSectionId: planned.sectionId,
+          plannerSectionType: planned.sectionType,
+          matchedExistingSection: false,
+          addedByBusinessAugmentation: true,
+        },
+      },
+    };
+    merged.push(added);
+    renderedPlannerIds.push(...collectSectionMetricIds(planned));
+    addedSectionCount += 1;
+  }
+
+  if (JSON.stringify(tables) !== inputSnapshot) {
+    throw new Error(
+      "업무 템플릿 Semantic Output Planner가 입력 테이블을 변경했습니다.",
+    );
+  }
+
+  const normalizedSections = normalizeSectionMetricIds(merged);
+  const expectedMetricIds = uniqueMetricIds(renderedPlannerIds);
+
+  return {
+    ...cloneValue(executionResult),
+    sections: normalizedSections,
+    contractSummaryCoverage: {
+      version: `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_business_coverage_v1`,
+      contractCatalogVersion: `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_business_coverage_catalog_v1`,
+      expectedMetricIds,
+    },
+    executionMeta: {
+      ...(executionResult.executionMeta || {}),
+      semanticBusinessAugmentation: true,
+      semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+      preferredTableCount: preferredTables.length,
+      plannedSectionCount: plannedSections.length,
+      matchedExistingSectionCount,
+      addedSectionCount,
+      expectedMetricIdCount: expectedMetricIds.length,
+      maxAddedSections,
+      sourceTablesPreserved: true,
+    },
+  };
 }
 
 function diagnosticSections(tables = [], plans = []) {
@@ -1145,31 +1652,47 @@ function buildSemanticOutputPlan({
   title = "범용 구조화 통계 요약",
   patchVersion = SEMANTIC_OUTPUT_PLANNER_VERSION,
   context = {},
+  options = {},
 } = {}) {
-  const sourceTables = Array.isArray(tables) ? tables : [];
-  const inputSnapshot = JSON.stringify(sourceTables);
+  const inputTables = Array.isArray(tables) ? tables : [];
+  const inputSnapshot = JSON.stringify(inputTables);
+  const sourceTables = options.preferVirtualTables
+    ? selectPreferredSemanticTables(inputTables)
+    : inputTables;
   const plans = sourceTables.map((table, index) =>
-    buildSemanticSeries(table, index),
+    buildSemanticSeries(table, index, context),
   );
   const sections = [];
 
   sourceTables.forEach((table, tableIndex) => {
     const plan = plans[tableIndex];
-    sections.push(overviewSection(table, tableIndex, plan.contract));
+    if (options.includeOverview !== false) {
+      sections.push(overviewSection(table, tableIndex, plan.contract));
+    }
     plan.series.forEach((series) => {
-      sections.push(...seriesSections(table, tableIndex, series));
+      sections.push(...seriesSections(table, tableIndex, series, options));
     });
   });
 
-  sections.push(...diagnosticSections(sourceTables, plans));
+  if (options.includeDiagnostics !== false) {
+    sections.push(...diagnosticSections(sourceTables, plans));
+  }
 
-  if (JSON.stringify(sourceTables) !== inputSnapshot) {
+  const maxSections = Number(options.maxSections);
+  const limitedSections =
+    Number.isFinite(maxSections) && maxSections >= 0
+      ? sections.slice(0, maxSections)
+      : sections;
+
+  if (JSON.stringify(inputTables) !== inputSnapshot) {
     throw new Error(
       "Semantic Output Planner가 입력 query table을 변경했습니다.",
     );
   }
 
-  const dedupedSections = normalizeSectionMetricIds(dedupeSections(sections));
+  const dedupedSections = normalizeSectionMetricIds(
+    dedupeSections(limitedSections),
+  );
   const expectedMetricIds = Array.from(
     new Set(
       dedupedSections.flatMap((section) =>
@@ -1216,6 +1739,9 @@ function buildSemanticOutputPlan({
       physicalWideTableCount,
       plannedTableCount: plans.filter((plan) => plan.series.length > 0).length,
       context: cloneValue(context),
+      compactTitles: options.compactTitles === true,
+      maxDimensionsPerSeries: Number(options.maxDimensionsPerSeries ?? 3),
+      preferVirtualTables: options.preferVirtualTables === true,
     },
   };
 }
@@ -1225,7 +1751,10 @@ module.exports = {
   SEMANTIC_OUTPUT_CONTRACT_VERSION,
   buildSemanticOutputPlan,
   buildSemanticSeries,
+  augmentBusinessTemplateResult,
   canPlanSemanticOutput,
+  selectPreferredSemanticTables,
+  existingSectionCoversPlanned,
   canonicalLongContract,
   physicalWideContract,
   strictPeriodValue,
