@@ -8,7 +8,7 @@ const {
 } = require("./metricIdContract");
 
 const SEMANTIC_OUTPUT_PLANNER_VERSION =
-  "semantic_output_planner_common_v2_business_coverage";
+  "semantic_output_planner_common_v2_2_generic_section_cleanup";
 const SEMANTIC_OUTPUT_CONTRACT_VERSION = "semantic_output_contract_v1";
 
 const SUMMARY_LABEL_PATTERN =
@@ -366,6 +366,10 @@ function parseTemporalMeasureHeader(header = "") {
         /(?:^|[_\s])((?:19|20|21)\d{2})\s*년\s*(0?[1-9]|1[0-2])\s*월(?:[_\s]|$)/,
       period: (match) =>
         `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`,
+    },
+    {
+      regex: /(?:^|[_\s])(0?[1-9]|1[0-2])\s*월(?:[_\s]|$)/,
+      period: (match) => `${String(Number(match[1])).padStart(2, "0")}월`,
     },
     {
       regex: /(?:^|[_\s])((?:19|20|21)\d{2})[./-](0?[1-9]|1[0-2])(?:[_\s]|$)/,
@@ -851,7 +855,10 @@ function physicalWideSeries(
   const rows = tableRows(table);
   const measureLabels = contract.measures.map((entry) => {
     const temporal = parseTemporalMeasureHeader(entry.header);
-    return temporal.metricLabel || fallbackMetricLabel(table, entry.header);
+    return (
+      temporal.metricLabel ||
+      (temporal.period ? "지표값" : fallbackMetricLabel(table, entry.header))
+    );
   });
   const hasDetailMetric = measureLabels.some(
     (label) => !isSummaryMetricLabel(label, measureLabels),
@@ -861,7 +868,8 @@ function physicalWideSeries(
   contract.measures.forEach((measure, measureIndex) => {
     const temporal = parseTemporalMeasureHeader(measure.header);
     let metricLabel =
-      temporal.metricLabel || fallbackMetricLabel(table, measure.header);
+      temporal.metricLabel ||
+      (temporal.period ? "지표값" : fallbackMetricLabel(table, measure.header));
 
     if (!metricLabel) return;
     if (hasDetailMetric && isSummaryMetricLabel(metricLabel, measureLabels))
@@ -1130,6 +1138,40 @@ function overviewSection(table = {}, tableIndex = 0, contract = null) {
   };
 }
 
+function dimensionSemanticPriority({ header = "", distinctCount = 0 } = {}) {
+  const text = normalizeText(header);
+  let score = 0;
+
+  if (
+    /상태|등급|결과|구분|분류|유형|단계|채널|지역|부서|업종|직급|소속|담당|category|status|grade|result|type/i.test(
+      text,
+    )
+  ) {
+    score += 120;
+  }
+
+  if (
+    /명$|이름|업체|거래처|기관|사업|프로젝트|과제|강사|강좌|행사|회의|자산|고객|서비스|품목|항목|entity|vendor|project|customer/i.test(
+      text,
+    )
+  ) {
+    score += 80;
+  }
+
+  if (
+    BUSINESS_TIME_HEADER_PATTERN.test(text) ||
+    /연도|년도|기준년도|일$|일자$|날짜$/i.test(text)
+  ) {
+    score -= 100;
+  }
+
+  if (distinctCount >= 2 && distinctCount <= 12) score += 35;
+  else if (distinctCount <= 50) score += 20;
+  else if (distinctCount > 100) score -= 20;
+
+  return score;
+}
+
 function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
   const label = tableLabel(table, tableIndex);
   const displayMetric = series.unit
@@ -1195,16 +1237,29 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
   ];
 
   const dimensionHeaders = series.dimensionHeaders
-    .map((header) => ({
-      header,
-      distinctCount: new Set(
+    .map((header) => {
+      const distinctCount = new Set(
         series.records
           .map((record) => normalizeText(record.dimensions?.[header]))
           .filter(Boolean),
-      ).size,
-    }))
+      ).size;
+
+      return {
+        header,
+        distinctCount,
+        semanticPriority: dimensionSemanticPriority({
+          header,
+          distinctCount,
+        }),
+      };
+    })
     .filter((entry) => entry.distinctCount >= 2 && entry.distinctCount <= 200)
-    .sort((left, right) => right.distinctCount - left.distinctCount)
+    .sort(
+      (left, right) =>
+        right.semanticPriority - left.semanticPriority ||
+        right.distinctCount - left.distinctCount ||
+        left.header.localeCompare(right.header, "ko"),
+    )
     .slice(0, maxDimensionsPerSeries);
 
   for (const dimension of dimensionHeaders) {
@@ -1379,11 +1434,71 @@ function sectionContainsToken(sectionText = "", token = "") {
   return Boolean(normalized && sectionText.includes(normalized));
 }
 
+function explicitSectionMetricHeader(section = {}) {
+  return normalizeText(
+    section.result?.metric?.header ||
+      section.metric?.header ||
+      section.metricHeader ||
+      section.candidate?.metricHeader ||
+      section.candidate?.metric ||
+      "",
+  );
+}
+
+function explicitSectionGroupHeader(section = {}) {
+  return normalizeText(
+    section.result?.groupBy?.header ||
+      section.groupBy?.header ||
+      section.groupHeader ||
+      section.candidate?.groupHeader ||
+      section.candidate?.groupBy ||
+      "",
+  );
+}
+
+function metricHeadersSemanticallyMatch(
+  existingMetric = "",
+  plannedMetric = "",
+) {
+  const existing = normalizeText(existingMetric);
+  const planned = normalizeText(plannedMetric);
+
+  if (!existing || !planned) return true;
+
+  const existingGeneric = GENERIC_METRIC_LABEL_PATTERN.test(existing);
+  const plannedGeneric = GENERIC_METRIC_LABEL_PATTERN.test(planned);
+
+  if (existingGeneric !== plannedGeneric) return false;
+
+  return normalizeKey(existing) === normalizeKey(planned);
+}
+
+function groupHeadersSemanticallyMatch(existingGroup = "", plannedGroup = "") {
+  const existing = normalizeText(existingGroup);
+  const planned = normalizeText(plannedGroup);
+
+  if (!existing || !planned) return true;
+
+  const aliases = new Set(semanticGroupAliases(planned).map(normalizeKey));
+  return aliases.has(normalizeKey(existing));
+}
+
 function existingSectionCoversPlanned(existing = {}, planned = {}) {
   const metric = normalizeText(planned.result?.metric?.header || "");
   const group = normalizeText(planned.result?.groupBy?.header || "");
   const text = semanticSectionText(existing);
+  const existingMetric = explicitSectionMetricHeader(existing);
+  const existingGroup = explicitSectionGroupHeader(existing);
+
   if (!metric || !sectionContainsToken(text, metric)) return false;
+
+  if (!metricHeadersSemanticallyMatch(existingMetric, metric)) {
+    return false;
+  }
+
+  if (group && !groupHeadersSemanticallyMatch(existingGroup, group)) {
+    return false;
+  }
 
   if (group) {
     const groupCovered = semanticGroupAliases(group).some((alias) =>
@@ -1435,6 +1550,122 @@ function annotateExistingSection(existing = {}, planned = {}) {
     },
   };
   return annotated;
+}
+
+const GENERIC_SECTION_CLEANUP_VERSION = "semantic_generic_section_cleanup_v1";
+
+function plannedSpecificMetricHeaders(plannedSections = []) {
+  return Array.from(
+    new Set(
+      plannedSections
+        .map((section) => normalizeText(section.result?.metric?.header || ""))
+        .filter(
+          (header) => header && !GENERIC_METRIC_LABEL_PATTERN.test(header),
+        ),
+    ),
+  );
+}
+
+function sectionHasGenericMetricIdentity(section = {}) {
+  const explicitMetric = explicitSectionMetricHeader(section);
+
+  if (explicitMetric) {
+    return GENERIC_METRIC_LABEL_PATTERN.test(explicitMetric);
+  }
+
+  const title = normalizeText(section.title);
+  return /지표값|metric\s*value|measure\s*value/i.test(title);
+}
+
+function plannedMetricHasReplacementCoverage({
+  plannedSections = [],
+  metricHeader = "",
+} = {}) {
+  const metricKey = normalizeKey(metricHeader);
+  const relevant = plannedSections.filter(
+    (section) =>
+      normalizeKey(section.result?.metric?.header || "") === metricKey,
+  );
+
+  if (!relevant.length) return false;
+
+  const hasSummary = relevant.some((section) => {
+    const group = normalizeText(section.result?.groupBy?.header || "");
+    const family = semanticOperationFamily(section);
+    return !group && ["summary", "sum", "average"].includes(family);
+  });
+
+  const hasGroupedOrPeriod = relevant.some((section) =>
+    normalizeText(section.result?.groupBy?.header || ""),
+  );
+
+  return hasSummary && hasGroupedOrPeriod;
+}
+
+function pruneSupersededGenericSections({
+  sections = [],
+  plannedSections = [],
+  baseSectionCount = 0,
+} = {}) {
+  const specificMetrics = plannedSpecificMetricHeaders(plannedSections);
+
+  if (specificMetrics.length !== 1) {
+    return {
+      sections,
+      prunedSectionCount: 0,
+      prunedSectionIds: [],
+      cleanupApplied: false,
+      reason: "SPECIFIC_METRIC_COUNT_NOT_ONE",
+    };
+  }
+
+  const [specificMetric] = specificMetrics;
+
+  if (
+    !plannedMetricHasReplacementCoverage({
+      plannedSections,
+      metricHeader: specificMetric,
+    })
+  ) {
+    return {
+      sections,
+      prunedSectionCount: 0,
+      prunedSectionIds: [],
+      cleanupApplied: false,
+      reason: "SPECIFIC_METRIC_COVERAGE_INCOMPLETE",
+    };
+  }
+
+  const prunedSectionIds = [];
+
+  const retained = sections.filter((section, index) => {
+    if (index >= baseSectionCount) return true;
+
+    if (collectSectionMetricIds(section).length > 0) {
+      return true;
+    }
+
+    if (!sectionHasGenericMetricIdentity(section)) {
+      return true;
+    }
+
+    prunedSectionIds.push(
+      normalizeText(
+        section.sectionId || section.title || `base_section_${index + 1}`,
+      ),
+    );
+    return false;
+  });
+
+  return {
+    sections: retained,
+    prunedSectionCount: prunedSectionIds.length,
+    prunedSectionIds,
+    cleanupApplied: prunedSectionIds.length > 0,
+    reason:
+      prunedSectionIds.length > 0 ? "" : "NO_UNCONTRACTED_GENERIC_SECTION",
+    specificMetric,
+  };
 }
 
 function augmentBusinessTemplateResult({
@@ -1532,7 +1763,13 @@ function augmentBusinessTemplateResult({
     );
   }
 
-  const normalizedSections = normalizeSectionMetricIds(merged);
+  const genericCleanup = pruneSupersededGenericSections({
+    sections: merged,
+    plannedSections,
+    baseSectionCount: baseSections.length,
+  });
+
+  const normalizedSections = normalizeSectionMetricIds(genericCleanup.sections);
   const expectedMetricIds = uniqueMetricIds(renderedPlannerIds);
 
   return {
@@ -1553,6 +1790,12 @@ function augmentBusinessTemplateResult({
       addedSectionCount,
       expectedMetricIdCount: expectedMetricIds.length,
       maxAddedSections,
+      genericSectionCleanupVersion: GENERIC_SECTION_CLEANUP_VERSION,
+      genericSectionCleanupApplied: genericCleanup.cleanupApplied,
+      prunedGenericSectionCount: genericCleanup.prunedSectionCount,
+      prunedGenericSectionIds: genericCleanup.prunedSectionIds,
+      genericSectionCleanupReason: genericCleanup.reason,
+      genericSectionCleanupMetric: genericCleanup.specificMetric || "",
       sourceTablesPreserved: true,
     },
   };
@@ -1757,5 +2000,7 @@ module.exports = {
   existingSectionCoversPlanned,
   canonicalLongContract,
   physicalWideContract,
+  dimensionSemanticPriority,
+  pruneSupersededGenericSections,
   strictPeriodValue,
 };
