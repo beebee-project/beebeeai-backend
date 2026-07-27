@@ -1,7 +1,4 @@
-"use strict";
-
-const METRIC_ID_CONTRACT_VERSION =
-  "metric_id_contract_common_v1";
+const METRIC_ID_CONTRACT_VERSION = "metric_id_contract_common_v1";
 
 function normalizeMetricId(value = "") {
   return String(value == null ? "" : value)
@@ -18,10 +15,7 @@ function metricIdValues(value) {
 function uniqueMetricIds(values = []) {
   return Array.from(
     new Set(
-      values
-        .flatMap(metricIdValues)
-        .map(normalizeMetricId)
-        .filter(Boolean),
+      values.flatMap(metricIdValues).map(normalizeMetricId).filter(Boolean),
     ),
   );
 }

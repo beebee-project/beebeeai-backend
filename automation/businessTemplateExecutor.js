@@ -1,3 +1,4 @@
+const path = require("path");
 const { executeAnalysisRecipeCandidate } = require("./analysisRecipeExecutor");
 const {
   SEMANTIC_OUTPUT_PLANNER_VERSION,
@@ -5,16 +6,82 @@ const {
 } = require("./semanticOutputPlanner");
 
 const BUSINESS_SEMANTIC_AUGMENTATION_VERSION =
-  "business_semantic_augmentation_v1";
+  "business_semantic_augmentation_v2_observed";
+const BUSINESS_TEMPLATE_EXECUTOR_VERSION =
+  "business_template_executor_v2_route_observed";
 
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
 }
 
+function normalizeBooleanFlag(value) {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+}
+
+function semanticAugmentationDecision(templateCandidate = {}) {
+  const environmentValue = String(
+    process.env.SEMANTIC_PLANNER_BUSINESS_AUGMENT ?? "",
+  ).trim();
+  const candidateFlag = normalizeBooleanFlag(
+    templateCandidate.semanticPlannerAugment,
+  );
+
+  if (candidateFlag === false) {
+    return {
+      enabled: false,
+      environmentValue,
+      candidateFlag,
+      skippedReason: "CANDIDATE_DISABLED",
+    };
+  }
+
+  if (environmentValue === "0") {
+    return {
+      enabled: false,
+      environmentValue,
+      candidateFlag,
+      skippedReason: "ENV_DISABLED",
+    };
+  }
+
+  return {
+    enabled: true,
+    environmentValue,
+    candidateFlag,
+    skippedReason: "",
+  };
+}
+
 function semanticAugmentationEnabled(templateCandidate = {}) {
-  if (templateCandidate.semanticPlannerAugment === false) return false;
-  return process.env.SEMANTIC_PLANNER_BUSINESS_AUGMENT !== "0";
+  return semanticAugmentationDecision(templateCandidate).enabled;
+}
+
+function modulePathForObservation(filePath = __filename) {
+  const relative = path.relative(process.cwd(), filePath);
+  return String(relative || filePath).replace(/\\/g, "/");
+}
+
+function buildExecutorObservationMeta({
+  templateCandidate = {},
+  normalizedQueryTables = [],
+  decision = semanticAugmentationDecision(templateCandidate),
+} = {}) {
+  return {
+    businessTemplateExecutorVersion: BUSINESS_TEMPLATE_EXECUTOR_VERSION,
+    businessSemanticAugmentationVersion: BUSINESS_SEMANTIC_AUGMENTATION_VERSION,
+    semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+    executorModulePath: modulePathForObservation(__filename),
+    semanticAugmentationEnvironmentValue: decision.environmentValue,
+    semanticPlannerCandidateFlag: decision.candidateFlag,
+    semanticAugmentationEnabled: decision.enabled,
+    semanticAugmentationSkippedReason: decision.skippedReason,
+    executorInputTableCount: Array.isArray(normalizedQueryTables)
+      ? normalizedQueryTables.length
+      : 0,
+  };
 }
 
 function executeTemplateSections({
@@ -57,10 +124,26 @@ function executeHrMonthlyReport(args) {
 }
 
 function augmentResult({ result, normalizedQueryTables, templateCandidate }) {
-  if (!semanticAugmentationEnabled(templateCandidate)) return result;
+  const decision = semanticAugmentationDecision(templateCandidate);
+  const observation = buildExecutorObservationMeta({
+    templateCandidate,
+    normalizedQueryTables,
+    decision,
+  });
+
+  if (!decision.enabled) {
+    return {
+      ...result,
+      executionMeta: {
+        ...(result.executionMeta || {}),
+        ...observation,
+        semanticBusinessAugmentation: false,
+      },
+    };
+  }
 
   try {
-    return augmentBusinessTemplateResult({
+    const augmented = augmentBusinessTemplateResult({
       executionResult: result,
       tables: normalizedQueryTables,
       templateCandidate,
@@ -82,6 +165,16 @@ function augmentResult({ result, normalizedQueryTables, templateCandidate }) {
         augmentationVersion: BUSINESS_SEMANTIC_AUGMENTATION_VERSION,
       },
     });
+
+    return {
+      ...augmented,
+      executionMeta: {
+        ...(augmented.executionMeta || {}),
+        ...observation,
+        semanticBusinessAugmentation: true,
+        semanticAugmentationSkippedReason: "",
+      },
+    };
   } catch (error) {
     console.warn(
       "[semantic-planner] business augmentation failed:",
@@ -92,8 +185,9 @@ function augmentResult({ result, normalizedQueryTables, templateCandidate }) {
       ...result,
       executionMeta: {
         ...(result.executionMeta || {}),
+        ...observation,
         semanticBusinessAugmentation: false,
-        semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+        semanticAugmentationSkippedReason: "EXECUTION_ERROR",
         semanticAugmentationError: error?.message || String(error),
       },
     };
@@ -111,6 +205,10 @@ function executeBusinessTemplate({
       ok: false,
       code: "BUSINESS_TEMPLATE_ID_REQUIRED",
       message: "templateId가 필요합니다.",
+      executionMeta: buildExecutorObservationMeta({
+        templateCandidate,
+        normalizedQueryTables,
+      }),
     };
   }
 
@@ -137,6 +235,10 @@ function executeBusinessTemplate({
       ok: false,
       code: "BUSINESS_TEMPLATE_EXECUTION_EMPTY",
       message: "실행 가능한 템플릿 섹션이 없습니다.",
+      executionMeta: buildExecutorObservationMeta({
+        templateCandidate,
+        normalizedQueryTables,
+      }),
     };
   }
 
@@ -158,7 +260,11 @@ function executeBusinessTemplate({
 
 module.exports = {
   BUSINESS_SEMANTIC_AUGMENTATION_VERSION,
+  BUSINESS_TEMPLATE_EXECUTOR_VERSION,
+  SEMANTIC_OUTPUT_PLANNER_VERSION,
+  buildExecutorObservationMeta,
   executeBusinessTemplate,
   executeTemplateSections,
+  semanticAugmentationDecision,
   semanticAugmentationEnabled,
 };
