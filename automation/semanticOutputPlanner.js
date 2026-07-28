@@ -16,9 +16,44 @@ const {
   classifyMetricRole,
   resolveAggregationContract,
 } = require("./metricSemanticRoleEngine");
+const {
+  FLOW_DIRECTION_SECTION_REPAIR_VERSION,
+  FLOW_DIRECTION_SEMANTIC_ENGINE_VERSION,
+  applyFlowDirectionSemantics,
+  buildDirectionRows,
+  buildEntityFlowRows,
+  buildLocationLedgerRows,
+  buildPeriodFlowRows,
+  buildSystemFlowSummary,
+  canonicalFlowDirection,
+  resolveFlowDirectionEvidence,
+} = require("./flowDirectionSemanticEngine");
+const {
+  DERIVED_TOTAL_RELATION_VERSION,
+  METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+  REPRESENTATIVE_METRIC_PRIORITY_VERSION,
+  applyMetricRelationshipPriorities,
+  prioritizeBusinessSections,
+} = require("./metricRelationshipPriorityEngine");
+const {
+  DISTINCT_ENTITY_SECTION_VERSION,
+  DURATION_SUMMARY_CONTRACT_VERSION,
+  MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+  SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+  applySemanticSectionBudget,
+  buildDistinctEntitySection,
+  median,
+  sectionPolicyForSeries,
+} = require("./semanticSectionBudgetEngine");
 
+const SEMANTIC_OUTPUT_PLANNER_LEGACY_VERSION =
+  "semantic_output_planner_common_v2_9_snapshot_latest_by_entity";
+const SEMANTIC_OUTPUT_PLANNER_FLOW_DIRECTION_VERSION =
+  "semantic_output_planner_common_v2_10_flow_direction_semantics";
+const SEMANTIC_OUTPUT_PLANNER_PREVIOUS_VERSION =
+  "semantic_output_planner_common_v2_11_total_component_duration_budget";
 const SEMANTIC_OUTPUT_PLANNER_VERSION =
-  "semantic_output_planner_common_v2_8_actual_flow_evidence_restore_gate";
+  "semantic_output_planner_common_v2_12_mandatory_summary_coverage_floor";
 const SEMANTIC_OUTPUT_CONTRACT_VERSION =
   "semantic_output_contract_v1";
 const SEMANTIC_CONTRACT_PRECEDENCE_VERSION =
@@ -31,6 +66,8 @@ const CONTRACT_KPI_SNAPSHOT_BRIDGE_VERSION =
   "contract_kpi_snapshot_bridge_v2_aggregation_aware";
 const ACTUAL_FLOW_EVIDENCE_GATE_VERSION =
   "actual_flow_evidence_restore_gate_v1";
+const SNAPSHOT_ENTITY_RESOLVER_VERSION =
+  "snapshot_latest_by_entity_resolver_v1";
 
 const SUMMARY_LABEL_PATTERN =
   /^(?:계|합계|소계|총계|전체|전국|세계|total|subtotal|grand\s*total)$/i;
@@ -58,6 +95,12 @@ const BUSINESS_SUM_HEADER_PATTERN =
   /금액|매출|매출액|비용|지출|예산|지원금|수량|건수|인원|횟수|amount|cost|revenue|budget|count|quantity/i;
 const BUSINESS_AVERAGE_HEADER_PATTERN =
   /점수|만족도|진행률|비율|평균|평점|내용연수|수명|score|rate|ratio|average/i;
+const SNAPSHOT_ENTITY_IDENTITY_HEADER_PATTERN =
+  /(?:^|[_\s])(?:id|code)(?:$|[_\s])|(?:품목|소모품|제품|상품|자산|장비|시설|고객|거래처|업체|기관|사업|프로젝트|과제|서비스|항목)(?:명|이름)$|^(?:이름|명칭|entity|item|product|asset|equipment|facility|customer|vendor|project)$/i;
+const SNAPSHOT_ENTITY_SECONDARY_HEADER_PATTERN =
+  /창고명|보관위치|지점명|매장명|사업장명|부서명|담당부서|사용부서|warehouse|location|branch|department/i;
+const SNAPSHOT_ENTITY_EXCLUDED_HEADER_PATTERN =
+  /상태|구분|분류|유형|결과|등급|채널|지역|기간|연월|월|일자|날짜|연도|년도|단위|비고|설명|status|category|type|result|grade|channel|region|period|date|month|year|unit|note/i;
 
 function normalizeText(value = "") {
   return String(value == null ? "" : value)
@@ -1335,12 +1378,250 @@ function latestRecordSelection(records = []) {
   };
 }
 
-function operationStats(records = [], operation = "sum") {
+function snapshotEntityValue(record = {}, header = "") {
+  return normalizeText(record?.dimensions?.[header]);
+}
+
+function snapshotEntityCompositeKey(record = {}, headers = []) {
+  const values = (Array.isArray(headers) ? headers : [])
+    .map((header) => snapshotEntityValue(record, header));
+  if (!values.length || values.some((value) => !value)) return "";
+  return values.map(normalizeKey).join("::");
+}
+
+function snapshotEntityCandidateScore({
+  header = "",
+  records = [],
+} = {}) {
+  const normalized = normalizeText(header);
+  if (!normalized || SNAPSHOT_ENTITY_EXCLUDED_HEADER_PATTERN.test(normalized)) {
+    return { header: normalized, score: -Infinity, eligible: false };
+  }
+
+  const values = (Array.isArray(records) ? records : [])
+    .map((record) => snapshotEntityValue(record, normalized))
+    .filter(Boolean);
+  const rowCount = Math.max(1, records.length);
+  const coverage = values.length / rowCount;
+  const distinctCount = new Set(values.map(normalizeKey)).size;
+  const repeatCount = Math.max(0, values.length - distinctCount);
+  const identity = SNAPSHOT_ENTITY_IDENTITY_HEADER_PATTERN.test(normalized);
+  const secondary = SNAPSHOT_ENTITY_SECONDARY_HEADER_PATTERN.test(normalized);
+
+  if ((!identity && !secondary) || coverage < 0.7 || distinctCount < 2) {
+    return {
+      header: normalized,
+      score: -Infinity,
+      eligible: false,
+      coverage,
+      distinctCount,
+      repeatCount,
+      identity,
+      secondary,
+    };
+  }
+
+  let score = identity ? 240 : 110;
+  if (/명$|이름$|명칭$/i.test(normalized)) score += 45;
+  if (/(?:^|[_\s])(?:id|code)(?:$|[_\s])|번호|코드/i.test(normalized)) {
+    score += 55;
+  }
+  if (coverage >= 0.95) score += 30;
+  else if (coverage >= 0.85) score += 18;
+  if (repeatCount > 0) score += 35;
+  if (distinctCount <= 200) score += 20;
+  else score -= 40;
+
+  return {
+    header: normalized,
+    score,
+    eligible: true,
+    coverage,
+    distinctCount,
+    repeatCount,
+    identity,
+    secondary,
+  };
+}
+
+function snapshotEntityDuplicateStats(records = [], headers = []) {
+  const buckets = new Map();
+  let observed = 0;
+  for (const record of Array.isArray(records) ? records : []) {
+    const key = snapshotEntityCompositeKey(record, headers);
+    if (!key) continue;
+    const period = comparablePeriod(record.period) || "__no_period__";
+    const bucketKey = `${period}::${key}`;
+    buckets.set(bucketKey, (buckets.get(bucketKey) || 0) + 1);
+    observed += 1;
+  }
+  const duplicateCount = [...buckets.values()].reduce(
+    (sum, count) => sum + Math.max(0, count - 1),
+    0,
+  );
+  return {
+    observed,
+    duplicateCount,
+    duplicateRate: observed ? duplicateCount / observed : 0,
+  };
+}
+
+function resolveSnapshotEntityHeaders(series = {}) {
+  const records = Array.isArray(series.records) ? series.records : [];
+  if (
+    series.operation !== SEMANTIC_AGGREGATION_OPERATION.LATEST ||
+    series.metricRole !== SEMANTIC_METRIC_ROLE.STOCK_SNAPSHOT
+  ) {
+    return {
+      version: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+      applied: false,
+      headers: [],
+      candidates: [],
+      reason: "not_snapshot_latest",
+    };
+  }
+
+  const headers = Array.from(new Set([
+    ...(Array.isArray(series.dimensionHeaders)
+      ? series.dimensionHeaders
+      : []),
+    ...records.flatMap((record) =>
+      Object.keys(record?.dimensions || {}),
+    ),
+  ].map(normalizeText).filter(Boolean)));
+
+  const candidates = headers
+    .map((header) => snapshotEntityCandidateScore({ header, records }))
+    .filter((candidate) => candidate.eligible)
+    .sort((left, right) =>
+      right.score - left.score ||
+      right.distinctCount - left.distinctCount ||
+      left.header.localeCompare(right.header, "ko"),
+    );
+
+  if (!candidates.length) {
+    return {
+      version: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+      applied: false,
+      headers: [],
+      candidates: [],
+      reason: "no_entity_dimension",
+    };
+  }
+
+  const selected = [candidates[0].header];
+  const hasPeriod = records.some((record) => normalizeText(record.period));
+  let duplicateStats = snapshotEntityDuplicateStats(records, selected);
+
+  if (hasPeriod && duplicateStats.duplicateRate > 0) {
+    for (const candidate of candidates.slice(1, 3)) {
+      const trial = [...selected, candidate.header];
+      const trialStats = snapshotEntityDuplicateStats(records, trial);
+      if (trialStats.duplicateCount < duplicateStats.duplicateCount) {
+        selected.push(candidate.header);
+        duplicateStats = trialStats;
+      }
+      if (duplicateStats.duplicateRate <= 0.01) break;
+    }
+  }
+
+  const keySet = new Set(
+    records
+      .map((record) => snapshotEntityCompositeKey(record, selected))
+      .filter(Boolean),
+  );
+
+  return {
+    version: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+    applied: keySet.size >= 2,
+    headers: keySet.size >= 2 ? selected : [],
+    candidates: candidates.map((candidate) => ({
+      header: candidate.header,
+      score: candidate.score,
+      coverage: candidate.coverage,
+      distinctCount: candidate.distinctCount,
+      repeatCount: candidate.repeatCount,
+    })),
+    entityCount: keySet.size,
+    duplicateCountWithinPeriod: duplicateStats.duplicateCount,
+    duplicateRateWithinPeriod: duplicateStats.duplicateRate,
+    reason: keySet.size >= 2
+      ? "entity_dimension_resolved"
+      : "insufficient_entity_count",
+  };
+}
+
+function latestRecordSelectionByEntity(records = [], entityHeaders = []) {
+  const list = (Array.isArray(records) ? records : []).filter(
+    (record) =>
+      record &&
+      typeof record.value === "number" &&
+      Number.isFinite(record.value),
+  );
+  const headers = (Array.isArray(entityHeaders) ? entityHeaders : [])
+    .map(normalizeText)
+    .filter(Boolean);
+  if (!list.length || !headers.length) {
+    return latestRecordSelection(list);
+  }
+
+  const grouped = new Map();
+  for (const record of list) {
+    const key = snapshotEntityCompositeKey(record, headers) ||
+      `__row__${Number(record.rowIndex ?? grouped.size)}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(record);
+  }
+
+  const selectedRecords = [];
+  const selectedPeriods = [];
+  for (const entityRecords of grouped.values()) {
+    const selected = latestRecordSelection(entityRecords);
+    const chosen = [...selected.records]
+      .sort((left, right) =>
+        Number(left.rowIndex ?? 0) - Number(right.rowIndex ?? 0),
+      )
+      .at(-1);
+    if (chosen) selectedRecords.push(chosen);
+    if (selected.period) selectedPeriods.push(selected.period);
+  }
+
+  const uniquePeriods = Array.from(
+    new Set(selectedPeriods.map(normalizeText).filter(Boolean)),
+  ).sort((left, right) =>
+    comparablePeriod(left).localeCompare(
+      comparablePeriod(right),
+      "ko",
+      { numeric: true },
+    ),
+  );
+  const period = uniquePeriods.length === 1
+    ? uniquePeriods[0]
+    : uniquePeriods.length > 1
+      ? `${uniquePeriods[0]} ~ ${uniquePeriods.at(-1)} (엔티티별 최신)`
+      : "행 순서 기준";
+
+  return {
+    records: selectedRecords,
+    period,
+    method: "latest_by_entity",
+    entityHeaders: headers,
+    entityCount: grouped.size,
+    selectedPeriods: uniquePeriods,
+  };
+}
+
+function operationStats(records = [], operation = "sum", options = {}) {
   const allStats = numberStats(
     records.map((record) => record.value),
   );
   if (operation === SEMANTIC_AGGREGATION_OPERATION.LATEST) {
-    const selection = latestRecordSelection(records);
+    const entityHeaders = (Array.isArray(options.entityHeaders)
+      ? options.entityHeaders
+      : []).map(normalizeText).filter(Boolean);
+    const selection = entityHeaders.length
+      ? latestRecordSelectionByEntity(records, entityHeaders)
+      : latestRecordSelection(records);
     const selectedStats = numberStats(
       selection.records.map((record) => record.value),
     );
@@ -1350,6 +1631,9 @@ function operationStats(records = [], operation = "sum") {
       selectedRecords: selection.records,
       selectedPeriod: selection.period,
       selectionMethod: selection.method,
+      entityHeaders: selection.entityHeaders || [],
+      entityCount: Number(selection.entityCount || 0),
+      selectedPeriods: selection.selectedPeriods || [],
       value: selectedStats.sum,
     };
   }
@@ -1359,6 +1643,9 @@ function operationStats(records = [], operation = "sum") {
     selectedRecords: records,
     selectedPeriod: "",
     selectionMethod: operation,
+    entityHeaders: [],
+    entityCount: 0,
+    selectedPeriods: [],
     value:
       operation === "average" ? allStats.average : allStats.sum,
   };
@@ -1371,6 +1658,7 @@ function groupRows({
   metricLabel = "지표값",
   unit = "",
   groupValue,
+  entityHeaders = [],
 } = {}) {
   const grouped = new Map();
 
@@ -1383,7 +1671,9 @@ function groupRows({
 
   return [...grouped.entries()]
     .map(([group, groupedRecords]) => {
-      const resolved = operationStats(groupedRecords, operation);
+      const resolved = operationStats(groupedRecords, operation, {
+        entityHeaders,
+      });
       return {
         [groupHeader]: group,
         operation,
@@ -1527,10 +1817,8 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
     ? `${series.metricLabel} (${series.unit})`
     : series.metricLabel;
   const titlePrefix = options.compactTitles ? "" : `${label} · `;
-  const maxDimensionsPerSeries = Math.max(
-    0,
-    Number(options.maxDimensionsPerSeries ?? 3),
-  );
+  const sectionPolicy = sectionPolicyForSeries(series, options);
+  const maxDimensionsPerSeries = sectionPolicy.maxDimensions;
   const baseId = metricId(
     tableIndex,
     series.metricLabel,
@@ -1540,13 +1828,28 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
   const stats = numberStats(
     series.records.map((record) => record.value),
   );
-  const resolvedSummary = operationStats(
-    series.records,
-    series.operation,
-  );
   const additive = series.operation === "sum";
   const snapshot =
     series.operation === SEMANTIC_AGGREGATION_OPERATION.LATEST;
+  const durationMetric =
+    series.metricRole === SEMANTIC_METRIC_ROLE.DURATION;
+  const snapshotEntityResolution = snapshot
+    ? resolveSnapshotEntityHeaders(series)
+    : {
+        version: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+        applied: false,
+        headers: [],
+        entityCount: 0,
+        reason: "not_snapshot_latest",
+      };
+  const snapshotEntityHeaders = snapshotEntityResolution.applied
+    ? snapshotEntityResolution.headers
+    : [];
+  const resolvedSummary = operationStats(
+    series.records,
+    series.operation,
+    { entityHeaders: snapshotEntityHeaders },
+  );
   const summaryTitle = snapshot
     ? `${titlePrefix}${displayMetric} 최신 스냅샷`
     : `${titlePrefix}${displayMetric} 통계`;
@@ -1557,6 +1860,23 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           지표: "최신 기준기간",
           값: resolvedSummary.selectedPeriod || "행 순서 기준",
         },
+        ...(snapshotEntityResolution.applied
+          ? [
+              {
+                지표: "Snapshot 선택 방식",
+                값: "엔티티별 최신",
+              },
+              {
+                지표: "엔티티 기준",
+                값: snapshotEntityHeaders.join(" + "),
+              },
+              {
+                지표: "엔티티 수",
+                값: resolvedSummary.entityCount,
+                단위: "건",
+              },
+            ]
+          : []),
         {
           지표: "최신 스냅샷 값",
           값: resolvedSummary.value,
@@ -1589,6 +1909,13 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
       : [
           { 지표: "유효값 수", 값: stats.count, 단위: "건" },
           { 지표: "평균", 값: stats.average, 단위: series.unit },
+          ...(durationMetric
+            ? [{
+                지표: "중앙값",
+                값: median(series.records.map((record) => record.value)),
+                단위: series.unit,
+              }]
+            : []),
           { 지표: "최솟값", 값: stats.min, 단위: series.unit },
           { 지표: "최댓값", 값: stats.max, 단위: series.unit },
         ];
@@ -1621,6 +1948,16 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           complete: true,
           additive,
           snapshot,
+          snapshotEntityResolverVersion:
+            SNAPSHOT_ENTITY_RESOLVER_VERSION,
+          snapshotEntitySelectionApplied:
+            snapshotEntityResolution.applied,
+          snapshotEntityHeaders:
+            cloneValue(snapshotEntityHeaders),
+          snapshotEntityCount:
+            Number(resolvedSummary.entityCount || 0),
+          snapshotSelectionMethod:
+            resolvedSummary.selectionMethod,
           metricRole: series.metricRole,
           aggregationContract: cloneValue(series.aggregationContract || {}),
           unit: series.unit,
@@ -1628,6 +1965,21 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           valueHeader: series.valueHeader,
           protectedHeaders: series.protectedHeaders,
           plannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+          metricRelationshipPriorityEngineVersion:
+            METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+          relationshipRole: series.relationshipRole || "independent",
+          representativeMetricPriority:
+            Number(series.representativeMetricPriority || 0),
+          componentOfMetric: series.componentOfMetric || "",
+          metricRelationships:
+            cloneValue(series.metricRelationships || []),
+          semanticSectionBudgetEngineVersion:
+            SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+          sectionBudgetPolicy: cloneValue(sectionPolicy),
+          sectionBudgetPriority: sectionPolicy.budgetPriority,
+          durationSummaryContractVersion: durationMetric
+            ? DURATION_SUMMARY_CONTRACT_VERSION
+            : "",
         },
       },
     },
@@ -1664,14 +2016,29 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
     .slice(0, maxDimensionsPerSeries);
 
   for (const dimension of dimensionHeaders) {
-    const rows = groupRows({
-      records: series.records,
+    const groupSourceRecords =
+      snapshot && snapshotEntityResolution.applied
+        ? resolvedSummary.selectedRecords
+        : series.records;
+    const groupOperation =
+      snapshot && snapshotEntityResolution.applied
+        ? SEMANTIC_AGGREGATION_OPERATION.SUM
+        : series.operation;
+    let rows = groupRows({
+      records: groupSourceRecords,
       groupHeader: dimension.header,
-      operation: series.operation,
+      operation: groupOperation,
       metricLabel: series.metricLabel,
       unit: series.unit,
       groupValue: (record) => record.dimensions?.[dimension.header],
     });
+    if (snapshot && snapshotEntityResolution.applied) {
+      rows = rows.map((row) => ({
+        ...row,
+        operation: "latest_by_entity",
+        기준기간: resolvedSummary.selectedPeriod,
+      }));
+    }
     if (!rows.length) continue;
 
     sections.push({
@@ -1698,12 +2065,37 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           complete: true,
           additive,
           snapshot,
+          snapshotEntityResolverVersion:
+            SNAPSHOT_ENTITY_RESOLVER_VERSION,
+          snapshotEntitySelectionApplied:
+            snapshotEntityResolution.applied,
+          snapshotEntityHeaders:
+            cloneValue(snapshotEntityHeaders),
+          snapshotEntityCount:
+            Number(resolvedSummary.entityCount || 0),
+          snapshotSelectionMethod:
+            resolvedSummary.selectionMethod,
           metricRole: series.metricRole,
           aggregationContract: cloneValue(series.aggregationContract || {}),
           unit: series.unit,
           sourceContract: series.sourceContract,
           valueHeader: series.valueHeader,
           plannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+          metricRelationshipPriorityEngineVersion:
+            METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+          relationshipRole: series.relationshipRole || "independent",
+          representativeMetricPriority:
+            Number(series.representativeMetricPriority || 0),
+          componentOfMetric: series.componentOfMetric || "",
+          metricRelationships:
+            cloneValue(series.metricRelationships || []),
+          semanticSectionBudgetEngineVersion:
+            SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+          sectionBudgetPolicy: cloneValue(sectionPolicy),
+          sectionBudgetPriority: sectionPolicy.budgetPriority,
+          durationSummaryContractVersion: durationMetric
+            ? DURATION_SUMMARY_CONTRACT_VERSION
+            : "",
         },
       },
     });
@@ -1716,9 +2108,10 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
     metricLabel: series.metricLabel,
     unit: series.unit,
     groupValue: (record) => record.period,
+    entityHeaders: snapshotEntityHeaders,
   });
 
-  if (periodRows.length) {
+  if (sectionPolicy.includePeriod && periodRows.length) {
     sections.push({
       sectionId: `${baseId}.by_period`,
       title: `${titlePrefix}기간별 ${displayMetric}`,
@@ -1743,6 +2136,16 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           complete: true,
           additive,
           snapshot,
+          snapshotEntityResolverVersion:
+            SNAPSHOT_ENTITY_RESOLVER_VERSION,
+          snapshotEntitySelectionApplied:
+            snapshotEntityResolution.applied,
+          snapshotEntityHeaders:
+            cloneValue(snapshotEntityHeaders),
+          snapshotEntityCount:
+            Number(resolvedSummary.entityCount || 0),
+          snapshotSelectionMethod:
+            resolvedSummary.selectionMethod,
           metricRole: series.metricRole,
           aggregationContract: cloneValue(series.aggregationContract || {}),
           explicitPeriodOnly: true,
@@ -1751,12 +2154,27 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           valueHeader: series.valueHeader,
           protectedHeaders: series.protectedHeaders,
           plannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+          metricRelationshipPriorityEngineVersion:
+            METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+          relationshipRole: series.relationshipRole || "independent",
+          representativeMetricPriority:
+            Number(series.representativeMetricPriority || 0),
+          componentOfMetric: series.componentOfMetric || "",
+          metricRelationships:
+            cloneValue(series.metricRelationships || []),
+          semanticSectionBudgetEngineVersion:
+            SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+          sectionBudgetPolicy: cloneValue(sectionPolicy),
+          sectionBudgetPriority: sectionPolicy.budgetPriority,
+          durationSummaryContractVersion: durationMetric
+            ? DURATION_SUMMARY_CONTRACT_VERSION
+            : "",
         },
       },
     });
   }
 
-  return sections;
+  return sections.slice(0, sectionPolicy.maxSections);
 }
 
 function semanticScalarText(value, output = [], depth = 0) {
@@ -1915,6 +2333,22 @@ function groupHeadersSemanticallyMatch(
   return aliases.has(normalizeKey(existing));
 }
 
+function isWholeMetricSummarySection(section = {}) {
+  const sectionType = normalizeText(section.sectionType || "");
+  const group = normalizeText(
+    section.result?.groupBy?.header || "",
+  );
+  return !group && /summary/.test(sectionType);
+}
+
+function hasGroupedOrRankedSectionIdentity(section = {}) {
+  if (normalizeText(explicitSectionGroupHeader(section))) return true;
+  const title = normalizeText(section.title || "");
+  return /(?:^|\s)(?:기간|연도|년도|연월|월|일|부서|팀|상태|분류|유형|지역|품목|상품|제품|자산|장비|시설|담당자|고객|거래처|기관|사업|과제|프로젝트)별|상위|하위|순위|구성비|증감률|추이/i.test(
+    title,
+  );
+}
+
 function existingSectionCoversPlanned(existing = {}, planned = {}) {
   const metric = normalizeText(
     planned.result?.metric?.header || "",
@@ -1927,6 +2361,13 @@ function existingSectionCoversPlanned(existing = {}, planned = {}) {
     explicitSectionMetricHeader(existing);
   const existingGroup =
     explicitSectionGroupHeader(existing);
+
+  if (
+    isWholeMetricSummarySection(planned) &&
+    hasGroupedOrRankedSectionIdentity(existing)
+  ) {
+    return false;
+  }
 
   if (!metric || !sectionContainsToken(text, metric)) return false;
 
@@ -1996,6 +2437,142 @@ function annotateExistingSection(existing = {}, planned = {}) {
     },
   };
   return annotated;
+}
+
+function applyMandatorySummaryCoverageFloor({
+  sections = [],
+  plannedSections = [],
+  expectedMetricIds = [],
+} = {}) {
+  const working = Array.isArray(sections)
+    ? sections.map((section) => cloneValue(section))
+    : [];
+  const expected = new Set(uniqueMetricIds(expectedMetricIds));
+  const renderedBefore = new Set(
+    uniqueMetricIds(
+      working.flatMap((section) => collectSectionMetricIds(section)),
+    ),
+  );
+  const candidates = (Array.isArray(plannedSections)
+    ? plannedSections
+    : []
+  ).filter((section) => {
+    if (!isWholeMetricSummarySection(section)) return false;
+    return collectSectionMetricIds(section).some(
+      (metricId) => expected.has(metricId),
+    );
+  });
+
+  const restoredMetricIds = [];
+  const transferredMetricIds = [];
+  const restoredSectionIds = [];
+  const coverageActions = [];
+
+  for (const planned of candidates) {
+    const plannedMetricIds = collectSectionMetricIds(planned).filter(
+      (metricId) => expected.has(metricId),
+    );
+    const missingMetricIds = plannedMetricIds.filter(
+      (metricId) => !renderedBefore.has(metricId),
+    );
+    if (!missingMetricIds.length) continue;
+
+    const targetIndex = working.findIndex((section) =>
+      existingSectionCoversPlanned(section, planned),
+    );
+    if (targetIndex >= 0) {
+      working[targetIndex] = annotateExistingSection(
+        working[targetIndex],
+        planned,
+      );
+      const targetMetricIds = collectSectionMetricIds(
+        working[targetIndex],
+      );
+      for (const metricId of missingMetricIds) {
+        renderedBefore.add(metricId);
+        transferredMetricIds.push(metricId);
+      }
+      coverageActions.push({
+        action: "transfer_to_authoritative_summary",
+        plannedSectionId: normalizeText(planned.sectionId || ""),
+        targetSectionId: normalizeText(
+          working[targetIndex]?.sectionId || "",
+        ),
+        targetTitle: normalizeText(working[targetIndex]?.title || ""),
+        metricIds: targetMetricIds.filter((metricId) =>
+          missingMetricIds.includes(metricId),
+        ),
+      });
+      continue;
+    }
+
+    const restored = applySectionMetricIds(planned);
+    restored.result = {
+      ...(restored.result || {}),
+      meta: {
+        ...(restored.result?.meta || {}),
+        mandatorySummaryCoverageFloorVersion:
+          MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+        restoredByMandatorySummaryCoverageFloor: true,
+      },
+    };
+    const metricHeader = normalizeText(
+      restored.result?.metric?.header || "",
+    );
+    const insertIndex = working.findIndex((section) =>
+      metricHeadersSemanticallyMatch(
+        explicitSectionMetricHeader(section),
+        metricHeader,
+      ),
+    );
+    if (insertIndex >= 0) working.splice(insertIndex, 0, restored);
+    else working.push(restored);
+
+    for (const metricId of missingMetricIds) {
+      renderedBefore.add(metricId);
+      restoredMetricIds.push(metricId);
+    }
+    restoredSectionIds.push(
+      normalizeText(restored.sectionId || restored.title || ""),
+    );
+    coverageActions.push({
+      action: "restore_planned_summary",
+      plannedSectionId: normalizeText(planned.sectionId || ""),
+      targetSectionId: normalizeText(restored.sectionId || ""),
+      targetTitle: normalizeText(restored.title || ""),
+      metricIds: missingMetricIds,
+    });
+  }
+
+  const renderedAfter = new Set(
+    uniqueMetricIds(
+      working.flatMap((section) => collectSectionMetricIds(section)),
+    ),
+  );
+  const missingBefore = [...expected].filter(
+    (metricId) => !new Set(
+      uniqueMetricIds(
+        sections.flatMap((section) => collectSectionMetricIds(section)),
+      ),
+    ).has(metricId),
+  );
+  const missingAfter = [...expected].filter(
+    (metricId) => !renderedAfter.has(metricId),
+  );
+
+  return {
+    version: MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+    sections: working,
+    applied: coverageActions.length > 0,
+    expectedMetricIdCount: expected.size,
+    missingMetricIdsBefore: missingBefore,
+    missingMetricIdsAfter: missingAfter,
+    restoredMetricIds: uniqueMetricIds(restoredMetricIds),
+    transferredMetricIds: uniqueMetricIds(transferredMetricIds),
+    restoredSectionIds,
+    coverageActions,
+    pass: missingAfter.length === 0,
+  };
 }
 
 function sectionMetricAndGroupMatch(
@@ -3447,6 +4024,8 @@ function augmentBusinessTemplateResult({
       maxDimensionsPerSeries:
         options.maxDimensionsPerSeries ?? 8,
       maxSections: options.maxPlannedSections ?? 120,
+      maxSectionsPerTable: options.maxSectionsPerTable ?? 28,
+      includeDistinct: options.includeDistinct !== false,
       preferVirtualTables: false,
     },
   });
@@ -3485,7 +4064,14 @@ function augmentBusinessTemplateResult({
       continue;
     }
 
-    if (addedSectionCount >= maxAddedSections) continue;
+    const mandatorySummary =
+      isWholeMetricSummarySection(planned);
+    if (
+      addedSectionCount >= maxAddedSections &&
+      !mandatorySummary
+    ) {
+      continue;
+    }
 
     const added = applySectionMetricIds(planned);
     added.result = {
@@ -3536,11 +4122,43 @@ function augmentBusinessTemplateResult({
       sections: genericCleanup.sections,
     });
 
+  const flowDirectionSemantics =
+    applyFlowDirectionSemantics({
+      sections: contractSnapshotBridge.sections,
+      tables: preferredTables,
+    });
+
+  const representativePriority = prioritizeBusinessSections({
+    sections: flowDirectionSemantics.sections,
+    primaryMetricLabels:
+      plan.executionMeta?.primaryMetricLabels || [],
+    componentMetricLabels:
+      plan.executionMeta?.componentMetricLabels || [],
+  });
+
+  const mandatorySummaryMetricIds = uniqueMetricIds(
+    plannedSections
+      .filter(isWholeMetricSummarySection)
+      .flatMap((section) => collectSectionMetricIds(section)),
+  );
+  const expectedMetricIds = uniqueMetricIds([
+    renderedPlannerIds,
+    mandatorySummaryMetricIds,
+  ]);
+  const normalizedBeforeCoverageFloor =
+    normalizeSectionMetricIds(
+      representativePriority.sections,
+    );
+  const mandatorySummaryCoverageFloor =
+    applyMandatorySummaryCoverageFloor({
+      sections: normalizedBeforeCoverageFloor,
+      plannedSections,
+      expectedMetricIds,
+    });
   const normalizedSections =
     normalizeSectionMetricIds(
-      contractSnapshotBridge.sections,
+      mandatorySummaryCoverageFloor.sections,
     );
-  const expectedMetricIds = uniqueMetricIds(renderedPlannerIds);
 
   return {
     ...cloneValue(executionResult),
@@ -3562,6 +4180,62 @@ function augmentBusinessTemplateResult({
       aggregationContractResolverVersion:
         plan.executionMeta?.aggregationContractResolverVersion ||
         AGGREGATION_CONTRACT_RESOLVER_VERSION,
+      metricRelationshipPriorityEngineVersion:
+        METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+      derivedTotalRelationVersion:
+        DERIVED_TOTAL_RELATION_VERSION,
+      representativeMetricPriorityVersion:
+        REPRESENTATIVE_METRIC_PRIORITY_VERSION,
+      metricRelationshipCount:
+        Number(plan.executionMeta?.metricRelationshipCount || 0),
+      metricRelationships:
+        cloneValue(plan.executionMeta?.metricRelationships || []),
+      primaryMetricLabels:
+        cloneValue(plan.executionMeta?.primaryMetricLabels || []),
+      componentMetricLabels:
+        cloneValue(plan.executionMeta?.componentMetricLabels || []),
+      representativeMetricPriorityApplied:
+        representativePriority.applied,
+      representativeMetricReorderedSectionCount:
+        representativePriority.reorderedSectionCount,
+      semanticSectionBudgetEngineVersion:
+        SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+      mandatorySummaryCoverageFloorVersion:
+        MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+      mandatorySummaryCoverageFloorApplied:
+        mandatorySummaryCoverageFloor.applied,
+      mandatorySummaryCoverageFloorPass:
+        mandatorySummaryCoverageFloor.pass,
+      mandatorySummaryCoverageMissingMetricIdsBefore:
+        cloneValue(
+          mandatorySummaryCoverageFloor.missingMetricIdsBefore,
+        ),
+      mandatorySummaryCoverageMissingMetricIdsAfter:
+        cloneValue(
+          mandatorySummaryCoverageFloor.missingMetricIdsAfter,
+        ),
+      mandatorySummaryCoverageRestoredMetricIds:
+        cloneValue(
+          mandatorySummaryCoverageFloor.restoredMetricIds,
+        ),
+      mandatorySummaryCoverageTransferredMetricIds:
+        cloneValue(
+          mandatorySummaryCoverageFloor.transferredMetricIds,
+        ),
+      mandatorySummaryCoverageRestoredSectionIds:
+        cloneValue(
+          mandatorySummaryCoverageFloor.restoredSectionIds,
+        ),
+      mandatorySummaryCoverageActions:
+        cloneValue(
+          mandatorySummaryCoverageFloor.coverageActions,
+        ),
+      durationSummaryContractVersion:
+        DURATION_SUMMARY_CONTRACT_VERSION,
+      distinctEntitySectionVersion:
+        DISTINCT_ENTITY_SECTION_VERSION,
+      sectionBudgetSummaries:
+        cloneValue(plan.executionMeta?.sectionBudgetSummaries || []),
       semanticMetricRoleCounts:
         cloneValue(plan.executionMeta?.semanticMetricRoleCounts || {}),
       semanticAggregationOperationCounts:
@@ -3570,6 +4244,37 @@ function augmentBusinessTemplateResult({
         ),
       unsafeAggregationOverrideCount:
         Number(plan.executionMeta?.unsafeAggregationOverrideCount || 0),
+      snapshotEntityResolverVersion:
+        plan.executionMeta?.snapshotEntityResolverVersion ||
+        SNAPSHOT_ENTITY_RESOLVER_VERSION,
+      snapshotEntitySeriesCount:
+        Number(plan.executionMeta?.snapshotEntitySeriesCount || 0),
+      snapshotEntityAppliedSeriesCount:
+        Number(plan.executionMeta?.snapshotEntityAppliedSeriesCount || 0),
+      snapshotEntitySelections:
+        cloneValue(plan.executionMeta?.snapshotEntitySelections || []),
+      flowDirectionSemanticEngineVersion:
+        FLOW_DIRECTION_SEMANTIC_ENGINE_VERSION,
+      flowDirectionSectionRepairVersion:
+        FLOW_DIRECTION_SECTION_REPAIR_VERSION,
+      flowDirectionApplied:
+        flowDirectionSemantics.applied,
+      flowDirectionReason:
+        flowDirectionSemantics.reason,
+      flowDirectionEvidence:
+        cloneValue(flowDirectionSemantics.evidence || {}),
+      flowDirectionSystemSummary:
+        cloneValue(flowDirectionSemantics.systemSummary || {}),
+      flowDirectionRepairedSectionCount:
+        Number(flowDirectionSemantics.repairedSectionCount || 0),
+      flowDirectionRepairedSectionIds:
+        cloneValue(flowDirectionSemantics.repairedSectionIds || []),
+      flowDirectionScopes:
+        cloneValue(flowDirectionSemantics.scopes || []),
+      flowDirectionDualEntryApplied:
+        flowDirectionSemantics.dualEntryApplied === true,
+      flowDirectionLocationEntryCount:
+        Number(flowDirectionSemantics.locationEntryCount || 0),
       semanticContractPrecedenceVersion:
         SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
       semanticContractPrecedenceApplied:
@@ -3761,6 +4466,41 @@ function semanticRoleSummary(plans = []) {
   };
 }
 
+function snapshotEntityResolutionSummary(plans = []) {
+  const selections = [];
+  let snapshotSeriesCount = 0;
+  let appliedSeriesCount = 0;
+
+  for (const plan of Array.isArray(plans) ? plans : []) {
+    for (const series of Array.isArray(plan.series) ? plan.series : []) {
+      if (
+        series.operation !== SEMANTIC_AGGREGATION_OPERATION.LATEST ||
+        series.metricRole !== SEMANTIC_METRIC_ROLE.STOCK_SNAPSHOT
+      ) {
+        continue;
+      }
+      snapshotSeriesCount += 1;
+      const resolution = resolveSnapshotEntityHeaders(series);
+      if (resolution.applied) appliedSeriesCount += 1;
+      selections.push({
+        tableIndex: series.tableIndex,
+        metricLabel: series.metricLabel,
+        applied: resolution.applied,
+        headers: cloneValue(resolution.headers || []),
+        entityCount: Number(resolution.entityCount || 0),
+        reason: resolution.reason,
+      });
+    }
+  }
+
+  return {
+    version: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+    snapshotSeriesCount,
+    appliedSeriesCount,
+    selections,
+  };
+}
+
 function buildSemanticOutputPlan({
   tables = [],
   templateId = "generic_structured_summary",
@@ -3774,22 +4514,51 @@ function buildSemanticOutputPlan({
   const sourceTables = options.preferVirtualTables
     ? selectPreferredSemanticTables(inputTables)
     : inputTables;
-  const plans = sourceTables.map((table, index) =>
+  const rawPlans = sourceTables.map((table, index) =>
     buildSemanticSeries(table, index, context),
   );
+  const relationshipAnalyses = rawPlans.map((plan) =>
+    applyMetricRelationshipPriorities(plan.series),
+  );
+  const plans = rawPlans.map((plan, index) => ({
+    ...plan,
+    series: relationshipAnalyses[index].series,
+    relationshipAnalysis: relationshipAnalyses[index],
+  }));
   const sections = [];
+  const sectionBudgetSummaries = [];
 
   sourceTables.forEach((table, tableIndex) => {
     const plan = plans[tableIndex];
+    const tableSections = [];
     if (options.includeOverview !== false) {
-      sections.push(
+      tableSections.push(
         overviewSection(table, tableIndex, plan.contract),
       );
     }
+    if (options.includeDistinct !== false) {
+      const distinctSection = buildDistinctEntitySection({
+        table,
+        tableIndex,
+        metricIdFactory: metricId,
+      });
+      if (distinctSection) tableSections.push(distinctSection);
+    }
     plan.series.forEach((series) => {
-      sections.push(
+      tableSections.push(
         ...seriesSections(table, tableIndex, series, options),
       );
+    });
+    const budget = applySemanticSectionBudget({
+      sections: tableSections,
+      maxSections: Number(options.maxSectionsPerTable ?? 28),
+    });
+    sections.push(...budget.sections);
+    sectionBudgetSummaries.push({
+      tableIndex,
+      tableLabel: tableLabel(table, tableIndex),
+      ...budget,
+      sections: undefined,
     });
   });
 
@@ -3827,6 +4596,21 @@ function buildSemanticOutputPlan({
     (plan) => plan.contract?.type === "physical_wide",
   ).length;
   const metricSemanticSummary = semanticRoleSummary(plans);
+  const snapshotEntitySummary =
+    snapshotEntityResolutionSummary(plans);
+  const metricRelationships = relationshipAnalyses.flatMap(
+    (analysis) => cloneValue(analysis.relations || []),
+  );
+  const primaryMetricLabels = Array.from(new Set(
+    relationshipAnalyses.flatMap(
+      (analysis) => analysis.primaryMetricLabels || [],
+    ),
+  ));
+  const componentMetricLabels = Array.from(new Set(
+    relationshipAnalyses.flatMap(
+      (analysis) => analysis.componentMetricLabels || [],
+    ),
+  ));
 
   return {
     ok: true,
@@ -3851,6 +4635,25 @@ function buildSemanticOutputPlan({
         METRIC_SEMANTIC_ROLE_ENGINE_VERSION,
       aggregationContractResolverVersion:
         AGGREGATION_CONTRACT_RESOLVER_VERSION,
+      metricRelationshipPriorityEngineVersion:
+        METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+      derivedTotalRelationVersion:
+        DERIVED_TOTAL_RELATION_VERSION,
+      representativeMetricPriorityVersion:
+        REPRESENTATIVE_METRIC_PRIORITY_VERSION,
+      metricRelationshipCount: metricRelationships.length,
+      metricRelationships: cloneValue(metricRelationships),
+      primaryMetricLabels: cloneValue(primaryMetricLabels),
+      componentMetricLabels: cloneValue(componentMetricLabels),
+      semanticSectionBudgetEngineVersion:
+        SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+      mandatorySummaryCoverageFloorVersion:
+        MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+      durationSummaryContractVersion:
+        DURATION_SUMMARY_CONTRACT_VERSION,
+      distinctEntitySectionVersion:
+        DISTINCT_ENTITY_SECTION_VERSION,
+      sectionBudgetSummaries: cloneValue(sectionBudgetSummaries),
       semanticContractPrecedenceVersion:
         SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
       semanticMetricRoleCounts:
@@ -3859,6 +4662,14 @@ function buildSemanticOutputPlan({
         metricSemanticSummary.operationCounts,
       unsafeAggregationOverrideCount:
         metricSemanticSummary.unsafeAggregationOverrideCount,
+      snapshotEntityResolverVersion:
+        SNAPSHOT_ENTITY_RESOLVER_VERSION,
+      snapshotEntitySeriesCount:
+        snapshotEntitySummary.snapshotSeriesCount,
+      snapshotEntityAppliedSeriesCount:
+        snapshotEntitySummary.appliedSeriesCount,
+      snapshotEntitySelections:
+        cloneValue(snapshotEntitySummary.selections),
       valueColumnOnlyForCanonicalLong: true,
       protectedTemporalColumns: true,
       metricIdentitySeparated: true,
@@ -3879,12 +4690,17 @@ function buildSemanticOutputPlan({
       maxDimensionsPerSeries: Number(
         options.maxDimensionsPerSeries ?? 3,
       ),
+      maxSectionsPerTable: Number(options.maxSectionsPerTable ?? 28),
+      includeDistinct: options.includeDistinct !== false,
       preferVirtualTables: options.preferVirtualTables === true,
     },
   };
 }
 
 module.exports = {
+  SEMANTIC_OUTPUT_PLANNER_LEGACY_VERSION,
+  SEMANTIC_OUTPUT_PLANNER_FLOW_DIRECTION_VERSION,
+  SEMANTIC_OUTPUT_PLANNER_PREVIOUS_VERSION,
   SEMANTIC_OUTPUT_PLANNER_VERSION,
   SEMANTIC_OUTPUT_CONTRACT_VERSION,
   SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
@@ -3892,12 +4708,24 @@ module.exports = {
   GENERAL_STOCK_SNAPSHOT_ALIAS_VERSION,
   CONTRACT_KPI_SNAPSHOT_BRIDGE_VERSION,
   ACTUAL_FLOW_EVIDENCE_GATE_VERSION,
+  SNAPSHOT_ENTITY_RESOLVER_VERSION,
+  FLOW_DIRECTION_SEMANTIC_ENGINE_VERSION,
+  FLOW_DIRECTION_SECTION_REPAIR_VERSION,
+  METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
+  DERIVED_TOTAL_RELATION_VERSION,
+  REPRESENTATIVE_METRIC_PRIORITY_VERSION,
+  SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
+  MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+  DURATION_SUMMARY_CONTRACT_VERSION,
+  DISTINCT_ENTITY_SECTION_VERSION,
   buildSemanticOutputPlan,
   buildSemanticSeries,
   augmentBusinessTemplateResult,
   canPlanSemanticOutput,
   selectPreferredSemanticTables,
   existingSectionCoversPlanned,
+  isWholeMetricSummarySection,
+  applyMandatorySummaryCoverageFloor,
   canonicalLongContract,
   physicalWideContract,
   dimensionSemanticPriority,
@@ -3906,6 +4734,9 @@ module.exports = {
   inferAggregation,
   inferAggregationContract,
   latestRecordSelection,
+  latestRecordSelectionByEntity,
+  resolveSnapshotEntityHeaders,
+  snapshotEntityResolutionSummary,
   operationStats,
   resolveSemanticContractConflicts,
   replaceMixedSectionRows,
@@ -3915,10 +4746,23 @@ module.exports = {
   detectActualFlowEvidence,
   tableActualFlowEvidence,
   canonicalActualFlowDirection,
+  canonicalFlowDirection,
+  resolveFlowDirectionEvidence,
+  buildSystemFlowSummary,
+  buildDirectionRows,
+  buildPeriodFlowRows,
+  buildEntityFlowRows,
+  buildLocationLedgerRows,
+  applyFlowDirectionSemantics,
   isInventoryFlowMixedSection,
   contractRowAggregationIntent,
   sectionMetricAndGroupMatch,
   sectionOperationFamilies,
   semanticConflictReason,
   semanticRoleSummary,
+  applyMetricRelationshipPriorities,
+  prioritizeBusinessSections,
+  applySemanticSectionBudget,
+  buildDistinctEntitySection,
+  sectionPolicyForSeries,
 };
