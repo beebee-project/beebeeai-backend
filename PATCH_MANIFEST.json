@@ -1,0 +1,69 @@
+{
+  "version": "beebeeai_repo_relative_patch_manifest_v1",
+  "patchId": "priority4a_actual_flow_evidence_restore_gate",
+  "createdAt": "2026-07-28",
+  "repositoryRoot": "C:\\Users\\rlatk\\beebeeai\\beebeeai-backend",
+  "productionFiles": [
+    "automation/semanticOutputPlanner.js"
+  ],
+  "productionVersion": "semantic_output_planner_common_v2_8_actual_flow_evidence_restore_gate",
+  "gateVersion": "actual_flow_evidence_restore_gate_v1",
+  "hardcodingPolicy": {
+    "productionCaseIds": false,
+    "productionFixtureFileNames": false,
+    "productionExpectedNumericValues": false,
+    "testsMayReferenceCasesAndFixtures": true
+  },
+  "files": [
+    {
+      "path": "PATCH_VALIDATION.json",
+      "size": 3271,
+      "sha256": "a5f0e2458e83915af1df66af183df84863f0d18b209e7761461285b84b3e7d93"
+    },
+    {
+      "path": "README_PRIORITY4A_ACTUAL_FLOW_EVIDENCE_RESTORE_GATE.md",
+      "size": 5733,
+      "sha256": "01094558d7de9db152712ead18cd8e6c1d988cafba814bb0997aeb1b3c1acfde"
+    },
+    {
+      "path": "automation/semanticOutputPlanner.js",
+      "size": 109508,
+      "sha256": "8ab0e6befbe60710014622fe3579656f82b5a8c82a8c3f5818aa626091bae615"
+    },
+    {
+      "path": "semanticOutputPlanner_actual_flow_restore_gate.patch.diff",
+      "size": 13988,
+      "sha256": "129f280dba2c5fe8083438a6010dceff89faf592a81d87de6d9624a7858ca623"
+    },
+    {
+      "path": "tests/actualFlowEvidenceMixedSectionIntegrationSmokeTest.js",
+      "size": 5264,
+      "sha256": "eed5d7f7d6e1b79f5c58f96028682d59a3a6d12ef4f8db92261438a617bd1de6"
+    },
+    {
+      "path": "tests/actualFlowEvidenceRestoreGateCommonSmokeTest.js",
+      "size": 3901,
+      "sha256": "9ec5c5c7dd751368ddacfa97ede1b3b3683294a927753bfa03c69d81a0434bef"
+    },
+    {
+      "path": "tests/actualFlowEvidenceRestoreGateSourceIntegritySmokeTest.js",
+      "size": 1273,
+      "sha256": "eeb4db05bc60f1bc2907afe2115adc8a0e1665314eefe7f56b46035327500e6c"
+    },
+    {
+      "path": "tests/actualMixedSectionRowShapeSourceIntegritySmokeTest.js",
+      "size": 967,
+      "sha256": "c20836b4fdf9ca10a1478230421e589de77d26a0a3e51a071b74259b54cad2dc"
+    },
+    {
+      "path": "tests/priority4AActualFlowEvidenceOriginalFixtureSmokeTest.js",
+      "size": 1839,
+      "sha256": "b0b27503f437295dd74a3ac7061fea7a9f0b4a17b8c86481e0283995a3f5a88e"
+    },
+    {
+      "path": "tests/priority4a_actual_flow_evidence_restore_gate_cases.txt",
+      "size": 313,
+      "sha256": "9a069ab66f1ca11c38c030f15ba9ea186db2f1b1453dc7a86f118357ed2287b7"
+    }
+  ]
+}

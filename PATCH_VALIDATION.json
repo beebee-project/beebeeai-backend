@@ -1,0 +1,87 @@
+{
+  "version": "priority4a_actual_flow_evidence_restore_gate_validation_v1",
+  "patchId": "priority4a_actual_flow_evidence_restore_gate",
+  "productionFile": "automation/semanticOutputPlanner.js",
+  "productionSha256": "8ab0e6befbe60710014622fe3579656f82b5a8c82a8c3f5818aa626091bae615",
+  "versions": {
+    "semanticOutputPlanner": "semantic_output_planner_common_v2_8_actual_flow_evidence_restore_gate",
+    "actualFlowEvidenceGate": "actual_flow_evidence_restore_gate_v1"
+  },
+  "isolatedValidation": {
+    "syntaxCheck": "PASS",
+    "newTests": {
+      "passed": 4,
+      "total": 4,
+      "results": [
+        "PASS actual flow evidence restore gate common smoke",
+        "PASS actual flow evidence mixed section integration smoke",
+        "PASS actual flow evidence restore gate source integrity",
+        "PASS priority4A actual flow evidence original fixture smoke: 7"
+      ]
+    },
+    "compatibilityTests": {
+      "passed": 20,
+      "total": 20,
+      "results": [
+        "PASS actual mixed section row shape snapshot alias smoke",
+        "PASS actual mixed section row shape source integrity",
+        "PASS general inventory snapshot alias common smoke",
+        "PASS inventory snapshot alias and aggregation bridge integration smoke",
+        "PASS inventory snapshot alias aggregation bridge source integrity",
+        "PASS aggregation-aware contract KPI bridge common smoke",
+        "PASS mixed section contract snapshot source integrity",
+        "PASS contract KPI snapshot bridge common smoke",
+        "PASS mixed section row contract precedence common smoke",
+        "PASS mixed section and contract snapshot integration smoke",
+        "PASS metric semantic role engine common smoke",
+        "PASS semantic output planner metric role aggregation smoke",
+        "PASS semantic contract precedence common smoke",
+        "PASS semantic contract precedence integration smoke",
+        "PASS semantic contract precedence source integrity",
+        "PASS semantic output planner module integrity",
+        "PASS semantic output planner common smoke",
+        "PASS semantic output planner generic section cleanup smoke",
+        "PASS priority4A metric semantic source integrity",
+        "PASS priority4A original fixture role smoke: 25"
+      ]
+    },
+    "sourceMutation": "PASS",
+    "productionHardcodingScan": "PASS"
+  },
+  "fixtureEvidence": {
+    "inventory_stock_status.csv": {
+      "pass": true,
+      "mode": "explicit_inbound_outbound_columns"
+    },
+    "warehouse_movement_report.csv": {
+      "pass": true,
+      "mode": "direction_column_with_quantity"
+    },
+    "supply_usage_report.csv": {
+      "pass": false,
+      "mode": "no_actual_flow_evidence"
+    },
+    "equipment_rental_status.csv": {
+      "pass": false,
+      "mode": "no_actual_flow_evidence"
+    },
+    "asset_equipment_management.csv": {
+      "pass": false,
+      "mode": "no_actual_flow_evidence"
+    },
+    "travel_expense_settlement_analysis.csv": {
+      "pass": false,
+      "mode": "no_actual_flow_evidence"
+    },
+    "energy_usage_report.csv": {
+      "pass": false,
+      "mode": "no_actual_flow_evidence"
+    }
+  },
+  "notRun": [
+    "backend server restart",
+    "7-case runtime regression",
+    "full backend regression",
+    "deployment"
+  ]
+}
