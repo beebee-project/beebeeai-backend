@@ -45,15 +45,21 @@ const {
   median,
   sectionPolicyForSeries,
 } = require("./semanticSectionBudgetEngine");
+const {
+  FINAL_OUTPUT_QUALITY_GATE_VERSION,
+  OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+  SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+  applyFinalOutputQualityGate,
+} = require("./finalOutputQualityGateEngine");
 
 const SEMANTIC_OUTPUT_PLANNER_LEGACY_VERSION =
   "semantic_output_planner_common_v2_9_snapshot_latest_by_entity";
 const SEMANTIC_OUTPUT_PLANNER_FLOW_DIRECTION_VERSION =
   "semantic_output_planner_common_v2_10_flow_direction_semantics";
 const SEMANTIC_OUTPUT_PLANNER_PREVIOUS_VERSION =
-  "semantic_output_planner_common_v2_11_total_component_duration_budget";
-const SEMANTIC_OUTPUT_PLANNER_VERSION =
   "semantic_output_planner_common_v2_12_mandatory_summary_coverage_floor";
+const SEMANTIC_OUTPUT_PLANNER_VERSION =
+  "semantic_output_planner_common_v2_13_final_output_quality_gate";
 const SEMANTIC_OUTPUT_CONTRACT_VERSION =
   "semantic_output_contract_v1";
 const SEMANTIC_CONTRACT_PRECEDENCE_VERSION =
@@ -4155,9 +4161,18 @@ function augmentBusinessTemplateResult({
       plannedSections,
       expectedMetricIds,
     });
+  const finalOutputQualityGate =
+    applyFinalOutputQualityGate({
+      sections: mandatorySummaryCoverageFloor.sections,
+      expectedMetricIds,
+      sectionBudgetSummaries:
+        plan.executionMeta?.sectionBudgetSummaries || [],
+      throwOnFailure:
+        options.enforceFinalOutputQualityGate !== false,
+    });
   const normalizedSections =
     normalizeSectionMetricIds(
-      mandatorySummaryCoverageFloor.sections,
+      finalOutputQualityGate.sections,
     );
 
   return {
@@ -4168,6 +4183,21 @@ function augmentBusinessTemplateResult({
       contractCatalogVersion:
         `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_business_coverage_catalog_v1`,
       expectedMetricIds,
+    },
+    finalOutputQualityGate: {
+      version: FINAL_OUTPUT_QUALITY_GATE_VERSION,
+      completenessVersion: OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+      duplicateResolverVersion:
+        SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+      status: finalOutputQualityGate.status,
+      pass: finalOutputQualityGate.pass,
+      failureReasons: cloneValue(
+        finalOutputQualityGate.failureReasons || [],
+      ),
+      expectedMetricCount:
+        finalOutputQualityGate.analysis?.expectedMetricCount || 0,
+      renderedExpectedMetricCount:
+        finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
     },
     executionMeta: {
       ...(executionResult.executionMeta || {}),
@@ -4230,6 +4260,76 @@ function augmentBusinessTemplateResult({
         cloneValue(
           mandatorySummaryCoverageFloor.coverageActions,
         ),
+      outputCompletenessContractVersion:
+        OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+      semanticOutputDuplicateResolverVersion:
+        SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+      finalOutputQualityGateVersion:
+        FINAL_OUTPUT_QUALITY_GATE_VERSION,
+      finalOutputQualityGateApplied:
+        finalOutputQualityGate.applied,
+      finalOutputQualityGatePass:
+        finalOutputQualityGate.pass,
+      finalOutputQualityGateStatus:
+        finalOutputQualityGate.status,
+      finalOutputQualityGateStrict:
+        options.enforceFinalOutputQualityGate !== false,
+      finalOutputQualityGateFailureReasons:
+        cloneValue(finalOutputQualityGate.failureReasons || []),
+      finalOutputQualityGateExpectedMetricCount:
+        Number(finalOutputQualityGate.analysis?.expectedMetricCount || 0),
+      finalOutputQualityGateRenderedExpectedMetricCount:
+        Number(
+          finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
+        ),
+      finalOutputQualityGateMissingMetricIds:
+        cloneValue(finalOutputQualityGate.analysis?.missingMetricIds || []),
+      finalOutputQualityGateDuplicateMetricIds:
+        cloneValue(finalOutputQualityGate.analysis?.duplicateMetricIds || []),
+      finalOutputQualityGateEmptyRequiredSectionIds:
+        cloneValue(
+          finalOutputQualityGate.analysis?.emptyRequiredSectionIds || [],
+        ),
+      finalOutputQualityGateIncompleteRequiredSectionIds:
+        cloneValue(
+          finalOutputQualityGate.analysis?.incompleteRequiredSectionIds || [],
+        ),
+      finalOutputQualityGateInvalidNumberCount:
+        Number(finalOutputQualityGate.analysis?.invalidNumbers?.length || 0),
+      finalOutputQualityGateBudgetViolationCount:
+        Number(
+          finalOutputQualityGate.analysis?.sectionBudgetViolations?.length || 0,
+        ),
+      finalOutputQualityGateInputSectionCount:
+        Number(
+          finalOutputQualityGate.duplicateResolution?.inputSectionCount || 0,
+        ),
+      finalOutputQualityGateOutputSectionCount:
+        Number(finalOutputQualityGate.sections?.length || 0),
+      finalOutputQualityGateRemovedDuplicateSectionCount:
+        Number(
+          finalOutputQualityGate.duplicateResolution
+            ?.removedDuplicateSectionCount || 0,
+        ),
+      finalOutputQualityGateRemovedDuplicateSectionIds:
+        cloneValue(
+          finalOutputQualityGate.duplicateResolution
+            ?.removedDuplicateSectionIds || [],
+        ),
+      finalOutputQualityGateMergedMetricIdCount:
+        Number(
+          finalOutputQualityGate.duplicateResolution
+            ?.mergedMetricIdCount || 0,
+        ),
+      finalOutputQualityGateReassignedMetricIdCount:
+        Number(
+          finalOutputQualityGate.metricOwnership
+            ?.removedOwnershipCount || 0,
+        ),
+      finalOutputQualityGateRenamedSectionIdCount:
+        Number(finalOutputQualityGate.renamedSectionIds?.length || 0),
+      finalOutputQualityGateRenamedTitleCount:
+        Number(finalOutputQualityGate.renamedTitles?.length || 0),
       durationSummaryContractVersion:
         DURATION_SUMMARY_CONTRACT_VERSION,
       distinctEntitySectionVersion:
@@ -4578,15 +4678,24 @@ function buildSemanticOutputPlan({
     );
   }
 
-  const dedupedSections = normalizeSectionMetricIds(
+  const preliminarySections = normalizeSectionMetricIds(
     dedupeSections(limitedSections),
   );
-  const expectedMetricIds = Array.from(
-    new Set(
-      dedupedSections.flatMap((section) =>
-        Array.isArray(section.metricIds) ? section.metricIds : [],
-      ),
+  const expectedMetricIds = uniqueMetricIds(
+    preliminarySections.flatMap((section) =>
+      collectSectionMetricIds(section),
     ),
+  );
+  const finalOutputQualityGate =
+    applyFinalOutputQualityGate({
+      sections: preliminarySections,
+      expectedMetricIds,
+      sectionBudgetSummaries,
+      throwOnFailure:
+        options.enforceFinalOutputQualityGate !== false,
+    });
+  const finalSections = normalizeSectionMetricIds(
+    finalOutputQualityGate.sections,
   );
 
   const canonicalLongTableCount = plans.filter(
@@ -4618,12 +4727,27 @@ function buildSemanticOutputPlan({
     operation: "genericStructuredSummary",
     templateId,
     title,
-    sections: dedupedSections,
+    sections: finalSections,
     contractSummaryCoverage: {
       version: SEMANTIC_OUTPUT_CONTRACT_VERSION,
       contractCatalogVersion:
         `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_catalog`,
       expectedMetricIds,
+    },
+    finalOutputQualityGate: {
+      version: FINAL_OUTPUT_QUALITY_GATE_VERSION,
+      completenessVersion: OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+      duplicateResolverVersion:
+        SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+      status: finalOutputQualityGate.status,
+      pass: finalOutputQualityGate.pass,
+      failureReasons: cloneValue(
+        finalOutputQualityGate.failureReasons || [],
+      ),
+      expectedMetricCount:
+        finalOutputQualityGate.analysis?.expectedMetricCount || 0,
+      renderedExpectedMetricCount:
+        finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
     },
     executionMeta: {
       sourceDataOnly: false,
@@ -4649,6 +4773,46 @@ function buildSemanticOutputPlan({
         SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
       mandatorySummaryCoverageFloorVersion:
         MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
+      outputCompletenessContractVersion:
+        OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+      semanticOutputDuplicateResolverVersion:
+        SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+      finalOutputQualityGateVersion:
+        FINAL_OUTPUT_QUALITY_GATE_VERSION,
+      finalOutputQualityGateApplied:
+        finalOutputQualityGate.applied,
+      finalOutputQualityGatePass:
+        finalOutputQualityGate.pass,
+      finalOutputQualityGateStatus:
+        finalOutputQualityGate.status,
+      finalOutputQualityGateStrict:
+        options.enforceFinalOutputQualityGate !== false,
+      finalOutputQualityGateFailureReasons:
+        cloneValue(finalOutputQualityGate.failureReasons || []),
+      finalOutputQualityGateExpectedMetricCount:
+        Number(finalOutputQualityGate.analysis?.expectedMetricCount || 0),
+      finalOutputQualityGateRenderedExpectedMetricCount:
+        Number(
+          finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
+        ),
+      finalOutputQualityGateMissingMetricIds:
+        cloneValue(finalOutputQualityGate.analysis?.missingMetricIds || []),
+      finalOutputQualityGateDuplicateMetricIds:
+        cloneValue(finalOutputQualityGate.analysis?.duplicateMetricIds || []),
+      finalOutputQualityGateRemovedDuplicateSectionCount:
+        Number(
+          finalOutputQualityGate.duplicateResolution
+            ?.removedDuplicateSectionCount || 0,
+        ),
+      finalOutputQualityGateRemovedDuplicateSectionIds:
+        cloneValue(
+          finalOutputQualityGate.duplicateResolution
+            ?.removedDuplicateSectionIds || [],
+        ),
+      finalOutputQualityGateRenamedSectionIdCount:
+        Number(finalOutputQualityGate.renamedSectionIds?.length || 0),
+      finalOutputQualityGateRenamedTitleCount:
+        Number(finalOutputQualityGate.renamedTitles?.length || 0),
       durationSummaryContractVersion:
         DURATION_SUMMARY_CONTRACT_VERSION,
       distinctEntitySectionVersion:
@@ -4718,6 +4882,9 @@ module.exports = {
   MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
   DURATION_SUMMARY_CONTRACT_VERSION,
   DISTINCT_ENTITY_SECTION_VERSION,
+  OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+  SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+  FINAL_OUTPUT_QUALITY_GATE_VERSION,
   buildSemanticOutputPlan,
   buildSemanticSeries,
   augmentBusinessTemplateResult,
@@ -4765,4 +4932,5 @@ module.exports = {
   applySemanticSectionBudget,
   buildDistinctEntitySection,
   sectionPolicyForSeries,
+  applyFinalOutputQualityGate,
 };
