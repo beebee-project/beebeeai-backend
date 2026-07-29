@@ -444,7 +444,6 @@ function buildGeneratedDownloadUrl({
   filePath = "",
   displayName = "",
   outputType = "",
-  queryTablesKey = "",
   deleteAfterDownload = true,
 } = {}) {
   const params = new URLSearchParams();
@@ -453,7 +452,6 @@ function buildGeneratedDownloadUrl({
   if (filePath) params.set("filePath", filePath);
   if (displayName) params.set("displayName", displayName);
   if (outputType) params.set("outputType", outputType);
-  if (queryTablesKey) params.set("queryTablesKey", queryTablesKey);
   if (deleteAfterDownload) params.set("deleteAfterDownload", "1");
 
   return `/api/automation/download?${params.toString()}`;
@@ -473,28 +471,6 @@ function assertGeneratedStorageKeyAccess(req, storageKey = "") {
   );
 }
 
-function assertQueryTablesKeyAccess(req, queryTablesKey = "") {
-  const key = String(queryTablesKey || "");
-  if (!key) return false;
-
-  const userId = req.user?.id ? String(req.user.id) : "local-dev";
-
-  if (
-    isFlatLocalRegressionQueryTablesKey({
-      key,
-      localStorageEnabled: localStorageEnabled(),
-      nodeEnv: process.env.NODE_ENV,
-    })
-  ) {
-    return true;
-  }
-
-  return (
-    key.startsWith("query-tables/" + userId + "/") ||
-    key.startsWith("query-tables/local-dev/")
-  );
-}
-
 function shouldDeleteAfterDownload(value = "1") {
   const normalized = String(value ?? "1")
     .trim()
@@ -506,7 +482,6 @@ async function cleanupGeneratedDownloadArtifacts({
   req,
   storageKey = "",
   filePath = "",
-  queryTablesKey = "",
 } = {}) {
   const deleted = [];
   const errors = [];
@@ -531,12 +506,6 @@ async function cleanupGeneratedDownloadArtifacts({
         fs.unlinkSync(safePath);
       });
     }
-  }
-
-  if (queryTablesKey && assertQueryTablesKeyAccess(req, queryTablesKey)) {
-    await tryDelete("queryTables:" + queryTablesKey, () =>
-      deleteObject(queryTablesKey),
-    );
   }
 
   if (deleted.length || errors.length) {
@@ -604,6 +573,72 @@ function isMissingStorageObjectError(error) {
     /No such object/i.test(message) ||
     /not found/i.test(message)
   );
+}
+
+function createQueryTablesNotFoundError(queryTablesKey, cause) {
+  console.warn("[query-tables] storage object missing", {
+    queryTablesKey,
+    originalMessage: cause?.message || String(cause || ""),
+  });
+
+  const error = new Error(
+    "작업 데이터가 만료되었거나 존재하지 않습니다. 다시 준비해주세요.",
+  );
+
+  error.status = 410;
+  error.code = "QUERY_TABLE_NOT_FOUND";
+  error.cause = cause;
+
+  return error;
+}
+
+/*
+ * 운영 환경:
+ *   query-json/encrypted/... 객체를 내려받아 메모리에서만 복호화.
+ *
+ * 로컬 개발·기존 데이터:
+ *   평문 query-tables JSON 판독을 계속 지원.
+ */
+async function readQueryTablesPayload(queryTablesKey) {
+  if (!queryTablesKey) {
+    const error = new Error("queryTablesKey가 필요합니다.");
+    error.status = 400;
+    error.code = "QUERY_TABLES_KEY_REQUIRED";
+    throw error;
+  }
+
+  try {
+    const encryptedPayload = await readEncryptedQueryJson(queryTablesKey);
+
+    if (encryptedPayload) {
+      return encryptedPayload.payload || encryptedPayload;
+    }
+
+    return await readJsonObject(queryTablesKey);
+  } catch (error) {
+    if (isMissingStorageObjectError(error)) {
+      throw createQueryTablesNotFoundError(queryTablesKey, error);
+    }
+
+    throw error;
+  }
+}
+
+function respondQueryTablesReadError(res, error) {
+  if (
+    error?.code !== "QUERY_TABLE_NOT_FOUND" &&
+    error?.code !== "QUERY_TABLES_KEY_REQUIRED"
+  ) {
+    return false;
+  }
+
+  res.status(error.status || 410).json({
+    ok: false,
+    code: error.code,
+    message: error.message,
+  });
+
+  return true;
 }
 
 const MOJIBAKE_PATTERN =
@@ -746,6 +781,7 @@ async function buildQueryTablesForFile(req, fileName) {
       candidateBundlePropagation:
         candidateBundlePropagationMeta(candidateBundle),
       source: "encrypted-query-json",
+      queryJsonKey: savedQueryJson.fileInfo?.queryJsonKey || null,
     };
   }
 
@@ -837,8 +873,10 @@ async function buildQueryTablesForFile(req, fileName) {
   const businessTemplateCandidates =
     propagatedCandidateBundle.businessTemplateCandidates || [];
 
+  let queryJsonKey = null;
+
   if (savedQueryJson?.user && savedQueryJson?.fileInfo) {
-    await saveQueryJsonForFile({
+    queryJsonKey = await saveQueryJsonForFile({
       user: savedQueryJson.user,
       fileInfo: savedQueryJson.fileInfo,
       fileName,
@@ -869,6 +907,7 @@ async function buildQueryTablesForFile(req, fileName) {
       propagatedCandidateBundle,
     ),
     source: "rebuilt-from-xlsx",
+    queryJsonKey,
   };
 }
 
@@ -915,7 +954,7 @@ async function executeAnalysisCandidate(req, res) {
     let tablesForExecution = normalizedQueryTables;
 
     if (!Array.isArray(tablesForExecution) && queryTablesKey) {
-      const saved = await readJsonObject(queryTablesKey);
+      const saved = await readQueryTablesPayload(queryTablesKey);
       tablesForExecution =
         saved.normalizedQueryTables ||
         buildNormalizedQueryTables(saved.tables || []);
@@ -947,6 +986,10 @@ async function executeAnalysisCandidate(req, res) {
   } catch (error) {
     console.error("executeAnalysisCandidate error:", error);
 
+    if (respondQueryTablesReadError(res, error)) {
+      return;
+    }
+
     return res.status(500).json({
       ok: false,
       code: "ANALYSIS_CANDIDATE_EXECUTE_FAILED",
@@ -963,7 +1006,7 @@ async function executeBusinessTemplateCandidate(req, res) {
     let tablesForExecution = normalizedQueryTables;
 
     if (!Array.isArray(tablesForExecution) && queryTablesKey) {
-      const saved = await readJsonObject(queryTablesKey);
+      const saved = await readQueryTablesPayload(queryTablesKey);
       tablesForExecution =
         saved.normalizedQueryTables ||
         buildNormalizedQueryTables(saved.tables || []);
@@ -995,6 +1038,10 @@ async function executeBusinessTemplateCandidate(req, res) {
   } catch (error) {
     console.error("executeBusinessTemplateCandidate error:", error);
 
+    if (respondQueryTablesReadError(res, error)) {
+      return;
+    }
+
     return res.status(500).json({
       ok: false,
       code: "BUSINESS_TEMPLATE_EXECUTE_FAILED",
@@ -1014,7 +1061,6 @@ exports.downloadGeneratedFile = async (req, res, next) => {
       filePath = "",
       displayName = "",
       outputType = "",
-      queryTablesKey = "",
       deleteAfterDownload = "1",
     } = req.query || {};
 
@@ -1069,7 +1115,6 @@ exports.downloadGeneratedFile = async (req, res, next) => {
           req,
           storageKey,
           filePath,
-          queryTablesKey,
         }),
       );
     }
@@ -1104,7 +1149,7 @@ exports.createSummarySheet = async (req, res, next) => {
     }
     if (!(await assertTemplateGenerationUsage(req, res))) return;
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const normalizedQueryTables =
       saved.normalizedQueryTables ||
       buildNormalizedQueryTables(saved.tables || []);
@@ -1267,6 +1312,11 @@ exports.createSummarySheet = async (req, res, next) => {
     });
   } catch (e) {
     console.error("[automation.createSummarySheet]", e);
+
+    if (respondQueryTablesReadError(res, e)) {
+      return;
+    }
+
     next(e);
   }
 };
@@ -1422,7 +1472,7 @@ exports.exportXlsx = async (req, res) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -1528,7 +1578,6 @@ exports.exportXlsx = async (req, res) => {
         filePath,
         displayName: fileName,
         outputType,
-        queryTablesKey,
       }),
       filePath,
       outputType,
@@ -1572,7 +1621,7 @@ exports.exportReportJson = async (req, res) => {
     }
     if (!(await assertTemplateGenerationUsage(req, res))) return;
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -1655,7 +1704,6 @@ exports.exportReportJson = async (req, res) => {
         filePath: exported.filePath,
         displayName: exported.displayName || exported.fileName,
         outputType,
-        queryTablesKey,
       }),
       filePath: exported.filePath,
       outputType,
@@ -1697,7 +1745,7 @@ exports.exportPptx = async (req, res) => {
     }
     if (!(await assertTemplateGenerationUsage(req, res))) return;
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const tables = saved.tables || [];
 
     let intent = null;
@@ -1781,7 +1829,6 @@ exports.exportPptx = async (req, res) => {
         filePath: exported.filePath,
         displayName: exported.displayName || exported.fileName,
         outputType,
-        queryTablesKey,
       }),
       filePath: exported.filePath,
       outputType,
@@ -1820,7 +1867,7 @@ exports.getAnalysisCandidates = async (req, res, next) => {
     let key = queryTablesKey || null;
 
     if (key) {
-      saved = await readJsonObject(key);
+      saved = await readQueryTablesPayload(key);
 
       if (saved && hasMojibakeQueryPayload(saved) && saved.fileName) {
         console.warn(
@@ -2019,6 +2066,11 @@ exports.getAnalysisCandidates = async (req, res, next) => {
     });
   } catch (e) {
     console.error("[automation.getAnalysisCandidates]", e);
+
+    if (respondQueryTablesReadError(res, e)) {
+      return;
+    }
+
     next(e);
   }
 };
@@ -2034,7 +2086,7 @@ exports.executeQuery = async (req, res, next) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const queryIntent = intent || parseQueryIntent(message, saved.tables || []);
 
     if (!queryIntent?.ok) {
@@ -2072,7 +2124,7 @@ exports.analyzeQueryIntent = async (req, res, next) => {
       });
     }
 
-    const saved = await readJsonObject(queryTablesKey);
+    const saved = await readQueryTablesPayload(queryTablesKey);
     const intent = parseQueryIntent(message, saved.tables || []);
 
     return res.json({
@@ -2231,9 +2283,6 @@ exports.saveQueryTables = async (req, res, next) => {
       source: "save-query-tables",
     });
 
-    const now = new Date();
-    const userId = req.user?.id || "local-dev";
-    const rand = crypto.randomBytes(6).toString("hex");
     const normalizedRegressionContext =
       normalizeRegressionContext(regressionContext);
     const stableRegressionKey = buildLocalRegressionQueryTablesKey({
@@ -2242,17 +2291,13 @@ exports.saveQueryTables = async (req, res, next) => {
       nodeEnv: process.env.NODE_ENV,
     });
 
-    const key =
-      stableRegressionKey ||
-      `query-tables/${userId}/${fileHash}/${Date.now()}_${rand}.json`;
-
     const payload = {
       version: "query_tables_v4_text_csv_encoding",
       fileName,
       fileHash,
       sheetStateSig,
       tableCount: tables.length,
-      createdAt: now.toISOString(),
+      createdAt: new Date().toISOString(),
       regressionContext: normalizedRegressionContext,
       artifactNaming: regressionArtifactNamingMeta(regressionContext),
       tables,
@@ -2273,7 +2318,24 @@ exports.saveQueryTables = async (req, res, next) => {
       ),
     };
 
-    const saved = await saveJsonObject(key, payload);
+    /*
+     * 운영 환경에서는 buildQueryTablesForFile()이 생성하거나 재사용한
+     * 암호화 queryJsonKey를 그대로 사용.
+     *
+     * 로컬 테스트에서는 기존 평문 저장 방식을 유지.
+     */
+    let key = built.queryJsonKey || "";
+    let saved = null;
+
+    if (!key) {
+      const userId = req.user?.id || "local-dev";
+      const rand = crypto.randomBytes(6).toString("hex");
+
+      key =
+        `query-tables/${userId}/${fileHash}/` + `${Date.now()}_${rand}.json`;
+
+      saved = await saveJsonObject(key, payload);
+    }
 
     return res.json({
       ok: true,
@@ -2282,6 +2344,7 @@ exports.saveQueryTables = async (req, res, next) => {
       sheetStateSig,
       tableCount: tables.length,
       queryTablesKey: key,
+      queryTablesEncrypted: key.startsWith("query-json/encrypted/"),
       artifactNaming: regressionArtifactNamingMeta(regressionContext),
       normalizedQueryTables,
       analysisRecipeCandidates,
@@ -2298,8 +2361,8 @@ exports.saveQueryTables = async (req, res, next) => {
       candidateBundlePropagation: candidateBundlePropagationMeta(
         propagatedCandidateBundle,
       ),
-      localName: saved.localName,
-      gcsName: saved.gcsName,
+      localName: saved?.localName || null,
+      gcsName: saved?.gcsName || key,
       tables: tables.map((t) => ({
         source: t.source,
         confidence: t.confidence,
