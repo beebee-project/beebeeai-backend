@@ -6,7 +6,6 @@ const User = require("../models/User");
 const {
   downloadToBuffer,
   saveJsonObject,
-  readJsonObject,
   saveBufferObject,
   deleteObject,
   isLocalStorage,
@@ -34,7 +33,12 @@ const { decryptBuffer } = require("../services/encryptedFileService");
 const {
   readEncryptedQueryJson,
   saveEncryptedQueryJson,
+  deleteEncryptedQueryJson,
 } = require("../services/encryptedJsonStorageService");
+const {
+  readQueryTablesPayload: readQueryTablesPayloadFromStorage,
+  isEncryptedQueryTablesKey,
+} = require("../services/queryTablesPayloadService");
 const { assertCanUse, bumpUsage } = require("../services/usageService");
 const {
   buildQueryTablesFromWorkbook,
@@ -471,6 +475,15 @@ function assertGeneratedStorageKeyAccess(req, storageKey = "") {
   );
 }
 
+function normalizeBooleanFlag(value = false) {
+  if (value === true) return true;
+  if (value === false || value == null) return false;
+
+  return ["1", "true", "yes", "on"].includes(
+    String(value).trim().toLowerCase(),
+  );
+}
+
 function shouldDeleteAfterDownload(value = "1") {
   const normalized = String(value ?? "1")
     .trim()
@@ -575,59 +588,20 @@ function isMissingStorageObjectError(error) {
   );
 }
 
-function createQueryTablesNotFoundError(queryTablesKey, cause) {
-  console.warn("[query-tables] storage object missing", {
-    queryTablesKey,
-    originalMessage: cause?.message || String(cause || ""),
-  });
-
-  const error = new Error(
-    "작업 데이터가 만료되었거나 존재하지 않습니다. 다시 준비해주세요.",
-  );
-
-  error.status = 410;
-  error.code = "QUERY_TABLE_NOT_FOUND";
-  error.cause = cause;
-
-  return error;
-}
-
 /*
  * 운영 환경:
- *   query-json/encrypted/... 객체를 내려받아 메모리에서만 복호화.
- *
- * 로컬 개발·기존 데이터:
- *   평문 query-tables JSON 판독을 계속 지원.
+ * query-json/encrypted/... 객체를 내려받아 메모리에서만 복호화.
+ * 로컬 개발·기존 데이터: 평문 query-tables JSON 판독을 계속 지원.
  */
 async function readQueryTablesPayload(queryTablesKey) {
-  if (!queryTablesKey) {
-    const error = new Error("queryTablesKey가 필요합니다.");
-    error.status = 400;
-    error.code = "QUERY_TABLES_KEY_REQUIRED";
-    throw error;
-  }
-
-  try {
-    const encryptedPayload = await readEncryptedQueryJson(queryTablesKey);
-
-    if (encryptedPayload) {
-      return encryptedPayload.payload || encryptedPayload;
-    }
-
-    return await readJsonObject(queryTablesKey);
-  } catch (error) {
-    if (isMissingStorageObjectError(error)) {
-      throw createQueryTablesNotFoundError(queryTablesKey, error);
-    }
-
-    throw error;
-  }
+  return readQueryTablesPayloadFromStorage(queryTablesKey);
 }
 
 function respondQueryTablesReadError(res, error) {
   if (
     error?.code !== "QUERY_TABLE_NOT_FOUND" &&
-    error?.code !== "QUERY_TABLES_KEY_REQUIRED"
+    error?.code !== "QUERY_TABLES_KEY_REQUIRED" &&
+    error?.code !== "QUERY_TABLE_INVALID_ENCRYPTED_PAYLOAD"
   ) {
     return false;
   }
@@ -661,7 +635,11 @@ function hasMojibakeQueryPayload(payload = {}) {
   return suspiciousCount >= 2;
 }
 
-async function loadSavedQueryJsonForFile(req, fileName) {
+async function loadSavedQueryJsonForFile(
+  req,
+  fileName,
+  { forceRefresh = false } = {},
+) {
   if (isLocalDevBypassMode()) return null;
   if (!req.user?.id || !fileName) return null;
 
@@ -674,6 +652,22 @@ async function loadSavedQueryJsonForFile(req, fileName) {
   }
 
   const staleQueryJsonKey = fileInfo.queryJsonKey;
+
+  /*
+   * forceRefresh에서는 기존 암호화 객체를 읽지 않고
+   * 원본 엑셀·CSV에서 쿼리테이블을 다시 생성.
+   * 기존 키는 새 객체 저장이 성공한 이후 삭제.
+   */
+  if (forceRefresh) {
+    return {
+      user,
+      fileInfo,
+      payload: null,
+      staleQueryJsonKey,
+      forceRefresh: true,
+    };
+  }
+
   let payload = null;
 
   try {
@@ -724,11 +718,64 @@ async function saveQueryJsonForFile({ user, fileInfo, fileName, payload }) {
   return meta.queryJsonKey;
 }
 
-async function buildQueryTablesForFile(req, fileName) {
+async function deleteSupersededQueryJson({
+  previousKey = "",
+  nextKey = "",
+  fileName = "",
+  reason = "",
+} = {}) {
+  const previous = String(previousKey || "");
+  const next = String(nextKey || "");
+
+  if (!previous || !next || previous === next) {
+    return;
+  }
+
+  if (!isEncryptedQueryTablesKey(previous)) {
+    return;
+  }
+
+  try {
+    await deleteEncryptedQueryJson(previous);
+
+    console.log("[query-json] superseded object deleted", {
+      fileName,
+      previousKey: previous,
+      nextKey: next,
+      reason,
+    });
+  } catch (error) {
+    /*
+     * 새 키 저장과 DB 갱신은 이미 완료됐으므로
+     * 구 키 정리 실패 때문에 사용자 요청까지 실패시키지는 않는다.
+     */
+    console.warn("[query-json] superseded object cleanup failed", {
+      fileName,
+      previousKey: previous,
+      nextKey: next,
+      reason,
+      message: error?.message || String(error),
+    });
+  }
+}
+
+async function buildQueryTablesForFile(
+  req,
+  fileName,
+  { forceRefresh = false } = {},
+) {
   let buffer;
-  const savedQueryJson = await loadSavedQueryJsonForFile(req, fileName);
+  const savedQueryJson = await loadSavedQueryJsonForFile(req, fileName, {
+    forceRefresh,
+  });
+
+  const previousQueryJsonKey =
+    savedQueryJson?.staleQueryJsonKey ||
+    savedQueryJson?.fileInfo?.queryJsonKey ||
+    "";
 
   if (
+    !forceRefresh &&
     savedQueryJson?.payload &&
     !hasMojibakeQueryPayload(savedQueryJson.payload)
   ) {
@@ -895,6 +942,14 @@ async function buildQueryTablesForFile(req, fileName) {
         ),
       },
     });
+    if (queryJsonKey) {
+      await deleteSupersededQueryJson({
+        previousKey: previousQueryJsonKey,
+        nextKey: queryJsonKey,
+        fileName,
+        reason: forceRefresh ? "force-refresh" : "query-table-rebuild",
+      });
+    }
   }
 
   return {
@@ -908,6 +963,7 @@ async function buildQueryTablesForFile(req, fileName) {
     ),
     source: "rebuilt-from-xlsx",
     queryJsonKey,
+    queryTablesForceRefreshed: forceRefresh === true,
   };
 }
 
@@ -1282,7 +1338,6 @@ exports.createSummarySheet = async (req, res, next) => {
         storageKey: key,
         displayName: outputFileName,
         outputType,
-        queryTablesKey,
       }),
       sourceFileName: saved.fileName,
       outputType,
@@ -1878,7 +1933,10 @@ exports.getAnalysisCandidates = async (req, res, next) => {
           },
         );
 
-        const rebuilt = await buildQueryTablesForFile(req, saved.fileName);
+        const previousKey = key;
+        const rebuilt = await buildQueryTablesForFile(req, saved.fileName, {
+          forceRefresh: true,
+        });
 
         saved = {
           version: "query_tables_v4_text_csv_encoding",
@@ -1896,7 +1954,20 @@ exports.getAnalysisCandidates = async (req, res, next) => {
           candidateBundlePropagation: candidateBundlePropagationMeta(rebuilt),
         };
 
-        await saveJsonObject(key, saved);
+        /*
+         * 운영 환경은 buildQueryTablesForFile()에서 이미
+         * 새 암호화 객체 저장과 DB queryJsonKey 교체를 완료했다.
+         */
+        if (rebuilt.queryJsonKey) {
+          key = rebuilt.queryJsonKey;
+        } else if (previousKey && !isEncryptedQueryTablesKey(previousKey)) {
+          /*
+           * 로컬·레거시 평문 회귀 데이터에 대해서만
+           * 기존 키를 같은 형식으로 갱신한다.
+           */
+          await saveJsonObject(previousKey, saved);
+          key = previousKey;
+        }
       }
     } else if (fileName) {
       const built = await buildQueryTablesForFile(req, fileName);
@@ -2232,7 +2303,11 @@ exports.previewQueryTables = async (req, res, next) => {
 
 exports.saveQueryTables = async (req, res, next) => {
   try {
-    const { fileName, regressionContext = null } = req.body || {};
+    const {
+      fileName,
+      forceRefresh = false,
+      regressionContext = null,
+    } = req.body || {};
 
     if (!fileName) {
       return res.status(400).json({
@@ -2241,7 +2316,11 @@ exports.saveQueryTables = async (req, res, next) => {
       });
     }
 
-    const built = await buildQueryTablesForFile(req, fileName);
+    const shouldForceRefresh = normalizeBooleanFlag(forceRefresh);
+
+    const built = await buildQueryTablesForFile(req, fileName, {
+      forceRefresh: shouldForceRefresh,
+    });
     const { fileHash, sheetStateSig, tables } = built;
 
     const normalizedQueryTables =
@@ -2321,7 +2400,6 @@ exports.saveQueryTables = async (req, res, next) => {
     /*
      * 운영 환경에서는 buildQueryTablesForFile()이 생성하거나 재사용한
      * 암호화 queryJsonKey를 그대로 사용.
-     *
      * 로컬 테스트에서는 기존 평문 저장 방식을 유지.
      */
     let key = built.queryJsonKey || "";
@@ -2332,6 +2410,7 @@ exports.saveQueryTables = async (req, res, next) => {
       const rand = crypto.randomBytes(6).toString("hex");
 
       key =
+        stableRegressionKey ||
         `query-tables/${userId}/${fileHash}/` + `${Date.now()}_${rand}.json`;
 
       saved = await saveJsonObject(key, payload);
@@ -2345,6 +2424,7 @@ exports.saveQueryTables = async (req, res, next) => {
       tableCount: tables.length,
       queryTablesKey: key,
       queryTablesEncrypted: key.startsWith("query-json/encrypted/"),
+      queryTablesForceRefreshed: built.queryTablesForceRefreshed === true,
       artifactNaming: regressionArtifactNamingMeta(regressionContext),
       normalizedQueryTables,
       analysisRecipeCandidates,

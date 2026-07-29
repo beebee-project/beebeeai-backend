@@ -1,10 +1,8 @@
-"use strict";
-
 const path = require("path");
-const { readJsonObject } = require("../utils/storage");
 const {
-  buildNormalizedQueryTables,
-} = require("./normalizedQueryTableBuilder");
+  readQueryTablesPayload,
+} = require("../services/queryTablesPayloadService");
+const { buildNormalizedQueryTables } = require("./normalizedQueryTableBuilder");
 const {
   BUSINESS_TEMPLATE_EXECUTOR_VERSION,
   SEMANTIC_OUTPUT_PLANNER_VERSION,
@@ -46,10 +44,8 @@ function runtimeFingerprint() {
       AUTOMATION_EXECUTION_ROUTE_BRIDGE_VERSION,
     automationExecuteBusinessRouteVersion:
       AUTOMATION_EXECUTE_BUSINESS_ROUTE_VERSION,
-    businessTemplateExecutorVersion:
-      BUSINESS_TEMPLATE_EXECUTOR_VERSION,
-    semanticOutputPlannerVersion:
-      SEMANTIC_OUTPUT_PLANNER_VERSION,
+    businessTemplateExecutorVersion: BUSINESS_TEMPLATE_EXECUTOR_VERSION,
+    semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
     routeBridgeModulePath: modulePathForObservation(__filename),
     executorModulePath,
     plannerModulePath,
@@ -72,7 +68,10 @@ async function resolveExecutionTables({
   queryTablesKey = "",
   normalizedQueryTables,
 } = {}) {
-  if (Array.isArray(normalizedQueryTables)) {
+  if (
+    Array.isArray(normalizedQueryTables) &&
+    normalizedQueryTables.length > 0
+  ) {
     return {
       tables: normalizedQueryTables,
       source: "request.normalizedQueryTables",
@@ -88,7 +87,7 @@ async function resolveExecutionTables({
     };
   }
 
-  const saved = await readJsonObject(queryTablesKey);
+  const saved = await readQueryTablesPayload(queryTablesKey);
   if (Array.isArray(saved?.normalizedQueryTables)) {
     return {
       tables: saved.normalizedQueryTables,
@@ -125,8 +124,7 @@ async function executeBusinessTemplateObserved(req, res) {
           {
             ok: false,
             code: "NORMALIZED_QUERY_TABLES_REQUIRED",
-            message:
-              "normalizedQueryTables 또는 queryTablesKey가 필요합니다.",
+            message: "normalizedQueryTables 또는 queryTablesKey가 필요합니다.",
           },
           {
             routeInputSource: resolved.source,
@@ -147,6 +145,33 @@ async function executeBusinessTemplateObserved(req, res) {
           {
             routeInputSource: resolved.source,
             routeExecutionTableCount: resolved.tables.length,
+            routeExecutionElapsedMs: Date.now() - startedAt,
+          },
+        ),
+      );
+    }
+
+    if (resolved.tables.length === 0) {
+      return res.status(400).json(
+        withRouteExecutionMeta(
+          {
+            ok: false,
+            code: "NORMALIZED_QUERY_TABLES_EMPTY",
+            message:
+              "실행할 작업 데이터가 없습니다. 파일 분석을 다시 진행해주세요.",
+          },
+          {
+            routeInputSource: resolved.source,
+            routeQueryTablesKeyPresent: Boolean(queryTablesKey),
+            routeExecutionTableCount: 0,
+            routeSavedPhysicalTableCount: Array.isArray(resolved.saved?.tables)
+              ? resolved.saved.tables.length
+              : 0,
+            routeSavedNormalizedTableCount: Array.isArray(
+              resolved.saved?.normalizedQueryTables,
+            )
+              ? resolved.saved.normalizedQueryTables.length
+              : 0,
             routeExecutionElapsedMs: Date.now() - startedAt,
           },
         ),
@@ -177,6 +202,18 @@ async function executeBusinessTemplateObserved(req, res) {
   } catch (error) {
     console.error("executeBusinessTemplateObserved error:", error);
 
+    if (
+      error?.code === "QUERY_TABLE_NOT_FOUND" ||
+      error?.code === "QUERY_TABLES_KEY_REQUIRED" ||
+      error?.code === "QUERY_TABLE_INVALID_ENCRYPTED_PAYLOAD"
+    ) {
+      return res.status(error.status || 410).json({
+        ok: false,
+        code: error.code,
+        message: error.message,
+      });
+    }
+
     return res.status(500).json(
       withRouteExecutionMeta(
         {
@@ -186,8 +223,7 @@ async function executeBusinessTemplateObserved(req, res) {
         },
         {
           routeExecutionElapsedMs: Date.now() - startedAt,
-          routeExecutionError:
-            error?.message || String(error),
+          routeExecutionError: error?.message || String(error),
         },
       ),
     );
