@@ -12,6 +12,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const cronRoutes = require("./routes/cronRoutes");
 const automationRoutes = require("./routes/automationRoutes");
+const inquiryRoutes = require("./routes/inquiryRoutes");
 // 앱 초기화
 const app = express();
 app.set("trust proxy", 1);
@@ -99,6 +100,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/automation", automationRoutes);
+app.use("/api/inquiries", inquiryRoutes);
 app.use("/admin", adminRoutes);
 app.use("/cron", cronRoutes);
 
