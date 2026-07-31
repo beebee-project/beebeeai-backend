@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beebeeai.kr/schemas/query-candidate-retrieval-v1.json",
+  "title": "BeeBee AI Deterministic Query Candidate Retrieval v1",
+  "type": "object",
+  "required": [
+    "version",
+    "itemVersion",
+    "policy",
+    "source",
+    "integrity",
+    "counts",
+    "candidates",
+    "retrievalSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_retrieval_v1"
+    },
+    "itemVersion": {
+      "const": "query_candidate_retrieval_item_v1"
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "version",
+        "explicitBindingStatuses",
+        "inferredCandidatesAreDeferred",
+        "unboundCandidatesAreDeferred",
+        "onlyExplicitMissingRequirementsAreExcluded",
+        "candidateStatusMutation"
+      ],
+      "properties": {
+        "version": {
+          "const": "deterministic_candidate_retrieval_policy_v1"
+        },
+        "explicitBindingStatuses": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "BOUND",
+              "PARTIAL"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "inferredCandidatesAreDeferred": {
+          "const": true
+        },
+        "unboundCandidatesAreDeferred": {
+          "const": true
+        },
+        "onlyExplicitMissingRequirementsAreExcluded": {
+          "const": true
+        },
+        "candidateStatusMutation": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "fileName",
+        "contractVersion",
+        "contractSha256",
+        "capabilityManifestVersion",
+        "capabilityManifestSha256",
+        "semanticProfileVersion",
+        "semanticProfileSha256"
+      ]
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "total",
+        "retrieved",
+        "deferred",
+        "excluded",
+        "boundRetrieved",
+        "partialRetrieved",
+        "inferredDeferred",
+        "unboundDeferred"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retrieved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deferred": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "boundRetrieved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "partialRetrieved": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inferredDeferred": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unboundDeferred": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "retrievalSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "contractCandidateCount",
+        "capabilityCandidateCount",
+        "missingCapabilityCandidateIds",
+        "orphanCapabilityCandidateIds",
+        "candidateCountMatch"
+      ],
+      "properties": {
+        "contractCandidateCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capabilityCandidateCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missingCapabilityCandidateIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "orphanCapabilityCandidateIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "candidateCountMatch": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "version",
+        "candidateId",
+        "recipeId",
+        "templateId",
+        "candidateType",
+        "result",
+        "bindingStatus",
+        "bindingSource",
+        "observedClass",
+        "visibility",
+        "originalRank",
+        "originalScore",
+        "retrievalScore",
+        "sourceTableIds",
+        "matchedTableIds",
+        "matchedPhysicalTableIds",
+        "matchedColumnIds",
+        "checks",
+        "reasons",
+        "missingRequirements",
+        "evidence",
+        "provenance",
+        "retrievalItemSha256"
+      ],
+      "properties": {
+        "version": {
+          "const": "query_candidate_retrieval_item_v1"
+        },
+        "candidateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recipeId": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        },
+        "candidateType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "RETRIEVED",
+            "DEFERRED",
+            "EXCLUDED"
+          ]
+        },
+        "bindingStatus": {
+          "enum": [
+            "BOUND",
+            "PARTIAL",
+            "INFERRED",
+            "UNBOUND"
+          ]
+        },
+        "bindingSource": {
+          "type": "string"
+        },
+        "observedClass": {
+          "type": "string"
+        },
+        "visibility": {
+          "type": "string"
+        },
+        "originalRank": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "originalScore": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "retrievalScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "sourceTableIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "matchedTableIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "matchedPhysicalTableIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "matchedColumnIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "checks": {
+          "type": "object"
+        },
+        "reasons": {
+          "type": "array"
+        },
+        "missingRequirements": {
+          "type": "array"
+        },
+        "evidence": {
+          "type": "array"
+        },
+        "provenance": {
+          "type": "object"
+        },
+        "retrievalItemSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
