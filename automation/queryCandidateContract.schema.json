@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beebeeai.kr/schemas/query-candidate-contract-v1.json",
+  "title": "BeeBee AI Query Candidate Contract v1",
+  "type": "object",
+  "required": ["version", "itemVersion", "source", "counts", "candidates", "contractSha256"],
+  "properties": {
+    "version": { "const": "query_candidate_contract_v1" },
+    "itemVersion": { "const": "query_candidate_item_v1" },
+    "source": { "type": "object" },
+    "counts": {
+      "type": "object",
+      "required": ["total", "unassessed", "ready", "conditional", "unsupported", "rejected"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "unassessed": { "type": "integer", "minimum": 0 },
+        "ready": { "type": "integer", "minimum": 0 },
+        "conditional": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "contractSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": [
+        "version", "candidateId", "recipeId", "recipeIds", "templateId",
+        "candidateType", "title", "outputType", "outputTypes", "status",
+        "observedClass", "visibility", "confidence", "score", "rank", "reason",
+        "evidence", "requiredCapabilities", "missingRequirements", "risks",
+        "sourceTableIds", "sourceSheetNames", "provenance"
+      ],
+      "properties": {
+        "version": { "const": "query_candidate_item_v1" },
+        "candidateId": { "type": "string", "minLength": 1, "pattern": "^[^\\s\\\\/]+$" },
+        "recipeId": { "type": "string" },
+        "recipeIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "templateId": { "type": "string" },
+        "candidateType": { "enum": ["ANALYSIS_RECIPE", "BUSINESS_TEMPLATE", "DASHBOARD", "CATEGORY", "MULTI_SOURCE", "UNKNOWN"] },
+        "title": { "type": "string", "minLength": 1 },
+        "outputType": { "type": "string" },
+        "outputTypes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "status": { "enum": ["UNASSESSED", "READY", "CONDITIONAL", "UNSUPPORTED", "REJECTED"] },
+        "observedClass": { "enum": ["ELIGIBLE", "CONDITIONAL", "HIDDEN", "UNKNOWN"] },
+        "visibility": { "enum": ["RECOMMENDED", "VISIBLE", "HIDDEN"] },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "score": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "rank": { "type": ["integer", "null"], "minimum": 1 },
+        "reason": {
+          "type": "object",
+          "required": ["summary", "codes", "source"],
+          "properties": {
+            "summary": { "type": "string" },
+            "codes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "source": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["evidenceId", "type", "path", "tableId", "sheetName", "columnId", "columnName", "role", "value", "source"],
+            "properties": {
+              "evidenceId": { "type": "string", "minLength": 1 },
+              "type": { "enum": ["SOURCE_TABLE", "SOURCE_COLUMN", "SEMANTIC_ROLE", "CAPABILITY", "RECIPE_BINDING", "QUERY_PATH", "OTHER"] },
+              "path": { "type": "string" },
+              "tableId": { "type": "string" },
+              "sheetName": { "type": "string" },
+              "columnId": { "type": "string" },
+              "columnName": { "type": "string" },
+              "role": { "type": "string" },
+              "value": { "type": "string" },
+              "source": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "requiredCapabilities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "missingRequirements": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "level", "message", "source"],
+            "properties": {
+              "code": { "type": "string" },
+              "level": { "enum": ["INFO", "WARNING", "BLOCKING"] },
+              "message": { "type": "string" },
+              "source": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "sourceTableIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "sourceSheetNames": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "provenance": { "type": "object" }
+      }
+    }
+  }
+}
