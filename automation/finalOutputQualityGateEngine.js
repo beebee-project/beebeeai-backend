@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   applySectionMetricIds,
@@ -8,12 +6,10 @@ const {
   uniqueMetricIds,
 } = require("./metricIdContract");
 
-const OUTPUT_COMPLETENESS_CONTRACT_VERSION =
-  "output_completeness_contract_v1";
+const OUTPUT_COMPLETENESS_CONTRACT_VERSION = "output_completeness_contract_v1";
 const SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION =
   "semantic_output_duplicate_resolver_v1";
-const FINAL_OUTPUT_QUALITY_GATE_VERSION =
-  "final_output_quality_gate_v1";
+const FINAL_OUTPUT_QUALITY_GATE_VERSION = "final_output_quality_gate_v1";
 
 const PERIOD_HEADER_PATTERN =
   /기간|년월|연월|월|일자|날짜|연도|년도|date|period|month|quarter|year/i;
@@ -66,19 +62,11 @@ function sectionGroupHeader(section = {}) {
 }
 
 function sectionUnit(section = {}) {
-  return normalizeText(
-    section.result?.metric?.unit ||
-      section.unit ||
-      "",
-  );
+  return normalizeText(section.result?.metric?.unit || section.unit || "");
 }
 
 function sectionOperation(section = {}) {
-  return normalizeText(
-    section.result?.operation ||
-      section.operation ||
-      "",
-  );
+  return normalizeText(section.result?.operation || section.operation || "");
 }
 
 function sectionType(section = {}) {
@@ -185,7 +173,8 @@ function sectionPreferenceScore(section = {}, expectedMetricIds = new Set()) {
   if (isWholeMetricSummary(section)) score += 140;
   if (sectionScope(section) === "distinct") score += 120;
   if (sectionRows(section).length) score += 80;
-  if (section.result?.meta?.semanticCoverage?.matchedExistingSection) score += 30;
+  if (section.result?.meta?.semanticCoverage?.matchedExistingSection)
+    score += 30;
   score += Math.min(sectionRows(section).length, 50);
   return score;
 }
@@ -208,9 +197,14 @@ function setSectionMetricIds(section = {}, metricIds = []) {
   };
 }
 
-function resolveDuplicateSections({ sections = [], expectedMetricIds = [] } = {}) {
+function resolveDuplicateSections({
+  sections = [],
+  expectedMetricIds = [],
+} = {}) {
   const expectedSet = new Set(uniqueMetricIds(expectedMetricIds));
-  const input = normalizeSectionMetricIds(cloneValue(Array.isArray(sections) ? sections : []));
+  const input = normalizeSectionMetricIds(
+    cloneValue(Array.isArray(sections) ? sections : []),
+  );
   const groups = new Map();
 
   input.forEach((section, index) => {
@@ -251,9 +245,11 @@ function resolveDuplicateSections({ sections = [], expectedMetricIds = [] } = {}
       retainedSectionId: normalizeText(
         retained.section.sectionId || retained.section.title || "",
       ),
-      removedSectionIds: ranked.slice(1).map((item) =>
-        normalizeText(item.section.sectionId || item.section.title || ""),
-      ),
+      removedSectionIds: ranked
+        .slice(1)
+        .map((item) =>
+          normalizeText(item.section.sectionId || item.section.title || ""),
+        ),
       mergedMetricIds: allMetricIds,
     });
   }
@@ -286,21 +282,34 @@ function metricIdExpectedScope(metricId = "") {
   return "";
 }
 
-function metricHolderScore(section = {}, metricId = "", expectedSet = new Set()) {
+function metricHolderScore(
+  section = {},
+  metricId = "",
+  expectedSet = new Set(),
+) {
   let score = sectionPreferenceScore(section, expectedSet);
   const expectedScope = metricIdExpectedScope(metricId);
   if (expectedScope && sectionScope(section) === expectedScope) score += 900;
-  if (expectedScope === "summary" && isWholeMetricSummary(section)) score += 350;
+  if (expectedScope === "summary" && isWholeMetricSummary(section))
+    score += 350;
   if (expectedScope === "group" && sectionGroupHeader(section)) score += 220;
-  if (expectedScope === "period" && PERIOD_HEADER_PATTERN.test(sectionGroupHeader(section))) {
+  if (
+    expectedScope === "period" &&
+    PERIOD_HEADER_PATTERN.test(sectionGroupHeader(section))
+  ) {
     score += 220;
   }
   return score;
 }
 
-function normalizeMetricIdOwnership({ sections = [], expectedMetricIds = [] } = {}) {
+function normalizeMetricIdOwnership({
+  sections = [],
+  expectedMetricIds = [],
+} = {}) {
   const expectedSet = new Set(uniqueMetricIds(expectedMetricIds));
-  const working = normalizeSectionMetricIds(cloneValue(Array.isArray(sections) ? sections : []));
+  const working = normalizeSectionMetricIds(
+    cloneValue(Array.isArray(sections) ? sections : []),
+  );
   const holders = new Map();
 
   working.forEach((section, index) => {
@@ -336,9 +345,11 @@ function normalizeMetricIdOwnership({ sections = [], expectedMetricIds = [] } = 
       retainedSectionId: normalizeText(
         working[winner].sectionId || working[winner].title || "",
       ),
-      removedHolderSectionIds: ranked.slice(1).map((index) =>
-        normalizeText(working[index].sectionId || working[index].title || ""),
-      ),
+      removedHolderSectionIds: ranked
+        .slice(1)
+        .map((index) =>
+          normalizeText(working[index].sectionId || working[index].title || ""),
+        ),
     });
   }
 
@@ -368,7 +379,9 @@ function ensureUniqueSectionIdentity(sections = []) {
   const output = (Array.isArray(sections) ? sections : []).map(
     (original, index) => {
       const section = cloneValue(original);
-      const rawId = normalizeText(section.sectionId) || `final_quality_section_${index + 1}`;
+      const rawId =
+        normalizeText(section.sectionId) ||
+        `final_quality_section_${index + 1}`;
       const idKey = normalizeKey(rawId) || `section${index + 1}`;
       const idCount = (sectionIdCounts.get(idKey) || 0) + 1;
       sectionIdCounts.set(idKey, idCount);
@@ -381,11 +394,13 @@ function ensureUniqueSectionIdentity(sections = []) {
       }
       section.sectionId = resolvedId;
 
-      const rawTitle = normalizeText(section.title) || defaultSectionTitle(section, index);
+      const rawTitle =
+        normalizeText(section.title) || defaultSectionTitle(section, index);
       const titleKey = normalizeKey(rawTitle) || `title${index + 1}`;
       const titleCount = (titleCounts.get(titleKey) || 0) + 1;
       titleCounts.set(titleKey, titleCount);
-      const resolvedTitle = titleCount === 1 ? rawTitle : `${rawTitle} ${titleCount}`;
+      const resolvedTitle =
+        titleCount === 1 ? rawTitle : `${rawTitle} ${titleCount}`;
       if (resolvedTitle !== normalizeText(section.title)) {
         renamedTitles.push({
           from: normalizeText(section.title),
@@ -426,7 +441,9 @@ function duplicateMetricIdOwners(sections = []) {
       metricId,
       sectionIds: indexes.map((index) =>
         normalizeText(
-          sections[index]?.sectionId || sections[index]?.title || `section_${index + 1}`,
+          sections[index]?.sectionId ||
+            sections[index]?.title ||
+            `section_${index + 1}`,
         ),
       ),
     }));
@@ -458,9 +475,7 @@ function invalidNumberEntries(value, path = "") {
   }
   if (value && typeof value === "object") {
     for (const [key, item] of Object.entries(value)) {
-      found.push(
-        ...invalidNumberEntries(item, path ? `${path}.${key}` : key),
-      );
+      found.push(...invalidNumberEntries(item, path ? `${path}.${key}` : key));
     }
   }
   return found;
@@ -480,7 +495,9 @@ function duplicateSemanticOutputs(sections = []) {
       signature,
       sectionIds: indexes.map((index) =>
         normalizeText(
-          sections[index]?.sectionId || sections[index]?.title || `section_${index + 1}`,
+          sections[index]?.sectionId ||
+            sections[index]?.title ||
+            `section_${index + 1}`,
         ),
       ),
     }));
@@ -525,7 +542,9 @@ function analyzeOutputCompleteness({
     const ids = collectSectionMetricIds(section);
     const required = ids.some((id) => expectedSet.has(id));
     if (!required || DIAGNOSTIC_TYPE_PATTERN.test(sectionType(section))) return;
-    const id = normalizeText(section.sectionId || section.title || `section_${index + 1}`);
+    const id = normalizeText(
+      section.sectionId || section.title || `section_${index + 1}`,
+    );
     const rows = sectionRows(section);
     const meta = section.result?.meta || {};
     const enforceNonEmpty = Boolean(
@@ -533,7 +552,7 @@ function analyzeOutputCompleteness({
       meta.complete === true ||
       meta.addedByBusinessAugmentation === true ||
       meta.restoredByMandatorySummaryCoverageFloor === true ||
-      meta.finalOutputQualityRequired === true
+      meta.finalOutputQualityRequired === true,
     );
     if (!rows.length && enforceNonEmpty) emptyRequiredSectionIds.push(id);
     if (!sectionComplete(section)) incompleteRequiredSectionIds.push(id);
@@ -553,13 +572,18 @@ function analyzeOutputCompleteness({
   const budgetViolations = sectionBudgetViolations(sectionBudgetSummaries);
 
   const failureReasons = [];
-  if (missingMetricIds.length) failureReasons.push("MISSING_EXPECTED_METRIC_IDS");
-  if (duplicateMetricIds.length) failureReasons.push("DUPLICATE_METRIC_ID_OWNERS");
-  if (emptyRequiredSectionIds.length) failureReasons.push("EMPTY_REQUIRED_SECTIONS");
-  if (incompleteRequiredSectionIds.length) failureReasons.push("INCOMPLETE_REQUIRED_SECTIONS");
+  if (missingMetricIds.length)
+    failureReasons.push("MISSING_EXPECTED_METRIC_IDS");
+  if (duplicateMetricIds.length)
+    failureReasons.push("DUPLICATE_METRIC_ID_OWNERS");
+  if (emptyRequiredSectionIds.length)
+    failureReasons.push("EMPTY_REQUIRED_SECTIONS");
+  if (incompleteRequiredSectionIds.length)
+    failureReasons.push("INCOMPLETE_REQUIRED_SECTIONS");
   if (duplicateSectionIds.length) failureReasons.push("DUPLICATE_SECTION_IDS");
   if (duplicateTitles.length) failureReasons.push("DUPLICATE_SECTION_TITLES");
-  if (duplicateOutputs.length) failureReasons.push("DUPLICATE_SEMANTIC_OUTPUTS");
+  if (duplicateOutputs.length)
+    failureReasons.push("DUPLICATE_SEMANTIC_OUTPUTS");
   if (invalidNumbers.length) failureReasons.push("INVALID_NUMERIC_VALUES");
   if (budgetViolations.length) failureReasons.push("SECTION_BUDGET_VIOLATIONS");
 
@@ -571,7 +595,8 @@ function analyzeOutputCompleteness({
     expectedMetricIds: expected,
     renderedMetricIds: rendered,
     expectedMetricCount: expected.length,
-    renderedExpectedMetricCount: expected.filter((id) => renderedSet.has(id)).length,
+    renderedExpectedMetricCount: expected.filter((id) => renderedSet.has(id))
+      .length,
     missingMetricIds,
     duplicateMetricIds,
     duplicateSectionIds,

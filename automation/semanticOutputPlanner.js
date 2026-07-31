@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   METRIC_ID_CONTRACT_VERSION,
@@ -60,10 +58,8 @@ const SEMANTIC_OUTPUT_PLANNER_PREVIOUS_VERSION =
   "semantic_output_planner_common_v2_12_mandatory_summary_coverage_floor";
 const SEMANTIC_OUTPUT_PLANNER_VERSION =
   "semantic_output_planner_common_v2_13_final_output_quality_gate";
-const SEMANTIC_OUTPUT_CONTRACT_VERSION =
-  "semantic_output_contract_v1";
-const SEMANTIC_CONTRACT_PRECEDENCE_VERSION =
-  "semantic_contract_precedence_v1";
+const SEMANTIC_OUTPUT_CONTRACT_VERSION = "semantic_output_contract_v1";
+const SEMANTIC_CONTRACT_PRECEDENCE_VERSION = "semantic_contract_precedence_v1";
 const MIXED_SECTION_ROW_PRECEDENCE_VERSION =
   "semantic_mixed_section_row_precedence_v2_contract_exclusion";
 const GENERAL_STOCK_SNAPSHOT_ALIAS_VERSION =
@@ -86,8 +82,7 @@ const METRIC_IDENTITY_HEADER_PATTERN =
   /^(?:지표명|지표|항목|측정항목|세부항목|metric|measure|indicator)$/i;
 const METRIC_VALUE_HEADER_PATTERN =
   /^(?:지표값|값|수치|metric\s*value|measure\s*value|value)$/i;
-const UNIT_HEADER_PATTERN =
-  /^(?:단위|측정단위|unit|measure\s*unit)$/i;
+const UNIT_HEADER_PATTERN = /^(?:단위|측정단위|unit|measure\s*unit)$/i;
 const AGGREGATION_HEADER_PATTERN =
   /^(?:집계유형|집계방식|aggregation|aggregate)$/i;
 const PERIOD_HEADER_PATTERN =
@@ -136,11 +131,7 @@ function tableColumns(table = {}) {
 function tableLabel(table = {}, index = 0) {
   return (
     normalizeText(
-      table.tableName ||
-        table.sheetName ||
-        table.title ||
-        table.tableId ||
-        "",
+      table.tableName || table.sheetName || table.title || table.tableId || "",
     ) || `표 ${index + 1}`
   );
 }
@@ -164,9 +155,9 @@ function semanticContextText(table = {}, context = {}) {
 function isVirtualSemanticTable(table = {}) {
   return Boolean(
     table.isVirtual === true ||
-      table.virtual === true ||
-      table.transformation?.type ||
-      table.sourceTableId,
+    table.virtual === true ||
+    table.transformation?.type ||
+    table.sourceTableId,
   );
 }
 
@@ -207,10 +198,7 @@ function semanticDimensionHeaderSet(table = {}) {
   return new Set();
 }
 
-function selectPreferredSemanticTables(
-  tables = [],
-  options = {},
-) {
+function selectPreferredSemanticTables(tables = [], options = {}) {
   const eligible = (Array.isArray(tables) ? tables : []).filter(
     isSemanticAnalysisEligible,
   );
@@ -238,9 +226,7 @@ function selectPreferredSemanticTables(
 
       const physicalDimensions = semanticDimensionHeaderSet(table);
       const virtualDimensions = new Set(
-        representedBy.flatMap((item) =>
-          [...semanticDimensionHeaderSet(item)],
-        ),
+        representedBy.flatMap((item) => [...semanticDimensionHeaderSet(item)]),
       );
       const losesDimension = [...physicalDimensions].some(
         (header) => !virtualDimensions.has(header),
@@ -255,10 +241,7 @@ function selectPreferredSemanticTables(
   return eligible.filter((table) => {
     if (isVirtualSemanticTable(table)) {
       const sourceId = semanticSourceTableId(table);
-      return (
-        !sourceId ||
-        !physicalPreferredSources.has(sourceId)
-      );
+      return !sourceId || !physicalPreferredSources.has(sourceId);
     }
 
     const id = semanticTableId(table);
@@ -344,10 +327,7 @@ function numericValue(value) {
   const source = normalizeText(value);
   if (!source || source === "-") return null;
 
-  const normalized = source
-    .replace(/,/g, "")
-    .replace(/%$/g, "")
-    .trim();
+  const normalized = source.replace(/,/g, "").replace(/%$/g, "").trim();
 
   if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(normalized)) {
     return null;
@@ -357,15 +337,13 @@ function numericValue(value) {
   return Number.isFinite(result) ? result : null;
 }
 
-
 const ACTUAL_FLOW_INBOUND_HEADER_PATTERN =
   /^(?:총|누적|기간)?(?:입고|입하|반입|수취|inbound|receipt|received)(?:수량|량|quantity|qty|count)?$/i;
 const ACTUAL_FLOW_OUTBOUND_HEADER_PATTERN =
   /^(?:총|누적|기간)?(?:출고|출하|반출|outbound|shipment|shipped)(?:수량|량|quantity|qty|count)?$/i;
 const ACTUAL_FLOW_DIRECTION_HEADER_PATTERN =
   /^(?:(?:입출고|이동|수불|재고이동|창고이동|거래|물류)(?:구분|유형|방향)|(?:flow|movement|transaction)(?:type|direction)|direction)$/i;
-const ACTUAL_FLOW_QUANTITY_HEADER_PATTERN =
-  /(?:수량|quantity|qty)$/i;
+const ACTUAL_FLOW_QUANTITY_HEADER_PATTERN = /(?:수량|quantity|qty)$/i;
 
 function columnNumericObservationCount(table = {}, column = {}, index = 0) {
   return tableRows(table).reduce((count, row) => {
@@ -535,9 +513,7 @@ function extractHeaderUnit(header = "") {
       /(?:\(|\[|（)\s*([^()[\]（）]{1,32})\s*(?:\)|\]|）)/g,
     ),
   ];
-  return matches.length
-    ? normalizeText(matches[matches.length - 1][1])
-    : "";
+  return matches.length ? normalizeText(matches[matches.length - 1][1]) : "";
 }
 
 function stripHeaderUnit(header = "") {
@@ -563,23 +539,17 @@ function strictPeriodValue(value) {
     return `${String(Number(monthOnly[1])).padStart(2, "0")}월`;
   }
 
-  let match = source.match(
-    /^((?:19|20|21)\d{2})[-./]\s*(0?[1-9]|1[0-2])$/,
-  );
+  let match = source.match(/^((?:19|20|21)\d{2})[-./]\s*(0?[1-9]|1[0-2])$/);
   if (match) {
     return `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`;
   }
 
-  match = source.match(
-    /^((?:19|20|21)\d{2})\s*년\s*(0?[1-9]|1[0-2])\s*월$/,
-  );
+  match = source.match(/^((?:19|20|21)\d{2})\s*년\s*(0?[1-9]|1[0-2])\s*월$/);
   if (match) {
     return `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`;
   }
 
-  match = source.match(
-    /^((?:19|20|21)\d{2})\s*(?:Q([1-4])|([1-4])\s*분기)$/i,
-  );
+  match = source.match(/^((?:19|20|21)\d{2})\s*(?:Q([1-4])|([1-4])\s*분기)$/i);
   if (match) return `${match[1]}-Q${match[2] || match[3]}`;
 
   match = source.match(
@@ -621,14 +591,11 @@ function parseTemporalMeasureHeader(header = "") {
         `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`,
     },
     {
-      regex:
-        /(?:^|[_\s])(0?[1-9]|1[0-2])\s*월(?:[_\s]|$)/,
-      period: (match) =>
-        `${String(Number(match[1])).padStart(2, "0")}월`,
+      regex: /(?:^|[_\s])(0?[1-9]|1[0-2])\s*월(?:[_\s]|$)/,
+      period: (match) => `${String(Number(match[1])).padStart(2, "0")}월`,
     },
     {
-      regex:
-        /(?:^|[_\s])((?:19|20|21)\d{2})[./-](0?[1-9]|1[0-2])(?:[_\s]|$)/,
+      regex: /(?:^|[_\s])((?:19|20|21)\d{2})[./-](0?[1-9]|1[0-2])(?:[_\s]|$)/,
       period: (match) =>
         `${match[1]}-${String(Number(match[2])).padStart(2, "0")}`,
     },
@@ -671,14 +638,13 @@ function parseTemporalMeasureHeader(header = "") {
 
 function isSummaryLabel(value = "") {
   const text = normalizeText(value);
-  return (
-    SUMMARY_LABEL_PATTERN.test(text) ||
-    SUMMARY_SUFFIX_PATTERN.test(text)
-  );
+  return SUMMARY_LABEL_PATTERN.test(text) || SUMMARY_SUFFIX_PATTERN.test(text);
 }
 
 function summaryMetricBase(value = "") {
-  return normalizeText(value).replace(/(?:[_/|>:\-]\s*|\s+)(?:계|합계|소계|총계)\s*$/i, "").trim();
+  return normalizeText(value)
+    .replace(/(?:[_/|>:\-]\s*|\s+)(?:계|합계|소계|총계)\s*$/i, "")
+    .trim();
 }
 function officialTotalHasDetailSiblings(value = "", allLabels = []) {
   const text = normalizeText(value);
@@ -686,10 +652,17 @@ function officialTotalHasDetailSiblings(value = "", allLabels = []) {
   if (/[_/|>:\-]\s*합계\s*$/i.test(text)) return false;
   const base = summaryMetricBase(text);
   if (!base) return false;
-  return (allLabels || []).filter((candidate) => {
-    const label = normalizeText(candidate);
-    return label && label !== text && label.startsWith(`${base} `) && !/(?:계|합계|소계|총계)\s*$/i.test(label);
-  }).length >= 2;
+  return (
+    (allLabels || []).filter((candidate) => {
+      const label = normalizeText(candidate);
+      return (
+        label &&
+        label !== text &&
+        label.startsWith(`${base} `) &&
+        !/(?:계|합계|소계|총계)\s*$/i.test(label)
+      );
+    }).length >= 2
+  );
 }
 function isSummaryMetricLabel(value = "", allLabels = []) {
   const text = normalizeText(value);
@@ -697,7 +670,8 @@ function isSummaryMetricLabel(value = "", allLabels = []) {
   if (SUMMARY_LABEL_PATTERN.test(text)) return true;
   if (/(?:[_/|>:\-]\s*|\s+)(?:소계|총계)\s*$/i.test(text)) return true;
   if (/(?:[_/|>:\-]\s*)(?:계|합계)\s*$/i.test(text)) return true;
-  if (/\s+합계\s*$/i.test(text)) return !officialTotalHasDetailSiblings(text, allLabels);
+  if (/\s+합계\s*$/i.test(text))
+    return !officialTotalHasDetailSiblings(text, allLabels);
   return false;
 }
 
@@ -745,8 +719,7 @@ function isPeriodColumn(column = {}, header = "") {
   return (
     ["period", "date", "datetime", "month", "quarter"].includes(
       semanticType(column),
-    ) ||
-    PERIOD_HEADER_PATTERN.test(normalizeText(header))
+    ) || PERIOD_HEADER_PATTERN.test(normalizeText(header))
   );
 }
 
@@ -781,24 +754,23 @@ function inferAggregationContract({
   declaredAggregation = "",
   hasTemporalAxis = false,
 } = {}) {
-  const fallbackAggregation =
-    BUSINESS_AVERAGE_HEADER_PATTERN.test(
-      [metricLabel, unit, semanticType(column), columnRole(column)]
-        .map(normalizeText)
-        .join(" "),
-    )
-      ? "average"
-      : BUSINESS_SUM_HEADER_PATTERN.test(
+  const fallbackAggregation = BUSINESS_AVERAGE_HEADER_PATTERN.test(
+    [metricLabel, unit, semanticType(column), columnRole(column)]
+      .map(normalizeText)
+      .join(" "),
+  )
+    ? "average"
+    : BUSINESS_SUM_HEADER_PATTERN.test(
           [metricLabel, unit, semanticType(column), columnRole(column)]
             .map(normalizeText)
             .join(" "),
         )
-        ? "sum"
-        : /%|퍼센트|백분율|비율|비중|구성비|점유율|증감률|달성률|지수|평균|평점|점수|시간|기록|속도|초|분초|cm|명\/천명|rate|ratio|share|percent|index|average|avg|score|duration|time/i.test(
+      ? "sum"
+      : /%|퍼센트|백분율|비율|비중|구성비|점유율|증감률|달성률|지수|평균|평점|점수|시간|기록|속도|초|분초|cm|명\/천명|rate|ratio|share|percent|index|average|avg|score|duration|time/i.test(
             [metricLabel, unit].map(normalizeText).join(" "),
           )
-          ? "average"
-          : "sum";
+        ? "average"
+        : "sum";
 
   return resolveAggregationContract({
     metricLabel,
@@ -854,8 +826,9 @@ function canonicalLongContract(table = {}) {
   const explicitMetricIdentity =
     semanticType(metricIdentity.column) === "metricidentity" ||
     columnRole(metricIdentity.column) === "metricidentity";
-  const canonicalMetricValueHeader =
-    METRIC_VALUE_HEADER_PATTERN.test(metricValue.header);
+  const canonicalMetricValueHeader = METRIC_VALUE_HEADER_PATTERN.test(
+    metricValue.header,
+  );
 
   if (!explicitMetricIdentity && !canonicalMetricValueHeader) {
     return null;
@@ -911,9 +884,7 @@ function canonicalLongContract(table = {}) {
 function dimensionValuesForRow(row, dimensions = []) {
   const values = {};
   for (const entry of dimensions) {
-    const value = normalizeText(
-      rowValue(row, entry.column, entry.index),
-    );
+    const value = normalizeText(rowValue(row, entry.column, entry.index));
     if (value) values[entry.header] = value;
   }
   return values;
@@ -923,7 +894,12 @@ function shouldSkipDimensionRow(dimensionValues = {}) {
   return Object.values(dimensionValues).some(isSummaryLabel);
 }
 
-function canonicalLongSeries(table = {}, tableIndex = 0, contract = null, context = {}) {
+function canonicalLongSeries(
+  table = {},
+  tableIndex = 0,
+  contract = null,
+  context = {},
+) {
   const rows = tableRows(table);
   const distinctMetricLabels = new Set();
 
@@ -953,27 +929,19 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null, contex
       ),
     );
     if (!metricLabel) continue;
-    if (hasDetailMetric && isSummaryMetricLabel(metricLabel, metricLabels)) continue;
+    if (hasDetailMetric && isSummaryMetricLabel(metricLabel, metricLabels))
+      continue;
 
     const value = numericValue(
-      rowValue(
-        row,
-        contract.metricValue.column,
-        contract.metricValue.index,
-      ),
+      rowValue(row, contract.metricValue.column, contract.metricValue.index),
     );
     if (value == null) continue;
 
-    const dimensions = dimensionValuesForRow(
-      row,
-      contract.dimensions,
-    );
+    const dimensions = dimensionValuesForRow(row, contract.dimensions);
     if (shouldSkipDimensionRow(dimensions)) continue;
 
     const unit = contract.unit
-      ? normalizeText(
-          rowValue(row, contract.unit.column, contract.unit.index),
-        )
+      ? normalizeText(rowValue(row, contract.unit.column, contract.unit.index))
       : normalizeText(
           contract.metricValue.column.unit ||
             contract.metricValue.column.measureUnit ||
@@ -997,16 +965,13 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null, contex
         )
       : "";
 
-    const aggregationContract =
-      inferAggregationContract({
-        metricLabel,
-        unit,
-        column: contract.metricValue.column,
-        declaredAggregation,
-        hasTemporalAxis: Boolean(
-          contract.period || contract.year,
-        ),
-      });
+    const aggregationContract = inferAggregationContract({
+      metricLabel,
+      unit,
+      column: contract.metricValue.column,
+      declaredAggregation,
+      hasTemporalAxis: Boolean(contract.period || contract.year),
+    });
     const operation = aggregationContract.operation;
 
     const period = canonicalPeriodValue(
@@ -1037,9 +1002,7 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null, contex
         sourceContract: "canonical_long",
         valueHeader: contract.metricValue.header,
         protectedHeaders: contract.protectedHeaders,
-        dimensionHeaders: contract.dimensions.map(
-          (entry) => entry.header,
-        ),
+        dimensionHeaders: contract.dimensions.map((entry) => entry.header),
         records: [],
       });
     }
@@ -1052,9 +1015,7 @@ function canonicalLongSeries(table = {}, tableIndex = 0, contract = null, contex
     });
   }
 
-  return [...seriesMap.values()].filter(
-    (series) => series.records.length,
-  );
+  return [...seriesMap.values()].filter((series) => series.records.length);
 }
 
 function physicalWideContract(table = {}) {
@@ -1073,15 +1034,10 @@ function physicalWideContract(table = {}) {
     if (isPeriodColumn(entry.column, entry.header)) return false;
     if (isYearColumn(entry.column, entry.header)) return false;
     if (EXCLUDED_DIMENSION_HEADER_PATTERN.test(entry.header)) return false;
-    return (
-      entry.profile.nonBlankCount > 0 &&
-      entry.profile.numericRatio < 0.5
-    );
+    return entry.profile.nonBlankCount > 0 && entry.profile.numericRatio < 0.5;
   });
 
-  const dimensionIndexes = new Set(
-    dimensions.map((entry) => entry.index),
-  );
+  const dimensionIndexes = new Set(dimensions.map((entry) => entry.index));
 
   const measures = columns.filter((entry) => {
     if (dimensionIndexes.has(entry.index)) return false;
@@ -1133,24 +1089,24 @@ function fallbackMetricLabel(table = {}, header = "") {
     return stripped;
   }
 
-  const explicit =
-    normalizeText(table.metricLabel || table.measureName || "");
+  const explicit = normalizeText(table.metricLabel || table.measureName || "");
   if (explicit) return explicit;
 
   return "지표값";
 }
 
-function physicalWideSeries(table = {}, tableIndex = 0, contract = null, context = {}) {
+function physicalWideSeries(
+  table = {},
+  tableIndex = 0,
+  contract = null,
+  context = {},
+) {
   const rows = tableRows(table);
   const measureLabels = contract.measures.map((entry) => {
     const temporal = parseTemporalMeasureHeader(entry.header);
     return (
       temporal.metricLabel ||
-      (
-        temporal.period
-          ? "지표값"
-          : fallbackMetricLabel(table, entry.header)
-      )
+      (temporal.period ? "지표값" : fallbackMetricLabel(table, entry.header))
     );
   });
   const hasDetailMetric = measureLabels.some(
@@ -1162,14 +1118,11 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null, context
     const temporal = parseTemporalMeasureHeader(measure.header);
     let metricLabel =
       temporal.metricLabel ||
-      (
-        temporal.period
-          ? "지표값"
-          : fallbackMetricLabel(table, measure.header)
-      );
+      (temporal.period ? "지표값" : fallbackMetricLabel(table, measure.header));
 
     if (!metricLabel) return;
-    if (hasDetailMetric && isSummaryMetricLabel(metricLabel, measureLabels)) return;
+    if (hasDetailMetric && isSummaryMetricLabel(metricLabel, measureLabels))
+      return;
 
     const unit =
       normalizeText(
@@ -1177,8 +1130,7 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null, context
           measure.column.measureUnit ||
           measure.column.meta?.unit ||
           "",
-      ) ||
-      temporal.unit;
+      ) || temporal.unit;
 
     metricLabel = inferContextualMetricLabel({
       metricLabel,
@@ -1187,15 +1139,14 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null, context
       context,
     });
 
-    const aggregationContract =
-      inferAggregationContract({
-        metricLabel,
-        unit,
-        column: measure.column,
-        hasTemporalAxis: Boolean(
-          contract.period || contract.year || temporal.period,
-        ),
-      });
+    const aggregationContract = inferAggregationContract({
+      metricLabel,
+      unit,
+      column: measure.column,
+      hasTemporalAxis: Boolean(
+        contract.period || contract.year || temporal.period,
+      ),
+    });
     const operation = aggregationContract.operation;
 
     const key = [
@@ -1217,32 +1168,27 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null, context
         sourceContract: "physical_wide",
         valueHeader: measure.header,
         protectedHeaders: contract.protectedHeaders,
-        dimensionHeaders: contract.dimensions.map(
-          (entry) => entry.header,
-        ),
+        dimensionHeaders: contract.dimensions.map((entry) => entry.header),
         records: [],
       });
     }
 
     for (const [rowIndex, row] of rows.entries()) {
-      const value = numericValue(
-        rowValue(row, measure.column, measure.index),
-      );
+      const value = numericValue(rowValue(row, measure.column, measure.index));
       if (value == null) continue;
 
-      const dimensions = dimensionValuesForRow(
-        row,
-        contract.dimensions,
-      );
+      const dimensions = dimensionValuesForRow(row, contract.dimensions);
       if (shouldSkipDimensionRow(dimensions)) continue;
 
-      const rowPeriod = temporal.period || strictPeriodValue(
-        contract.period
-          ? rowValue(row, contract.period.column, contract.period.index)
-          : contract.year
-            ? rowValue(row, contract.year.column, contract.year.index)
-            : "",
-      );
+      const rowPeriod =
+        temporal.period ||
+        strictPeriodValue(
+          contract.period
+            ? rowValue(row, contract.period.column, contract.period.index)
+            : contract.year
+              ? rowValue(row, contract.year.column, contract.year.index)
+              : "",
+        );
 
       seriesMap.get(key).records.push({
         value,
@@ -1254,9 +1200,7 @@ function physicalWideSeries(table = {}, tableIndex = 0, contract = null, context
     }
   });
 
-  return [...seriesMap.values()].filter(
-    (series) => series.records.length,
-  );
+  return [...seriesMap.values()].filter((series) => series.records.length);
 }
 
 function buildSemanticSeries(table = {}, tableIndex = 0, context = {}) {
@@ -1280,11 +1224,13 @@ function buildSemanticSeries(table = {}, tableIndex = 0, context = {}) {
 }
 
 function canPlanSemanticOutput(tables = [], context = {}) {
-  return Array.isArray(tables) &&
+  return (
+    Array.isArray(tables) &&
     tables.some(
       (table, index) =>
         buildSemanticSeries(table, index, context).series.length > 0,
-    );
+    )
+  );
 }
 
 function numberStats(values = []) {
@@ -1356,9 +1302,7 @@ function latestRecordSelection(records = []) {
   if (withPeriod.length) {
     const latestPeriod = withPeriod
       .map((record) => comparablePeriod(record.period))
-      .sort((left, right) =>
-        left.localeCompare(right, "ko", { numeric: true }),
-      )
+      .sort((left, right) => left.localeCompare(right, "ko", { numeric: true }))
       .at(-1);
     return {
       records: withPeriod.filter(
@@ -1373,10 +1317,11 @@ function latestRecordSelection(records = []) {
     };
   }
 
-  const last = [...list].sort(
-    (left, right) =>
-      Number(left.rowIndex ?? 0) - Number(right.rowIndex ?? 0),
-  ).at(-1);
+  const last = [...list]
+    .sort(
+      (left, right) => Number(left.rowIndex ?? 0) - Number(right.rowIndex ?? 0),
+    )
+    .at(-1);
   return {
     records: last ? [last] : [],
     period: "",
@@ -1389,16 +1334,14 @@ function snapshotEntityValue(record = {}, header = "") {
 }
 
 function snapshotEntityCompositeKey(record = {}, headers = []) {
-  const values = (Array.isArray(headers) ? headers : [])
-    .map((header) => snapshotEntityValue(record, header));
+  const values = (Array.isArray(headers) ? headers : []).map((header) =>
+    snapshotEntityValue(record, header),
+  );
   if (!values.length || values.some((value) => !value)) return "";
   return values.map(normalizeKey).join("::");
 }
 
-function snapshotEntityCandidateScore({
-  header = "",
-  records = [],
-} = {}) {
+function snapshotEntityCandidateScore({ header = "", records = [] } = {}) {
   const normalized = normalizeText(header);
   if (!normalized || SNAPSHOT_ENTITY_EXCLUDED_HEADER_PATTERN.test(normalized)) {
     return { header: normalized, score: -Infinity, eligible: false };
@@ -1487,22 +1430,27 @@ function resolveSnapshotEntityHeaders(series = {}) {
     };
   }
 
-  const headers = Array.from(new Set([
-    ...(Array.isArray(series.dimensionHeaders)
-      ? series.dimensionHeaders
-      : []),
-    ...records.flatMap((record) =>
-      Object.keys(record?.dimensions || {}),
+  const headers = Array.from(
+    new Set(
+      [
+        ...(Array.isArray(series.dimensionHeaders)
+          ? series.dimensionHeaders
+          : []),
+        ...records.flatMap((record) => Object.keys(record?.dimensions || {})),
+      ]
+        .map(normalizeText)
+        .filter(Boolean),
     ),
-  ].map(normalizeText).filter(Boolean)));
+  );
 
   const candidates = headers
     .map((header) => snapshotEntityCandidateScore({ header, records }))
     .filter((candidate) => candidate.eligible)
-    .sort((left, right) =>
-      right.score - left.score ||
-      right.distinctCount - left.distinctCount ||
-      left.header.localeCompare(right.header, "ko"),
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.distinctCount - left.distinctCount ||
+        left.header.localeCompare(right.header, "ko"),
     );
 
   if (!candidates.length) {
@@ -1551,9 +1499,10 @@ function resolveSnapshotEntityHeaders(series = {}) {
     entityCount: keySet.size,
     duplicateCountWithinPeriod: duplicateStats.duplicateCount,
     duplicateRateWithinPeriod: duplicateStats.duplicateRate,
-    reason: keySet.size >= 2
-      ? "entity_dimension_resolved"
-      : "insufficient_entity_count",
+    reason:
+      keySet.size >= 2
+        ? "entity_dimension_resolved"
+        : "insufficient_entity_count",
   };
 }
 
@@ -1573,7 +1522,8 @@ function latestRecordSelectionByEntity(records = [], entityHeaders = []) {
 
   const grouped = new Map();
   for (const record of list) {
-    const key = snapshotEntityCompositeKey(record, headers) ||
+    const key =
+      snapshotEntityCompositeKey(record, headers) ||
       `__row__${Number(record.rowIndex ?? grouped.size)}`;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(record);
@@ -1584,8 +1534,9 @@ function latestRecordSelectionByEntity(records = [], entityHeaders = []) {
   for (const entityRecords of grouped.values()) {
     const selected = latestRecordSelection(entityRecords);
     const chosen = [...selected.records]
-      .sort((left, right) =>
-        Number(left.rowIndex ?? 0) - Number(right.rowIndex ?? 0),
+      .sort(
+        (left, right) =>
+          Number(left.rowIndex ?? 0) - Number(right.rowIndex ?? 0),
       )
       .at(-1);
     if (chosen) selectedRecords.push(chosen);
@@ -1595,17 +1546,16 @@ function latestRecordSelectionByEntity(records = [], entityHeaders = []) {
   const uniquePeriods = Array.from(
     new Set(selectedPeriods.map(normalizeText).filter(Boolean)),
   ).sort((left, right) =>
-    comparablePeriod(left).localeCompare(
-      comparablePeriod(right),
-      "ko",
-      { numeric: true },
-    ),
+    comparablePeriod(left).localeCompare(comparablePeriod(right), "ko", {
+      numeric: true,
+    }),
   );
-  const period = uniquePeriods.length === 1
-    ? uniquePeriods[0]
-    : uniquePeriods.length > 1
-      ? `${uniquePeriods[0]} ~ ${uniquePeriods.at(-1)} (엔티티별 최신)`
-      : "행 순서 기준";
+  const period =
+    uniquePeriods.length === 1
+      ? uniquePeriods[0]
+      : uniquePeriods.length > 1
+        ? `${uniquePeriods[0]} ~ ${uniquePeriods.at(-1)} (엔티티별 최신)`
+        : "행 순서 기준";
 
   return {
     records: selectedRecords,
@@ -1618,13 +1568,13 @@ function latestRecordSelectionByEntity(records = [], entityHeaders = []) {
 }
 
 function operationStats(records = [], operation = "sum", options = {}) {
-  const allStats = numberStats(
-    records.map((record) => record.value),
-  );
+  const allStats = numberStats(records.map((record) => record.value));
   if (operation === SEMANTIC_AGGREGATION_OPERATION.LATEST) {
-    const entityHeaders = (Array.isArray(options.entityHeaders)
-      ? options.entityHeaders
-      : []).map(normalizeText).filter(Boolean);
+    const entityHeaders = (
+      Array.isArray(options.entityHeaders) ? options.entityHeaders : []
+    )
+      .map(normalizeText)
+      .filter(Boolean);
     const selection = entityHeaders.length
       ? latestRecordSelectionByEntity(records, entityHeaders)
       : latestRecordSelection(records);
@@ -1652,8 +1602,7 @@ function operationStats(records = [], operation = "sum", options = {}) {
     entityHeaders: [],
     entityCount: 0,
     selectedPeriods: [],
-    value:
-      operation === "average" ? allStats.average : allStats.sum,
+    value: operation === "average" ? allStats.average : allStats.sum,
   };
 }
 
@@ -1780,10 +1729,7 @@ function overviewSection(table = {}, tableIndex = 0, contract = null) {
   };
 }
 
-function dimensionSemanticPriority({
-  header = "",
-  distinctCount = 0,
-} = {}) {
+function dimensionSemanticPriority({ header = "", distinctCount = 0 } = {}) {
   const text = normalizeText(header);
   let score = 0;
 
@@ -1831,14 +1777,10 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
     series.unit,
     series.operation,
   );
-  const stats = numberStats(
-    series.records.map((record) => record.value),
-  );
+  const stats = numberStats(series.records.map((record) => record.value));
   const additive = series.operation === "sum";
-  const snapshot =
-    series.operation === SEMANTIC_AGGREGATION_OPERATION.LATEST;
-  const durationMetric =
-    series.metricRole === SEMANTIC_METRIC_ROLE.DURATION;
+  const snapshot = series.operation === SEMANTIC_AGGREGATION_OPERATION.LATEST;
+  const durationMetric = series.metricRole === SEMANTIC_METRIC_ROLE.DURATION;
   const snapshotEntityResolution = snapshot
     ? resolveSnapshotEntityHeaders(series)
     : {
@@ -1851,11 +1793,9 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
   const snapshotEntityHeaders = snapshotEntityResolution.applied
     ? snapshotEntityResolution.headers
     : [];
-  const resolvedSummary = operationStats(
-    series.records,
-    series.operation,
-    { entityHeaders: snapshotEntityHeaders },
-  );
+  const resolvedSummary = operationStats(series.records, series.operation, {
+    entityHeaders: snapshotEntityHeaders,
+  });
   const summaryTitle = snapshot
     ? `${titlePrefix}${displayMetric} 최신 스냅샷`
     : `${titlePrefix}${displayMetric} 통계`;
@@ -1916,11 +1856,13 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           { 지표: "유효값 수", 값: stats.count, 단위: "건" },
           { 지표: "평균", 값: stats.average, 단위: series.unit },
           ...(durationMetric
-            ? [{
-                지표: "중앙값",
-                값: median(series.records.map((record) => record.value)),
-                단위: series.unit,
-              }]
+            ? [
+                {
+                  지표: "중앙값",
+                  값: median(series.records.map((record) => record.value)),
+                  단위: series.unit,
+                },
+              ]
             : []),
           { 지표: "최솟값", 값: stats.min, 단위: series.unit },
           { 지표: "최댓값", 값: stats.max, 단위: series.unit },
@@ -1954,16 +1896,11 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           complete: true,
           additive,
           snapshot,
-          snapshotEntityResolverVersion:
-            SNAPSHOT_ENTITY_RESOLVER_VERSION,
-          snapshotEntitySelectionApplied:
-            snapshotEntityResolution.applied,
-          snapshotEntityHeaders:
-            cloneValue(snapshotEntityHeaders),
-          snapshotEntityCount:
-            Number(resolvedSummary.entityCount || 0),
-          snapshotSelectionMethod:
-            resolvedSummary.selectionMethod,
+          snapshotEntityResolverVersion: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+          snapshotEntitySelectionApplied: snapshotEntityResolution.applied,
+          snapshotEntityHeaders: cloneValue(snapshotEntityHeaders),
+          snapshotEntityCount: Number(resolvedSummary.entityCount || 0),
+          snapshotSelectionMethod: resolvedSummary.selectionMethod,
           metricRole: series.metricRole,
           aggregationContract: cloneValue(series.aggregationContract || {}),
           unit: series.unit,
@@ -1974,11 +1911,11 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           metricRelationshipPriorityEngineVersion:
             METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
           relationshipRole: series.relationshipRole || "independent",
-          representativeMetricPriority:
-            Number(series.representativeMetricPriority || 0),
+          representativeMetricPriority: Number(
+            series.representativeMetricPriority || 0,
+          ),
           componentOfMetric: series.componentOfMetric || "",
-          metricRelationships:
-            cloneValue(series.metricRelationships || []),
+          metricRelationships: cloneValue(series.metricRelationships || []),
           semanticSectionBudgetEngineVersion:
             SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
           sectionBudgetPolicy: cloneValue(sectionPolicy),
@@ -2008,11 +1945,7 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
         }),
       };
     })
-    .filter(
-      (entry) =>
-        entry.distinctCount >= 2 &&
-        entry.distinctCount <= 200,
-    )
+    .filter((entry) => entry.distinctCount >= 2 && entry.distinctCount <= 200)
     .sort(
       (left, right) =>
         right.semanticPriority - left.semanticPriority ||
@@ -2071,16 +2004,11 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           complete: true,
           additive,
           snapshot,
-          snapshotEntityResolverVersion:
-            SNAPSHOT_ENTITY_RESOLVER_VERSION,
-          snapshotEntitySelectionApplied:
-            snapshotEntityResolution.applied,
-          snapshotEntityHeaders:
-            cloneValue(snapshotEntityHeaders),
-          snapshotEntityCount:
-            Number(resolvedSummary.entityCount || 0),
-          snapshotSelectionMethod:
-            resolvedSummary.selectionMethod,
+          snapshotEntityResolverVersion: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+          snapshotEntitySelectionApplied: snapshotEntityResolution.applied,
+          snapshotEntityHeaders: cloneValue(snapshotEntityHeaders),
+          snapshotEntityCount: Number(resolvedSummary.entityCount || 0),
+          snapshotSelectionMethod: resolvedSummary.selectionMethod,
           metricRole: series.metricRole,
           aggregationContract: cloneValue(series.aggregationContract || {}),
           unit: series.unit,
@@ -2090,11 +2018,11 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           metricRelationshipPriorityEngineVersion:
             METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
           relationshipRole: series.relationshipRole || "independent",
-          representativeMetricPriority:
-            Number(series.representativeMetricPriority || 0),
+          representativeMetricPriority: Number(
+            series.representativeMetricPriority || 0,
+          ),
           componentOfMetric: series.componentOfMetric || "",
-          metricRelationships:
-            cloneValue(series.metricRelationships || []),
+          metricRelationships: cloneValue(series.metricRelationships || []),
           semanticSectionBudgetEngineVersion:
             SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
           sectionBudgetPolicy: cloneValue(sectionPolicy),
@@ -2142,16 +2070,11 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           complete: true,
           additive,
           snapshot,
-          snapshotEntityResolverVersion:
-            SNAPSHOT_ENTITY_RESOLVER_VERSION,
-          snapshotEntitySelectionApplied:
-            snapshotEntityResolution.applied,
-          snapshotEntityHeaders:
-            cloneValue(snapshotEntityHeaders),
-          snapshotEntityCount:
-            Number(resolvedSummary.entityCount || 0),
-          snapshotSelectionMethod:
-            resolvedSummary.selectionMethod,
+          snapshotEntityResolverVersion: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+          snapshotEntitySelectionApplied: snapshotEntityResolution.applied,
+          snapshotEntityHeaders: cloneValue(snapshotEntityHeaders),
+          snapshotEntityCount: Number(resolvedSummary.entityCount || 0),
+          snapshotSelectionMethod: resolvedSummary.selectionMethod,
           metricRole: series.metricRole,
           aggregationContract: cloneValue(series.aggregationContract || {}),
           explicitPeriodOnly: true,
@@ -2163,11 +2086,11 @@ function seriesSections(table = {}, tableIndex = 0, series = {}, options = {}) {
           metricRelationshipPriorityEngineVersion:
             METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
           relationshipRole: series.relationshipRole || "independent",
-          representativeMetricPriority:
-            Number(series.representativeMetricPriority || 0),
+          representativeMetricPriority: Number(
+            series.representativeMetricPriority || 0,
+          ),
           componentOfMetric: series.componentOfMetric || "",
-          metricRelationships:
-            cloneValue(series.metricRelationships || []),
+          metricRelationships: cloneValue(series.metricRelationships || []),
           semanticSectionBudgetEngineVersion:
             SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
           sectionBudgetPolicy: cloneValue(sectionPolicy),
@@ -2191,9 +2114,9 @@ function semanticScalarText(value, output = [], depth = 0) {
     return output;
   }
   if (Array.isArray(value)) {
-    value.slice(0, 100).forEach((item) =>
-      semanticScalarText(item, output, depth + 1),
-    );
+    value
+      .slice(0, 100)
+      .forEach((item) => semanticScalarText(item, output, depth + 1));
     return output;
   }
   if (typeof value === "object") {
@@ -2223,9 +2146,7 @@ function semanticSectionText(section = {}) {
             section.result.rows
               .slice(0, 30)
               .flatMap((row) =>
-                row && typeof row === "object"
-                  ? Object.keys(row)
-                  : [],
+                row && typeof row === "object" ? Object.keys(row) : [],
               ),
           ),
         )
@@ -2307,20 +2228,15 @@ function metricHeadersSemanticallyMatch(
 
   if (!existing || !planned) return true;
 
-  const existingGeneric =
-    GENERIC_METRIC_LABEL_PATTERN.test(existing);
-  const plannedGeneric =
-    GENERIC_METRIC_LABEL_PATTERN.test(planned);
+  const existingGeneric = GENERIC_METRIC_LABEL_PATTERN.test(existing);
+  const plannedGeneric = GENERIC_METRIC_LABEL_PATTERN.test(planned);
 
   if (existingGeneric !== plannedGeneric) return false;
 
   return normalizeKey(existing) === normalizeKey(planned);
 }
 
-function groupHeadersSemanticallyMatch(
-  existingGroup = "",
-  plannedGroup = "",
-) {
+function groupHeadersSemanticallyMatch(existingGroup = "", plannedGroup = "") {
   const existing = normalizeText(existingGroup);
   const planned = normalizeText(plannedGroup);
 
@@ -2333,17 +2249,13 @@ function groupHeadersSemanticallyMatch(
     return true;
   }
 
-  const aliases = new Set(
-    semanticGroupAliases(planned).map(normalizeKey),
-  );
+  const aliases = new Set(semanticGroupAliases(planned).map(normalizeKey));
   return aliases.has(normalizeKey(existing));
 }
 
 function isWholeMetricSummarySection(section = {}) {
   const sectionType = normalizeText(section.sectionType || "");
-  const group = normalizeText(
-    section.result?.groupBy?.header || "",
-  );
+  const group = normalizeText(section.result?.groupBy?.header || "");
   return !group && /summary/.test(sectionType);
 }
 
@@ -2356,17 +2268,11 @@ function hasGroupedOrRankedSectionIdentity(section = {}) {
 }
 
 function existingSectionCoversPlanned(existing = {}, planned = {}) {
-  const metric = normalizeText(
-    planned.result?.metric?.header || "",
-  );
-  const group = normalizeText(
-    planned.result?.groupBy?.header || "",
-  );
+  const metric = normalizeText(planned.result?.metric?.header || "");
+  const group = normalizeText(planned.result?.groupBy?.header || "");
   const text = semanticSectionText(existing);
-  const existingMetric =
-    explicitSectionMetricHeader(existing);
-  const existingGroup =
-    explicitSectionGroupHeader(existing);
+  const existingMetric = explicitSectionMetricHeader(existing);
+  const existingGroup = explicitSectionGroupHeader(existing);
 
   if (
     isWholeMetricSummarySection(planned) &&
@@ -2377,22 +2283,11 @@ function existingSectionCoversPlanned(existing = {}, planned = {}) {
 
   if (!metric || !sectionContainsToken(text, metric)) return false;
 
-  if (
-    !metricHeadersSemanticallyMatch(
-      existingMetric,
-      metric,
-    )
-  ) {
+  if (!metricHeadersSemanticallyMatch(existingMetric, metric)) {
     return false;
   }
 
-  if (
-    group &&
-    !groupHeadersSemanticallyMatch(
-      existingGroup,
-      group,
-    )
-  ) {
+  if (group && !groupHeadersSemanticallyMatch(existingGroup, group)) {
     return false;
   }
 
@@ -2411,16 +2306,22 @@ function existingSectionCoversPlanned(existing = {}, planned = {}) {
     return existingFamily === "latest";
   }
   if (plannedFamily === "average") {
-    return ["average", "summary"].includes(existingFamily) ||
-      /평균|점수\s*요약/.test(normalizeText(existing.title));
+    return (
+      ["average", "summary"].includes(existingFamily) ||
+      /평균|점수\s*요약/.test(normalizeText(existing.title))
+    );
   }
   if (plannedFamily === "sum") {
-    return ["sum", "summary"].includes(existingFamily) ||
-      /합계|금액\s*요약|수량\s*요약/.test(normalizeText(existing.title));
+    return (
+      ["sum", "summary"].includes(existingFamily) ||
+      /합계|금액\s*요약|수량\s*요약/.test(normalizeText(existing.title))
+    );
   }
   if (!group) {
-    return ["summary", "average", "sum"].includes(existingFamily) ||
-      /요약|통계/.test(normalizeText(existing.title));
+    return (
+      ["summary", "average", "sum"].includes(existingFamily) ||
+      /요약|통계/.test(normalizeText(existing.title))
+    );
   }
   return true;
 }
@@ -2459,13 +2360,12 @@ function applyMandatorySummaryCoverageFloor({
       working.flatMap((section) => collectSectionMetricIds(section)),
     ),
   );
-  const candidates = (Array.isArray(plannedSections)
-    ? plannedSections
-    : []
+  const candidates = (
+    Array.isArray(plannedSections) ? plannedSections : []
   ).filter((section) => {
     if (!isWholeMetricSummarySection(section)) return false;
-    return collectSectionMetricIds(section).some(
-      (metricId) => expected.has(metricId),
+    return collectSectionMetricIds(section).some((metricId) =>
+      expected.has(metricId),
     );
   });
 
@@ -2491,9 +2391,7 @@ function applyMandatorySummaryCoverageFloor({
         working[targetIndex],
         planned,
       );
-      const targetMetricIds = collectSectionMetricIds(
-        working[targetIndex],
-      );
+      const targetMetricIds = collectSectionMetricIds(working[targetIndex]);
       for (const metricId of missingMetricIds) {
         renderedBefore.add(metricId);
         transferredMetricIds.push(metricId);
@@ -2501,9 +2399,7 @@ function applyMandatorySummaryCoverageFloor({
       coverageActions.push({
         action: "transfer_to_authoritative_summary",
         plannedSectionId: normalizeText(planned.sectionId || ""),
-        targetSectionId: normalizeText(
-          working[targetIndex]?.sectionId || "",
-        ),
+        targetSectionId: normalizeText(working[targetIndex]?.sectionId || ""),
         targetTitle: normalizeText(working[targetIndex]?.title || ""),
         metricIds: targetMetricIds.filter((metricId) =>
           missingMetricIds.includes(metricId),
@@ -2522,9 +2418,7 @@ function applyMandatorySummaryCoverageFloor({
         restoredByMandatorySummaryCoverageFloor: true,
       },
     };
-    const metricHeader = normalizeText(
-      restored.result?.metric?.header || "",
-    );
+    const metricHeader = normalizeText(restored.result?.metric?.header || "");
     const insertIndex = working.findIndex((section) =>
       metricHeadersSemanticallyMatch(
         explicitSectionMetricHeader(section),
@@ -2556,11 +2450,12 @@ function applyMandatorySummaryCoverageFloor({
     ),
   );
   const missingBefore = [...expected].filter(
-    (metricId) => !new Set(
-      uniqueMetricIds(
-        sections.flatMap((section) => collectSectionMetricIds(section)),
-      ),
-    ).has(metricId),
+    (metricId) =>
+      !new Set(
+        uniqueMetricIds(
+          sections.flatMap((section) => collectSectionMetricIds(section)),
+        ),
+      ).has(metricId),
   );
   const missingAfter = [...expected].filter(
     (metricId) => !renderedAfter.has(metricId),
@@ -2581,35 +2476,18 @@ function applyMandatorySummaryCoverageFloor({
   };
 }
 
-function sectionMetricAndGroupMatch(
-  existing = {},
-  planned = {},
-) {
-  const metric = normalizeText(
-    planned.result?.metric?.header || "",
-  );
-  const group = normalizeText(
-    planned.result?.groupBy?.header || "",
-  );
+function sectionMetricAndGroupMatch(existing = {}, planned = {}) {
+  const metric = normalizeText(planned.result?.metric?.header || "");
+  const group = normalizeText(planned.result?.groupBy?.header || "");
   const text = semanticSectionText(existing);
-  const existingMetric =
-    explicitSectionMetricHeader(existing);
-  const existingGroup =
-    explicitSectionGroupHeader(existing);
+  const existingMetric = explicitSectionMetricHeader(existing);
+  const existingGroup = explicitSectionGroupHeader(existing);
 
-  if (
-    !metric ||
-    !sectionContainsToken(text, metric)
-  ) {
+  if (!metric || !sectionContainsToken(text, metric)) {
     return false;
   }
 
-  if (
-    !metricHeadersSemanticallyMatch(
-      existingMetric,
-      metric,
-    )
-  ) {
+  if (!metricHeadersSemanticallyMatch(existingMetric, metric)) {
     return false;
   }
 
@@ -2617,74 +2495,48 @@ function sectionMetricAndGroupMatch(
     return !existingGroup;
   }
 
-  if (
-    existingGroup &&
-    !groupHeadersSemanticallyMatch(
-      existingGroup,
-      group,
-    )
-  ) {
+  if (existingGroup && !groupHeadersSemanticallyMatch(existingGroup, group)) {
     return false;
   }
 
-  if (
-    BUSINESS_TIME_HEADER_PATTERN.test(group)
-  ) {
+  if (BUSINESS_TIME_HEADER_PATTERN.test(group)) {
     return Boolean(
-      BUSINESS_TIME_HEADER_PATTERN.test(
-        existingGroup,
-      ) ||
-      BUSINESS_TIME_HEADER_PATTERN.test(
-        normalizeText(existing.title),
-      ) ||
-      semanticGroupAliases(group).some(
-        (alias) =>
-          sectionContainsToken(text, alias),
+      BUSINESS_TIME_HEADER_PATTERN.test(existingGroup) ||
+      BUSINESS_TIME_HEADER_PATTERN.test(normalizeText(existing.title)) ||
+      semanticGroupAliases(group).some((alias) =>
+        sectionContainsToken(text, alias),
       ),
     );
   }
 
   if (existingGroup) return true;
 
-  return semanticGroupAliases(group).some(
-    (alias) =>
-      sectionContainsToken(text, alias),
+  return semanticGroupAliases(group).some((alias) =>
+    sectionContainsToken(text, alias),
   );
 }
 
-function sectionOperationFamilies(
-  section = {},
-) {
+function sectionOperationFamilies(section = {}) {
   const families = new Set();
-  const directFamily =
-    semanticOperationFamily(section);
+  const directFamily = semanticOperationFamily(section);
   if (directFamily && directFamily !== "other") {
     families.add(directFamily);
   }
 
-  const rows = Array.isArray(
-    section.result?.rows,
-  )
+  const rows = Array.isArray(section.result?.rows)
     ? section.result.rows.slice(0, 100)
     : [];
 
   for (const row of rows) {
-    if (
-      !row ||
-      typeof row !== "object" ||
-      Array.isArray(row)
-    ) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
       continue;
     }
 
-    const text = normalizeText([
-      row.작업,
-      row.operation,
-      row.집계,
-      row.집계유형,
-      row.지표,
-      row.metric,
-    ].filter(Boolean).join(" ")).toLowerCase();
+    const text = normalizeText(
+      [row.작업, row.operation, row.집계, row.집계유형, row.지표, row.metric]
+        .filter(Boolean)
+        .join(" "),
+    ).toLowerCase();
 
     if (!text) continue;
     if (/latest|snapshot|최신|스냅샷|기말/.test(text)) {
@@ -2730,14 +2582,7 @@ function semanticRowMetricLabel(row = {}) {
 }
 
 function semanticRowValue(row = {}) {
-  for (const key of [
-    "값",
-    "value",
-    "수치",
-    "amount",
-    "합계",
-    "평균",
-  ]) {
+  for (const key of ["값", "value", "수치", "amount", "합계", "평균"]) {
     const value = Number(row?.[key]);
     if (Number.isFinite(value)) {
       return { key, value };
@@ -2769,9 +2614,7 @@ function isGeneralStockSnapshotAlias(label = "") {
     /^(?:행별|전체|총|평균|누적)?재고(?:스냅샷|수량|잔액|보유수량)(?:합계|총계|평균|값)?$/.test(
       key,
     ) ||
-    /^(?:스냅샷|기말)재고(?:수량|잔액|보유수량)?(?:합계|총계|값)?$/.test(
-      key,
-    ) ||
+    /^(?:스냅샷|기말)재고(?:수량|잔액|보유수량)?(?:합계|총계|값)?$/.test(key) ||
     /^(?:row|all|total|average|cumulative)?(?:inventory|stock)(?:snapshot|quantity|balance|onhand)(?:sum|total|average)?$/.test(
       key,
     )
@@ -2818,7 +2661,9 @@ function semanticRoleForMetricLabel(label = "") {
 
   if (
     classified.role === SEMANTIC_METRIC_ROLE.GENERIC_MEASURE &&
-    /재고.*(?:스냅샷|잔액|잔량|합계)|(?:스냅샷|기말).*재고|최다.*보유|보유.*(?:수량|품목)/i.test(normalized)
+    /재고.*(?:스냅샷|잔액|잔량|합계)|(?:스냅샷|기말).*재고|최다.*보유|보유.*(?:수량|품목)/i.test(
+      normalized,
+    )
   ) {
     return {
       ...classified,
@@ -2841,20 +2686,20 @@ function sectionAuthoritativeMetricHeader(section = {}) {
 }
 
 function sectionAuthoritativeScalar(section = {}, family = "") {
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   const wanted = family || semanticOperationFamily(section);
-  const patterns = wanted === "latest"
-    ? [/최신\s*스냅샷\s*값|최신값|기말값|latest\s*(?:snapshot\s*)?value/i]
-    : [/평균|average|mean|avg/i];
+  const patterns =
+    wanted === "latest"
+      ? [/최신\s*스냅샷\s*값|최신값|기말값|latest\s*(?:snapshot\s*)?value/i]
+      : [/평균|average|mean|avg/i];
 
   for (const pattern of patterns) {
-    const row = rows.find((item) =>
-      item &&
-      typeof item === "object" &&
-      !Array.isArray(item) &&
-      pattern.test(semanticRowMetricLabel(item)),
+    const row = rows.find(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        pattern.test(semanticRowMetricLabel(item)),
     );
     if (!row) continue;
     const numeric = semanticRowValue(row);
@@ -2868,9 +2713,7 @@ function sectionAuthoritativeScalar(section = {}, family = "") {
   }
 
   const direct = Number(
-    section.result?.value ??
-      section.value ??
-      section.result?.total,
+    section.result?.value ?? section.value ?? section.result?.total,
   );
   if (Number.isFinite(direct)) {
     return { value: direct, valueKey: "value", row: null };
@@ -2880,15 +2723,9 @@ function sectionAuthoritativeScalar(section = {}, family = "") {
 }
 
 function sectionAuthoritativeSelectedCount(section = {}) {
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   for (const row of rows) {
-    if (
-      !row ||
-      typeof row !== "object" ||
-      Array.isArray(row)
-    ) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
       continue;
     }
     const label = semanticRowMetricLabel(row);
@@ -2962,9 +2799,7 @@ function semanticMetricCompatibilityScore({
     "단가",
     "일수",
     "기간",
-  ].filter((token) =>
-    requested.includes(token) && candidate.includes(token),
-  );
+  ].filter((token) => requested.includes(token) && candidate.includes(token));
   score += sharedTokens.length * 8;
 
   const requestedMoney = /금액|비용|원가|amount|cost|value/i.test(requested);
@@ -2974,7 +2809,9 @@ function semanticMetricCompatibilityScore({
 
   const requestedOpening = /기초|opening/i.test(requested);
   const requestedSafety = /안전|safety/i.test(requested);
-  const requestedCurrent = /현재|기말|잔여|on\s*hand|closing|remaining/i.test(requested);
+  const requestedCurrent = /현재|기말|잔여|on\s*hand|closing|remaining/i.test(
+    requested,
+  );
 
   if (/현재|기말|on\s*hand|closing/i.test(candidate)) {
     score += requestedOpening || requestedSafety ? -12 : 24;
@@ -3018,14 +2855,10 @@ function authoritativeSemanticSectionIndex({
 
     const metric = sectionAuthoritativeMetricHeader(section);
     const scalar = sectionAuthoritativeScalar(section, family);
-    const groupedRows = groupHeader
-      ? candidateGroupedRows(section)
-      : [];
+    const groupedRows = groupHeader ? candidateGroupedRows(section) : [];
     if (
       !metric ||
-      (groupHeader
-        ? groupedRows.length === 0
-        : !Number.isFinite(scalar.value))
+      (groupHeader ? groupedRows.length === 0 : !Number.isFinite(scalar.value))
     ) {
       return;
     }
@@ -3043,15 +2876,18 @@ function authoritativeSemanticSectionIndex({
   return bestScore >= 10 ? bestIndex : -1;
 }
 
-
 function isInventoryFlowMixedSection(section = {}) {
-  const text = normalizeText([
-    section.sectionId,
-    section.sectionType,
-    section.title,
-    section.result?.resultType,
-    section.result?.operation,
-  ].filter(Boolean).join(" ")).toLowerCase();
+  const text = normalizeText(
+    [
+      section.sectionId,
+      section.sectionType,
+      section.title,
+      section.result?.resultType,
+      section.result?.operation,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  ).toLowerCase();
 
   return (
     /inventory[_\s-]*flow[_\s-]*(?:overview|summary)/i.test(text) ||
@@ -3087,9 +2923,7 @@ function blockedFlowMetricTransferTargetIndex({
   section = {},
   excludedIndex = -1,
 } = {}) {
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   let bestIndex = -1;
   let bestScore = -Infinity;
 
@@ -3128,9 +2962,7 @@ function blockedFlowMetricTransferTargetIndex({
 }
 
 function mixedSectionSemanticRoles(section = {}) {
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   return new Set(
     rows
       .map((row) => semanticRowMetricLabel(row))
@@ -3141,9 +2973,7 @@ function mixedSectionSemanticRoles(section = {}) {
 }
 
 function isMixedMetricRowSection(section = {}) {
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   if (rows.length < 2) return false;
   const roles = mixedSectionSemanticRoles(section);
   return roles.size > 1;
@@ -3170,30 +3000,25 @@ function replaceMixedSectionRows({
     };
   }
 
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   const replacements = [];
   const nextRows = rows.map((row, rowIndex) => {
-    if (
-      !row ||
-      typeof row !== "object" ||
-      Array.isArray(row)
-    ) {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
       return row;
     }
 
     const label = semanticRowMetricLabel(row);
     const role = semanticRoleForMetricLabel(label);
-    const family = role.role === SEMANTIC_METRIC_ROLE.STOCK_SNAPSHOT
-      ? "latest"
-      : [
-          SEMANTIC_METRIC_ROLE.UNIT_RATE,
-          SEMANTIC_METRIC_ROLE.DURATION,
-          SEMANTIC_METRIC_ROLE.PERCENTAGE_RATE,
-        ].includes(role.role)
-        ? "average"
-        : "";
+    const family =
+      role.role === SEMANTIC_METRIC_ROLE.STOCK_SNAPSHOT
+        ? "latest"
+        : [
+              SEMANTIC_METRIC_ROLE.UNIT_RATE,
+              SEMANTIC_METRIC_ROLE.DURATION,
+              SEMANTIC_METRIC_ROLE.PERCENTAGE_RATE,
+            ].includes(role.role)
+          ? "average"
+          : "";
     if (!family) return row;
 
     const targetIndex = authoritativeSemanticSectionIndex({
@@ -3212,14 +3037,10 @@ function replaceMixedSectionRows({
     const valueInfo = semanticRowValue(row);
     const valueKey = valueInfo.key || "값";
     const metric = sectionAuthoritativeMetricHeader(target);
-    const labelKey = [
-      "지표",
-      "metric",
-      "지표명",
-      "항목",
-      "label",
-      "name",
-    ].find((key) => Object.prototype.hasOwnProperty.call(row, key)) || "지표";
+    const labelKey =
+      ["지표", "metric", "지표명", "항목", "label", "name"].find((key) =>
+        Object.prototype.hasOwnProperty.call(row, key),
+      ) || "지표";
     const suffix = family === "latest" ? "최신 스냅샷" : "평균";
     const nextRow = {
       ...row,
@@ -3277,30 +3098,28 @@ function isContractMetricSection(section = {}) {
 
 function contractMetricOutputHeader(section = {}) {
   const groupHeader = explicitSectionGroupHeader(section);
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
-  const row = rows.find((item) =>
-    item && typeof item === "object" && !Array.isArray(item),
-  ) || {};
-  const ignored = new Set([
-    groupHeader,
-    "metricId",
-    "순위",
-    "rank",
-    "작업",
-    "operation",
-  ].filter(Boolean));
-  return Object.keys(row).find((key) =>
-    !ignored.has(key) && Number.isFinite(Number(row[key])),
-  ) || sectionAuthoritativeMetricHeader(section) || normalizeText(section.title);
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
+  const row =
+    rows.find(
+      (item) => item && typeof item === "object" && !Array.isArray(item),
+    ) || {};
+  const ignored = new Set(
+    [groupHeader, "metricId", "순위", "rank", "작업", "operation"].filter(
+      Boolean,
+    ),
+  );
+  return (
+    Object.keys(row).find(
+      (key) => !ignored.has(key) && Number.isFinite(Number(row[key])),
+    ) ||
+    sectionAuthoritativeMetricHeader(section) ||
+    normalizeText(section.title)
+  );
 }
 
 function candidateGroupedRows(section = {}) {
   const groupHeader = explicitSectionGroupHeader(section);
-  const rows = Array.isArray(section.result?.rows)
-    ? section.result.rows
-    : [];
+  const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
   return rows
     .map((row) => {
       const groupValue = row?.[groupHeader];
@@ -3310,27 +3129,29 @@ function candidateGroupedRows(section = {}) {
         value: numeric.value,
       };
     })
-    .filter((item) =>
-      item.groupValue != null && Number.isFinite(item.value),
-    );
+    .filter((item) => item.groupValue != null && Number.isFinite(item.value));
 }
 
 function contractRowAggregationIntent(row = {}, section = {}) {
   const label = semanticRowMetricLabel(row);
-  const evidence = normalizeText([
-    label,
-    row.집계유형,
-    row.집계방식,
-    row.aggregation,
-    row.aggregate,
-    row.operation,
-    row.작업,
-    row.metricId,
-    section.result?.aggregation,
-    section.result?.operation,
-    section.operation,
-    section.sectionType,
-  ].filter(Boolean).join(" ")).toLowerCase();
+  const evidence = normalizeText(
+    [
+      label,
+      row.집계유형,
+      row.집계방식,
+      row.aggregation,
+      row.aggregate,
+      row.operation,
+      row.작업,
+      row.metricId,
+      section.result?.aggregation,
+      section.result?.operation,
+      section.operation,
+      section.sectionType,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  ).toLowerCase();
 
   if (/평균|average|mean|avg/.test(evidence)) return "average";
   if (/총|합계|합산|총계|sum|total|grand\s*total/.test(evidence)) {
@@ -3357,7 +3178,10 @@ function connectContractKpisToSemanticSnapshots({ sections = [] } = {}) {
     );
     const sectionRole = semanticRoleForMetricLabel(sectionLabel);
 
-    if (groupHeader && sectionRole.role === SEMANTIC_METRIC_ROLE.STOCK_SNAPSHOT) {
+    if (
+      groupHeader &&
+      sectionRole.role === SEMANTIC_METRIC_ROLE.STOCK_SNAPSHOT
+    ) {
       const targetIndex = authoritativeSemanticSectionIndex({
         sections: working,
         requestedLabel: sectionLabel,
@@ -3411,8 +3235,11 @@ function connectContractKpisToSemanticSnapshots({ sections = [] } = {}) {
             contractKpiSnapshotBridgeVersion:
               CONTRACT_KPI_SNAPSHOT_BRIDGE_VERSION,
             contractKpiSnapshotBridgeApplied: true,
-            authoritativeSemanticSectionId: normalizeText(target.sectionId || ""),
-            authoritativeSemanticMetric: sectionAuthoritativeMetricHeader(target),
+            authoritativeSemanticSectionId: normalizeText(
+              target.sectionId || "",
+            ),
+            authoritativeSemanticMetric:
+              sectionAuthoritativeMetricHeader(target),
           },
         },
       };
@@ -3426,9 +3253,7 @@ function connectContractKpisToSemanticSnapshots({ sections = [] } = {}) {
     }
 
     if (groupHeader) return;
-    const rows = Array.isArray(section.result?.rows)
-      ? section.result.rows
-      : [];
+    const rows = Array.isArray(section.result?.rows) ? section.result.rows : [];
     let changed = false;
     const rowUpdates = [];
     const nextRows = rows.map((row, rowIndex) => {
@@ -3453,16 +3278,16 @@ function connectContractKpisToSemanticSnapshots({ sections = [] } = {}) {
       const isAverage = aggregationIntent === "average";
       const selectedCount = sectionAuthoritativeSelectedCount(target);
       if (isAverage && selectedCount <= 0) return row;
-      const value = isAverage
-        ? scalar.value / selectedCount
-        : scalar.value;
+      const value = isAverage ? scalar.value / selectedCount : scalar.value;
       const valueInfo = semanticRowValue(row);
       const valueKey = valueInfo.key || "값";
       changed = true;
       rowUpdates.push({
         rowIndex,
         label,
-        originalValue: Number.isFinite(valueInfo.value) ? valueInfo.value : null,
+        originalValue: Number.isFinite(valueInfo.value)
+          ? valueInfo.value
+          : null,
         replacementValue: value,
         mode: isAverage ? "snapshot_average" : "snapshot_total",
         aggregationIntent,
@@ -3511,57 +3336,32 @@ function connectContractKpisToSemanticSnapshots({ sections = [] } = {}) {
   };
 }
 
-
-function semanticConflictReason({
-  existing = {},
-  planned = {},
-} = {}) {
-  if (
-    !sectionMetricAndGroupMatch(
-      existing,
-      planned,
-    )
-  ) {
+function semanticConflictReason({ existing = {}, planned = {} } = {}) {
+  if (!sectionMetricAndGroupMatch(existing, planned)) {
     return "";
   }
 
-  const plannedFamily =
-    semanticOperationFamily(planned);
-  if (
-    !["latest", "average"].includes(
-      plannedFamily,
-    )
-  ) {
+  const plannedFamily = semanticOperationFamily(planned);
+  if (!["latest", "average"].includes(plannedFamily)) {
     return "";
   }
 
-  const existingFamilies =
-    sectionOperationFamilies(existing);
+  const existingFamilies = sectionOperationFamilies(existing);
 
-  if (
-    plannedFamily === "latest"
-  ) {
+  if (plannedFamily === "latest") {
     if (existingFamilies.has("latest")) {
       return "";
     }
-    if (
-      existingFamilies.has("sum") ||
-      existingFamilies.has("summary")
-    ) {
+    if (existingFamilies.has("sum") || existingFamilies.has("summary")) {
       return "LATEST_OVERRIDES_LEGACY_SUM";
     }
   }
 
-  if (
-    plannedFamily === "average"
-  ) {
+  if (plannedFamily === "average") {
     if (existingFamilies.has("average")) {
       return "";
     }
-    if (
-      existingFamilies.has("sum") ||
-      existingFamilies.has("summary")
-    ) {
+    if (existingFamilies.has("sum") || existingFamilies.has("summary")) {
       return "AVERAGE_OVERRIDES_LEGACY_SUM";
     }
   }
@@ -3574,17 +3374,13 @@ function authoritativeSectionIndex({
   planned = {},
   excludedIndex = -1,
 } = {}) {
-  const plannedId = normalizeText(
-    planned.sectionId || "",
-  );
+  const plannedId = normalizeText(planned.sectionId || "");
 
   const exactIndex = sections.findIndex(
     (section, index) =>
       index !== excludedIndex &&
       plannedId &&
-      normalizeText(
-        section.sectionId || "",
-      ) === plannedId,
+      normalizeText(section.sectionId || "") === plannedId,
   );
   if (exactIndex >= 0) return exactIndex;
 
@@ -3592,9 +3388,7 @@ function authoritativeSectionIndex({
     (section, index) =>
       index !== excludedIndex &&
       normalizeText(
-        section.result?.meta
-          ?.semanticCoverage
-          ?.plannerSectionId || "",
+        section.result?.meta?.semanticCoverage?.plannerSectionId || "",
       ) === plannedId,
   );
   if (annotatedIndex >= 0) {
@@ -3603,11 +3397,7 @@ function authoritativeSectionIndex({
 
   return sections.findIndex(
     (section, index) =>
-      index !== excludedIndex &&
-      existingSectionCoversPlanned(
-        section,
-        planned,
-      ),
+      index !== excludedIndex && existingSectionCoversPlanned(section, planned),
   );
 }
 
@@ -3618,21 +3408,12 @@ function resolveSemanticContractConflicts({
   actualFlowEvidence = null,
 } = {}) {
   const working = Array.isArray(sections)
-    ? sections.map((section) =>
-        cloneValue(section),
-      )
+    ? sections.map((section) => cloneValue(section))
     : [];
-  const plans = Array.isArray(
-    plannedSections,
-  )
-    ? plannedSections
-    : [];
+  const plans = Array.isArray(plannedSections) ? plannedSections : [];
   const baseLimit = Math.max(
     0,
-    Math.min(
-      Number(baseSectionCount) || 0,
-      working.length,
-    ),
+    Math.min(Number(baseSectionCount) || 0, working.length),
   );
   const removedIndexes = new Set();
   const conflicts = [];
@@ -3641,11 +3422,7 @@ function resolveSemanticContractConflicts({
   let transferredMetricIdCount = 0;
   let replacedMixedRowCount = 0;
 
-  for (
-    let existingIndex = 0;
-    existingIndex < baseLimit;
-    existingIndex += 1
-  ) {
+  for (let existingIndex = 0; existingIndex < baseLimit; existingIndex += 1) {
     const existing = working[existingIndex];
     if (!existing) continue;
 
@@ -3683,9 +3460,7 @@ function resolveSemanticContractConflicts({
         authoritativeSectionId = normalizeText(
           working[targetIndex]?.sectionId || "",
         );
-        authoritativeTitle = normalizeText(
-          working[targetIndex]?.title || "",
-        );
+        authoritativeTitle = normalizeText(working[targetIndex]?.title || "");
       }
 
       removedIndexes.add(existingIndex);
@@ -3696,8 +3471,7 @@ function resolveSemanticContractConflicts({
         authoritativeSectionId,
         authoritativeTitle,
         transferredMetricIds,
-        flowEvidenceMode:
-          actualFlowEvidence?.mode || "no_actual_flow_evidence",
+        flowEvidenceMode: actualFlowEvidence?.mode || "no_actual_flow_evidence",
       };
       blockedMixedFlowSections.push(blocked);
       conflicts.push({
@@ -3771,31 +3545,22 @@ function resolveSemanticContractConflicts({
       removedIndexes.add(existingIndex);
       conflicts.push({
         reason,
-        metricHeader: normalizeText(
-          planned.result?.metric?.header || "",
-        ),
-        groupHeader: normalizeText(
-          planned.result?.groupBy?.header || "",
-        ),
+        metricHeader: normalizeText(planned.result?.metric?.header || ""),
+        groupHeader: normalizeText(planned.result?.groupBy?.header || ""),
         legacySectionId: normalizeText(existing.sectionId || ""),
         legacyTitle: normalizeText(existing.title || ""),
         authoritativeSectionId: normalizeText(
           working[targetIndex]?.sectionId || "",
         ),
-        authoritativeTitle: normalizeText(
-          working[targetIndex]?.title || "",
-        ),
+        authoritativeTitle: normalizeText(working[targetIndex]?.title || ""),
         transferredMetricIds: legacyMetricIds,
         rowLevel: false,
       });
       break;
     }
-
   }
 
-  const retained = working.filter(
-    (_, index) => !removedIndexes.has(index),
-  );
+  const retained = working.filter((_, index) => !removedIndexes.has(index));
   const prunedConflicts = conflicts.filter(
     (conflict) => conflict.rowLevel !== true,
   );
@@ -3805,16 +3570,11 @@ function resolveSemanticContractConflicts({
     applied: conflicts.length > 0,
     prunedSectionCount: removedIndexes.size,
     prunedSectionIds: prunedConflicts.map(
-      (conflict) =>
-        conflict.legacySectionId ||
-        conflict.legacyTitle,
+      (conflict) => conflict.legacySectionId || conflict.legacyTitle,
     ),
-    mixedSectionRowPrecedenceVersion:
-      MIXED_SECTION_ROW_PRECEDENCE_VERSION,
-    mixedSectionRowPrecedenceApplied:
-      mixedRowRepairs.length > 0,
-    repairedMixedSectionCount:
-      mixedRowRepairs.length,
+    mixedSectionRowPrecedenceVersion: MIXED_SECTION_ROW_PRECEDENCE_VERSION,
+    mixedSectionRowPrecedenceApplied: mixedRowRepairs.length > 0,
+    repairedMixedSectionCount: mixedRowRepairs.length,
     replacedMixedRowCount,
     mixedRowRepairs,
     actualFlowEvidenceGateVersion: ACTUAL_FLOW_EVIDENCE_GATE_VERSION,
@@ -3830,45 +3590,29 @@ function resolveSemanticContractConflicts({
   };
 }
 
-const GENERIC_SECTION_CLEANUP_VERSION =
-  "semantic_generic_section_cleanup_v1";
+const GENERIC_SECTION_CLEANUP_VERSION = "semantic_generic_section_cleanup_v1";
 
-function plannedSpecificMetricHeaders(
-  plannedSections = [],
-) {
+function plannedSpecificMetricHeaders(plannedSections = []) {
   return Array.from(
     new Set(
       plannedSections
-        .map((section) =>
-          normalizeText(
-            section.result?.metric?.header || "",
-          ),
-        )
+        .map((section) => normalizeText(section.result?.metric?.header || ""))
         .filter(
-          (header) =>
-            header &&
-            !GENERIC_METRIC_LABEL_PATTERN.test(header),
+          (header) => header && !GENERIC_METRIC_LABEL_PATTERN.test(header),
         ),
     ),
   );
 }
 
-function sectionHasGenericMetricIdentity(
-  section = {},
-) {
-  const explicitMetric =
-    explicitSectionMetricHeader(section);
+function sectionHasGenericMetricIdentity(section = {}) {
+  const explicitMetric = explicitSectionMetricHeader(section);
 
   if (explicitMetric) {
-    return GENERIC_METRIC_LABEL_PATTERN.test(
-      explicitMetric,
-    );
+    return GENERIC_METRIC_LABEL_PATTERN.test(explicitMetric);
   }
 
   const title = normalizeText(section.title);
-  return /지표값|metric\s*value|measure\s*value/i.test(
-    title,
-  );
+  return /지표값|metric\s*value|measure\s*value/i.test(title);
 }
 
 function plannedMetricHasReplacementCoverage({
@@ -3878,31 +3622,19 @@ function plannedMetricHasReplacementCoverage({
   const metricKey = normalizeKey(metricHeader);
   const relevant = plannedSections.filter(
     (section) =>
-      normalizeKey(
-        section.result?.metric?.header || "",
-      ) === metricKey,
+      normalizeKey(section.result?.metric?.header || "") === metricKey,
   );
 
   if (!relevant.length) return false;
 
   const hasSummary = relevant.some((section) => {
-    const group = normalizeText(
-      section.result?.groupBy?.header || "",
-    );
+    const group = normalizeText(section.result?.groupBy?.header || "");
     const family = semanticOperationFamily(section);
-    return (
-      !group &&
-      ["summary", "sum", "average"].includes(
-        family,
-      )
-    );
+    return !group && ["summary", "sum", "average"].includes(family);
   });
 
-  const hasGroupedOrPeriod = relevant.some(
-    (section) =>
-      normalizeText(
-        section.result?.groupBy?.header || "",
-      ),
+  const hasGroupedOrPeriod = relevant.some((section) =>
+    normalizeText(section.result?.groupBy?.header || ""),
   );
 
   return hasSummary && hasGroupedOrPeriod;
@@ -3913,8 +3645,7 @@ function pruneSupersededGenericSections({
   plannedSections = [],
   baseSectionCount = 0,
 } = {}) {
-  const specificMetrics =
-    plannedSpecificMetricHeaders(plannedSections);
+  const specificMetrics = plannedSpecificMetricHeaders(plannedSections);
 
   if (specificMetrics.length !== 1) {
     return {
@@ -3922,8 +3653,7 @@ function pruneSupersededGenericSections({
       prunedSectionCount: 0,
       prunedSectionIds: [],
       cleanupApplied: false,
-      reason:
-        "SPECIFIC_METRIC_COUNT_NOT_ONE",
+      reason: "SPECIFIC_METRIC_COUNT_NOT_ONE",
     };
   }
 
@@ -3940,51 +3670,38 @@ function pruneSupersededGenericSections({
       prunedSectionCount: 0,
       prunedSectionIds: [],
       cleanupApplied: false,
-      reason:
-        "SPECIFIC_METRIC_COVERAGE_INCOMPLETE",
+      reason: "SPECIFIC_METRIC_COVERAGE_INCOMPLETE",
     };
   }
 
   const prunedSectionIds = [];
 
-  const retained = sections.filter(
-    (section, index) => {
-      if (index >= baseSectionCount) return true;
+  const retained = sections.filter((section, index) => {
+    if (index >= baseSectionCount) return true;
 
-      if (
-        collectSectionMetricIds(section).length > 0
-      ) {
-        return true;
-      }
+    if (collectSectionMetricIds(section).length > 0) {
+      return true;
+    }
 
-      if (
-        !sectionHasGenericMetricIdentity(section)
-      ) {
-        return true;
-      }
+    if (!sectionHasGenericMetricIdentity(section)) {
+      return true;
+    }
 
-      prunedSectionIds.push(
-        normalizeText(
-          section.sectionId ||
-            section.title ||
-            `base_section_${index + 1}`,
-        ),
-      );
-      return false;
-    },
-  );
+    prunedSectionIds.push(
+      normalizeText(
+        section.sectionId || section.title || `base_section_${index + 1}`,
+      ),
+    );
+    return false;
+  });
 
   return {
     sections: retained,
-    prunedSectionCount:
-      prunedSectionIds.length,
+    prunedSectionCount: prunedSectionIds.length,
     prunedSectionIds,
-    cleanupApplied:
-      prunedSectionIds.length > 0,
+    cleanupApplied: prunedSectionIds.length > 0,
     reason:
-      prunedSectionIds.length > 0
-        ? ""
-        : "NO_UNCONTRACTED_GENERIC_SECTION",
+      prunedSectionIds.length > 0 ? "" : "NO_UNCONTRACTED_GENERIC_SECTION",
     specificMetric,
   };
 }
@@ -4000,16 +3717,14 @@ function augmentBusinessTemplateResult({
   const baseSections = Array.isArray(executionResult.sections)
     ? cloneValue(executionResult.sections)
     : [];
-  const preferredTables = selectPreferredSemanticTables(
-    tables,
-    { preferDimensionCompletePhysical: true },
-  );
+  const preferredTables = selectPreferredSemanticTables(tables, {
+    preferDimensionCompletePhysical: true,
+  });
   const plannerContext = {
     ...cloneValue(context),
     templateId:
       executionResult.templateId || templateCandidate.templateId || "",
-    templateTitle:
-      executionResult.title || templateCandidate.title || "",
+    templateTitle: executionResult.title || templateCandidate.title || "",
     templateDescription:
       executionResult.description || templateCandidate.description || "",
   };
@@ -4017,18 +3732,16 @@ function augmentBusinessTemplateResult({
   const plan = buildSemanticOutputPlan({
     tables: preferredTables,
     templateId:
-      executionResult.templateId || templateCandidate.templateId ||
+      executionResult.templateId ||
+      templateCandidate.templateId ||
       "business_template",
-    title:
-      executionResult.title || templateCandidate.title ||
-      "업무 템플릿",
+    title: executionResult.title || templateCandidate.title || "업무 템플릿",
     context: plannerContext,
     options: {
       includeOverview: false,
       includeDiagnostics: false,
       compactTitles: true,
-      maxDimensionsPerSeries:
-        options.maxDimensionsPerSeries ?? 8,
+      maxDimensionsPerSeries: options.maxDimensionsPerSeries ?? 8,
       maxSections: options.maxPlannedSections ?? 120,
       maxSectionsPerTable: options.maxSectionsPerTable ?? 28,
       includeDistinct: options.includeDistinct !== false,
@@ -4040,20 +3753,14 @@ function augmentBusinessTemplateResult({
     (section) =>
       !String(section.sectionType || "").startsWith(
         "semantic_table_overview",
-      ) &&
-      !String(section.sectionType || "").startsWith(
-        "semanticSource",
-      ),
+      ) && !String(section.sectionType || "").startsWith("semanticSource"),
   );
 
   const merged = [...baseSections];
   const renderedPlannerIds = [];
   let matchedExistingSectionCount = 0;
   let addedSectionCount = 0;
-  const maxAddedSections = Math.max(
-    0,
-    Number(options.maxAddedSections ?? 64),
-  );
+  const maxAddedSections = Math.max(0, Number(options.maxAddedSections ?? 64));
 
   for (const planned of plannedSections) {
     const existingIndex = merged.findIndex((section) =>
@@ -4070,12 +3777,8 @@ function augmentBusinessTemplateResult({
       continue;
     }
 
-    const mandatorySummary =
-      isWholeMetricSummarySection(planned);
-    if (
-      addedSectionCount >= maxAddedSections &&
-      !mandatorySummary
-    ) {
+    const mandatorySummary = isWholeMetricSummarySection(planned);
+    if (addedSectionCount >= maxAddedSections && !mandatorySummary) {
       continue;
     }
 
@@ -4104,42 +3807,35 @@ function augmentBusinessTemplateResult({
   }
 
   const actualFlowEvidence = detectActualFlowEvidence(preferredTables);
-  const contractPrecedence =
-    resolveSemanticContractConflicts({
-      sections: merged,
-      plannedSections,
-      baseSectionCount: baseSections.length,
-      actualFlowEvidence,
-    });
+  const contractPrecedence = resolveSemanticContractConflicts({
+    sections: merged,
+    plannedSections,
+    baseSectionCount: baseSections.length,
+    actualFlowEvidence,
+  });
 
-  const genericCleanup =
-    pruneSupersededGenericSections({
-      sections: contractPrecedence.sections,
-      plannedSections,
-      baseSectionCount: Math.max(
-        0,
-        baseSections.length -
-          contractPrecedence.prunedSectionCount,
-      ),
-    });
+  const genericCleanup = pruneSupersededGenericSections({
+    sections: contractPrecedence.sections,
+    plannedSections,
+    baseSectionCount: Math.max(
+      0,
+      baseSections.length - contractPrecedence.prunedSectionCount,
+    ),
+  });
 
-  const contractSnapshotBridge =
-    connectContractKpisToSemanticSnapshots({
-      sections: genericCleanup.sections,
-    });
+  const contractSnapshotBridge = connectContractKpisToSemanticSnapshots({
+    sections: genericCleanup.sections,
+  });
 
-  const flowDirectionSemantics =
-    applyFlowDirectionSemantics({
-      sections: contractSnapshotBridge.sections,
-      tables: preferredTables,
-    });
+  const flowDirectionSemantics = applyFlowDirectionSemantics({
+    sections: contractSnapshotBridge.sections,
+    tables: preferredTables,
+  });
 
   const representativePriority = prioritizeBusinessSections({
     sections: flowDirectionSemantics.sections,
-    primaryMetricLabels:
-      plan.executionMeta?.primaryMetricLabels || [],
-    componentMetricLabels:
-      plan.executionMeta?.componentMetricLabels || [],
+    primaryMetricLabels: plan.executionMeta?.primaryMetricLabels || [],
+    componentMetricLabels: plan.executionMeta?.componentMetricLabels || [],
   });
 
   const mandatorySummaryMetricIds = uniqueMetricIds(
@@ -4151,49 +3847,39 @@ function augmentBusinessTemplateResult({
     renderedPlannerIds,
     mandatorySummaryMetricIds,
   ]);
-  const normalizedBeforeCoverageFloor =
-    normalizeSectionMetricIds(
-      representativePriority.sections,
-    );
-  const mandatorySummaryCoverageFloor =
-    applyMandatorySummaryCoverageFloor({
-      sections: normalizedBeforeCoverageFloor,
-      plannedSections,
-      expectedMetricIds,
-    });
-  const finalOutputQualityGate =
-    applyFinalOutputQualityGate({
-      sections: mandatorySummaryCoverageFloor.sections,
-      expectedMetricIds,
-      sectionBudgetSummaries:
-        plan.executionMeta?.sectionBudgetSummaries || [],
-      throwOnFailure:
-        options.enforceFinalOutputQualityGate !== false,
-    });
-  const normalizedSections =
-    normalizeSectionMetricIds(
-      finalOutputQualityGate.sections,
-    );
+  const normalizedBeforeCoverageFloor = normalizeSectionMetricIds(
+    representativePriority.sections,
+  );
+  const mandatorySummaryCoverageFloor = applyMandatorySummaryCoverageFloor({
+    sections: normalizedBeforeCoverageFloor,
+    plannedSections,
+    expectedMetricIds,
+  });
+  const finalOutputQualityGate = applyFinalOutputQualityGate({
+    sections: mandatorySummaryCoverageFloor.sections,
+    expectedMetricIds,
+    sectionBudgetSummaries: plan.executionMeta?.sectionBudgetSummaries || [],
+    throwOnFailure: options.enforceFinalOutputQualityGate !== false,
+  });
+  const normalizedSections = normalizeSectionMetricIds(
+    finalOutputQualityGate.sections,
+  );
 
   return {
     ...cloneValue(executionResult),
     sections: normalizedSections,
     contractSummaryCoverage: {
       version: `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_business_coverage_v1`,
-      contractCatalogVersion:
-        `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_business_coverage_catalog_v1`,
+      contractCatalogVersion: `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_business_coverage_catalog_v1`,
       expectedMetricIds,
     },
     finalOutputQualityGate: {
       version: FINAL_OUTPUT_QUALITY_GATE_VERSION,
       completenessVersion: OUTPUT_COMPLETENESS_CONTRACT_VERSION,
-      duplicateResolverVersion:
-        SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+      duplicateResolverVersion: SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
       status: finalOutputQualityGate.status,
       pass: finalOutputQualityGate.pass,
-      failureReasons: cloneValue(
-        finalOutputQualityGate.failureReasons || [],
-      ),
+      failureReasons: cloneValue(finalOutputQualityGate.failureReasons || []),
       expectedMetricCount:
         finalOutputQualityGate.analysis?.expectedMetricCount || 0,
       renderedExpectedMetricCount:
@@ -4202,8 +3888,7 @@ function augmentBusinessTemplateResult({
     executionMeta: {
       ...(executionResult.executionMeta || {}),
       semanticBusinessAugmentation: true,
-      semanticOutputPlannerVersion:
-        SEMANTIC_OUTPUT_PLANNER_VERSION,
+      semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
       metricSemanticRoleEngineVersion:
         plan.executionMeta?.metricSemanticRoleEngineVersion ||
         METRIC_SEMANTIC_ROLE_ENGINE_VERSION,
@@ -4212,20 +3897,22 @@ function augmentBusinessTemplateResult({
         AGGREGATION_CONTRACT_RESOLVER_VERSION,
       metricRelationshipPriorityEngineVersion:
         METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
-      derivedTotalRelationVersion:
-        DERIVED_TOTAL_RELATION_VERSION,
+      derivedTotalRelationVersion: DERIVED_TOTAL_RELATION_VERSION,
       representativeMetricPriorityVersion:
         REPRESENTATIVE_METRIC_PRIORITY_VERSION,
-      metricRelationshipCount:
-        Number(plan.executionMeta?.metricRelationshipCount || 0),
-      metricRelationships:
-        cloneValue(plan.executionMeta?.metricRelationships || []),
-      primaryMetricLabels:
-        cloneValue(plan.executionMeta?.primaryMetricLabels || []),
-      componentMetricLabels:
-        cloneValue(plan.executionMeta?.componentMetricLabels || []),
-      representativeMetricPriorityApplied:
-        representativePriority.applied,
+      metricRelationshipCount: Number(
+        plan.executionMeta?.metricRelationshipCount || 0,
+      ),
+      metricRelationships: cloneValue(
+        plan.executionMeta?.metricRelationships || [],
+      ),
+      primaryMetricLabels: cloneValue(
+        plan.executionMeta?.primaryMetricLabels || [],
+      ),
+      componentMetricLabels: cloneValue(
+        plan.executionMeta?.componentMetricLabels || [],
+      ),
+      representativeMetricPriorityApplied: representativePriority.applied,
       representativeMetricReorderedSectionCount:
         representativePriority.reorderedSectionCount,
       semanticSectionBudgetEngineVersion:
@@ -4234,213 +3921,177 @@ function augmentBusinessTemplateResult({
         MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
       mandatorySummaryCoverageFloorApplied:
         mandatorySummaryCoverageFloor.applied,
-      mandatorySummaryCoverageFloorPass:
-        mandatorySummaryCoverageFloor.pass,
-      mandatorySummaryCoverageMissingMetricIdsBefore:
-        cloneValue(
-          mandatorySummaryCoverageFloor.missingMetricIdsBefore,
-        ),
-      mandatorySummaryCoverageMissingMetricIdsAfter:
-        cloneValue(
-          mandatorySummaryCoverageFloor.missingMetricIdsAfter,
-        ),
-      mandatorySummaryCoverageRestoredMetricIds:
-        cloneValue(
-          mandatorySummaryCoverageFloor.restoredMetricIds,
-        ),
-      mandatorySummaryCoverageTransferredMetricIds:
-        cloneValue(
-          mandatorySummaryCoverageFloor.transferredMetricIds,
-        ),
-      mandatorySummaryCoverageRestoredSectionIds:
-        cloneValue(
-          mandatorySummaryCoverageFloor.restoredSectionIds,
-        ),
-      mandatorySummaryCoverageActions:
-        cloneValue(
-          mandatorySummaryCoverageFloor.coverageActions,
-        ),
-      outputCompletenessContractVersion:
-        OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+      mandatorySummaryCoverageFloorPass: mandatorySummaryCoverageFloor.pass,
+      mandatorySummaryCoverageMissingMetricIdsBefore: cloneValue(
+        mandatorySummaryCoverageFloor.missingMetricIdsBefore,
+      ),
+      mandatorySummaryCoverageMissingMetricIdsAfter: cloneValue(
+        mandatorySummaryCoverageFloor.missingMetricIdsAfter,
+      ),
+      mandatorySummaryCoverageRestoredMetricIds: cloneValue(
+        mandatorySummaryCoverageFloor.restoredMetricIds,
+      ),
+      mandatorySummaryCoverageTransferredMetricIds: cloneValue(
+        mandatorySummaryCoverageFloor.transferredMetricIds,
+      ),
+      mandatorySummaryCoverageRestoredSectionIds: cloneValue(
+        mandatorySummaryCoverageFloor.restoredSectionIds,
+      ),
+      mandatorySummaryCoverageActions: cloneValue(
+        mandatorySummaryCoverageFloor.coverageActions,
+      ),
+      outputCompletenessContractVersion: OUTPUT_COMPLETENESS_CONTRACT_VERSION,
       semanticOutputDuplicateResolverVersion:
         SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
-      finalOutputQualityGateVersion:
-        FINAL_OUTPUT_QUALITY_GATE_VERSION,
-      finalOutputQualityGateApplied:
-        finalOutputQualityGate.applied,
-      finalOutputQualityGatePass:
-        finalOutputQualityGate.pass,
-      finalOutputQualityGateStatus:
-        finalOutputQualityGate.status,
+      finalOutputQualityGateVersion: FINAL_OUTPUT_QUALITY_GATE_VERSION,
+      finalOutputQualityGateApplied: finalOutputQualityGate.applied,
+      finalOutputQualityGatePass: finalOutputQualityGate.pass,
+      finalOutputQualityGateStatus: finalOutputQualityGate.status,
       finalOutputQualityGateStrict:
         options.enforceFinalOutputQualityGate !== false,
-      finalOutputQualityGateFailureReasons:
-        cloneValue(finalOutputQualityGate.failureReasons || []),
-      finalOutputQualityGateExpectedMetricCount:
-        Number(finalOutputQualityGate.analysis?.expectedMetricCount || 0),
-      finalOutputQualityGateRenderedExpectedMetricCount:
-        Number(
-          finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
-        ),
-      finalOutputQualityGateMissingMetricIds:
-        cloneValue(finalOutputQualityGate.analysis?.missingMetricIds || []),
-      finalOutputQualityGateDuplicateMetricIds:
-        cloneValue(finalOutputQualityGate.analysis?.duplicateMetricIds || []),
-      finalOutputQualityGateEmptyRequiredSectionIds:
-        cloneValue(
-          finalOutputQualityGate.analysis?.emptyRequiredSectionIds || [],
-        ),
-      finalOutputQualityGateIncompleteRequiredSectionIds:
-        cloneValue(
-          finalOutputQualityGate.analysis?.incompleteRequiredSectionIds || [],
-        ),
-      finalOutputQualityGateInvalidNumberCount:
-        Number(finalOutputQualityGate.analysis?.invalidNumbers?.length || 0),
-      finalOutputQualityGateBudgetViolationCount:
-        Number(
-          finalOutputQualityGate.analysis?.sectionBudgetViolations?.length || 0,
-        ),
-      finalOutputQualityGateInputSectionCount:
-        Number(
-          finalOutputQualityGate.duplicateResolution?.inputSectionCount || 0,
-        ),
-      finalOutputQualityGateOutputSectionCount:
-        Number(finalOutputQualityGate.sections?.length || 0),
-      finalOutputQualityGateRemovedDuplicateSectionCount:
-        Number(
-          finalOutputQualityGate.duplicateResolution
-            ?.removedDuplicateSectionCount || 0,
-        ),
-      finalOutputQualityGateRemovedDuplicateSectionIds:
-        cloneValue(
-          finalOutputQualityGate.duplicateResolution
-            ?.removedDuplicateSectionIds || [],
-        ),
-      finalOutputQualityGateMergedMetricIdCount:
-        Number(
-          finalOutputQualityGate.duplicateResolution
-            ?.mergedMetricIdCount || 0,
-        ),
-      finalOutputQualityGateReassignedMetricIdCount:
-        Number(
-          finalOutputQualityGate.metricOwnership
-            ?.removedOwnershipCount || 0,
-        ),
-      finalOutputQualityGateRenamedSectionIdCount:
-        Number(finalOutputQualityGate.renamedSectionIds?.length || 0),
-      finalOutputQualityGateRenamedTitleCount:
-        Number(finalOutputQualityGate.renamedTitles?.length || 0),
-      durationSummaryContractVersion:
-        DURATION_SUMMARY_CONTRACT_VERSION,
-      distinctEntitySectionVersion:
-        DISTINCT_ENTITY_SECTION_VERSION,
-      sectionBudgetSummaries:
-        cloneValue(plan.executionMeta?.sectionBudgetSummaries || []),
-      semanticMetricRoleCounts:
-        cloneValue(plan.executionMeta?.semanticMetricRoleCounts || {}),
-      semanticAggregationOperationCounts:
-        cloneValue(
-          plan.executionMeta?.semanticAggregationOperationCounts || {},
-        ),
-      unsafeAggregationOverrideCount:
-        Number(plan.executionMeta?.unsafeAggregationOverrideCount || 0),
+      finalOutputQualityGateFailureReasons: cloneValue(
+        finalOutputQualityGate.failureReasons || [],
+      ),
+      finalOutputQualityGateExpectedMetricCount: Number(
+        finalOutputQualityGate.analysis?.expectedMetricCount || 0,
+      ),
+      finalOutputQualityGateRenderedExpectedMetricCount: Number(
+        finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
+      ),
+      finalOutputQualityGateMissingMetricIds: cloneValue(
+        finalOutputQualityGate.analysis?.missingMetricIds || [],
+      ),
+      finalOutputQualityGateDuplicateMetricIds: cloneValue(
+        finalOutputQualityGate.analysis?.duplicateMetricIds || [],
+      ),
+      finalOutputQualityGateEmptyRequiredSectionIds: cloneValue(
+        finalOutputQualityGate.analysis?.emptyRequiredSectionIds || [],
+      ),
+      finalOutputQualityGateIncompleteRequiredSectionIds: cloneValue(
+        finalOutputQualityGate.analysis?.incompleteRequiredSectionIds || [],
+      ),
+      finalOutputQualityGateInvalidNumberCount: Number(
+        finalOutputQualityGate.analysis?.invalidNumbers?.length || 0,
+      ),
+      finalOutputQualityGateBudgetViolationCount: Number(
+        finalOutputQualityGate.analysis?.sectionBudgetViolations?.length || 0,
+      ),
+      finalOutputQualityGateInputSectionCount: Number(
+        finalOutputQualityGate.duplicateResolution?.inputSectionCount || 0,
+      ),
+      finalOutputQualityGateOutputSectionCount: Number(
+        finalOutputQualityGate.sections?.length || 0,
+      ),
+      finalOutputQualityGateRemovedDuplicateSectionCount: Number(
+        finalOutputQualityGate.duplicateResolution
+          ?.removedDuplicateSectionCount || 0,
+      ),
+      finalOutputQualityGateRemovedDuplicateSectionIds: cloneValue(
+        finalOutputQualityGate.duplicateResolution
+          ?.removedDuplicateSectionIds || [],
+      ),
+      finalOutputQualityGateMergedMetricIdCount: Number(
+        finalOutputQualityGate.duplicateResolution?.mergedMetricIdCount || 0,
+      ),
+      finalOutputQualityGateReassignedMetricIdCount: Number(
+        finalOutputQualityGate.metricOwnership?.removedOwnershipCount || 0,
+      ),
+      finalOutputQualityGateRenamedSectionIdCount: Number(
+        finalOutputQualityGate.renamedSectionIds?.length || 0,
+      ),
+      finalOutputQualityGateRenamedTitleCount: Number(
+        finalOutputQualityGate.renamedTitles?.length || 0,
+      ),
+      durationSummaryContractVersion: DURATION_SUMMARY_CONTRACT_VERSION,
+      distinctEntitySectionVersion: DISTINCT_ENTITY_SECTION_VERSION,
+      sectionBudgetSummaries: cloneValue(
+        plan.executionMeta?.sectionBudgetSummaries || [],
+      ),
+      semanticMetricRoleCounts: cloneValue(
+        plan.executionMeta?.semanticMetricRoleCounts || {},
+      ),
+      semanticAggregationOperationCounts: cloneValue(
+        plan.executionMeta?.semanticAggregationOperationCounts || {},
+      ),
+      unsafeAggregationOverrideCount: Number(
+        plan.executionMeta?.unsafeAggregationOverrideCount || 0,
+      ),
       snapshotEntityResolverVersion:
         plan.executionMeta?.snapshotEntityResolverVersion ||
         SNAPSHOT_ENTITY_RESOLVER_VERSION,
-      snapshotEntitySeriesCount:
-        Number(plan.executionMeta?.snapshotEntitySeriesCount || 0),
-      snapshotEntityAppliedSeriesCount:
-        Number(plan.executionMeta?.snapshotEntityAppliedSeriesCount || 0),
-      snapshotEntitySelections:
-        cloneValue(plan.executionMeta?.snapshotEntitySelections || []),
+      snapshotEntitySeriesCount: Number(
+        plan.executionMeta?.snapshotEntitySeriesCount || 0,
+      ),
+      snapshotEntityAppliedSeriesCount: Number(
+        plan.executionMeta?.snapshotEntityAppliedSeriesCount || 0,
+      ),
+      snapshotEntitySelections: cloneValue(
+        plan.executionMeta?.snapshotEntitySelections || [],
+      ),
       flowDirectionSemanticEngineVersion:
         FLOW_DIRECTION_SEMANTIC_ENGINE_VERSION,
-      flowDirectionSectionRepairVersion:
-        FLOW_DIRECTION_SECTION_REPAIR_VERSION,
-      flowDirectionApplied:
-        flowDirectionSemantics.applied,
-      flowDirectionReason:
-        flowDirectionSemantics.reason,
-      flowDirectionEvidence:
-        cloneValue(flowDirectionSemantics.evidence || {}),
-      flowDirectionSystemSummary:
-        cloneValue(flowDirectionSemantics.systemSummary || {}),
-      flowDirectionRepairedSectionCount:
-        Number(flowDirectionSemantics.repairedSectionCount || 0),
-      flowDirectionRepairedSectionIds:
-        cloneValue(flowDirectionSemantics.repairedSectionIds || []),
-      flowDirectionScopes:
-        cloneValue(flowDirectionSemantics.scopes || []),
+      flowDirectionSectionRepairVersion: FLOW_DIRECTION_SECTION_REPAIR_VERSION,
+      flowDirectionApplied: flowDirectionSemantics.applied,
+      flowDirectionReason: flowDirectionSemantics.reason,
+      flowDirectionEvidence: cloneValue(flowDirectionSemantics.evidence || {}),
+      flowDirectionSystemSummary: cloneValue(
+        flowDirectionSemantics.systemSummary || {},
+      ),
+      flowDirectionRepairedSectionCount: Number(
+        flowDirectionSemantics.repairedSectionCount || 0,
+      ),
+      flowDirectionRepairedSectionIds: cloneValue(
+        flowDirectionSemantics.repairedSectionIds || [],
+      ),
+      flowDirectionScopes: cloneValue(flowDirectionSemantics.scopes || []),
       flowDirectionDualEntryApplied:
         flowDirectionSemantics.dualEntryApplied === true,
-      flowDirectionLocationEntryCount:
-        Number(flowDirectionSemantics.locationEntryCount || 0),
-      semanticContractPrecedenceVersion:
-        SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
-      semanticContractPrecedenceApplied:
-        contractPrecedence.applied,
-      prunedLegacyConflictCount:
-        contractPrecedence.prunedSectionCount,
-      prunedLegacyConflictSectionIds:
-        contractPrecedence.prunedSectionIds,
+      flowDirectionLocationEntryCount: Number(
+        flowDirectionSemantics.locationEntryCount || 0,
+      ),
+      semanticContractPrecedenceVersion: SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
+      semanticContractPrecedenceApplied: contractPrecedence.applied,
+      prunedLegacyConflictCount: contractPrecedence.prunedSectionCount,
+      prunedLegacyConflictSectionIds: contractPrecedence.prunedSectionIds,
       transferredLegacyMetricIdCount:
         contractPrecedence.transferredMetricIdCount,
-      semanticContractConflicts:
-        cloneValue(contractPrecedence.conflicts),
-      actualFlowEvidenceGateVersion:
-        ACTUAL_FLOW_EVIDENCE_GATE_VERSION,
-      actualFlowEvidencePass:
-        actualFlowEvidence.pass,
-      actualFlowEvidenceMode:
-        actualFlowEvidence.mode,
-      actualFlowEvidence:
-        cloneValue(actualFlowEvidence),
+      semanticContractConflicts: cloneValue(contractPrecedence.conflicts),
+      actualFlowEvidenceGateVersion: ACTUAL_FLOW_EVIDENCE_GATE_VERSION,
+      actualFlowEvidencePass: actualFlowEvidence.pass,
+      actualFlowEvidenceMode: actualFlowEvidence.mode,
+      actualFlowEvidence: cloneValue(actualFlowEvidence),
       blockedMixedFlowSectionCount:
         contractPrecedence.blockedMixedFlowSectionCount,
-      blockedMixedFlowSectionIds:
-        contractPrecedence.blockedMixedFlowSectionIds,
-      blockedMixedFlowSections:
-        cloneValue(contractPrecedence.blockedMixedFlowSections),
-      mixedSectionRowPrecedenceVersion:
-        MIXED_SECTION_ROW_PRECEDENCE_VERSION,
-      generalStockSnapshotAliasVersion:
-        GENERAL_STOCK_SNAPSHOT_ALIAS_VERSION,
+      blockedMixedFlowSectionIds: contractPrecedence.blockedMixedFlowSectionIds,
+      blockedMixedFlowSections: cloneValue(
+        contractPrecedence.blockedMixedFlowSections,
+      ),
+      mixedSectionRowPrecedenceVersion: MIXED_SECTION_ROW_PRECEDENCE_VERSION,
+      generalStockSnapshotAliasVersion: GENERAL_STOCK_SNAPSHOT_ALIAS_VERSION,
       mixedSectionRowPrecedenceApplied:
         contractPrecedence.mixedSectionRowPrecedenceApplied,
-      repairedMixedSectionCount:
-        contractPrecedence.repairedMixedSectionCount,
-      replacedMixedRowCount:
-        contractPrecedence.replacedMixedRowCount,
-      mixedRowRepairs:
-        cloneValue(contractPrecedence.mixedRowRepairs),
-      contractKpiSnapshotBridgeVersion:
-        CONTRACT_KPI_SNAPSHOT_BRIDGE_VERSION,
-      contractKpiSnapshotBridgeApplied:
-        contractSnapshotBridge.applied,
+      repairedMixedSectionCount: contractPrecedence.repairedMixedSectionCount,
+      replacedMixedRowCount: contractPrecedence.replacedMixedRowCount,
+      mixedRowRepairs: cloneValue(contractPrecedence.mixedRowRepairs),
+      contractKpiSnapshotBridgeVersion: CONTRACT_KPI_SNAPSHOT_BRIDGE_VERSION,
+      contractKpiSnapshotBridgeApplied: contractSnapshotBridge.applied,
       contractKpiSnapshotUpdatedSectionCount:
         contractSnapshotBridge.updatedSectionCount,
       contractKpiSnapshotUpdatedRowCount:
         contractSnapshotBridge.updatedRowCount,
-      contractKpiSnapshotUpdates:
-        cloneValue(contractSnapshotBridge.updates),
+      contractKpiSnapshotUpdates: cloneValue(contractSnapshotBridge.updates),
       preferredTableCount: preferredTables.length,
       plannedSectionCount: plannedSections.length,
       matchedExistingSectionCount,
       addedSectionCount,
       expectedMetricIdCount: expectedMetricIds.length,
       maxAddedSections,
-      genericSectionCleanupVersion:
-        GENERIC_SECTION_CLEANUP_VERSION,
-      genericSectionCleanupApplied:
-        genericCleanup.cleanupApplied,
-      prunedGenericSectionCount:
-        genericCleanup.prunedSectionCount,
-      prunedGenericSectionIds:
-        genericCleanup.prunedSectionIds,
-      genericSectionCleanupReason:
-        genericCleanup.reason,
-      genericSectionCleanupMetric:
-        genericCleanup.specificMetric || "",
+      genericSectionCleanupVersion: GENERIC_SECTION_CLEANUP_VERSION,
+      genericSectionCleanupApplied: genericCleanup.cleanupApplied,
+      prunedGenericSectionCount: genericCleanup.prunedSectionCount,
+      prunedGenericSectionIds: genericCleanup.prunedSectionIds,
+      genericSectionCleanupReason: genericCleanup.reason,
+      genericSectionCleanupMetric: genericCleanup.specificMetric || "",
       sourceTablesPreserved: true,
     },
   };
@@ -4453,9 +4104,7 @@ function diagnosticSections(tables = [], plans = []) {
 
   tables.forEach((table, tableIndex) => {
     const label = tableLabel(table, tableIndex);
-    const summary = Array.isArray(table.summaryRows)
-      ? table.summaryRows
-      : [];
+    const summary = Array.isArray(table.summaryRows) ? table.summaryRows : [];
     const excluded = Array.isArray(table.excludedRows)
       ? table.excludedRows
       : [];
@@ -4551,9 +4200,7 @@ function semanticRoleSummary(plans = []) {
       const operation = normalizeText(series.operation || "sum");
       roleCounts[role] = (roleCounts[role] || 0) + 1;
       operationCounts[operation] = (operationCounts[operation] || 0) + 1;
-      if (
-        series.aggregationContract?.unsafeDeclaredAggregationOverridden
-      ) {
+      if (series.aggregationContract?.unsafeDeclaredAggregationOverridden) {
         unsafeAggregationOverrideCount += 1;
       }
     }
@@ -4632,9 +4279,7 @@ function buildSemanticOutputPlan({
     const plan = plans[tableIndex];
     const tableSections = [];
     if (options.includeOverview !== false) {
-      tableSections.push(
-        overviewSection(table, tableIndex, plan.contract),
-      );
+      tableSections.push(overviewSection(table, tableIndex, plan.contract));
     }
     if (options.includeDistinct !== false) {
       const distinctSection = buildDistinctEntitySection({
@@ -4645,9 +4290,7 @@ function buildSemanticOutputPlan({
       if (distinctSection) tableSections.push(distinctSection);
     }
     plan.series.forEach((series) => {
-      tableSections.push(
-        ...seriesSections(table, tableIndex, series, options),
-      );
+      tableSections.push(...seriesSections(table, tableIndex, series, options));
     });
     const budget = applySemanticSectionBudget({
       sections: tableSections,
@@ -4682,18 +4325,14 @@ function buildSemanticOutputPlan({
     dedupeSections(limitedSections),
   );
   const expectedMetricIds = uniqueMetricIds(
-    preliminarySections.flatMap((section) =>
-      collectSectionMetricIds(section),
-    ),
+    preliminarySections.flatMap((section) => collectSectionMetricIds(section)),
   );
-  const finalOutputQualityGate =
-    applyFinalOutputQualityGate({
-      sections: preliminarySections,
-      expectedMetricIds,
-      sectionBudgetSummaries,
-      throwOnFailure:
-        options.enforceFinalOutputQualityGate !== false,
-    });
+  const finalOutputQualityGate = applyFinalOutputQualityGate({
+    sections: preliminarySections,
+    expectedMetricIds,
+    sectionBudgetSummaries,
+    throwOnFailure: options.enforceFinalOutputQualityGate !== false,
+  });
   const finalSections = normalizeSectionMetricIds(
     finalOutputQualityGate.sections,
   );
@@ -4705,21 +4344,24 @@ function buildSemanticOutputPlan({
     (plan) => plan.contract?.type === "physical_wide",
   ).length;
   const metricSemanticSummary = semanticRoleSummary(plans);
-  const snapshotEntitySummary =
-    snapshotEntityResolutionSummary(plans);
-  const metricRelationships = relationshipAnalyses.flatMap(
-    (analysis) => cloneValue(analysis.relations || []),
+  const snapshotEntitySummary = snapshotEntityResolutionSummary(plans);
+  const metricRelationships = relationshipAnalyses.flatMap((analysis) =>
+    cloneValue(analysis.relations || []),
   );
-  const primaryMetricLabels = Array.from(new Set(
-    relationshipAnalyses.flatMap(
-      (analysis) => analysis.primaryMetricLabels || [],
+  const primaryMetricLabels = Array.from(
+    new Set(
+      relationshipAnalyses.flatMap(
+        (analysis) => analysis.primaryMetricLabels || [],
+      ),
     ),
-  ));
-  const componentMetricLabels = Array.from(new Set(
-    relationshipAnalyses.flatMap(
-      (analysis) => analysis.componentMetricLabels || [],
+  );
+  const componentMetricLabels = Array.from(
+    new Set(
+      relationshipAnalyses.flatMap(
+        (analysis) => analysis.componentMetricLabels || [],
+      ),
     ),
-  ));
+  );
 
   return {
     ok: true,
@@ -4730,20 +4372,16 @@ function buildSemanticOutputPlan({
     sections: finalSections,
     contractSummaryCoverage: {
       version: SEMANTIC_OUTPUT_CONTRACT_VERSION,
-      contractCatalogVersion:
-        `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_catalog`,
+      contractCatalogVersion: `${SEMANTIC_OUTPUT_CONTRACT_VERSION}_catalog`,
       expectedMetricIds,
     },
     finalOutputQualityGate: {
       version: FINAL_OUTPUT_QUALITY_GATE_VERSION,
       completenessVersion: OUTPUT_COMPLETENESS_CONTRACT_VERSION,
-      duplicateResolverVersion:
-        SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
+      duplicateResolverVersion: SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
       status: finalOutputQualityGate.status,
       pass: finalOutputQualityGate.pass,
-      failureReasons: cloneValue(
-        finalOutputQualityGate.failureReasons || [],
-      ),
+      failureReasons: cloneValue(finalOutputQualityGate.failureReasons || []),
       expectedMetricCount:
         finalOutputQualityGate.analysis?.expectedMetricCount || 0,
       renderedExpectedMetricCount:
@@ -4753,16 +4391,12 @@ function buildSemanticOutputPlan({
       sourceDataOnly: false,
       genericSummary: true,
       patchVersion,
-      semanticOutputPlannerVersion:
-        SEMANTIC_OUTPUT_PLANNER_VERSION,
-      metricSemanticRoleEngineVersion:
-        METRIC_SEMANTIC_ROLE_ENGINE_VERSION,
-      aggregationContractResolverVersion:
-        AGGREGATION_CONTRACT_RESOLVER_VERSION,
+      semanticOutputPlannerVersion: SEMANTIC_OUTPUT_PLANNER_VERSION,
+      metricSemanticRoleEngineVersion: METRIC_SEMANTIC_ROLE_ENGINE_VERSION,
+      aggregationContractResolverVersion: AGGREGATION_CONTRACT_RESOLVER_VERSION,
       metricRelationshipPriorityEngineVersion:
         METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION,
-      derivedTotalRelationVersion:
-        DERIVED_TOTAL_RELATION_VERSION,
+      derivedTotalRelationVersion: DERIVED_TOTAL_RELATION_VERSION,
       representativeMetricPriorityVersion:
         REPRESENTATIVE_METRIC_PRIORITY_VERSION,
       metricRelationshipCount: metricRelationships.length,
@@ -4773,67 +4407,57 @@ function buildSemanticOutputPlan({
         SEMANTIC_SECTION_BUDGET_ENGINE_VERSION,
       mandatorySummaryCoverageFloorVersion:
         MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION,
-      outputCompletenessContractVersion:
-        OUTPUT_COMPLETENESS_CONTRACT_VERSION,
+      outputCompletenessContractVersion: OUTPUT_COMPLETENESS_CONTRACT_VERSION,
       semanticOutputDuplicateResolverVersion:
         SEMANTIC_OUTPUT_DUPLICATE_RESOLVER_VERSION,
-      finalOutputQualityGateVersion:
-        FINAL_OUTPUT_QUALITY_GATE_VERSION,
-      finalOutputQualityGateApplied:
-        finalOutputQualityGate.applied,
-      finalOutputQualityGatePass:
-        finalOutputQualityGate.pass,
-      finalOutputQualityGateStatus:
-        finalOutputQualityGate.status,
+      finalOutputQualityGateVersion: FINAL_OUTPUT_QUALITY_GATE_VERSION,
+      finalOutputQualityGateApplied: finalOutputQualityGate.applied,
+      finalOutputQualityGatePass: finalOutputQualityGate.pass,
+      finalOutputQualityGateStatus: finalOutputQualityGate.status,
       finalOutputQualityGateStrict:
         options.enforceFinalOutputQualityGate !== false,
-      finalOutputQualityGateFailureReasons:
-        cloneValue(finalOutputQualityGate.failureReasons || []),
-      finalOutputQualityGateExpectedMetricCount:
-        Number(finalOutputQualityGate.analysis?.expectedMetricCount || 0),
-      finalOutputQualityGateRenderedExpectedMetricCount:
-        Number(
-          finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
-        ),
-      finalOutputQualityGateMissingMetricIds:
-        cloneValue(finalOutputQualityGate.analysis?.missingMetricIds || []),
-      finalOutputQualityGateDuplicateMetricIds:
-        cloneValue(finalOutputQualityGate.analysis?.duplicateMetricIds || []),
-      finalOutputQualityGateRemovedDuplicateSectionCount:
-        Number(
-          finalOutputQualityGate.duplicateResolution
-            ?.removedDuplicateSectionCount || 0,
-        ),
-      finalOutputQualityGateRemovedDuplicateSectionIds:
-        cloneValue(
-          finalOutputQualityGate.duplicateResolution
-            ?.removedDuplicateSectionIds || [],
-        ),
-      finalOutputQualityGateRenamedSectionIdCount:
-        Number(finalOutputQualityGate.renamedSectionIds?.length || 0),
-      finalOutputQualityGateRenamedTitleCount:
-        Number(finalOutputQualityGate.renamedTitles?.length || 0),
-      durationSummaryContractVersion:
-        DURATION_SUMMARY_CONTRACT_VERSION,
-      distinctEntitySectionVersion:
-        DISTINCT_ENTITY_SECTION_VERSION,
+      finalOutputQualityGateFailureReasons: cloneValue(
+        finalOutputQualityGate.failureReasons || [],
+      ),
+      finalOutputQualityGateExpectedMetricCount: Number(
+        finalOutputQualityGate.analysis?.expectedMetricCount || 0,
+      ),
+      finalOutputQualityGateRenderedExpectedMetricCount: Number(
+        finalOutputQualityGate.analysis?.renderedExpectedMetricCount || 0,
+      ),
+      finalOutputQualityGateMissingMetricIds: cloneValue(
+        finalOutputQualityGate.analysis?.missingMetricIds || [],
+      ),
+      finalOutputQualityGateDuplicateMetricIds: cloneValue(
+        finalOutputQualityGate.analysis?.duplicateMetricIds || [],
+      ),
+      finalOutputQualityGateRemovedDuplicateSectionCount: Number(
+        finalOutputQualityGate.duplicateResolution
+          ?.removedDuplicateSectionCount || 0,
+      ),
+      finalOutputQualityGateRemovedDuplicateSectionIds: cloneValue(
+        finalOutputQualityGate.duplicateResolution
+          ?.removedDuplicateSectionIds || [],
+      ),
+      finalOutputQualityGateRenamedSectionIdCount: Number(
+        finalOutputQualityGate.renamedSectionIds?.length || 0,
+      ),
+      finalOutputQualityGateRenamedTitleCount: Number(
+        finalOutputQualityGate.renamedTitles?.length || 0,
+      ),
+      durationSummaryContractVersion: DURATION_SUMMARY_CONTRACT_VERSION,
+      distinctEntitySectionVersion: DISTINCT_ENTITY_SECTION_VERSION,
       sectionBudgetSummaries: cloneValue(sectionBudgetSummaries),
-      semanticContractPrecedenceVersion:
-        SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
-      semanticMetricRoleCounts:
-        metricSemanticSummary.roleCounts,
-      semanticAggregationOperationCounts:
-        metricSemanticSummary.operationCounts,
+      semanticContractPrecedenceVersion: SEMANTIC_CONTRACT_PRECEDENCE_VERSION,
+      semanticMetricRoleCounts: metricSemanticSummary.roleCounts,
+      semanticAggregationOperationCounts: metricSemanticSummary.operationCounts,
       unsafeAggregationOverrideCount:
         metricSemanticSummary.unsafeAggregationOverrideCount,
-      snapshotEntityResolverVersion:
-        SNAPSHOT_ENTITY_RESOLVER_VERSION,
-      snapshotEntitySeriesCount:
-        snapshotEntitySummary.snapshotSeriesCount,
+      snapshotEntityResolverVersion: SNAPSHOT_ENTITY_RESOLVER_VERSION,
+      snapshotEntitySeriesCount: snapshotEntitySummary.snapshotSeriesCount,
       snapshotEntityAppliedSeriesCount:
         snapshotEntitySummary.appliedSeriesCount,
-      snapshotEntitySelections:
-        cloneValue(snapshotEntitySummary.selections),
+      snapshotEntitySelections: cloneValue(snapshotEntitySummary.selections),
       valueColumnOnlyForCanonicalLong: true,
       protectedTemporalColumns: true,
       metricIdentitySeparated: true,
@@ -4846,14 +4470,10 @@ function buildSemanticOutputPlan({
       metricIdContractVersion: METRIC_ID_CONTRACT_VERSION,
       canonicalLongTableCount,
       physicalWideTableCount,
-      plannedTableCount: plans.filter(
-        (plan) => plan.series.length > 0,
-      ).length,
+      plannedTableCount: plans.filter((plan) => plan.series.length > 0).length,
       context: cloneValue(context),
       compactTitles: options.compactTitles === true,
-      maxDimensionsPerSeries: Number(
-        options.maxDimensionsPerSeries ?? 3,
-      ),
+      maxDimensionsPerSeries: Number(options.maxDimensionsPerSeries ?? 3),
       maxSectionsPerTable: Number(options.maxSectionsPerTable ?? 28),
       includeDistinct: options.includeDistinct !== false,
       preferVirtualTables: options.preferVirtualTables === true,

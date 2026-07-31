@@ -1,5 +1,3 @@
-"use strict";
-
 const FLOW_DIRECTION_SEMANTIC_ENGINE_VERSION =
   "flow_direction_semantic_engine_v1";
 const FLOW_DIRECTION_SECTION_REPAIR_VERSION =
@@ -112,7 +110,9 @@ function canonicalFlowDirection(value = "") {
   if (/^(?:출고|출하|반출|outbound|shipment|shipped)$/.test(key)) {
     return "outbound";
   }
-  if (/^(?:이동|내부이동|재고이동|창고이동|이관|transfer|movement)$/.test(key)) {
+  if (
+    /^(?:이동|내부이동|재고이동|창고이동|이관|transfer|movement)$/.test(key)
+  ) {
     return "transfer";
   }
   return "";
@@ -177,7 +177,12 @@ function resolveDirectionalTable(table = {}, tableIndex = 0) {
           unknownDirectionRowCount += 1;
           continue;
         }
-        records.push({ row, rowIndex, direction: canonical, quantity: numeric });
+        records.push({
+          row,
+          rowIndex,
+          direction: canonical,
+          quantity: numeric,
+        });
       }
 
       const classes = new Set(records.map((record) => record.direction));
@@ -223,7 +228,8 @@ function resolveDirectionalTable(table = {}, tableIndex = 0) {
     .filter((fact) => ENTITY_HEADER_PATTERN.test(fact.header))
     .map((fact) => ({
       ...fact,
-      distinctCount: distinctValuesForColumn(table, fact.column, fact.index).size,
+      distinctCount: distinctValuesForColumn(table, fact.column, fact.index)
+        .size,
     }))
     .sort((left, right) => right.distinctCount - left.distinctCount);
   const entity = entityCandidates[0] || null;
@@ -276,14 +282,16 @@ function resolveDirectionalTable(table = {}, tableIndex = 0) {
 }
 
 function resolveFlowDirectionEvidence(tables = []) {
-  const candidates = (Array.isArray(tables) ? tables : [])
-    .map((table, tableIndex) => resolveDirectionalTable(table, tableIndex));
+  const candidates = (Array.isArray(tables) ? tables : []).map(
+    (table, tableIndex) => resolveDirectionalTable(table, tableIndex),
+  );
   const applied = candidates
     .filter((candidate) => candidate.applied)
-    .sort((left, right) =>
-      Number(right.dualEntryAvailable) - Number(left.dualEntryAvailable) ||
-      right.recognizedDirectionRowCount - left.recognizedDirectionRowCount ||
-      right.directionClasses.length - left.directionClasses.length,
+    .sort(
+      (left, right) =>
+        Number(right.dualEntryAvailable) - Number(left.dualEntryAvailable) ||
+        right.recognizedDirectionRowCount - left.recognizedDirectionRowCount ||
+        right.directionClasses.length - left.directionClasses.length,
     )[0];
 
   if (!applied) {
@@ -311,8 +319,7 @@ function resolveFlowDirectionEvidence(tables = []) {
       directionHeader: candidate.directionHeader || "",
       quantityHeader: candidate.quantityHeader || "",
       directionClasses: candidate.directionClasses || [],
-      recognizedDirectionRowCount:
-        candidate.recognizedDirectionRowCount || 0,
+      recognizedDirectionRowCount: candidate.recognizedDirectionRowCount || 0,
     })),
   };
 }
@@ -398,14 +405,22 @@ function buildGroupedFlowRows(records = [], groupHeader = "구분", keySelector)
       };
     })
     .sort((left, right) =>
-      String(left[groupHeader]).localeCompare(String(right[groupHeader]), "ko", {
-        numeric: true,
-      }),
+      String(left[groupHeader]).localeCompare(
+        String(right[groupHeader]),
+        "ko",
+        {
+          numeric: true,
+        },
+      ),
     );
 }
 
 function buildPeriodFlowRows(records = []) {
-  return buildGroupedFlowRows(records, "기간", (record) => record.period || "미분류");
+  return buildGroupedFlowRows(
+    records,
+    "기간",
+    (record) => record.period || "미분류",
+  );
 }
 
 function buildEntityFlowRows(records = [], entityHeader = "항목") {
@@ -489,9 +504,11 @@ function rowKeySet(row = {}) {
 }
 
 function firstRow(section = {}) {
-  return sectionRows(section).find(
-    (row) => row && typeof row === "object" && !Array.isArray(row),
-  ) || null;
+  return (
+    sectionRows(section).find(
+      (row) => row && typeof row === "object" && !Array.isArray(row),
+    ) || null
+  );
 }
 
 function sectionText(section = {}) {
@@ -587,8 +604,7 @@ function setSectionRows(section = {}, rows = [], patch = {}) {
       ...(next.result?.meta || {}),
       flowDirectionSemanticEngineVersion:
         FLOW_DIRECTION_SEMANTIC_ENGINE_VERSION,
-      flowDirectionSectionRepairVersion:
-        FLOW_DIRECTION_SECTION_REPAIR_VERSION,
+      flowDirectionSectionRepairVersion: FLOW_DIRECTION_SECTION_REPAIR_VERSION,
       flowDirectionScope: patch.scope || "",
       flowDirectionRepairApplied: true,
       internalTransferNetEffect: 0,
@@ -608,7 +624,12 @@ function buildSystemOverviewRows(summary = {}) {
   const total = summary.totalHandledQuantity || 0;
   const percent = (value) => (total ? (value / total) * 100 : null);
   return [
-    { 지표: "전체 행 수", 값: summary.rowCount, 보조값: null, 비율Percent: null },
+    {
+      지표: "전체 행 수",
+      값: summary.rowCount,
+      보조값: null,
+      비율Percent: null,
+    },
     {
       지표: "입고 수량",
       값: summary.inboundQuantity,
@@ -730,7 +751,11 @@ function applyFlowDirectionSemantics({ sections = [], tables = [] } = {}) {
 
     if (!next) return cloneValue(section);
     repairedSectionIds.push(
-      normalizeText(section.sectionId || section.title || `section_${repairedSectionIds.length + 1}`),
+      normalizeText(
+        section.sectionId ||
+          section.title ||
+          `section_${repairedSectionIds.length + 1}`,
+      ),
     );
     scopes.push(scope);
     return next;

@@ -1,9 +1,5 @@
 const { REASONS } = require("./reasonClassifier");
 
-/**
- * reason별 "우선 수정 액션" 가이드(관리자 요약에 포함)
- * - 5-B 핵심: 무엇부터 고칠지 자동으로 보이게
- */
 const RECOMMENDATIONS = {
   [REASONS.MISSING_INPUT]: {
     title: "입력 검증 강화",

@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   findColumnHeader,
   makeTemplateCandidate,
@@ -15,8 +13,7 @@ const STATUS_COLUMN_SELECTION_VERSION =
   "status_column_selection_v2_semantic_evidence";
 const STATUS_CLASSIFICATION_VERSION =
   "canonical_business_status_v2_1_exact_progress";
-const STATUS_RATIO_CONTRACT_VERSION =
-  "status_ratio_denominator_v2_all_rows";
+const STATUS_RATIO_CONTRACT_VERSION = "status_ratio_denominator_v2_all_rows";
 const STATUS_OVERVIEW_COMPATIBILITY_VERSION =
   "status_overview_compatibility_v1_legacy_pending_rollup";
 const LEGACY_PENDING_ROLLUP_CLASSES = Object.freeze([
@@ -334,9 +331,7 @@ function classifyStatus(value = "", context = {}) {
       "waiting",
       "active",
     ]) ||
-    /(?:업무|처리|배송|검수|발주|조치|진행|참여|심사|검토|접수)중$/.test(
-      text,
-    )
+    /(?:업무|처리|배송|검수|발주|조치|진행|참여|심사|검토|접수)중$/.test(text)
   ) {
     return "pending";
   }
@@ -427,11 +422,7 @@ function tableHeaders(table = {}) {
 }
 
 function statusContextText(config = {}) {
-  return [
-    config.templateId,
-    config.title,
-    config.description,
-  ]
+  return [config.templateId, config.title, config.description]
     .map(normalizeText)
     .filter(Boolean)
     .join(" ");
@@ -544,10 +535,9 @@ function scoreStatusHeader({
 }
 
 function selectStatusHeader(table = {}, config = {}) {
-  const hints = [
-    ...(config.hints?.status || []),
-    ...DEFAULT_STATUS_HINTS,
-  ].map(normalizeText);
+  const hints = [...(config.hints?.status || []), ...DEFAULT_STATUS_HINTS].map(
+    normalizeText,
+  );
 
   const hintIndexByKey = new Map();
   hints.forEach((hint, index) => {
@@ -572,8 +562,7 @@ function selectStatusHeader(table = {}, config = {}) {
     .sort(
       (left, right) =>
         right.score - left.score ||
-        right.evidence.recognizedRatio -
-          left.evidence.recognizedRatio ||
+        right.evidence.recognizedRatio - left.evidence.recognizedRatio ||
         left.header.localeCompare(right.header, "ko"),
     );
 
@@ -710,14 +699,12 @@ function buildStatusCounts(rows = [], statusHeader = "") {
   const classCounts = emptyClassCounts();
 
   rows.forEach((row) => {
-    const rawStatus =
-      normalizeText(getRowValue(row, statusHeader)) || "미입력";
+    const rawStatus = normalizeText(getRowValue(row, statusHeader)) || "미입력";
     const normalizedClass = classifyStatus(rawStatus, {
       statusHeader,
     });
 
-    classCounts[normalizedClass] =
-      (classCounts[normalizedClass] || 0) + 1;
+    classCounts[normalizedClass] = (classCounts[normalizedClass] || 0) + 1;
 
     if (!statusMap.has(rawStatus)) {
       statusMap.set(rawStatus, {
@@ -757,20 +744,13 @@ function buildStatusCounts(rows = [], statusHeader = "") {
     classifiedTotal,
     classCounts,
     statusRows,
-    ratioSum: statusRows.reduce(
-      (sum, row) => sum + Number(row.비율 || 0),
-      0,
-    ),
+    ratioSum: statusRows.reduce((sum, row) => sum + Number(row.비율 || 0), 0),
   };
 }
 
-function legacyPendingRollupCount(
-  classCounts = {},
-) {
+function legacyPendingRollupCount(classCounts = {}) {
   return LEGACY_PENDING_ROLLUP_CLASSES.reduce(
-    (sum, statusClass) =>
-      sum +
-      Number(classCounts[statusClass] || 0),
+    (sum, statusClass) => sum + Number(classCounts[statusClass] || 0),
     0,
   );
 }
@@ -805,30 +785,14 @@ function buildStatusOverviewRows({
   config = {},
 } = {}) {
   const labelOverrides = {
-    completed:
-      config.labels?.completed ||
-      "완료·승인 건수",
-    pending:
-      config.labels?.pending ||
-      "진행·대기 건수",
-    incomplete:
-      config.labels?.incomplete ||
-      "미완료 건수",
-    cancelled:
-      config.labels?.cancelled ||
-      "취소·반려 건수",
-    delayed:
-      config.labels?.delayed ||
-      "지연 건수",
-    terminated:
-      config.labels?.terminated ||
-      "종료·중단 건수",
-    other:
-      config.labels?.other ||
-      "기타 건수",
-    unknown:
-      config.labels?.unknown ||
-      "미입력 건수",
+    completed: config.labels?.completed || "완료·승인 건수",
+    pending: config.labels?.pending || "진행·대기 건수",
+    incomplete: config.labels?.incomplete || "미완료 건수",
+    cancelled: config.labels?.cancelled || "취소·반려 건수",
+    delayed: config.labels?.delayed || "지연 건수",
+    terminated: config.labels?.terminated || "종료·중단 건수",
+    other: config.labels?.other || "기타 건수",
+    unknown: config.labels?.unknown || "미입력 건수",
   };
 
   const rows = [
@@ -841,54 +805,41 @@ function buildStatusOverviewRows({
     }),
   ];
 
-  CANONICAL_STATUS_ORDER.forEach(
-    (statusClass) => {
-      const canonicalCount = Number(
-        classCounts[statusClass] || 0,
-      );
+  CANONICAL_STATUS_ORDER.forEach((statusClass) => {
+    const canonicalCount = Number(classCounts[statusClass] || 0);
 
-      /*
-       * 성공 기준선의 '진행·대기 건수'는 과거의 넓은
-       * 미완료 처리 묶음이다. 세분화된 canonical 상태를
-       * 유지하면서 overview KPI에서만 다음을 합산한다.
-       *
-       * pending + incomplete + delayed
-       */
-      const count =
-        statusClass === "pending"
-          ? legacyPendingRollupCount(
-              classCounts,
-            )
-          : canonicalCount;
+    /*
+     * 성공 기준선의 '진행·대기 건수'는 과거의 넓은
+     * 미완료 처리 묶음이다. 세분화된 canonical 상태를
+     * 유지하면서 overview KPI에서만 다음을 합산한다.
+     *
+     * pending + incomplete + delayed
+     */
+    const count =
+      statusClass === "pending"
+        ? legacyPendingRollupCount(classCounts)
+        : canonicalCount;
 
-      if (count <= 0) return;
+    if (count <= 0) return;
 
-      rows.push(
-        makeStatusOverviewRow({
-          label: labelOverrides[statusClass],
-          count,
-          total,
-          statusGroup:
-            statusClass === "pending"
-              ? "pending_rollup"
-              : statusClass,
-          statusGroupName:
-            statusClass === "pending"
-              ? "진행·대기(호환 집계)"
-              : statusClassLabel(statusClass),
-        }),
-      );
-    },
-  );
+    rows.push(
+      makeStatusOverviewRow({
+        label: labelOverrides[statusClass],
+        count,
+        total,
+        statusGroup: statusClass === "pending" ? "pending_rollup" : statusClass,
+        statusGroupName:
+          statusClass === "pending"
+            ? "진행·대기(호환 집계)"
+            : statusClassLabel(statusClass),
+      }),
+    );
+  });
 
   return rows;
 }
 
-function buildStatusOverviewSection({
-  table,
-  headers,
-  config = {},
-}) {
+function buildStatusOverviewSection({ table, headers, config = {} }) {
   const { statusHeader } = headers || {};
   if (!table?.tableId || !statusHeader) return null;
 
@@ -896,8 +847,7 @@ function buildStatusOverviewSection({
   if (!summary.total) return null;
 
   return makeCustomMetricSection({
-    sectionId:
-      config.sectionIds?.overview || "status_rate_overview",
+    sectionId: config.sectionIds?.overview || "status_rate_overview",
     sectionType: "status_rate_overview",
     title: config.titles?.overview || "상태 처리율 요약",
     table,
@@ -929,26 +879,12 @@ function buildStatusOverviewSection({
     },
     meta: {
       ...commonStatusMeta(headers),
-      statusOverviewCompatibilityVersion:
-        STATUS_OVERVIEW_COMPATIBILITY_VERSION,
-      legacyPendingRollupClasses:
-        LEGACY_PENDING_ROLLUP_CLASSES,
-      legacyPendingRollupCount:
-        legacyPendingRollupCount(
-          summary.classCounts,
-        ),
-      canonicalPendingCount:
-        Number(
-          summary.classCounts.pending || 0,
-        ),
-      canonicalIncompleteCount:
-        Number(
-          summary.classCounts.incomplete || 0,
-        ),
-      canonicalDelayedCount:
-        Number(
-          summary.classCounts.delayed || 0,
-        ),
+      statusOverviewCompatibilityVersion: STATUS_OVERVIEW_COMPATIBILITY_VERSION,
+      legacyPendingRollupClasses: LEGACY_PENDING_ROLLUP_CLASSES,
+      legacyPendingRollupCount: legacyPendingRollupCount(summary.classCounts),
+      canonicalPendingCount: Number(summary.classCounts.pending || 0),
+      canonicalIncompleteCount: Number(summary.classCounts.incomplete || 0),
+      canonicalDelayedCount: Number(summary.classCounts.delayed || 0),
       sourceRowCount: summary.total,
       classifiedRowCount: summary.classifiedTotal,
       ratioSum: summary.ratioSum,
@@ -956,11 +892,7 @@ function buildStatusOverviewSection({
   });
 }
 
-function buildStatusRatioSection({
-  table,
-  headers,
-  config = {},
-}) {
+function buildStatusRatioSection({ table, headers, config = {} }) {
   const { statusHeader } = headers || {};
   if (!table?.tableId || !statusHeader) return null;
 
@@ -968,13 +900,9 @@ function buildStatusRatioSection({
   if (!summary.statusRows.length) return null;
 
   return makeCustomMetricSection({
-    sectionId:
-      config.sectionIds?.statusRatio ||
-      "status_ratio_breakdown",
+    sectionId: config.sectionIds?.statusRatio || "status_ratio_breakdown",
     sectionType: "status_ratio_breakdown",
-    title:
-      config.titles?.statusRatio ||
-      `${statusHeader}별 구성비`,
+    title: config.titles?.statusRatio || `${statusHeader}별 구성비`,
     table,
     rows: summary.statusRows,
     columns: {
@@ -1002,10 +930,7 @@ function buildStatusRatioSection({
   });
 }
 
-function initialDimensionItem(
-  dimensionHeader = "",
-  dimension = "",
-) {
+function initialDimensionItem(dimensionHeader = "", dimension = "") {
   return {
     [dimensionHeader]: dimension,
     전체건수: 0,
@@ -1071,16 +996,12 @@ function buildDimensionStatusRows({
   getRows(table).forEach((row) => {
     const dimension =
       normalizeText(getRowValue(row, dimensionHeader)) || "미입력";
-    const statusClass = classifyStatus(
-      getRowValue(row, statusHeader),
-      { statusHeader },
-    );
+    const statusClass = classifyStatus(getRowValue(row, statusHeader), {
+      statusHeader,
+    });
 
     if (!map.has(dimension)) {
-      map.set(
-        dimension,
-        initialDimensionItem(dimensionHeader, dimension),
-      );
+      map.set(dimension, initialDimensionItem(dimensionHeader, dimension));
     }
 
     const item = map.get(dimension);
@@ -1092,8 +1013,7 @@ function buildDimensionStatusRows({
     .map(withDimensionRates)
     .sort(
       (left, right) =>
-        Number(right.전체건수 || 0) -
-          Number(left.전체건수 || 0) ||
+        Number(right.전체건수 || 0) - Number(left.전체건수 || 0) ||
         String(left[dimensionHeader]).localeCompare(
           String(right[dimensionHeader]),
           "ko",
@@ -1121,8 +1041,7 @@ function buildDimensionStatusRateSection({
   if (!resultRows.length) return null;
 
   return makeCustomMetricSection({
-    sectionId:
-      sectionId || `status_rate_by_${dimensionHeader}`,
+    sectionId: sectionId || `status_rate_by_${dimensionHeader}`,
     sectionType: "status_rate_by_dimension",
     title: title || `${dimensionHeader}별 상태 처리율`,
     table,
@@ -1161,11 +1080,7 @@ function buildDimensionStatusRateSection({
   });
 }
 
-function buildStatusRateCandidates({
-  table,
-  headers,
-  config = {},
-}) {
+function buildStatusRateCandidates({ table, headers, config = {} }) {
   if (!table?.tableId) return [];
 
   const {
@@ -1183,13 +1098,10 @@ function buildStatusRateCandidates({
   if (statusHeader) {
     candidates.push(
       makeTemplateCandidate({
-        sectionId:
-          config.sectionIds?.statusCount || "status_count",
+        sectionId: config.sectionIds?.statusCount || "status_count",
         sectionType: "status_count",
         recipeType: "category_count",
-        title:
-          config.titles?.statusCount ||
-          `${statusHeader}별 건수`,
+        title: config.titles?.statusCount || `${statusHeader}별 건수`,
         tableId,
         columns: {
           dimension: statusHeader,
@@ -1208,14 +1120,10 @@ function buildStatusRateCandidates({
 
     candidates.push(
       makeTemplateCandidate({
-        sectionId:
-          config.sectionIds?.statusComposition ||
-          "status_composition",
+        sectionId: config.sectionIds?.statusComposition || "status_composition",
         sectionType: "status_composition",
         recipeType: "composition_ratio",
-        title:
-          config.titles?.statusComposition ||
-          `${statusHeader} 구성비`,
+        title: config.titles?.statusComposition || `${statusHeader} 구성비`,
         tableId,
         columns: {
           dimension: statusHeader,
@@ -1236,14 +1144,10 @@ function buildStatusRateCandidates({
   if (dateHeader) {
     candidates.push(
       makeTemplateCandidate({
-        sectionId:
-          config.sectionIds?.timeCount ||
-          "status_time_count",
+        sectionId: config.sectionIds?.timeCount || "status_time_count",
         sectionType: "status_time_count",
         recipeType: "time_count",
-        title:
-          config.titles?.timeCount ||
-          `${dateHeader}별 건수 추이`,
+        title: config.titles?.timeCount || `${dateHeader}별 건수 추이`,
         tableId,
         columns: {
           date: dateHeader,
@@ -1265,10 +1169,7 @@ function buildStatusRateCandidates({
     departmentHeader,
     categoryHeader,
     ownerHeader,
-  ].filter(
-    (value, index, values) =>
-      value && values.indexOf(value) === index,
-  );
+  ].filter((value, index, values) => value && values.indexOf(value) === index);
 
   summaryDimensions.forEach((dimensionHeader) => {
     candidates.push(
@@ -1322,10 +1223,7 @@ function buildStatusRateCandidates({
 
   if (metricHeader) {
     const topDimension =
-      categoryHeader ||
-      ownerHeader ||
-      departmentHeader ||
-      statusHeader;
+      categoryHeader || ownerHeader || departmentHeader || statusHeader;
 
     candidates.push(
       makeTemplateCandidate({
@@ -1368,9 +1266,7 @@ function buildStatusRateReportSections({
   const headers = findStatusRateHeaders(table, config);
 
   if (!headers.statusHeader) {
-    const fallbackCandidates = Array.isArray(
-      templateCandidate.candidates,
-    )
+    const fallbackCandidates = Array.isArray(templateCandidate.candidates)
       ? templateCandidate.candidates
       : [];
 

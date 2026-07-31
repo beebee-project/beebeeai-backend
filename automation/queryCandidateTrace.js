@@ -1,5 +1,3 @@
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -49,10 +47,8 @@ function compactObservation(observation = {}) {
     observationSha256: observation.observationSha256 || "",
     queryShape: {
       tableCount: observation.queryShape?.tableCount || 0,
-      analysisEligibleCount:
-        observation.queryShape?.analysisEligibleCount || 0,
-      templateEligibleCount:
-        observation.queryShape?.templateEligibleCount || 0,
+      analysisEligibleCount: observation.queryShape?.analysisEligibleCount || 0,
+      templateEligibleCount: observation.queryShape?.templateEligibleCount || 0,
       shapeSha256: observation.queryShape?.shapeSha256 || "",
     },
     candidateObservation: {

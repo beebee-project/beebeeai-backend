@@ -1,13 +1,10 @@
-"use strict";
-
 const SEMANTIC_SECTION_BUDGET_ENGINE_VERSION =
   "semantic_section_budget_engine_v2_mandatory_summary_coverage_floor";
 const MANDATORY_SUMMARY_COVERAGE_FLOOR_VERSION =
   "mandatory_summary_coverage_floor_v1";
 const DURATION_SUMMARY_CONTRACT_VERSION =
   "duration_summary_contract_v1_average_median_range";
-const DISTINCT_ENTITY_SECTION_VERSION =
-  "distinct_entity_section_v1";
+const DISTINCT_ENTITY_SECTION_VERSION = "distinct_entity_section_v1";
 
 const ENTITY_HEADER_PATTERN =
   /(?:^|[_\s])(?:id|code)(?:$|[_\s])|(?:품목|소모품|제품|상품|자산|장비|시설|고객|거래처|업체|기관|사업|프로젝트|과제|서비스|항목)(?:명|이름)$|^(?:이름|명칭|entity|item|product|asset|equipment|facility|customer|vendor|project)$/i;
@@ -140,11 +137,15 @@ function applySemanticSectionBudget({ sections = [], maxSections = 28 } = {}) {
   const summaryByMetric = new Map();
   for (const item of decorated) {
     if (item.mandatory) mandatoryIndexes.add(item.index);
-    if (!item.metricKey || !/summary/.test(normalizeText(item.section.sectionType))) {
+    if (
+      !item.metricKey ||
+      !/summary/.test(normalizeText(item.section.sectionType))
+    ) {
       continue;
     }
     const current = summaryByMetric.get(item.metricKey);
-    if (!current || item.score > current.score) summaryByMetric.set(item.metricKey, item);
+    if (!current || item.score > current.score)
+      summaryByMetric.set(item.metricKey, item);
   }
   for (const item of summaryByMetric.values()) mandatoryIndexes.add(item.index);
 
@@ -152,8 +153,8 @@ function applySemanticSectionBudget({ sections = [], maxSections = 28 } = {}) {
   const retainedIndexes = new Set(mandatoryIndexes);
   const ranked = decorated
     .filter((item) => !retainedIndexes.has(item.index))
-    .sort((left, right) =>
-      right.score - left.score || left.index - right.index,
+    .sort(
+      (left, right) => right.score - left.score || left.index - right.index,
     );
   for (const item of ranked) {
     if (retainedIndexes.size >= effectiveCap) break;
@@ -170,7 +171,9 @@ function applySemanticSectionBudget({ sections = [], maxSections = 28 } = {}) {
     retainedSectionCount: retained.length,
     droppedSectionCount: dropped.length,
     droppedSectionIds: dropped.map((section, index) =>
-      normalizeText(section.sectionId || section.title || `section_${index + 1}`),
+      normalizeText(
+        section.sectionId || section.title || `section_${index + 1}`,
+      ),
     ),
     maxSections: cap,
     effectiveMaxSections: effectiveCap,
@@ -191,7 +194,11 @@ function tableRows(table = {}) {
 
 function columnHeader(column = {}, index = 0) {
   return normalizeText(
-    column.header || column.originalHeader || column.name || column.label || `열${index + 1}`,
+    column.header ||
+      column.originalHeader ||
+      column.name ||
+      column.label ||
+      `열${index + 1}`,
   );
 }
 
@@ -207,7 +214,9 @@ function rowValue(row, column = {}, index = 0) {
     column.originalHeader,
     column.label,
     column.id,
-  ].map((value) => String(value || "").trim()).filter(Boolean);
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(row, key)) return row[key];
   }
@@ -220,31 +229,39 @@ function rowValue(row, column = {}, index = 0) {
 
 function resolveDistinctEntity(table = {}) {
   const rows = tableRows(table);
-  const candidates = tableColumns(table).map((column, index) => {
-    const header = columnHeader(column, index);
-    const values = rows
-      .map((row) => normalizeText(rowValue(row, column, index)))
-      .filter(Boolean);
-    const distinctCount = new Set(values.map(normalizeKey)).size;
-    const coverage = rows.length ? values.length / rows.length : 0;
-    const identity = ENTITY_HEADER_PATTERN.test(header);
-    const excluded = EXCLUDED_ENTITY_HEADER_PATTERN.test(header);
-    let score = identity ? 200 : -Infinity;
-    if (excluded || coverage < 0.75 || distinctCount < 2 || distinctCount > 500) {
-      score = -Infinity;
-    }
-    if (Number.isFinite(score)) {
-      if (/명$|이름$|명칭$/i.test(header)) score += 40;
-      if (coverage >= 0.95) score += 25;
-      if (distinctCount === rows.length) score += 15;
-      if (distinctCount <= 100) score += 15;
-    }
-    return { column, index, header, values, distinctCount, coverage, score };
-  }).filter((candidate) => Number.isFinite(candidate.score))
-    .sort((left, right) =>
-      right.score - left.score ||
-      right.distinctCount - left.distinctCount ||
-      left.header.localeCompare(right.header, "ko"),
+  const candidates = tableColumns(table)
+    .map((column, index) => {
+      const header = columnHeader(column, index);
+      const values = rows
+        .map((row) => normalizeText(rowValue(row, column, index)))
+        .filter(Boolean);
+      const distinctCount = new Set(values.map(normalizeKey)).size;
+      const coverage = rows.length ? values.length / rows.length : 0;
+      const identity = ENTITY_HEADER_PATTERN.test(header);
+      const excluded = EXCLUDED_ENTITY_HEADER_PATTERN.test(header);
+      let score = identity ? 200 : -Infinity;
+      if (
+        excluded ||
+        coverage < 0.75 ||
+        distinctCount < 2 ||
+        distinctCount > 500
+      ) {
+        score = -Infinity;
+      }
+      if (Number.isFinite(score)) {
+        if (/명$|이름$|명칭$/i.test(header)) score += 40;
+        if (coverage >= 0.95) score += 25;
+        if (distinctCount === rows.length) score += 15;
+        if (distinctCount <= 100) score += 15;
+      }
+      return { column, index, header, values, distinctCount, coverage, score };
+    })
+    .filter((candidate) => Number.isFinite(candidate.score))
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.distinctCount - left.distinctCount ||
+        left.header.localeCompare(right.header, "ko"),
     );
 
   const selected = candidates[0];
@@ -266,12 +283,22 @@ function resolveDistinctEntity(table = {}) {
   };
 }
 
-function buildDistinctEntitySection({ table = {}, tableIndex = 0, metricIdFactory } = {}) {
+function buildDistinctEntitySection({
+  table = {},
+  tableIndex = 0,
+  metricIdFactory,
+} = {}) {
   const resolution = resolveDistinctEntity(table);
   if (!resolution.applied) return null;
-  const id = typeof metricIdFactory === "function"
-    ? metricIdFactory(tableIndex, `고유 ${resolution.header} 수`, "건", "distinct")
-    : `semantic.table_${tableIndex + 1}.distinct.${normalizeKey(resolution.header)}`;
+  const id =
+    typeof metricIdFactory === "function"
+      ? metricIdFactory(
+          tableIndex,
+          `고유 ${resolution.header} 수`,
+          "건",
+          "distinct",
+        )
+      : `semantic.table_${tableIndex + 1}.distinct.${normalizeKey(resolution.header)}`;
   return {
     sectionId: id,
     title: `고유 ${resolution.header} 수`,
@@ -284,7 +311,11 @@ function buildDistinctEntitySection({ table = {}, tableIndex = 0, metricIdFactor
       metric: { header: `고유 ${resolution.header} 수`, unit: "건" },
       rows: [
         { 지표: "전체 행 수", 값: resolution.rowCount, 단위: "건" },
-        { 지표: `고유 ${resolution.header} 수`, 값: resolution.distinctCount, 단위: "건" },
+        {
+          지표: `고유 ${resolution.header} 수`,
+          값: resolution.distinctCount,
+          단위: "건",
+        },
         { 지표: "중복 행 수", 값: resolution.duplicateRowCount, 단위: "건" },
       ],
       meta: {

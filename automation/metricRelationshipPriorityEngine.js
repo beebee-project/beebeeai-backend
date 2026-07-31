@@ -1,5 +1,3 @@
-"use strict";
-
 const METRIC_RELATIONSHIP_PRIORITY_ENGINE_VERSION =
   "metric_relationship_priority_engine_v1";
 const DERIVED_TOTAL_RELATION_VERSION =
@@ -33,9 +31,7 @@ function cloneValue(value) {
 }
 
 function finiteNumber(value) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : null;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function seriesLabel(series = {}) {
@@ -43,7 +39,10 @@ function seriesLabel(series = {}) {
 }
 
 function seriesKey(series = {}, index = 0) {
-  return normalizeText(series.key) || `${normalizeKey(seriesLabel(series))}::${index}`;
+  return (
+    normalizeText(series.key) ||
+    `${normalizeKey(seriesLabel(series))}::${index}`
+  );
 }
 
 function sameUnit(left = {}, right = {}) {
@@ -64,7 +63,13 @@ function rowValueMap(series = {}) {
   return map;
 }
 
-function combinations(items = [], size = 2, start = 0, prefix = [], output = []) {
+function combinations(
+  items = [],
+  size = 2,
+  start = 0,
+  prefix = [],
+  output = [],
+) {
   if (prefix.length === size) {
     output.push(prefix);
     return output;
@@ -91,9 +96,10 @@ function relationMatchStats(target = {}, components = [], mode = "sum") {
     const values = componentMaps.map((map) => map.get(rowIndex));
     if (values.some((value) => value == null)) continue;
     comparableCount += 1;
-    const expected = mode === "product"
-      ? values.reduce((product, value) => product * value, 1)
-      : values.reduce((sum, value) => sum + value, 0);
+    const expected =
+      mode === "product"
+        ? values.reduce((product, value) => product * value, 1)
+        : values.reduce((sum, value) => sum + value, 0);
     const matched = approximatelyEqual(targetValue, expected);
     if (matched) matchedCount += 1;
     matches.push({ rowIndex, targetValue, expected, matched });
@@ -122,7 +128,11 @@ function additiveTargetEvidenceScore(series = {}) {
   const label = seriesLabel(series);
   let score = 0;
   if (/^(?:총|전체)|(?:합계|총계)$|\btotal\b/i.test(label)) score += 180;
-  if (/금액|비용|사용량|수량|매출|지출|예산|원가|amount|cost|usage|quantity/i.test(label)) {
+  if (
+    /금액|비용|사용량|수량|매출|지출|예산|원가|amount|cost|usage|quantity/i.test(
+      label,
+    )
+  ) {
     score += 35;
   }
   if (/단가|평균|비율|율|기간|일수|rate|average|duration/i.test(label)) {
@@ -155,7 +165,9 @@ function detectAdditiveRelations(seriesList = []) {
         }
 
         const positiveContribution = componentSet.every((component) =>
-          [...rowValueMap(component).values()].some((value) => Math.abs(value) > 0),
+          [...rowValueMap(component).values()].some(
+            (value) => Math.abs(value) > 0,
+          ),
         );
         if (!positiveContribution) continue;
 
@@ -241,10 +253,11 @@ function detectProductRelations(seriesList = []) {
 }
 
 function chooseNonConflictingRelations(relations = []) {
-  const ordered = [...relations].sort((left, right) =>
-    right.matchRatio - left.matchRatio ||
-    right.coverage - left.coverage ||
-    (right.componentKeys?.length || 0) - (left.componentKeys?.length || 0),
+  const ordered = [...relations].sort(
+    (left, right) =>
+      right.matchRatio - left.matchRatio ||
+      right.coverage - left.coverage ||
+      (right.componentKeys?.length || 0) - (left.componentKeys?.length || 0),
   );
   const targetSeen = new Set();
   const output = [];
@@ -272,15 +285,19 @@ function baseRepresentativePriority(series = {}) {
 
 function applyMetricRelationshipPriorities(seriesList = []) {
   const originalSnapshot = JSON.stringify(seriesList);
-  const cloned = (Array.isArray(seriesList) ? seriesList : []).map((series, index) => ({
-    ...cloneValue(series),
-    relationshipRole: RELATION_ROLE.INDEPENDENT,
-    representativeMetricPriority: baseRepresentativePriority(series),
-    metricRelationships: [],
-    originalSeriesIndex: index,
-  }));
+  const cloned = (Array.isArray(seriesList) ? seriesList : []).map(
+    (series, index) => ({
+      ...cloneValue(series),
+      relationshipRole: RELATION_ROLE.INDEPENDENT,
+      representativeMetricPriority: baseRepresentativePriority(series),
+      metricRelationships: [],
+      originalSeriesIndex: index,
+    }),
+  );
 
-  const keyMap = new Map(cloned.map((series, index) => [seriesKey(series, index), series]));
+  const keyMap = new Map(
+    cloned.map((series, index) => [seriesKey(series, index), series]),
+  );
   const detected = chooseNonConflictingRelations([
     ...detectAdditiveRelations(cloned),
     ...detectProductRelations(cloned),
@@ -322,9 +339,10 @@ function applyMetricRelationshipPriorities(seriesList = []) {
     }
   }
 
-  cloned.sort((left, right) =>
-    right.representativeMetricPriority - left.representativeMetricPriority ||
-    left.originalSeriesIndex - right.originalSeriesIndex,
+  cloned.sort(
+    (left, right) =>
+      right.representativeMetricPriority - left.representativeMetricPriority ||
+      left.originalSeriesIndex - right.originalSeriesIndex,
   );
 
   if (JSON.stringify(seriesList) !== originalSnapshot) {
@@ -338,9 +356,9 @@ function applyMetricRelationshipPriorities(seriesList = []) {
     series: cloned,
     relations: detected,
     primaryMetricLabels: detected.map((relation) => relation.targetMetric),
-    componentMetricLabels: Array.from(new Set(
-      detected.flatMap((relation) => relation.componentMetrics || []),
-    )),
+    componentMetricLabels: Array.from(
+      new Set(detected.flatMap((relation) => relation.componentMetrics || [])),
+    ),
   };
 }
 
@@ -353,21 +371,32 @@ function sectionMetricHeader(section = {}) {
   );
 }
 
-function prioritizeBusinessSections({ sections = [], primaryMetricLabels = [], componentMetricLabels = [] } = {}) {
-  const primary = new Set(primaryMetricLabels.map(normalizeKey).filter(Boolean));
-  const components = new Set(componentMetricLabels.map(normalizeKey).filter(Boolean));
-  const decorated = (Array.isArray(sections) ? sections : []).map((section, index) => {
-    const metric = normalizeKey(sectionMetricHeader(section));
-    let score = 500;
-    if (primary.has(metric)) score = 1200;
-    else if (components.has(metric)) score = 300;
-    if (/계약|핵심지표|contract/i.test(normalizeText(section.title))) score += 100;
-    if (String(section.sectionType || "").includes("overview")) score += 80;
-    return { section, index, score, metric };
-  });
+function prioritizeBusinessSections({
+  sections = [],
+  primaryMetricLabels = [],
+  componentMetricLabels = [],
+} = {}) {
+  const primary = new Set(
+    primaryMetricLabels.map(normalizeKey).filter(Boolean),
+  );
+  const components = new Set(
+    componentMetricLabels.map(normalizeKey).filter(Boolean),
+  );
+  const decorated = (Array.isArray(sections) ? sections : []).map(
+    (section, index) => {
+      const metric = normalizeKey(sectionMetricHeader(section));
+      let score = 500;
+      if (primary.has(metric)) score = 1200;
+      else if (components.has(metric)) score = 300;
+      if (/계약|핵심지표|contract/i.test(normalizeText(section.title)))
+        score += 100;
+      if (String(section.sectionType || "").includes("overview")) score += 80;
+      return { section, index, score, metric };
+    },
+  );
 
-  const sorted = [...decorated].sort((left, right) =>
-    right.score - left.score || left.index - right.index,
+  const sorted = [...decorated].sort(
+    (left, right) => right.score - left.score || left.index - right.index,
   );
   const reorderedCount = sorted.reduce(
     (count, item, index) => count + (item.index === index ? 0 : 1),

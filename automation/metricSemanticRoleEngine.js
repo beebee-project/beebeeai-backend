@@ -1,7 +1,4 @@
-"use strict";
-
-const METRIC_SEMANTIC_ROLE_ENGINE_VERSION =
-  "metric_semantic_role_engine_v1";
+const METRIC_SEMANTIC_ROLE_ENGINE_VERSION = "metric_semantic_role_engine_v1";
 const AGGREGATION_CONTRACT_RESOLVER_VERSION =
   "aggregation_contract_resolver_v1";
 
@@ -102,11 +99,7 @@ function declaredSemanticRole(column = {}) {
   return aliases.get(raw) || "";
 }
 
-function classifyMetricRole({
-  metricLabel = "",
-  unit = "",
-  column = {},
-} = {}) {
+function classifyMetricRole({ metricLabel = "", unit = "", column = {} } = {}) {
   const explicitRole = declaredSemanticRole(column);
   const evidence = [
     metricLabel,
@@ -177,16 +170,11 @@ function roleDefaultOperation({
   if (role === ROLE.STOCK_SNAPSHOT) {
     return hasTemporalAxis ? OPERATION.LATEST : OPERATION.SUM;
   }
-  if (
-    role === ROLE.UNIT_RATE ||
-    role === ROLE.PERCENTAGE_RATE
-  ) {
+  if (role === ROLE.UNIT_RATE || role === ROLE.PERCENTAGE_RATE) {
     return OPERATION.AVERAGE;
   }
   if (role === ROLE.DURATION) {
-    return totality === "total"
-      ? OPERATION.SUM
-      : OPERATION.AVERAGE;
+    return totality === "total" ? OPERATION.SUM : OPERATION.AVERAGE;
   }
   if (
     role === ROLE.MONEY_FLOW ||
@@ -254,13 +242,12 @@ function resolveAggregationContract({
     hasTemporalAxis,
     fallbackOperation: fallbackAggregation,
   });
-  const unsafeDeclaredAggregationOverridden =
-    declaredOperationIsUnsafe({
-      role: classification.role,
-      totality: classification.totality,
-      hasTemporalAxis,
-      declaredOperation,
-    });
+  const unsafeDeclaredAggregationOverridden = declaredOperationIsUnsafe({
+    role: classification.role,
+    totality: classification.totality,
+    hasTemporalAxis,
+    declaredOperation,
+  });
   const operation =
     declaredOperation && !unsafeDeclaredAggregationOverridden
       ? declaredOperation

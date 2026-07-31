@@ -1,9 +1,3 @@
-/**
- * Intent Cache (Redis + Memory fallback)
- * - Default: DISABLED
- * - Stores INTENT ONLY (never formula/script)
- */
-
 const CACHE_PREFIX = "intent_cache:";
 
 // ============================

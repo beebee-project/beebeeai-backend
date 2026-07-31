@@ -1,11 +1,7 @@
-"use strict";
-
 const crypto = require("crypto");
 
-const QUERY_CANDIDATE_OBSERVATION_VERSION =
-  "query_candidate_observation_v1";
-const QUERY_CANDIDATE_BASELINE_VERSION =
-  "query_candidate_baseline_v1";
+const QUERY_CANDIDATE_OBSERVATION_VERSION = "query_candidate_observation_v1";
+const QUERY_CANDIDATE_BASELINE_VERSION = "query_candidate_baseline_v1";
 
 const CANDIDATE_GROUPS = Object.freeze([
   "analysisRecipeCandidates",
@@ -33,7 +29,9 @@ function normalizeText(value = "") {
 
 function uniqueSorted(values = []) {
   return Array.from(
-    new Set((Array.isArray(values) ? values : []).map(normalizeText).filter(Boolean)),
+    new Set(
+      (Array.isArray(values) ? values : []).map(normalizeText).filter(Boolean),
+    ),
   ).sort((left, right) => left.localeCompare(right, "ko"));
 }
 
@@ -152,22 +150,25 @@ function summarizeQueryTable(table = {}, index = 0) {
     ),
     virtual: Boolean(
       table.isVirtual === true ||
-        table.virtual === true ||
-        table.transformation?.virtual === true,
+      table.virtual === true ||
+      table.transformation?.virtual === true,
     ),
     primary: Boolean(table.isPrimary === true || usage.primary === true),
     analysisEligible: Boolean(
       table.analysisEligible === true ||
-        usage.analysisEligible === true ||
-        usage.analysis === true,
+      usage.analysisEligible === true ||
+      usage.analysis === true,
     ),
     templateEligible: Boolean(
       table.templateEligible === true ||
-        usage.templateEligible === true ||
-        usage.template === true,
+      usage.templateEligible === true ||
+      usage.template === true,
     ),
     rowCount: numericOrZero(
-      table.rowCount || table.dataRowCount || table.stats?.rowCount || rows.length,
+      table.rowCount ||
+        table.dataRowCount ||
+        table.stats?.rowCount ||
+        rows.length,
     ),
     columnCount: numericOrZero(
       table.columnCount || table.stats?.columnCount || headers.length,
@@ -231,7 +232,9 @@ function summarizeCandidate(candidate = {}, index = 0, groupName = "") {
     candidateType: normalizeText(
       candidate.candidateType || candidate.recipeType || candidate.type || "",
     ),
-    title: normalizeText(candidate.title || candidate.label || candidate.name || ""),
+    title: normalizeText(
+      candidate.title || candidate.label || candidate.name || "",
+    ),
     templateId: normalizeText(candidate.templateId || ""),
     recipeIds: uniqueSorted([
       ...asArray(candidate.recipeIds),
@@ -443,7 +446,11 @@ function compareArray(label, actual = [], expected = [], differences = []) {
   const actualValue = JSON.stringify(asArray(actual));
   const expectedValue = JSON.stringify(asArray(expected));
   if (actualValue !== expectedValue) {
-    differences.push({ label, expected: asArray(expected), actual: asArray(actual) });
+    differences.push({
+      label,
+      expected: asArray(expected),
+      actual: asArray(actual),
+    });
   }
 }
 
@@ -466,7 +473,11 @@ function compareQueryCandidateBaseline(observation = {}, baseline = {}) {
 
   for (const [label, actualValue] of scalarChecks) {
     if (actualValue !== expected[label]) {
-      differences.push({ label, expected: expected[label], actual: actualValue });
+      differences.push({
+        label,
+        expected: expected[label],
+        actual: actualValue,
+      });
     }
   }
 

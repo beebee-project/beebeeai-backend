@@ -1,5 +1,3 @@
-"use strict";
-
 let xlsxModule = null;
 
 function getXlsxModule() {
@@ -10,9 +8,7 @@ function getXlsxModule() {
   return xlsxModule;
 }
 
-const {
-  collectSectionMetricIds,
-} = require("./metricIdContract");
+const { collectSectionMetricIds } = require("./metricIdContract");
 
 const SUMMARY_SHEET_RECIPE_MANIFEST_VERSION =
   "summary_sheet_recipe_manifest_v2";
@@ -89,10 +85,7 @@ function cloneJsonValue(value) {
   }
   if (typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        cloneJsonValue(item),
-      ]),
+      Object.entries(value).map(([key, item]) => [key, cloneJsonValue(item)]),
     );
   }
   return value;
@@ -122,9 +115,7 @@ function buildFinalOutputQualityGateMeta(result = {}) {
   FINAL_OUTPUT_QUALITY_GATE_META_KEYS.forEach(copyExecutionMeta);
   Object.keys(executionMeta)
     .filter(
-      (key) =>
-        key.startsWith("finalOutputQualityGate") &&
-        !hasOwn(meta, key),
+      (key) => key.startsWith("finalOutputQualityGate") && !hasOwn(meta, key),
     )
     .sort()
     .forEach(copyExecutionMeta);
@@ -134,10 +125,7 @@ function buildFinalOutputQualityGateMeta(result = {}) {
     meta[key] = cloneJsonValue(value);
   };
 
-  assignFallback(
-    "outputCompletenessContractVersion",
-    gate.completenessVersion,
-  );
+  assignFallback("outputCompletenessContractVersion", gate.completenessVersion);
   assignFallback(
     "semanticOutputDuplicateResolverVersion",
     gate.duplicateResolverVersion,
@@ -149,10 +137,7 @@ function buildFinalOutputQualityGateMeta(result = {}) {
   );
   assignFallback("finalOutputQualityGatePass", gate.pass);
   assignFallback("finalOutputQualityGateStatus", gate.status);
-  assignFallback(
-    "finalOutputQualityGateFailureReasons",
-    gate.failureReasons,
-  );
+  assignFallback("finalOutputQualityGateFailureReasons", gate.failureReasons);
   assignFallback(
     "finalOutputQualityGateExpectedMetricCount",
     gate.expectedMetricCount,
@@ -244,25 +229,16 @@ function resultOutputHeaders(result = {}) {
   ];
 }
 
-function buildSectionManifest(
-  section = {},
-  resolvedSheetName = "",
-  index = 0,
-) {
+function buildSectionManifest(section = {}, resolvedSheetName = "", index = 0) {
   const result = section.result || {};
   return {
     sectionIndex: index,
     sectionId: normalizeText(section.sectionId || ""),
     title: normalizeText(
-      section.title ||
-        section.sectionId ||
-        `section_${index + 1}`,
+      section.title || section.sectionId || `section_${index + 1}`,
     ),
     resolvedSheetName: normalizeText(
-      resolvedSheetName ||
-        section.title ||
-        section.sectionId ||
-        "",
+      resolvedSheetName || section.title || section.sectionId || "",
     ),
     sectionType: normalizeText(section.sectionType || ""),
     resultType: normalizeText(result.resultType || ""),
@@ -273,9 +249,7 @@ function buildSectionManifest(
     outputHeaders: resultOutputHeaders(result),
     sourceMetricHeaders: Array.isArray(result.metrics)
       ? result.metrics
-          .map((item) =>
-            normalizeText(item?.header || item?.label || item),
-          )
+          .map((item) => normalizeText(item?.header || item?.label || item))
           .filter(Boolean)
       : [],
     metricIds: collectSectionMetricIds(section),
@@ -294,26 +268,20 @@ function buildSummarySheetRecipeManifest({
   resolvedSections = [],
 } = {}) {
   const resolvedByIndex = new Map(
-    (resolvedSections || []).map((entry) => [
-      Number(entry.index),
-      entry,
-    ]),
+    (resolvedSections || []).map((entry) => [Number(entry.index), entry]),
   );
 
-  const sections = (businessSections || []).map(
-    (section, index) =>
-      buildSectionManifest(
-        section,
-        resolvedByIndex.get(index)?.resolvedSheetName || "",
-        index,
-      ),
+  const sections = (businessSections || []).map((section, index) =>
+    buildSectionManifest(
+      section,
+      resolvedByIndex.get(index)?.resolvedSheetName || "",
+      index,
+    ),
   );
 
   const renderedMetricIds = Array.from(
     new Set(
-      sections
-        .flatMap((section) => section.metricIds || [])
-        .filter(Boolean),
+      sections.flatMap((section) => section.metricIds || []).filter(Boolean),
     ),
   );
 
@@ -329,17 +297,14 @@ function buildSummarySheetRecipeManifest({
   const missingMetricIds = expectedMetricIds.filter(
     (metricId) => !renderedMetricIds.includes(metricId),
   );
-  const finalOutputQualityGateMeta =
-    buildFinalOutputQualityGateMeta(result);
+  const finalOutputQualityGateMeta = buildFinalOutputQualityGateMeta(result);
 
   return {
     version: SUMMARY_SHEET_RECIPE_MANIFEST_VERSION,
     complete: true,
     templateId: normalizeText(result.templateId || ""),
     templateTitle: normalizeText(result.title || ""),
-    resultType: normalizeText(
-      result.resultType || "businessTemplate",
-    ),
+    resultType: normalizeText(result.resultType || "businessTemplate"),
     generatedAt: new Date().toISOString(),
     sectionCount: sections.length,
     renderedMetricIds,
@@ -351,9 +316,7 @@ function buildSummarySheetRecipeManifest({
           expectedMetricIds.includes(metricId),
         ).length / expectedMetricIds.length
       : 1,
-    contractCoverageVersion: normalizeText(
-      coverage.version || "",
-    ),
+    contractCoverageVersion: normalizeText(coverage.version || ""),
     contractCatalogVersion: normalizeText(
       coverage.contractCatalogVersion || "",
     ),
@@ -376,51 +339,30 @@ function manifestToAoa(manifest = {}) {
     ["resultType", manifest.resultType || ""],
     ["generatedAt", manifest.generatedAt || ""],
     ["sectionCount", manifest.sectionCount || 0],
-    [
-      "renderedMetricIdsJson",
-      JSON.stringify(manifest.renderedMetricIds || []),
-    ],
-    [
-      "expectedMetricIdsJson",
-      JSON.stringify(manifest.expectedMetricIds || []),
-    ],
-    [
-      "missingMetricIdsJson",
-      JSON.stringify(manifest.missingMetricIds || []),
-    ],
+    ["renderedMetricIdsJson", JSON.stringify(manifest.renderedMetricIds || [])],
+    ["expectedMetricIdsJson", JSON.stringify(manifest.expectedMetricIds || [])],
+    ["missingMetricIdsJson", JSON.stringify(manifest.missingMetricIds || [])],
     [
       "metricCoveragePass",
       manifest.metricCoveragePass === true ? "TRUE" : "FALSE",
     ],
     ["metricCoverageRate", manifest.metricCoverageRate ?? 0],
-    [
-      "contractCoverageVersion",
-      manifest.contractCoverageVersion || "",
-    ],
-    [
-      "contractCatalogVersion",
-      manifest.contractCatalogVersion || "",
-    ],
+    ["contractCoverageVersion", manifest.contractCoverageVersion || ""],
+    ["contractCatalogVersion", manifest.contractCatalogVersion || ""],
     [
       "finalOutputQualityGateMetaVersion",
       manifest.finalOutputQualityGateMetaVersion || "",
     ],
     [
       "finalOutputQualityGateMetaPresent",
-      manifest.finalOutputQualityGateMetaPresent === true
-        ? "TRUE"
-        : "FALSE",
+      manifest.finalOutputQualityGateMetaPresent === true ? "TRUE" : "FALSE",
     ],
-    ...FINAL_OUTPUT_QUALITY_GATE_META_KEYS
-      .filter((key) =>
-        hasOwn(manifest.finalOutputQualityGateMeta, key),
-      )
-      .map((key) => [
-        key,
-        serializeManifestMetaValue(
-          manifest.finalOutputQualityGateMeta[key],
-        ),
-      ]),
+    ...FINAL_OUTPUT_QUALITY_GATE_META_KEYS.filter((key) =>
+      hasOwn(manifest.finalOutputQualityGateMeta, key),
+    ).map((key) => [
+      key,
+      serializeManifestMetaValue(manifest.finalOutputQualityGateMeta[key]),
+    ]),
     ...Object.keys(manifest.finalOutputQualityGateMeta || {})
       .filter(
         (key) =>
@@ -430,9 +372,7 @@ function manifestToAoa(manifest = {}) {
       .sort()
       .map((key) => [
         key,
-        serializeManifestMetaValue(
-          manifest.finalOutputQualityGateMeta[key],
-        ),
+        serializeManifestMetaValue(manifest.finalOutputQualityGateMeta[key]),
       ]),
     [],
     [
@@ -497,11 +437,7 @@ function appendSummarySheetRecipeManifest(wb, args = {}) {
   const XLSX = getXlsxModule();
   const ws = XLSX.utils.aoa_to_sheet(manifestToAoa(manifest));
 
-  XLSX.utils.book_append_sheet(
-    wb,
-    ws,
-    SUMMARY_SHEET_RECIPE_MANIFEST_SHEET,
-  );
+  XLSX.utils.book_append_sheet(wb, ws, SUMMARY_SHEET_RECIPE_MANIFEST_SHEET);
   ensureHiddenSheet(wb, SUMMARY_SHEET_RECIPE_MANIFEST_SHEET);
 
   wb["!beebeeSummaryRecipeManifest"] = manifest;
@@ -522,8 +458,7 @@ function readSummarySheetRecipeManifest(workbook = {}) {
     return workbook["!beebeeSummaryRecipeManifest"];
   }
 
-  const ws =
-    workbook.Sheets?.[SUMMARY_SHEET_RECIPE_MANIFEST_SHEET];
+  const ws = workbook.Sheets?.[SUMMARY_SHEET_RECIPE_MANIFEST_SHEET];
   if (!ws) return null;
 
   const XLSX = getXlsxModule();
@@ -547,11 +482,7 @@ function readSummarySheetRecipeManifest(workbook = {}) {
 
   const sections = [];
   if (sectionHeaderIndex >= 0) {
-    for (
-      let index = sectionHeaderIndex + 1;
-      index < rows.length;
-      index += 1
-    ) {
+    for (let index = sectionHeaderIndex + 1; index < rows.length; index += 1) {
       const row = rows[index] || [];
       if (row.every((value) => value === "")) continue;
 
@@ -570,53 +501,34 @@ function readSummarySheetRecipeManifest(workbook = {}) {
         sourceMetricHeaders: parseJsonArray(row[11]),
         metricIds: parseJsonArray(row[12]),
         contractCoverageVersion: String(row[13] || ""),
-        complete:
-          String(row[14] || "TRUE").toUpperCase() !== "FALSE",
+        complete: String(row[14] || "TRUE").toUpperCase() !== "FALSE",
       });
     }
   }
 
   return {
     version: String(meta.manifestVersion || ""),
-    complete:
-      String(meta.complete || "").toUpperCase() === "TRUE",
+    complete: String(meta.complete || "").toUpperCase() === "TRUE",
     templateId: String(meta.templateId || ""),
     templateTitle: String(meta.templateTitle || ""),
     resultType: String(meta.resultType || ""),
     generatedAt: String(meta.generatedAt || ""),
-    sectionCount: Number(
-      meta.sectionCount || sections.length,
-    ),
-    renderedMetricIds: parseJsonArray(
-      meta.renderedMetricIdsJson,
-    ),
-    expectedMetricIds: parseJsonArray(
-      meta.expectedMetricIdsJson,
-    ),
-    missingMetricIds: parseJsonArray(
-      meta.missingMetricIdsJson,
-    ),
+    sectionCount: Number(meta.sectionCount || sections.length),
+    renderedMetricIds: parseJsonArray(meta.renderedMetricIdsJson),
+    expectedMetricIds: parseJsonArray(meta.expectedMetricIdsJson),
+    missingMetricIds: parseJsonArray(meta.missingMetricIdsJson),
     metricCoveragePass:
-      String(meta.metricCoveragePass || "").toUpperCase() ===
-      "TRUE",
-    metricCoverageRate: Number(
-      meta.metricCoverageRate || 0,
-    ),
-    contractCoverageVersion: String(
-      meta.contractCoverageVersion || "",
-    ),
-    contractCatalogVersion: String(
-      meta.contractCatalogVersion || "",
-    ),
+      String(meta.metricCoveragePass || "").toUpperCase() === "TRUE",
+    metricCoverageRate: Number(meta.metricCoverageRate || 0),
+    contractCoverageVersion: String(meta.contractCoverageVersion || ""),
+    contractCatalogVersion: String(meta.contractCatalogVersion || ""),
     finalOutputQualityGateMetaVersion: String(
       meta.finalOutputQualityGateMetaVersion || "",
     ),
     finalOutputQualityGateMetaPresent:
-      String(
-        meta.finalOutputQualityGateMetaPresent || "",
-      ).toUpperCase() === "TRUE",
-    finalOutputQualityGateMeta:
-      parseFinalOutputQualityGateMeta(meta),
+      String(meta.finalOutputQualityGateMetaPresent || "").toUpperCase() ===
+      "TRUE",
+    finalOutputQualityGateMeta: parseFinalOutputQualityGateMeta(meta),
     sections,
   };
 }

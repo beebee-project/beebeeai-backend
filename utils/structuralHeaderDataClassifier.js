@@ -1,5 +1,3 @@
-"use strict";
-
 const STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION =
   "structural_header_data_classifier_v1";
 
@@ -16,16 +14,9 @@ function isEmpty(value) {
 function isBooleanLike(value) {
   if (typeof value === "boolean") return true;
   const text = compactText(value).toLowerCase();
-  return [
-    "true",
-    "false",
-    "yes",
-    "no",
-    "y",
-    "n",
-    "예",
-    "아니오",
-  ].includes(text);
+  return ["true", "false", "yes", "no", "y", "n", "예", "아니오"].includes(
+    text,
+  );
 }
 
 function isNumberLike(value) {
@@ -91,8 +82,8 @@ function looksLikeSentenceOrNote(value = "") {
 
   return Boolean(
     text.length >= 50 ||
-      /[.!?。]|입니다|합니다|관련하여|참고|주의|설명/.test(text) ||
-      /^\s*(※|\*|주\s*[:：.]|note\b|remark\b)/i.test(text),
+    /[.!?。]|입니다|합니다|관련하여|참고|주의|설명/.test(text) ||
+    /^\s*(※|\*|주\s*[:：.]|note\b|remark\b)/i.test(text),
   );
 }
 
@@ -176,8 +167,7 @@ function buildRowStructuralProfile(row = []) {
   const dateCount = count("date");
   const timeCount = count("time");
   const booleanCount = count("boolean");
-  const measureValueCount =
-    numberCount + dateCount + timeCount + booleanCount;
+  const measureValueCount = numberCount + dateCount + timeCount + booleanCount;
   const dataValueCount = measureValueCount + periodCount;
   const headerLexicalCount = nonEmptyIndexes.filter((index) =>
     headerLexicalToken(row[index]),
@@ -238,10 +228,7 @@ function rowTypeSignatureSimilarity(leftRow = [], rightRow = []) {
   const right = buildRowStructuralProfile(rightRow);
   if (!left.nonEmpty || !right.nonEmpty) return 0;
 
-  const union = new Set([
-    ...left.nonEmptyIndexes,
-    ...right.nonEmptyIndexes,
-  ]);
+  const union = new Set([...left.nonEmptyIndexes, ...right.nonEmptyIndexes]);
   let comparable = 0;
   let matched = 0;
 
@@ -295,10 +282,7 @@ function scoreSubsequentRowRepeatability(row = [], nextRows = []) {
 
   for (let index = 1; index < following.length; index += 1) {
     adjacentSimilarities.push(
-      rowTypeSignatureSimilarity(
-        following[index - 1],
-        following[index],
-      ),
+      rowTypeSignatureSimilarity(following[index - 1], following[index]),
     );
   }
 
@@ -316,17 +300,11 @@ function scoreSubsequentRowRepeatability(row = [], nextRows = []) {
 
 function analyzeHeaderDataStructure(row = [], nextRows = []) {
   const profile = buildRowStructuralProfile(row);
-  const repeatability = scoreSubsequentRowRepeatability(
-    row,
-    nextRows,
-  );
+  const repeatability = scoreSubsequentRowRepeatability(row, nextRows);
 
-  const firstIsRecordValue = [
-    "number",
-    "date",
-    "time",
-    "period",
-  ].includes(profile.firstType);
+  const firstIsRecordValue = ["number", "date", "time", "period"].includes(
+    profile.firstType,
+  );
 
   const enoughRepeatability =
     repeatability.supportCount >=
@@ -335,11 +313,11 @@ function analyzeHeaderDataStructure(row = [], nextRows = []) {
 
   const likelyDataRecord = Boolean(
     profile.nonEmpty >= 3 &&
-      profile.measureValueRatio >= 0.2 &&
-      enoughRepeatability &&
-      (firstIsRecordValue ||
-        profile.headerLexicalRatio < 0.72 ||
-        profile.dataValueRatio >= 0.5),
+    profile.measureValueRatio >= 0.2 &&
+    enoughRepeatability &&
+    (firstIsRecordValue ||
+      profile.headerLexicalRatio < 0.72 ||
+      profile.dataValueRatio >= 0.5),
   );
 
   const followingLooksLikeStableData =
@@ -348,11 +326,10 @@ function analyzeHeaderDataStructure(row = [], nextRows = []) {
 
   const likelySchemaHeader = Boolean(
     profile.nonEmpty >= 2 &&
-      profile.headerLexicalRatio >= 0.65 &&
-      profile.measureValueRatio <= 0.15 &&
-      !likelyDataRecord &&
-      (followingLooksLikeStableData ||
-        repeatability.candidateSimilarity <= 0.6),
+    profile.headerLexicalRatio >= 0.65 &&
+    profile.measureValueRatio <= 0.15 &&
+    !likelyDataRecord &&
+    (followingLooksLikeStableData || repeatability.candidateSimilarity <= 0.6),
   );
 
   let scoreAdjustment = 0;
@@ -384,35 +361,24 @@ function analyzeHeaderDataStructure(row = [], nextRows = []) {
       firstType: profile.firstType,
       textRatio: Number(profile.textRatio.toFixed(3)),
       periodRatio: Number(profile.periodRatio.toFixed(3)),
-      measureValueRatio: Number(
-        profile.measureValueRatio.toFixed(3),
-      ),
+      measureValueRatio: Number(profile.measureValueRatio.toFixed(3)),
       dataValueRatio: Number(profile.dataValueRatio.toFixed(3)),
-      headerLexicalRatio: Number(
-        profile.headerLexicalRatio.toFixed(3),
-      ),
+      headerLexicalRatio: Number(profile.headerLexicalRatio.toFixed(3)),
       fillRatio: Number(profile.fillRatio.toFixed(3)),
       suspiciousConcatenatedRatio: Number(
         profile.suspiciousConcatenatedRatio.toFixed(3),
       ),
     },
     repeatability: {
-      candidateSimilarity: Number(
-        repeatability.candidateSimilarity.toFixed(3),
-      ),
-      followingSimilarity: Number(
-        repeatability.followingSimilarity.toFixed(3),
-      ),
+      candidateSimilarity: Number(repeatability.candidateSimilarity.toFixed(3)),
+      followingSimilarity: Number(repeatability.followingSimilarity.toFixed(3)),
       supportCount: repeatability.supportCount,
       followingRowCount: repeatability.followingRowCount,
     },
   };
 }
 
-function analyzeFlattenedHeaderBand(
-  rows = [],
-  mergedHeaders = [],
-) {
+function analyzeFlattenedHeaderBand(rows = [], mergedHeaders = []) {
   const profiles = (rows || []).map(buildRowStructuralProfile);
   const adjacentSimilarities = [];
 
@@ -429,9 +395,7 @@ function analyzeFlattenedHeaderBand(
     profiles.map((profile) => profile.dataValueRatio),
   );
   const adjacentTypeSimilarity = average(adjacentSimilarities);
-  const mergedValues = (mergedHeaders || []).filter(
-    (value) => !isEmpty(value),
-  );
+  const mergedValues = (mergedHeaders || []).filter((value) => !isEmpty(value));
   const suspiciousMergedCount = mergedValues.filter(
     looksLikeSuspiciousConcatenatedHeader,
   ).length;
@@ -441,27 +405,19 @@ function analyzeFlattenedHeaderBand(
 
   const rejectAsDataBand = Boolean(
     rows.length > 1 &&
-      averageMeasureValueRatio >= 0.2 &&
-      adjacentTypeSimilarity >= 0.68 &&
-      suspiciousMergedRatio >= 0.2,
+    averageMeasureValueRatio >= 0.2 &&
+    adjacentTypeSimilarity >= 0.68 &&
+    suspiciousMergedRatio >= 0.2,
   );
 
   return {
     version: STRUCTURAL_HEADER_DATA_CLASSIFIER_VERSION,
     depth: rows.length,
-    adjacentTypeSimilarity: Number(
-      adjacentTypeSimilarity.toFixed(3),
-    ),
-    averageMeasureValueRatio: Number(
-      averageMeasureValueRatio.toFixed(3),
-    ),
-    averageDataValueRatio: Number(
-      averageDataValueRatio.toFixed(3),
-    ),
+    adjacentTypeSimilarity: Number(adjacentTypeSimilarity.toFixed(3)),
+    averageMeasureValueRatio: Number(averageMeasureValueRatio.toFixed(3)),
+    averageDataValueRatio: Number(averageDataValueRatio.toFixed(3)),
     suspiciousMergedCount,
-    suspiciousMergedRatio: Number(
-      suspiciousMergedRatio.toFixed(3),
-    ),
+    suspiciousMergedRatio: Number(suspiciousMergedRatio.toFixed(3)),
     rejectAsDataBand,
   };
 }

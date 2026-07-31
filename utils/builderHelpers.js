@@ -1,7 +1,3 @@
-/* =========================
- * 시트 / 헤더 메타 공통 헬퍼
- * ========================= */
-
 /** 시트 메타 조회 */
 function sheetInfoOf(ctx, sheetName) {
   return (ctx.allSheetsData && ctx.allSheetsData[sheetName]) || null;
@@ -61,7 +57,7 @@ function refFromHeaderSpec(ctx, spec) {
       const r = resolveHeaderInSheet(
         ctx,
         spec.header,
-        ctx.bestReturn.sheetName
+        ctx.bestReturn.sheetName,
       );
       if (r) return r;
     }
@@ -119,7 +115,7 @@ function evalSubIntentToScalar(ctx, formatValue, node) {
       fb,
       { ...ctx, intent: node },
       formatValue,
-      fb._buildConditionPairs
+      fb._buildConditionPairs,
     );
     if (typeof res === "string" && res.startsWith("=")) {
       return res.slice(1);
