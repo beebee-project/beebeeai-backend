@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beebeeai.kr/schemas/llm-business-domain-profile-v1.json",
+  "title": "BeeBee AI LLM Business Domain Profile v1",
+  "type": "object",
+  "required": [
+    "version",
+    "schemaVersion",
+    "taxonomyVersion",
+    "promptVersion",
+    "source",
+    "model",
+    "privacy",
+    "classification",
+    "usage",
+    "integrity",
+    "profileSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": "llm_business_domain_profile_v1"
+    },
+    "schemaVersion": {
+      "const": "query_business_domain_schema_v1"
+    },
+    "taxonomyVersion": {
+      "const": "query_business_domain_taxonomy_v1"
+    },
+    "promptVersion": {
+      "const": "query_business_domain_prompt_v1"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "fileName",
+        "semanticProfileVersion",
+        "semanticProfileSha256",
+        "inputSha256"
+      ],
+      "properties": {
+        "caseId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "semanticProfileVersion": { "type": "string" },
+        "semanticProfileSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "provider",
+        "model",
+        "reasoningEffort",
+        "responseId"
+      ],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "reasoningEffort": {
+          "enum": ["none", "low", "medium", "high", "xhigh", "max"]
+        },
+        "responseId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "privacy": {
+      "type": "object",
+      "required": [
+        "rawRowsSent",
+        "sampleValuesSent",
+        "originalFileSent",
+        "fileNameSent",
+        "includedTableCount",
+        "includedColumnCount"
+      ],
+      "properties": {
+        "rawRowsSent": { "const": false },
+        "sampleValuesSent": { "const": false },
+        "originalFileSent": { "const": false },
+        "fileNameSent": { "const": false },
+        "includedTableCount": { "type": "integer", "minimum": 0 },
+        "includedColumnCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "classification": {
+      "type": "object",
+      "required": [
+        "primaryDomain",
+        "secondaryDomains",
+        "datasetIntent",
+        "confidence",
+        "evidence",
+        "ambiguities",
+        "requiresHumanReview"
+      ],
+      "properties": {
+        "primaryDomain": {
+          "enum": [
+            "SALES_REVENUE",
+            "FINANCE_BUDGET",
+            "EVENT_ATTENDANCE",
+            "EDUCATION_EVALUATION",
+            "HR_PEOPLE",
+            "INVENTORY_LOGISTICS",
+            "PROJECT_RESEARCH_ADMIN",
+            "SURVEY_FEEDBACK",
+            "CUSTOMER_VENDOR",
+            "OPERATIONS_GENERAL",
+            "UNKNOWN"
+          ]
+        },
+        "secondaryDomains": {
+          "type": "array",
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "datasetIntent": {
+          "enum": [
+            "TRANSACTION_ANALYSIS",
+            "BUDGET_EXECUTION",
+            "ATTENDANCE_TRACKING",
+            "APPLICATION_TRACKING",
+            "PERFORMANCE_EVALUATION",
+            "SURVEY_ANALYSIS",
+            "INVENTORY_TRACKING",
+            "ROSTER_MANAGEMENT",
+            "STATUS_TRACKING",
+            "TIME_TREND",
+            "RANKING_COMPARISON",
+            "AGGREGATE_SUMMARY",
+            "GENERAL_TABULAR_RECORDS",
+            "UNKNOWN"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "ambiguities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ambiguity" }
+        },
+        "requiresHumanReview": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "inputTokens",
+        "cachedInputTokens",
+        "cacheWriteTokens",
+        "outputTokens",
+        "reasoningTokens",
+        "totalTokens",
+        "estimatedCostUsd"
+      ],
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "cachedInputTokens": { "type": "integer", "minimum": 0 },
+        "cacheWriteTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 },
+        "reasoningTokens": { "type": "integer", "minimum": 0 },
+        "totalTokens": { "type": "integer", "minimum": 0 },
+        "estimatedCostUsd": {
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "modelOutputSha256",
+        "validationWarningCount",
+        "inputTableCount",
+        "inputColumnCount"
+      ],
+      "properties": {
+        "modelOutputSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "validationWarningCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inputTableCount": { "type": "integer", "minimum": 0 },
+        "inputColumnCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "profileSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "tableId",
+        "columnIds",
+        "signalCode",
+        "description",
+        "strength"
+      ],
+      "properties": {
+        "tableId": { "type": "string" },
+        "columnIds": { "$ref": "#/$defs/stringArray" },
+        "signalCode": {
+          "enum": [
+            "HEADER_SEMANTICS",
+            "ROLE_COMBINATION",
+            "METRIC_FAMILY",
+            "SHEET_CONTEXT",
+            "TABLE_RELATIONSHIP",
+            "OPERATION_PATTERN",
+            "INSUFFICIENT_EVIDENCE"
+          ]
+        },
+        "description": { "type": "string" },
+        "strength": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ambiguity": {
+      "type": "object",
+      "required": ["code", "description", "tableIds", "columnIds"],
+      "properties": {
+        "code": {
+          "enum": [
+            "DOMAIN_OVERLAP",
+            "GENERIC_HEADERS",
+            "MULTIPLE_DATASETS",
+            "INSUFFICIENT_CONTEXT",
+            "CONFLICTING_SIGNALS",
+            "OTHER"
+          ]
+        },
+        "description": { "type": "string" },
+        "tableIds": { "$ref": "#/$defs/stringArray" },
+        "columnIds": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
