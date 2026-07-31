@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beebeeai.kr/schemas/query-json-semantic-profile-v1.json",
+  "title": "BeeBee AI Query JSON Semantic Profile v1",
+  "type": "object",
+  "required": [
+    "version",
+    "tableProfileVersion",
+    "columnProfileVersion",
+    "source",
+    "counts",
+    "availableRoles",
+    "metricFamilies",
+    "supportedOperations",
+    "availableCapabilities",
+    "tables",
+    "issues",
+    "profileSha256"
+  ],
+  "properties": {
+    "version": { "const": "query_json_semantic_profile_v1" },
+    "tableProfileVersion": { "const": "query_json_table_profile_v1" },
+    "columnProfileVersion": { "const": "query_json_column_profile_v1" },
+    "source": {
+      "type": "object",
+      "required": ["caseId", "fileName", "querySchemaVersion", "querySha256", "tableSourceKey"],
+      "properties": {
+        "caseId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "querySchemaVersion": { "type": "string" },
+        "querySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "tableSourceKey": { "enum": ["normalizedQueryTables", "tables", "queryTables", "none"] }
+      },
+      "additionalProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "totalTables",
+        "analysisEligibleTables",
+        "templateEligibleTables",
+        "primaryTables",
+        "virtualTables",
+        "totalColumns",
+        "measureColumns",
+        "dimensionColumns",
+        "blockingIssues",
+        "warningIssues",
+        "infoIssues"
+      ],
+      "properties": {
+        "totalTables": { "type": "integer", "minimum": 0 },
+        "analysisEligibleTables": { "type": "integer", "minimum": 0 },
+        "templateEligibleTables": { "type": "integer", "minimum": 0 },
+        "primaryTables": { "type": "integer", "minimum": 0 },
+        "virtualTables": { "type": "integer", "minimum": 0 },
+        "totalColumns": { "type": "integer", "minimum": 0 },
+        "measureColumns": { "type": "integer", "minimum": 0 },
+        "dimensionColumns": { "type": "integer", "minimum": 0 },
+        "blockingIssues": { "type": "integer", "minimum": 0 },
+        "warningIssues": { "type": "integer", "minimum": 0 },
+        "infoIssues": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "availableRoles": { "$ref": "#/$defs/stringArray" },
+    "metricFamilies": { "$ref": "#/$defs/stringArray" },
+    "supportedOperations": { "$ref": "#/$defs/stringArray" },
+    "availableCapabilities": { "$ref": "#/$defs/stringArray" },
+    "tables": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/table" }
+    },
+    "issues": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/issue" }
+    },
+    "profileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "issue": {
+      "type": "object",
+      "required": ["code", "level", "message", "details"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "level": { "enum": ["INFO", "WARNING", "BLOCKING"] },
+        "message": { "type": "string", "minLength": 1 },
+        "details": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "column": {
+      "type": "object",
+      "required": [
+        "version",
+        "columnId",
+        "index",
+        "sourceHeader",
+        "normalizedHeader",
+        "dataType",
+        "dataTypeConfidence",
+        "dataTypeSource",
+        "semanticRole",
+        "roleAliases",
+        "semanticType",
+        "roleConfidence",
+        "roleSource",
+        "metricFamily",
+        "supportedOperations",
+        "capabilities",
+        "stats",
+        "sampleValues",
+        "evidence",
+        "issues",
+        "columnSha256"
+      ],
+      "properties": {
+        "version": { "const": "query_json_column_profile_v1" },
+        "columnId": { "type": "string", "minLength": 1 },
+        "index": { "type": "integer", "minimum": 0 },
+        "sourceHeader": { "type": "string" },
+        "normalizedHeader": { "type": "string" },
+        "dataType": { "enum": ["string", "number", "date", "boolean", "unknown"] },
+        "dataTypeConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "dataTypeSource": { "type": "string" },
+        "semanticRole": { "type": "string", "minLength": 1 },
+        "roleAliases": { "$ref": "#/$defs/stringArray" },
+        "semanticType": { "enum": ["dimension", "measure", "identifier", "text", "unknown"] },
+        "roleConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "roleSource": { "type": "string" },
+        "metricFamily": { "type": "string" },
+        "supportedOperations": { "$ref": "#/$defs/stringArray" },
+        "capabilities": { "$ref": "#/$defs/stringArray" },
+        "stats": {
+          "type": "object",
+          "required": ["sampledValueCount", "nonEmptyCount", "nonEmptyRatio", "uniqueCount", "uniqueRatio"],
+          "properties": {
+            "sampledValueCount": { "type": "integer", "minimum": 0 },
+            "nonEmptyCount": { "type": "integer", "minimum": 0 },
+            "nonEmptyRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+            "uniqueCount": { "type": "integer", "minimum": 0 },
+            "uniqueRatio": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "sampleValues": { "type": "array", "maxItems": 5 },
+        "evidence": {
+          "type": "object",
+          "required": ["explicitDataType", "explicitSemanticRole"],
+          "properties": {
+            "explicitDataType": { "type": "string" },
+            "explicitSemanticRole": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } },
+        "columnSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "table": {
+      "type": "object",
+      "required": [
+        "version",
+        "index",
+        "tableId",
+        "sourceTableId",
+        "sourceSheetName",
+        "flags",
+        "shape",
+        "quality",
+        "availableRoles",
+        "metricFamilies",
+        "supportedOperations",
+        "capabilities",
+        "columns",
+        "issues",
+        "tableSha256"
+      ],
+      "properties": {
+        "version": { "const": "query_json_table_profile_v1" },
+        "index": { "type": "integer", "minimum": 0 },
+        "tableId": { "type": "string", "minLength": 1 },
+        "sourceTableId": { "type": "string" },
+        "sourceSheetName": { "type": "string" },
+        "flags": {
+          "type": "object",
+          "required": ["primary", "analysisEligible", "templateEligible", "virtual"],
+          "properties": {
+            "primary": { "type": "boolean" },
+            "analysisEligible": { "type": "boolean" },
+            "templateEligible": { "type": "boolean" },
+            "virtual": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "shape": {
+          "type": "object",
+          "required": [
+            "rowCount",
+            "sampledRowCount",
+            "columnCount",
+            "blankHeaderCount",
+            "duplicateHeaderCount",
+            "mergedHeader",
+            "subtotalRowCount",
+            "totalRowCount",
+            "multiHeaderRowCount"
+          ],
+          "properties": {
+            "rowCount": { "type": "number", "minimum": 0 },
+            "sampledRowCount": { "type": "integer", "minimum": 0 },
+            "columnCount": { "type": "integer", "minimum": 0 },
+            "blankHeaderCount": { "type": "integer", "minimum": 0 },
+            "duplicateHeaderCount": { "type": "integer", "minimum": 0 },
+            "mergedHeader": { "type": "boolean" },
+            "subtotalRowCount": { "type": "integer", "minimum": 0 },
+            "totalRowCount": { "type": "integer", "minimum": 0 },
+            "multiHeaderRowCount": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "quality": {
+          "type": "object",
+          "required": ["sampledCellCount", "nonEmptyCellCount", "nonEmptyRatio"],
+          "properties": {
+            "sampledCellCount": { "type": "integer", "minimum": 0 },
+            "nonEmptyCellCount": { "type": "integer", "minimum": 0 },
+            "nonEmptyRatio": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "availableRoles": { "$ref": "#/$defs/stringArray" },
+        "metricFamilies": { "$ref": "#/$defs/stringArray" },
+        "supportedOperations": { "$ref": "#/$defs/stringArray" },
+        "capabilities": { "$ref": "#/$defs/stringArray" },
+        "columns": { "type": "array", "items": { "$ref": "#/$defs/column" } },
+        "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } },
+        "tableSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

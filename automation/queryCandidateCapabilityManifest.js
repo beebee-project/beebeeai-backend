@@ -1,11 +1,6 @@
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
-const {
-  normalizeText,
-  sha256,
-} = require("./queryCandidateObservation");
+const { normalizeText, sha256 } = require("./queryCandidateObservation");
 
 const QUERY_CANDIDATE_CAPABILITY_MANIFEST_VERSION =
   "query_candidate_capability_manifest_v1";
@@ -102,11 +97,7 @@ function loadDefaultCapabilitySources({ rootDir = process.cwd() } = {}) {
 }
 
 function sourceRole(item = {}, requiredFallback = false, source = "") {
-  const aliases = unique([
-    ...asArray(item.aliases),
-    item.label,
-    item.role,
-  ]);
+  const aliases = unique([...asArray(item.aliases), item.label, item.role]);
   return {
     role: normalizeText(item.role || item.label || ""),
     aliases,
@@ -239,14 +230,18 @@ function looseMatches(entries = [], candidate = {}) {
     candidate.templateId,
     candidate.recipeId,
     ...asArray(candidate.recipeIds),
-  ]).map(normalizeLoose).filter((value) => value.length >= 6);
+  ])
+    .map(normalizeLoose)
+    .filter((value) => value.length >= 6);
   if (!candidateValues.length) return [];
   return entries.filter((entry) =>
     entry.matchKeys
       .map(normalizeLoose)
       .some((key) =>
         candidateValues.some(
-          (value) => key && (key === value || key.includes(value) || value.includes(key)),
+          (value) =>
+            key &&
+            (key === value || key.includes(value) || value.includes(key)),
         ),
       ),
   );
@@ -291,10 +286,7 @@ function fromOverlayMatch(match = {}) {
     bindingSource: "OVERLAY",
     bindingKey: normalizeText(match.key || ""),
     contractIds: unique(entry.contractIds),
-    matchedTemplateIds: unique([
-      entry.templateId,
-      ...asArray(entry.aliases),
-    ]),
+    matchedTemplateIds: unique([entry.templateId, ...asArray(entry.aliases)]),
     requiredColumnRoles,
     optionalColumnRoles,
     metrics,
@@ -313,7 +305,11 @@ function explicitCandidateDescriptor(candidate = {}) {
     .map((metric) => normalizeMetric(metric, "explicit_candidate"))
     .filter((metric) => metric.metricId);
   const explicitCapabilities = unique(candidate.requiredCapabilities);
-  if (!requiredColumnRoles.length && !metrics.length && !explicitCapabilities.length) {
+  if (
+    !requiredColumnRoles.length &&
+    !metrics.length &&
+    !explicitCapabilities.length
+  ) {
     return null;
   }
   return {
@@ -360,7 +356,9 @@ function inferDescriptor(candidate = {}) {
       if (!normalizedToken) return false;
       if (/^[a-z0-9]+$/u.test(normalizedToken)) {
         const escaped = normalizedToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "u").test(rawText);
+        return new RegExp(`(^|[^a-z0-9])${escaped}(?=$|[^a-z0-9])`, "u").test(
+          rawText,
+        );
       }
       return compactText.includes(normalizedToken);
     });
@@ -488,7 +486,9 @@ function capabilityItem(candidate = {}, descriptor = {}) {
     ...asArray(descriptor.requiredColumnRoles).map(
       (role) => `column_role:${role.role}`,
     ),
-    ...(candidate.sourceTableIds?.length > 1 ? ["multi_table"] : ["single_table"]),
+    ...(candidate.sourceTableIds?.length > 1
+      ? ["multi_table"]
+      : ["single_table"]),
   ]);
   const item = {
     version: QUERY_CANDIDATE_CAPABILITY_ITEM_VERSION,
@@ -572,9 +572,12 @@ function buildQueryCandidateCapabilityManifest({
     counts: {
       total: candidates.length,
       bound: candidates.filter((item) => item.bindingStatus === "BOUND").length,
-      partial: candidates.filter((item) => item.bindingStatus === "PARTIAL").length,
-      inferred: candidates.filter((item) => item.bindingStatus === "INFERRED").length,
-      unbound: candidates.filter((item) => item.bindingStatus === "UNBOUND").length,
+      partial: candidates.filter((item) => item.bindingStatus === "PARTIAL")
+        .length,
+      inferred: candidates.filter((item) => item.bindingStatus === "INFERRED")
+        .length,
+      unbound: candidates.filter((item) => item.bindingStatus === "UNBOUND")
+        .length,
       executorDeclared: candidates.filter(
         (item) => item.executorSupport.status === "DECLARED",
       ).length,
@@ -601,10 +604,22 @@ function validateRole(role = {}, pathValue = "") {
     errors.push(issue(`${pathValue}.role`, "required", "role이 필요합니다."));
   }
   if (!Array.isArray(role.aliases)) {
-    errors.push(issue(`${pathValue}.aliases`, "invalid_type", "aliases는 배열이어야 합니다."));
+    errors.push(
+      issue(
+        `${pathValue}.aliases`,
+        "invalid_type",
+        "aliases는 배열이어야 합니다.",
+      ),
+    );
   }
   if (typeof role.required !== "boolean") {
-    errors.push(issue(`${pathValue}.required`, "invalid_type", "required는 boolean이어야 합니다."));
+    errors.push(
+      issue(
+        `${pathValue}.required`,
+        "invalid_type",
+        "required는 boolean이어야 합니다.",
+      ),
+    );
   }
   return errors;
 }
@@ -614,41 +629,105 @@ function validateCapabilityItem(item = {}, index = 0) {
   const errors = [];
   const warnings = [];
   if (item.version !== QUERY_CANDIDATE_CAPABILITY_ITEM_VERSION) {
-    errors.push(issue(`${pathValue}.version`, "invalid_version", "item version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        `${pathValue}.version`,
+        "invalid_version",
+        "item version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (!normalizeText(item.candidateId)) {
-    errors.push(issue(`${pathValue}.candidateId`, "required", "candidateId가 필요합니다."));
+    errors.push(
+      issue(
+        `${pathValue}.candidateId`,
+        "required",
+        "candidateId가 필요합니다.",
+      ),
+    );
   }
   if (!BINDING_STATUS.includes(item.bindingStatus)) {
-    errors.push(issue(`${pathValue}.bindingStatus`, "invalid_enum", "bindingStatus가 유효하지 않습니다."));
+    errors.push(
+      issue(
+        `${pathValue}.bindingStatus`,
+        "invalid_enum",
+        "bindingStatus가 유효하지 않습니다.",
+      ),
+    );
   }
   if (!BINDING_SOURCE.includes(item.bindingSource)) {
-    errors.push(issue(`${pathValue}.bindingSource`, "invalid_enum", "bindingSource가 유효하지 않습니다."));
+    errors.push(
+      issue(
+        `${pathValue}.bindingSource`,
+        "invalid_enum",
+        "bindingSource가 유효하지 않습니다.",
+      ),
+    );
   }
   if (!EXECUTOR_SUPPORT_STATUS.includes(item.executorSupport?.status)) {
-    errors.push(issue(`${pathValue}.executorSupport.status`, "invalid_enum", "executor support status가 유효하지 않습니다."));
+    errors.push(
+      issue(
+        `${pathValue}.executorSupport.status`,
+        "invalid_enum",
+        "executor support status가 유효하지 않습니다.",
+      ),
+    );
   }
   asArray(item.requiredColumnRoles).forEach((role, roleIndex) => {
-    errors.push(...validateRole(role, `${pathValue}.requiredColumnRoles[${roleIndex}]`));
+    errors.push(
+      ...validateRole(role, `${pathValue}.requiredColumnRoles[${roleIndex}]`),
+    );
   });
   asArray(item.optionalColumnRoles).forEach((role, roleIndex) => {
-    errors.push(...validateRole(role, `${pathValue}.optionalColumnRoles[${roleIndex}]`));
+    errors.push(
+      ...validateRole(role, `${pathValue}.optionalColumnRoles[${roleIndex}]`),
+    );
   });
   if (item.bindingStatus === "BOUND" && !item.bindingKey) {
-    errors.push(issue(`${pathValue}.bindingKey`, "required_for_bound", "BOUND 후보에는 bindingKey가 필요합니다."));
+    errors.push(
+      issue(
+        `${pathValue}.bindingKey`,
+        "required_for_bound",
+        "BOUND 후보에는 bindingKey가 필요합니다.",
+      ),
+    );
   }
   if (item.bindingStatus === "UNBOUND") {
-    warnings.push(issue(pathValue, "candidate_capability_unbound", "후보 capability가 아직 manifest에 연결되지 않았습니다."));
+    warnings.push(
+      issue(
+        pathValue,
+        "candidate_capability_unbound",
+        "후보 capability가 아직 manifest에 연결되지 않았습니다.",
+      ),
+    );
   }
   if (item.bindingStatus === "INFERRED") {
-    warnings.push(issue(pathValue, "candidate_capability_inferred", "식별자 기반 추론 capability입니다."));
+    warnings.push(
+      issue(
+        pathValue,
+        "candidate_capability_inferred",
+        "식별자 기반 추론 capability입니다.",
+      ),
+    );
   }
   if (item.executorSupport?.status !== "DECLARED") {
-    warnings.push(issue(`${pathValue}.executorSupport`, "executor_support_not_declared", "executor 지원이 명시적으로 선언되지 않았습니다."));
+    warnings.push(
+      issue(
+        `${pathValue}.executorSupport`,
+        "executor_support_not_declared",
+        "executor 지원이 명시적으로 선언되지 않았습니다.",
+      ),
+    );
   }
   const expectedSha = sha256({ ...item, capabilitySha256: undefined });
   if (item.capabilitySha256 !== expectedSha) {
-    errors.push(issue(`${pathValue}.capabilitySha256`, "sha_mismatch", "capability SHA-256이 일치하지 않습니다."));
+    errors.push(
+      issue(
+        `${pathValue}.capabilitySha256`,
+        "sha_mismatch",
+        "capability SHA-256이 일치하지 않습니다.",
+      ),
+    );
   }
   return { errors, warnings };
 }
@@ -657,13 +736,27 @@ function validateQueryCandidateCapabilityManifest(manifest = {}) {
   const errors = [];
   const warnings = [];
   if (manifest.version !== QUERY_CANDIDATE_CAPABILITY_MANIFEST_VERSION) {
-    errors.push(issue("version", "invalid_version", "manifest version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "version",
+        "invalid_version",
+        "manifest version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (manifest.itemVersion !== QUERY_CANDIDATE_CAPABILITY_ITEM_VERSION) {
-    errors.push(issue("itemVersion", "invalid_version", "itemVersion이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "itemVersion",
+        "invalid_version",
+        "itemVersion이 유효하지 않습니다.",
+      ),
+    );
   }
   if (!Array.isArray(manifest.candidates)) {
-    errors.push(issue("candidates", "invalid_type", "candidates는 배열이어야 합니다."));
+    errors.push(
+      issue("candidates", "invalid_type", "candidates는 배열이어야 합니다."),
+    );
   } else {
     manifest.candidates.forEach((item, index) => {
       const validation = validateCapabilityItem(item, index);
@@ -672,18 +765,36 @@ function validateQueryCandidateCapabilityManifest(manifest = {}) {
     });
   }
   if (manifest.counts?.total !== asArray(manifest.candidates).length) {
-    errors.push(issue("counts.total", "count_mismatch", "candidate 수와 counts.total이 다릅니다."));
+    errors.push(
+      issue(
+        "counts.total",
+        "count_mismatch",
+        "candidate 수와 counts.total이 다릅니다.",
+      ),
+    );
   }
   const statusTotal = ["bound", "partial", "inferred", "unbound"].reduce(
     (sum, key) => sum + Number(manifest.counts?.[key] || 0),
     0,
   );
   if (statusTotal !== Number(manifest.counts?.total || 0)) {
-    errors.push(issue("counts", "binding_count_mismatch", "binding 상태 합계가 total과 다릅니다."));
+    errors.push(
+      issue(
+        "counts",
+        "binding_count_mismatch",
+        "binding 상태 합계가 total과 다릅니다.",
+      ),
+    );
   }
   const expectedSha = sha256({ ...manifest, manifestSha256: undefined });
   if (manifest.manifestSha256 !== expectedSha) {
-    errors.push(issue("manifestSha256", "sha_mismatch", "manifest SHA-256이 일치하지 않습니다."));
+    errors.push(
+      issue(
+        "manifestSha256",
+        "sha_mismatch",
+        "manifest SHA-256이 일치하지 않습니다.",
+      ),
+    );
   }
   return {
     valid: errors.length === 0,

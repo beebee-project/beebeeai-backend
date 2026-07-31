@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   CANDIDATE_GROUPS,
   normalizeText,
@@ -196,7 +194,9 @@ function numericCandidates(records = [], selectors = []) {
 }
 
 function minPositive(values = []) {
-  const filtered = values.filter((value) => Number.isFinite(value) && value >= 1);
+  const filtered = values.filter(
+    (value) => Number.isFinite(value) && value >= 1,
+  );
   return filtered.length ? Math.min(...filtered) : null;
 }
 
@@ -205,7 +205,12 @@ function maxFinite(values = []) {
   return filtered.length ? Math.max(...filtered) : null;
 }
 
-function extractEvidence(records = [], recipeIds = [], sourceTableIds = [], sourceSheetNames = []) {
+function extractEvidence(
+  records = [],
+  recipeIds = [],
+  sourceTableIds = [],
+  sourceSheetNames = [],
+) {
   const evidence = [];
   const keys = new Set();
 
@@ -226,7 +231,8 @@ function extractEvidence(records = [], recipeIds = [], sourceTableIds = [], sour
     if (keys.has(key)) return;
     keys.add(key);
     normalized.evidenceId =
-      normalized.evidenceId || `evidence_${String(evidence.length + 1).padStart(3, "0")}`;
+      normalized.evidenceId ||
+      `evidence_${String(evidence.length + 1).padStart(3, "0")}`;
     evidence.push(normalized);
   }
 
@@ -290,7 +296,9 @@ function extractRisks(records = []) {
           ? { code: "legacy_warning", level: "WARNING", message: raw }
           : {
               code: raw?.code || raw?.reasonCode || "legacy_warning",
-              level: normalizeText(raw?.level || raw?.severity || "WARNING").toUpperCase(),
+              level: normalizeText(
+                raw?.level || raw?.severity || "WARNING",
+              ).toUpperCase(),
               message: raw?.message || raw?.reason || "",
             };
       const normalized = {
@@ -535,8 +543,9 @@ function buildQueryCandidateContract({
     },
     counts: {
       total: candidates.length,
-      unassessed: candidates.filter((candidate) => candidate.status === "UNASSESSED")
-        .length,
+      unassessed: candidates.filter(
+        (candidate) => candidate.status === "UNASSESSED",
+      ).length,
       ready: 0,
       conditional: 0,
       unsupported: 0,
@@ -567,7 +576,9 @@ function validateCandidate(candidate = {}, index = 0) {
     );
   }
   if (!normalizeText(candidate.candidateId)) {
-    errors.push(issue(`${path}.candidateId`, "required", "candidateId가 필요합니다."));
+    errors.push(
+      issue(`${path}.candidateId`, "required", "candidateId가 필요합니다."),
+    );
   } else if (/\s|[\\/]/u.test(candidate.candidateId)) {
     errors.push(
       issue(
@@ -582,32 +593,62 @@ function validateCandidate(candidate = {}, index = 0) {
   }
   if (!CANDIDATE_TYPE.includes(candidate.candidateType)) {
     errors.push(
-      issue(`${path}.candidateType`, "invalid_enum", "candidateType이 유효하지 않습니다."),
+      issue(
+        `${path}.candidateType`,
+        "invalid_enum",
+        "candidateType이 유효하지 않습니다.",
+      ),
     );
   }
   if (!CANDIDATE_STATUS.includes(candidate.status)) {
-    errors.push(issue(`${path}.status`, "invalid_enum", "status가 유효하지 않습니다."));
+    errors.push(
+      issue(`${path}.status`, "invalid_enum", "status가 유효하지 않습니다."),
+    );
   }
   if (!OBSERVED_CLASS.includes(candidate.observedClass)) {
     errors.push(
-      issue(`${path}.observedClass`, "invalid_enum", "observedClass가 유효하지 않습니다."),
+      issue(
+        `${path}.observedClass`,
+        "invalid_enum",
+        "observedClass가 유효하지 않습니다.",
+      ),
     );
   }
   if (!CANDIDATE_VISIBILITY.includes(candidate.visibility)) {
     errors.push(
-      issue(`${path}.visibility`, "invalid_enum", "visibility가 유효하지 않습니다."),
+      issue(
+        `${path}.visibility`,
+        "invalid_enum",
+        "visibility가 유효하지 않습니다.",
+      ),
     );
   }
   if (!Array.isArray(candidate.recipeIds)) {
-    errors.push(issue(`${path}.recipeIds`, "invalid_type", "recipeIds는 배열이어야 합니다."));
+    errors.push(
+      issue(
+        `${path}.recipeIds`,
+        "invalid_type",
+        "recipeIds는 배열이어야 합니다.",
+      ),
+    );
   }
   if (!Array.isArray(candidate.outputTypes)) {
     errors.push(
-      issue(`${path}.outputTypes`, "invalid_type", "outputTypes는 배열이어야 합니다."),
+      issue(
+        `${path}.outputTypes`,
+        "invalid_type",
+        "outputTypes는 배열이어야 합니다.",
+      ),
     );
   }
   if (!Array.isArray(candidate.evidence)) {
-    errors.push(issue(`${path}.evidence`, "invalid_type", "evidence는 배열이어야 합니다."));
+    errors.push(
+      issue(
+        `${path}.evidence`,
+        "invalid_type",
+        "evidence는 배열이어야 합니다.",
+      ),
+    );
   }
   if (!Array.isArray(candidate.requiredCapabilities)) {
     errors.push(
@@ -628,35 +669,69 @@ function validateCandidate(candidate = {}, index = 0) {
     );
   }
   if (!Array.isArray(candidate.risks)) {
-    errors.push(issue(`${path}.risks`, "invalid_type", "risks는 배열이어야 합니다."));
+    errors.push(
+      issue(`${path}.risks`, "invalid_type", "risks는 배열이어야 합니다."),
+    );
   }
-  if (!candidate.reason || typeof candidate.reason !== "object" || Array.isArray(candidate.reason)) {
-    errors.push(issue(`${path}.reason`, "invalid_type", "reason은 객체여야 합니다."));
+  if (
+    !candidate.reason ||
+    typeof candidate.reason !== "object" ||
+    Array.isArray(candidate.reason)
+  ) {
+    errors.push(
+      issue(`${path}.reason`, "invalid_type", "reason은 객체여야 합니다."),
+    );
   } else {
     if (!Array.isArray(candidate.reason.codes)) {
       errors.push(
-        issue(`${path}.reason.codes`, "invalid_type", "reason.codes는 배열이어야 합니다."),
+        issue(
+          `${path}.reason.codes`,
+          "invalid_type",
+          "reason.codes는 배열이어야 합니다.",
+        ),
       );
     }
     if (typeof candidate.reason.summary !== "string") {
       errors.push(
-        issue(`${path}.reason.summary`, "invalid_type", "reason.summary는 문자열이어야 합니다."),
+        issue(
+          `${path}.reason.summary`,
+          "invalid_type",
+          "reason.summary는 문자열이어야 합니다.",
+        ),
       );
     }
     if (typeof candidate.reason.source !== "string") {
       errors.push(
-        issue(`${path}.reason.source`, "invalid_type", "reason.source는 문자열이어야 합니다."),
+        issue(
+          `${path}.reason.source`,
+          "invalid_type",
+          "reason.source는 문자열이어야 합니다.",
+        ),
       );
     }
   }
-  if (normalizeText(candidate.recipeId) && !asArray(candidate.recipeIds).includes(candidate.recipeId)) {
+  if (
+    normalizeText(candidate.recipeId) &&
+    !asArray(candidate.recipeIds).includes(candidate.recipeId)
+  ) {
     errors.push(
-      issue(`${path}.recipeId`, "recipe_id_not_in_recipe_ids", "recipeId는 recipeIds에 포함되어야 합니다."),
+      issue(
+        `${path}.recipeId`,
+        "recipe_id_not_in_recipe_ids",
+        "recipeId는 recipeIds에 포함되어야 합니다.",
+      ),
     );
   }
-  if (normalizeText(candidate.outputType) && !asArray(candidate.outputTypes).includes(candidate.outputType)) {
+  if (
+    normalizeText(candidate.outputType) &&
+    !asArray(candidate.outputTypes).includes(candidate.outputType)
+  ) {
     errors.push(
-      issue(`${path}.outputType`, "output_type_not_in_output_types", "outputType은 outputTypes에 포함되어야 합니다."),
+      issue(
+        `${path}.outputType`,
+        "output_type_not_in_output_types",
+        "outputType은 outputTypes에 포함되어야 합니다.",
+      ),
     );
   }
 
@@ -676,15 +751,30 @@ function validateCandidate(candidate = {}, index = 0) {
     }
   }
   if (candidate.score != null) {
-    if (!Number.isFinite(candidate.score) || candidate.score < 0 || candidate.score > 100) {
+    if (
+      !Number.isFinite(candidate.score) ||
+      candidate.score < 0 ||
+      candidate.score > 100
+    ) {
       errors.push(
-        issue(`${path}.score`, "out_of_range", "score는 null 또는 0~100 범위여야 합니다."),
+        issue(
+          `${path}.score`,
+          "out_of_range",
+          "score는 null 또는 0~100 범위여야 합니다.",
+        ),
       );
     }
   }
-  if (candidate.rank != null && (!Number.isInteger(candidate.rank) || candidate.rank < 1)) {
+  if (
+    candidate.rank != null &&
+    (!Number.isInteger(candidate.rank) || candidate.rank < 1)
+  ) {
     errors.push(
-      issue(`${path}.rank`, "invalid_rank", "rank는 null 또는 1 이상의 정수여야 합니다."),
+      issue(
+        `${path}.rank`,
+        "invalid_rank",
+        "rank는 null 또는 1 이상의 정수여야 합니다.",
+      ),
     );
   }
 
@@ -715,7 +805,11 @@ function validateCandidate(candidate = {}, index = 0) {
   if (candidate.status === "READY") {
     if (!normalizeText(candidate.recipeId)) {
       errors.push(
-        issue(`${path}.recipeId`, "ready_requires_recipe", "READY 후보는 recipeId가 필요합니다."),
+        issue(
+          `${path}.recipeId`,
+          "ready_requires_recipe",
+          "READY 후보는 recipeId가 필요합니다.",
+        ),
       );
     }
     if (candidate.confidence == null) {
@@ -729,7 +823,11 @@ function validateCandidate(candidate = {}, index = 0) {
     }
     if (!evidence.length) {
       errors.push(
-        issue(`${path}.evidence`, "ready_requires_evidence", "READY 후보는 evidence가 필요합니다."),
+        issue(
+          `${path}.evidence`,
+          "ready_requires_evidence",
+          "READY 후보는 evidence가 필요합니다.",
+        ),
       );
     }
     if (asArray(candidate.missingRequirements).length) {
@@ -758,7 +856,8 @@ function validateCandidate(candidate = {}, index = 0) {
 
   if (["UNSUPPORTED", "REJECTED"].includes(candidate.status)) {
     const hasReason =
-      normalizeText(candidate.reason?.summary) || asArray(candidate.reason?.codes).length;
+      normalizeText(candidate.reason?.summary) ||
+      asArray(candidate.reason?.codes).length;
     if (!hasReason) {
       errors.push(
         issue(
@@ -770,7 +869,10 @@ function validateCandidate(candidate = {}, index = 0) {
     }
   }
 
-  if (candidate.status === "UNASSESSED" && candidate.observedClass === "ELIGIBLE") {
+  if (
+    candidate.status === "UNASSESSED" &&
+    candidate.observedClass === "ELIGIBLE"
+  ) {
     warnings.push(
       issue(
         `${path}.status`,
@@ -789,7 +891,12 @@ function validateCandidate(candidate = {}, index = 0) {
     );
   }
 
-  return { candidateId: candidate.candidateId || "", valid: errors.length === 0, errors, warnings };
+  return {
+    candidateId: candidate.candidateId || "",
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
 }
 
 function validateQueryCandidateContract(contract = {}) {
@@ -814,18 +921,32 @@ function validateQueryCandidateContract(contract = {}) {
       ),
     );
   }
-  if (!contract.source || typeof contract.source !== "object" || Array.isArray(contract.source)) {
+  if (
+    !contract.source ||
+    typeof contract.source !== "object" ||
+    Array.isArray(contract.source)
+  ) {
     errors.push(issue("source", "invalid_type", "source는 객체여야 합니다."));
   }
-  if (!contract.counts || typeof contract.counts !== "object" || Array.isArray(contract.counts)) {
+  if (
+    !contract.counts ||
+    typeof contract.counts !== "object" ||
+    Array.isArray(contract.counts)
+  ) {
     errors.push(issue("counts", "invalid_type", "counts는 객체여야 합니다."));
   }
   if (!Array.isArray(contract.candidates)) {
-    errors.push(issue("candidates", "invalid_type", "candidates는 배열이어야 합니다."));
+    errors.push(
+      issue("candidates", "invalid_type", "candidates는 배열이어야 합니다."),
+    );
   }
   if (!/^[a-f0-9]{64}$/.test(normalizeText(contract.contractSha256))) {
     errors.push(
-      issue("contractSha256", "invalid_hash", "contractSha256는 64자리 SHA-256이어야 합니다."),
+      issue(
+        "contractSha256",
+        "invalid_hash",
+        "contractSha256는 64자리 SHA-256이어야 합니다.",
+      ),
     );
   }
 
@@ -835,38 +956,62 @@ function validateQueryCandidateContract(contract = {}) {
     warnings.push(...result.warnings);
   });
 
-  const ids = asArray(contract.candidates).map((candidate) => candidate.candidateId);
-  const duplicateIds = ids.filter((candidateId, index) => ids.indexOf(candidateId) !== index);
+  const ids = asArray(contract.candidates).map(
+    (candidate) => candidate.candidateId,
+  );
+  const duplicateIds = ids.filter(
+    (candidateId, index) => ids.indexOf(candidateId) !== index,
+  );
   unique(duplicateIds).forEach((candidateId) =>
     errors.push(
-      issue("candidates", "duplicate_candidate_id", `candidateId가 중복되었습니다: ${candidateId}`),
+      issue(
+        "candidates",
+        "duplicate_candidate_id",
+        `candidateId가 중복되었습니다: ${candidateId}`,
+      ),
     ),
   );
 
   const counts = contract.counts || {};
   const expectedCounts = {
     total: asArray(contract.candidates).length,
-    unassessed: asArray(contract.candidates).filter((candidate) => candidate.status === "UNASSESSED")
-      .length,
-    ready: asArray(contract.candidates).filter((candidate) => candidate.status === "READY").length,
-    conditional: asArray(contract.candidates).filter((candidate) => candidate.status === "CONDITIONAL")
-      .length,
-    unsupported: asArray(contract.candidates).filter((candidate) => candidate.status === "UNSUPPORTED")
-      .length,
-    rejected: asArray(contract.candidates).filter((candidate) => candidate.status === "REJECTED")
-      .length,
+    unassessed: asArray(contract.candidates).filter(
+      (candidate) => candidate.status === "UNASSESSED",
+    ).length,
+    ready: asArray(contract.candidates).filter(
+      (candidate) => candidate.status === "READY",
+    ).length,
+    conditional: asArray(contract.candidates).filter(
+      (candidate) => candidate.status === "CONDITIONAL",
+    ).length,
+    unsupported: asArray(contract.candidates).filter(
+      (candidate) => candidate.status === "UNSUPPORTED",
+    ).length,
+    rejected: asArray(contract.candidates).filter(
+      (candidate) => candidate.status === "REJECTED",
+    ).length,
   };
   Object.entries(expectedCounts).forEach(([key, expected]) => {
     if (counts[key] !== expected) {
       errors.push(
-        issue(`counts.${key}`, "count_mismatch", `counts.${key}는 ${expected}이어야 합니다.`),
+        issue(
+          `counts.${key}`,
+          "count_mismatch",
+          `counts.${key}는 ${expected}이어야 합니다.`,
+        ),
       );
     }
   });
 
   const expectedHash = sha256({ ...contract, contractSha256: undefined });
   if (contract.contractSha256 && contract.contractSha256 !== expectedHash) {
-    errors.push(issue("contractSha256", "hash_mismatch", "contractSha256가 내용과 일치하지 않습니다."));
+    errors.push(
+      issue(
+        "contractSha256",
+        "hash_mismatch",
+        "contractSha256가 내용과 일치하지 않습니다.",
+      ),
+    );
   }
 
   return {
@@ -899,11 +1044,19 @@ function recountContract(contract = {}) {
   const candidates = asArray(contract.candidates);
   contract.counts = {
     total: candidates.length,
-    unassessed: candidates.filter((candidate) => candidate.status === "UNASSESSED").length,
-    ready: candidates.filter((candidate) => candidate.status === "READY").length,
-    conditional: candidates.filter((candidate) => candidate.status === "CONDITIONAL").length,
-    unsupported: candidates.filter((candidate) => candidate.status === "UNSUPPORTED").length,
-    rejected: candidates.filter((candidate) => candidate.status === "REJECTED").length,
+    unassessed: candidates.filter(
+      (candidate) => candidate.status === "UNASSESSED",
+    ).length,
+    ready: candidates.filter((candidate) => candidate.status === "READY")
+      .length,
+    conditional: candidates.filter(
+      (candidate) => candidate.status === "CONDITIONAL",
+    ).length,
+    unsupported: candidates.filter(
+      (candidate) => candidate.status === "UNSUPPORTED",
+    ).length,
+    rejected: candidates.filter((candidate) => candidate.status === "REJECTED")
+      .length,
   };
   contract.contractSha256 = sha256({ ...contract, contractSha256: undefined });
   return contract;
@@ -911,11 +1064,16 @@ function recountContract(contract = {}) {
 
 function applyCandidateAssessment(candidate = {}, assessment = {}) {
   const next = JSON.parse(JSON.stringify(candidate));
-  if (assessment.status != null) next.status = normalizeText(assessment.status).toUpperCase();
-  if (assessment.recipeId != null) next.recipeId = normalizeText(assessment.recipeId);
-  if (assessment.recipeIds != null) next.recipeIds = unique(assessment.recipeIds);
-  if (assessment.confidence !== undefined) next.confidence = normalizeConfidence(assessment.confidence);
-  if (assessment.score !== undefined) next.score = normalizeScore(assessment.score);
+  if (assessment.status != null)
+    next.status = normalizeText(assessment.status).toUpperCase();
+  if (assessment.recipeId != null)
+    next.recipeId = normalizeText(assessment.recipeId);
+  if (assessment.recipeIds != null)
+    next.recipeIds = unique(assessment.recipeIds);
+  if (assessment.confidence !== undefined)
+    next.confidence = normalizeConfidence(assessment.confidence);
+  if (assessment.score !== undefined)
+    next.score = normalizeScore(assessment.score);
   if (assessment.reason != null) {
     next.reason = {
       summary: normalizeText(assessment.reason.summary || assessment.reason),
