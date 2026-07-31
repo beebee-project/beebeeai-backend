@@ -1,0 +1,108 @@
+{
+  "version": "query_candidate_capability_overlay_v1",
+  "entries": {
+    "generic_count_by_group": {
+      "aliases": ["generic_summary", "generic_roster_summary"],
+      "title": "그룹별 건수 요약",
+      "requiredColumnRoles": [
+        { "role": "group", "aliases": ["분류", "그룹", "소속", "부서", "조직"], "dataType": "string", "semanticType": "dimension", "required": true }
+      ],
+      "optionalColumnRoles": [
+        { "role": "person", "aliases": ["이름", "성명", "대상자", "person", "name"], "dataType": "string", "semanticType": "dimension", "required": false }
+      ],
+      "metrics": [
+        {
+          "metricId": "generic.count_by_group",
+          "label": "그룹별 건수",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": ["group"],
+          "activation": { "requiresRoles": ["group"], "requiresMetricIds": [] }
+        }
+      ],
+      "executorSupport": { "status": "DECLARED", "outputTypes": ["summarySheet"], "reasons": ["overlay_recipe"] }
+    },
+    "summary_monthly_sales": {
+      "aliases": ["template_monthly_sales", "monthly_sales_summary", "sales_report"],
+      "title": "월별 매출 요약",
+      "requiredColumnRoles": [
+        { "role": "period", "aliases": ["거래일자", "판매일", "기간", "연월", "date", "period"], "dataType": "period", "semanticType": "dimension", "required": true },
+        { "role": "revenue", "aliases": ["매출금액", "매출액", "판매금액", "sales", "revenue", "amount"], "dataType": "number", "semanticType": "measure", "required": true }
+      ],
+      "optionalColumnRoles": [
+        { "role": "product", "aliases": ["품목", "상품", "제품", "item", "product"], "dataType": "string", "semanticType": "dimension", "required": false },
+        { "role": "customer", "aliases": ["거래처", "고객", "customer", "client"], "dataType": "string", "semanticType": "dimension", "required": false }
+      ],
+      "metrics": [
+        {
+          "metricId": "sales.by_period",
+          "label": "기간별 매출 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": ["period"],
+          "activation": { "requiresRoles": ["revenue", "period"], "requiresMetricIds": [] }
+        }
+      ],
+      "executorSupport": { "status": "DECLARED", "outputTypes": ["summarySheet"], "reasons": ["overlay_recipe"] }
+    },
+    "product_sales_ranking": {
+      "aliases": ["template_product_sales_ranking", "sales_product_ranking"],
+      "title": "품목별 매출 순위",
+      "requiredColumnRoles": [
+        { "role": "product", "aliases": ["품목", "상품", "제품", "item", "product"], "dataType": "string", "semanticType": "dimension", "required": true },
+        { "role": "revenue", "aliases": ["매출금액", "매출액", "판매금액", "sales", "revenue", "amount"], "dataType": "number", "semanticType": "measure", "required": true }
+      ],
+      "optionalColumnRoles": [],
+      "metrics": [
+        {
+          "metricId": "sales.by_product",
+          "label": "품목별 매출 합계",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "sum",
+          "valueRole": "revenue",
+          "groupByRoles": ["product"],
+          "activation": { "requiresRoles": ["revenue", "product"], "requiresMetricIds": [] }
+        },
+        {
+          "metricId": "sales.top_product",
+          "label": "최고 매출 품목",
+          "criticality": "core",
+          "kind": "rank",
+          "sourceMetricId": "sales.by_product",
+          "direction": "desc",
+          "limit": 1,
+          "activation": { "requiresRoles": [], "requiresMetricIds": ["sales.by_product"] }
+        }
+      ],
+      "executorSupport": { "status": "DECLARED", "outputTypes": ["summarySheet"], "reasons": ["overlay_recipe"] }
+    },
+    "attendance_status_summary": {
+      "aliases": ["template_attendance_summary", "attendance_summary"],
+      "title": "출석 상태 요약",
+      "requiredColumnRoles": [
+        { "role": "status", "aliases": ["출석상태", "참석상태", "상태", "attendance", "status"], "dataType": "string", "semanticType": "dimension", "required": true }
+      ],
+      "optionalColumnRoles": [
+        { "role": "person", "aliases": ["이름", "성명", "참석자", "person", "name"], "dataType": "string", "semanticType": "dimension", "required": false }
+      ],
+      "metrics": [
+        {
+          "metricId": "attendance.by_status",
+          "label": "출석 상태별 인원",
+          "criticality": "core",
+          "kind": "aggregate",
+          "aggregation": "countRows",
+          "valueRole": "",
+          "groupByRoles": ["status"],
+          "activation": { "requiresRoles": ["status"], "requiresMetricIds": [] }
+        }
+      ],
+      "executorSupport": { "status": "DECLARED", "outputTypes": ["summarySheet"], "reasons": ["overlay_recipe"] }
+    }
+  }
+}

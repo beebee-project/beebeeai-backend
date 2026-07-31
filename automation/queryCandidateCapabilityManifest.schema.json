@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beebeeai.kr/schemas/query-candidate-capability-manifest-v1.json",
+  "title": "BeeBee AI Query Candidate Capability Manifest v1",
+  "type": "object",
+  "required": ["version", "itemVersion", "source", "sources", "counts", "candidates", "manifestSha256"],
+  "properties": {
+    "version": { "const": "query_candidate_capability_manifest_v1" },
+    "itemVersion": { "const": "query_candidate_capability_item_v1" },
+    "source": { "type": "object" },
+    "sources": { "type": "object" },
+    "counts": {
+      "type": "object",
+      "required": ["total", "bound", "partial", "inferred", "unbound", "executorDeclared", "executorGeneric", "executorUnknown"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "bound": { "type": "integer", "minimum": 0 },
+        "partial": { "type": "integer", "minimum": 0 },
+        "inferred": { "type": "integer", "minimum": 0 },
+        "unbound": { "type": "integer", "minimum": 0 },
+        "executorDeclared": { "type": "integer", "minimum": 0 },
+        "executorGeneric": { "type": "integer", "minimum": 0 },
+        "executorUnknown": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "$defs": {
+    "role": {
+      "type": "object",
+      "required": ["role", "aliases", "dataType", "semanticType", "required", "source"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "dataType": { "type": "string" },
+        "semanticType": { "type": "string" },
+        "required": { "type": "boolean" },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "metric": {
+      "type": "object",
+      "required": ["metricId", "label", "criticality", "kind", "aggregation", "operator", "valueRole", "groupByRoles", "sourceMetricId", "requiresRoles", "requiresMetricIds", "source"],
+      "properties": {
+        "metricId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "criticality": { "type": "string" },
+        "kind": { "type": "string" },
+        "aggregation": { "type": "string" },
+        "operator": { "type": "string" },
+        "valueRole": { "type": "string" },
+        "groupByRoles": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "sourceMetricId": { "type": "string" },
+        "requiresRoles": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requiresMetricIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "version", "candidateId", "recipeId", "recipeIds", "templateId", "candidateType",
+        "bindingStatus", "bindingSource", "bindingKey", "contractIds", "matchedTemplateIds",
+        "requiredColumnRoles", "optionalColumnRoles", "metricContracts", "coreMetricIds",
+        "conditionalMetricIds", "supportedMetricIds", "metricFamilies", "supportedOperations",
+        "requiredCapabilities", "executorSupport", "constraints", "provenance", "capabilitySha256"
+      ],
+      "properties": {
+        "version": { "const": "query_candidate_capability_item_v1" },
+        "candidateId": { "type": "string", "minLength": 1 },
+        "recipeId": { "type": "string" },
+        "recipeIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "templateId": { "type": "string" },
+        "candidateType": { "type": "string" },
+        "bindingStatus": { "enum": ["BOUND", "PARTIAL", "INFERRED", "UNBOUND"] },
+        "bindingSource": { "enum": ["CONTRACT_CATALOG", "OVERLAY", "EXPLICIT_CANDIDATE", "IDENTIFIER_INFERENCE", "NONE"] },
+        "bindingKey": { "type": "string" },
+        "contractIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "matchedTemplateIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requiredColumnRoles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
+        "optionalColumnRoles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
+        "metricContracts": { "type": "array", "items": { "$ref": "#/$defs/metric" } },
+        "coreMetricIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "conditionalMetricIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "supportedMetricIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "metricFamilies": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "supportedOperations": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requiredCapabilities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "executorSupport": {
+          "type": "object",
+          "required": ["status", "outputTypes", "reasons"],
+          "properties": {
+            "status": { "enum": ["DECLARED", "GENERIC", "UNKNOWN"] },
+            "outputTypes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+            "reasons": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+          },
+          "additionalProperties": false
+        },
+        "constraints": { "type": "object" },
+        "provenance": { "type": "object" },
+        "capabilitySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}
