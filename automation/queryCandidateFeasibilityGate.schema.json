@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidateFeasibilityGate.schema.json",
+  "title": "Query Candidate Deterministic Feasibility Resolution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "itemVersion",
+    "executionPlanVersion",
+    "policy",
+    "source",
+    "integrity",
+    "counts",
+    "readyCandidateIds",
+    "reviewCandidateIds",
+    "unsupportedCandidateIds",
+    "notApplicableCandidateIds",
+    "candidates",
+    "feasibilityResolutionSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_feasibility_resolution_v1"
+    },
+    "itemVersion": {
+      "const": "query_candidate_feasibility_item_v1"
+    },
+    "executionPlanVersion": {
+      "const": "query_candidate_execution_plan_v1"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "selectedFamilyRepresentativesOnly",
+        "rankIndependent",
+        "rankScoreUsedForFeasibility",
+        "summarySheetMvpBoundary",
+        "declaredExecutorMayBeReadyFromRoleContract",
+        "genericOperationsRequireExplicitOperandColumns",
+        "timeCountRequiresSinglePeriodOperand",
+        "genericDashboardRequiresReview",
+        "multiSourceSchemaUnionRequiresReview",
+        "sourceCandidatesAreNotRemovedOrMutated",
+        "sourceCandidateStatusMutation",
+        "productionRouteChanged",
+        "feasibilityStatusAssigned"
+      ],
+      "properties": {
+        "version": {
+          "const": "deterministic_candidate_feasibility_policy_v1_1"
+        },
+        "selectedFamilyRepresentativesOnly": { "const": true },
+        "rankIndependent": { "const": true },
+        "rankScoreUsedForFeasibility": { "const": false },
+        "summarySheetMvpBoundary": { "const": true },
+        "declaredExecutorMayBeReadyFromRoleContract": { "const": true },
+        "genericOperationsRequireExplicitOperandColumns": { "const": true },
+        "timeCountRequiresSinglePeriodOperand": { "const": true },
+        "genericDashboardRequiresReview": { "const": true },
+        "multiSourceSchemaUnionRequiresReview": { "const": true },
+        "sourceCandidatesAreNotRemovedOrMutated": { "const": true },
+        "sourceCandidateStatusMutation": { "const": false },
+        "productionRouteChanged": { "const": false },
+        "feasibilityStatusAssigned": { "const": true }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "candidateResolutionVersion",
+        "candidateResolutionSha256",
+        "candidateFamilyResolutionVersion",
+        "candidateFamilyResolutionSha256"
+      ],
+      "properties": {
+        "caseId": { "type": "string" },
+        "candidateResolutionVersion": { "type": "string" },
+        "candidateResolutionPolicyVersion": { "type": "string" },
+        "candidateResolutionSha256": { "type": "string" },
+        "candidateFamilyResolutionVersion": { "type": "string" },
+        "candidateFamilyPolicyVersion": { "type": "string" },
+        "candidateFamilyResolutionSha256": { "type": "string" },
+        "primaryDomain": { "type": "string" },
+        "datasetIntent": { "type": "string" }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "candidateCoverageComplete",
+        "selectedCoverageComplete",
+        "statusPartitionComplete",
+        "sourceCandidatesPreserved",
+        "executionPlansContainNoSourceRecords"
+      ],
+      "properties": {
+        "candidateCoverageComplete": { "const": true },
+        "selectedCoverageComplete": { "const": true },
+        "statusPartitionComplete": { "const": true },
+        "sourceCandidatesPreserved": { "const": true },
+        "executionPlansContainNoSourceRecords": { "const": true }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "selectedInput",
+        "ready",
+        "review",
+        "unsupported",
+        "notApplicable",
+        "executionPlanCount"
+      ],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "selectedInput": { "type": "integer", "minimum": 0 },
+        "ready": { "type": "integer", "minimum": 0 },
+        "review": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 },
+        "notApplicable": { "type": "integer", "minimum": 0 },
+        "executionPlanCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "readyCandidateIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "reviewCandidateIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "unsupportedCandidateIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "notApplicableCandidateIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "candidateId",
+          "familyDisposition",
+          "feasibilityStatus",
+          "checks",
+          "executionPlan",
+          "reasons",
+          "missingRequirements",
+          "provenance",
+          "feasibilityItemSha256"
+        ],
+        "properties": {
+          "version": {
+            "const": "query_candidate_feasibility_item_v1"
+          },
+          "candidateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "familyDisposition": {
+            "enum": ["SELECTED", "SUPPRESSED", "NOT_APPLICABLE"]
+          },
+          "feasibilityStatus": {
+            "enum": ["READY", "REVIEW", "UNSUPPORTED", "NOT_APPLICABLE"]
+          },
+          "executionPlan": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": [
+                  "version",
+                  "candidateId",
+                  "familyId",
+                  "executorMode",
+                  "operation",
+                  "sourceTableIds",
+                  "outputType",
+                  "operandBindings",
+                  "requiredRoleBindings",
+                  "requiresManualConfirmation",
+                  "confirmationReasonCodes",
+                  "executionPlanSha256"
+                ],
+                "properties": {
+                  "version": {
+                    "const": "query_candidate_execution_plan_v1"
+                  },
+                  "sourceTableIds": {
+                    "type": "array",
+                    "items": { "type": "string", "minLength": 1 },
+                    "uniqueItems": true
+                  },
+                  "outputType": {
+                    "type": "string"
+                  },
+                  "requiresManualConfirmation": {
+                    "type": "boolean"
+                  },
+                  "executionPlanSha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            ]
+          },
+          "feasibilityItemSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "feasibilityResolutionSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

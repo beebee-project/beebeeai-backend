@@ -1,0 +1,53 @@
+{
+  "version": "query_candidate_patch11_validation_v1",
+  "patch": "Deterministic Feasibility Gate",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "rankerDependencyAdded": false,
+  "rankScoreUsedForFeasibility": false,
+  "sourceCandidateMutation": false,
+  "familyDispositionMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "feasibilityStatusAssigned": true,
+  "policyVersion": "deterministic_candidate_feasibility_policy_v1_1",
+  "statuses": [
+    "READY",
+    "REVIEW",
+    "UNSUPPORTED",
+    "NOT_APPLICABLE"
+  ],
+  "guardrails": {
+    "selectedFamilyRepresentativesOnly": true,
+    "summarySheetMvpBoundary": true,
+    "declaredExecutorRoleContract": true,
+    "genericOperationWhitelist": true,
+    "explicitOperandColumnIdsRequired": true,
+    "dashboardRequiresReview": true,
+    "multiSourceSchemaUnionRequiresReview": true,
+    "requiredRolesCapabilitiesConstraintsChecked": true,
+    "sourceCandidatesPreserved": true,
+    "rawRowsPersisted": false,
+    "sampleValuesPersisted": false,
+    "timeCountRequiresSinglePeriodOperand": true
+  },
+  "selfValidation": {
+    "syntheticSmokeTestsPassed": 15,
+    "seedBaselineSmokePassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedCaseCount": 3,
+    "previousFamilyRegressionPendingFinalRun": false,
+    "previousResolverRegressionPendingFinalRun": false,
+    "previousFamilyRegressionPassed": true,
+    "previousResolverRegressionPassed": true,
+    "zipReapplyPassed": true,
+    "cumulativeIntegrityPassed": true
+  },
+  "notes": [
+    "사용자 저장소에서는 실제 fixture 6개 기준선을 작성하고 Feasibility sample audit를 확인합니다.",
+    "time_count/timecount는 source 범위의 단일 period columnId가 확인될 때 READY이며 measure를 요구하지 않습니다.",
+    "READY는 생성 결과 품질 보장이 아니라 현재 결정론적 실행 계약 충족을 의미합니다.",
+    "Deterministic Candidate Ranker는 READY/REVIEW 판정 이후 별도 단계로 연결합니다."
+  ]
+}

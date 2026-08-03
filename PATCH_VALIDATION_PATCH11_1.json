@@ -1,0 +1,53 @@
+{
+  "version": "query_candidate_patch11_1_validation_v1",
+  "patch": "Time Count Feasibility Contract",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "rankerDependencyAdded": false,
+  "rankScoreUsedForFeasibility": false,
+  "sourceCandidateMutation": false,
+  "familyDispositionMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "policyVersion": "deterministic_candidate_feasibility_policy_v1_1",
+  "contract": {
+    "operationAliases": [
+      "time_count",
+      "timecount"
+    ],
+    "requiredOperandKinds": [
+      "period"
+    ],
+    "measureRequired": false,
+    "singlePeriodColumnRequired": true,
+    "ambiguousPeriodRejected": true,
+    "summarySheetOutputRequired": true
+  },
+  "guardrails": {
+    "selectedFamilyRepresentativesOnly": true,
+    "sourceScopedColumnIdsOnly": true,
+    "periodFallbackFromPassedRole": true,
+    "periodFallbackFromUniqueMatchedColumn": true,
+    "noArbitraryPeriodSelection": true,
+    "sourceCandidatesPreserved": true,
+    "rawRowsPersisted": false,
+    "sampleValuesPersisted": false
+  },
+  "selfValidation": {
+    "timeCountReadySmokePassed": true,
+    "timeCountAliasSmokePassed": true,
+    "timeCountMissingPeriodSmokePassed": true,
+    "timeCountAmbiguousPeriodSmokePassed": true,
+    "patch11RegressionPassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "familyRegressionPassed": true,
+    "resolverRegressionPassed": true,
+    "zipReapplyPassed": true,
+    "cumulativeIntegrityPassed": true
+  },
+  "notes": [
+    "사용자 저장소의 실제 6개 fixture 기준선은 적용 후 다시 작성합니다.",
+    "실제 행사 신청자 케이스에서 READY 14, UNSUPPORTED 0을 확인해야 최종 완료 처리합니다."
+  ]
+}

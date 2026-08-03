@@ -1,0 +1,46 @@
+{
+  "version": "query_candidate_patch9_validation_v1",
+  "patch": "Candidate Family and Deterministic Deduplication",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "candidateReadyStatusAssigned": false,
+  "candidateStatusMutation": false,
+  "sourceCandidateDeletion": false,
+  "plaintextProductionPersistenceAdded": false,
+  "policyVersion": "deterministic_candidate_family_policy_v1",
+  "guardrails": {
+    "resolvedCandidatesOnly": true,
+    "exactGenerationIntentSignature": true,
+    "sourceScopeSeparated": true,
+    "operationSeparated": true,
+    "operandAxisAndMeasureSeparated": true,
+    "namedTemplateAnchorSeparated": true,
+    "outputTypesSeparated": true,
+    "oneRepresentativePerFamily": true,
+    "allSourceCandidatesPreserved": true
+  },
+  "representativePriority": [
+    "priorRetrieved",
+    "bindingStatus",
+    "executorSupport",
+    "operandEvidence",
+    "resolutionScore",
+    "originalScore",
+    "originalRank",
+    "candidateId"
+  ],
+  "selfValidation": {
+    "newSyntheticSmokeTestsPassed": 7,
+    "seedBaselineSmokePassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedCaseCount": 3,
+    "previousResolverRegressionPassed": true
+  },
+  "notes": [
+    "사용자 저장소에서는 실제 fixture 6개 기준선을 작성하고 candidate-family sample audit를 확인합니다.",
+    "동일 제목이라도 operand 또는 source가 다르면 별도 family로 유지됩니다.",
+    "이 단계는 후보 중복 노출만 제어하며 실제 실행 가능성은 후속 Feasibility Gate에서 검증합니다."
+  ]
+}

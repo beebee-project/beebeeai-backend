@@ -1,0 +1,147 @@
+{
+  "version": "query_candidate_patch11_manifest_v1",
+  "patch": "Deterministic Feasibility Gate",
+  "fileCount": 28,
+  "files": [
+    {
+      "path": "PATCH_MANIFEST_PATCH8_2_1.json",
+      "bytes": 3229,
+      "sha256": "687bda19851d917c0222608ac7f30114b33908f8f28707c45fb81b8c712d2c8c"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH9.json",
+      "bytes": 3515,
+      "sha256": "8813fec1b58aee825e71362b5119c1aec8e45db64e5322398267e5c7fd7dc8b5"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH9.json",
+      "bytes": 1631,
+      "sha256": "d5d032999efd2eae1a9d0d20454c0db0e7d3f0c30fec469005cfea9e87dd1210"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH9_CANDIDATE_FAMILY_DEDUPLICATION.md",
+      "bytes": 5668,
+      "sha256": "cf6dc1075ccde0b3cdb242b5d558f4b4f6b31a3ecc79d8e3264b39c8285f78b1"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH11.json",
+      "bytes": 2081,
+      "sha256": "fbee740de55a000c0fb3d3e0811e63c9f084c43ab972c920e487e6cc44ea4a2c"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH11_DETERMINISTIC_FEASIBILITY_GATE.md",
+      "bytes": 5861,
+      "sha256": "de9b9772b0fb65ab768d7be3cbd61784bee750c7fcf8267b99655829b423432e"
+    },
+    {
+      "path": "automation/queryCandidateFeasibilityGate.js",
+      "bytes": 38943,
+      "sha256": "d26c08777751f6d1852d234146467be4593411011eeac2f947195c920ef0324f"
+    },
+    {
+      "path": "automation/queryCandidateFeasibilityGate.schema.json",
+      "bytes": 7564,
+      "sha256": "3b2c66bd7cbfa0c9330c0833ff780f05c69704d9dfad8e00b4a22afb9e5b00ed"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateTestSupport.js",
+      "bytes": 4978,
+      "sha256": "a8e3929a38f585e33a3b47031032dbb2ef70891d2f666199ecdd8954be8784d7"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateCapture.js",
+      "bytes": 4908,
+      "sha256": "86881c23e2a2c62796ec725e57608526da8b3948bee0a4e571531901f23f04f1"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateSampleAudit.js",
+      "bytes": 4727,
+      "sha256": "7178e73b693b20fbaf8991a1e7f9c6a255ccdcf09dbde60d978cbd53adb9ef8d"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateSmokeTest.js",
+      "bytes": 912,
+      "sha256": "76dcb6c879cda2b83d4f9b91db6caf1959473a9ccb5c8504119013e6f6c139b4"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateDeclaredExecutorSmokeTest.js",
+      "bytes": 1178,
+      "sha256": "5627c376f68d800caf294cb0d43e2ff9ce09f42fd7754c05389c5f9b8cc95785"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateGenericOperandSmokeTest.js",
+      "bytes": 934,
+      "sha256": "35608a4f9a9a6b1381c2b8fcadf03b629043a9e8bc045823e2fbcb6a0133477c"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateStructuralReviewSmokeTest.js",
+      "bytes": 1140,
+      "sha256": "b83cfa43b0cccfce5f2fb5551ebae23d4fe83b6c2c44b64d11503f10c1fa58b1"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateUnsupportedSmokeTest.js",
+      "bytes": 1183,
+      "sha256": "605d04de761b33a64d75bd152b82dfc22d6e51a91d59841cef50c6d65731b2a9"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateMissingOperandSmokeTest.js",
+      "bytes": 855,
+      "sha256": "ad6db1771e1c408e24c7595168f333823b36a565bc81f34b3bf6e5bac296cf85"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateSelectedOnlySmokeTest.js",
+      "bytes": 1163,
+      "sha256": "44979d8c1ba8a1c72a98c7104f031e734aa9f704231a3be73414a887931cfc14"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateRankIndependenceSmokeTest.js",
+      "bytes": 966,
+      "sha256": "2b47d260f2dc2a03ad33b8a12e3d8aec70334c434a03d1f036e56195b820efe2"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGatePrivacyBoundarySmokeTest.js",
+      "bytes": 781,
+      "sha256": "bf0bff9bb451819aa36ff39f1a93a7ac308cf91c2c0d0645f89525e2f5c43097"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateSchemaSmokeTest.js",
+      "bytes": 1126,
+      "sha256": "6d503df58086691d356e765ebec5a6a67837b7af61f45db06d35b04b4bee8ea6"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateBaselineSmokeTest.js",
+      "bytes": 1175,
+      "sha256": "a5840f090d4aed6109749d96d0173ac75550383c7ccd3424384435b33f3b2fdb"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateTimeCountSmokeTest.js",
+      "bytes": 2355,
+      "sha256": "2c8a472fa5ee0f208fd3c20c64beba3b18a9df76da53f5ef26658902ba0f012c"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateTimeCountAliasSmokeTest.js",
+      "bytes": 1421,
+      "sha256": "cc760b567d75cfcd5b740a2e35b78ae0fa2263dd9c1b85ac7aef8f4b0dbb57b8"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateTimeCountMissingPeriodSmokeTest.js",
+      "bytes": 1239,
+      "sha256": "ed7e396c5728e50965efb0f7561dadd62eb9e21e78cd4922eba729754d6f9635"
+    },
+    {
+      "path": "tests/queryCandidateFeasibilityGateTimeCountAmbiguousPeriodSmokeTest.js",
+      "bytes": 1386,
+      "sha256": "751ec4c7a2e795e6f6d5f216a7aa4087fc1ff1aa02120ff12992de4466ac3a24"
+    },
+    {
+      "path": "tests/queryCandidatePatch11SourceIntegritySmokeTest.js",
+      "bytes": 4192,
+      "sha256": "ccf822f997a842563a3853478a4323b7cea784e3bc3aa63ce04b07f679fad957"
+    },
+    {
+      "path": "tests/queryCandidatePatch11ManifestSmokeTest.js",
+      "bytes": 1131,
+      "sha256": "4388cdf7371e1398302b5e2a5d40ffb11729069e06da297cd76774798f2e78c0"
+    }
+  ]
+}

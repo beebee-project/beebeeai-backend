@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidateFamilyResolver.schema.json",
+  "title": "Query Candidate Family Resolution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "itemVersion",
+    "memberVersion",
+    "policy",
+    "source",
+    "integrity",
+    "counts",
+    "selectedCandidateIds",
+    "suppressedCandidateIds",
+    "families",
+    "candidates",
+    "familyResolutionSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_family_resolution_v1"
+    },
+    "itemVersion": {
+      "const": "query_candidate_family_item_v1"
+    },
+    "memberVersion": {
+      "const": "query_candidate_family_member_v1"
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "version",
+        "oneRepresentativePerFamily",
+        "finalReadyStatusAssigned",
+        "candidateStatusMutation"
+      ],
+      "properties": {
+        "version": {
+          "const": "deterministic_candidate_family_policy_v1"
+        },
+        "oneRepresentativePerFamily": {
+          "const": true
+        },
+        "finalReadyStatusAssigned": {
+          "const": false
+        },
+        "candidateStatusMutation": {
+          "const": false
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "candidateResolutionVersion",
+        "candidateResolutionSha256"
+      ],
+      "properties": {
+        "caseId": {
+          "type": "string"
+        },
+        "candidateResolutionVersion": {
+          "type": "string"
+        },
+        "candidateResolutionPolicyVersion": {
+          "type": "string"
+        },
+        "candidateResolutionSha256": {
+          "type": "string"
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "sourceCandidateIdsUnique",
+        "resolvedCoverageComplete",
+        "exactlyOneSelectedPerFamily",
+        "nonResolvedCandidatesPreserved"
+      ],
+      "properties": {
+        "sourceCandidateIdsUnique": {
+          "const": true
+        },
+        "resolvedCoverageComplete": {
+          "const": true
+        },
+        "exactlyOneSelectedPerFamily": {
+          "const": true
+        },
+        "nonResolvedCandidatesPreserved": {
+          "const": true
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "total",
+        "resolvedInput",
+        "stillDeferred",
+        "excluded",
+        "familyCount",
+        "selected",
+        "suppressed",
+        "duplicateFamilyCount",
+        "singletonFamilyCount",
+        "nonResolvedPassThrough"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resolvedInput": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stillDeferred": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "familyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suppressed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicateFamilyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "singletonFamilyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nonResolvedPassThrough": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "selectedCandidateIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "suppressedCandidateIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "familyId",
+          "familyType",
+          "signature",
+          "sourceRootIds",
+          "operation",
+          "familyCategory",
+          "recipeClass",
+          "operands",
+          "memberCount",
+          "selectedCandidateId",
+          "suppressedCandidateIds",
+          "members",
+          "familyRank",
+          "familySha256"
+        ],
+        "properties": {
+          "version": {
+            "const": "query_candidate_family_item_v1"
+          },
+          "familyId": {
+            "type": "string",
+            "pattern": "^family_[0-9a-f]{20}$"
+          },
+          "familyType": {
+            "enum": [
+              "NAMED_TEMPLATE",
+              "STRUCTURAL_RECIPE"
+            ]
+          },
+          "memberCount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selectedCandidateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "familyRank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "familySha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "familyCategory": {
+            "enum": [
+              "DASHBOARD",
+              "MULTI_SOURCE",
+              "TIME_SERIES",
+              "GROUP_AGGREGATION",
+              "RANKING",
+              "CROSS_TAB",
+              "COUNTING",
+              "OTHER"
+            ]
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "candidateId",
+          "resolutionResult",
+          "familyDisposition",
+          "familyId",
+          "selectedCandidateId",
+          "suppressionReason",
+          "provenance",
+          "familyMemberSha256"
+        ],
+        "properties": {
+          "version": {
+            "const": "query_candidate_family_member_v1"
+          },
+          "candidateId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolutionResult": {
+            "enum": [
+              "RESOLVED",
+              "STILL_DEFERRED",
+              "EXCLUDED"
+            ]
+          },
+          "familyDisposition": {
+            "enum": [
+              "SELECTED",
+              "SUPPRESSED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "familyMemberSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "familyResolutionSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
