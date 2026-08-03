@@ -1,0 +1,60 @@
+{
+  "version": "query_candidate_patch12_1_1_1_validation_v1",
+  "patch": "Legacy Time Count Compatibility Test Hash Fix",
+  "applicationOrder": "after_patch12_1_1",
+  "productionCodeChanged": false,
+  "productionRouteChanged": false,
+  "rootCause": {
+    "failingTest": "tests/queryCandidatePlannerResolverLegacyTimeCountCompatibilitySmokeTest.js",
+    "brittleAssertion": "full candidate-resolution resolutionSha256 exact equality",
+    "expectedInPatch12_1_1": "16688690c40ee7b7838c2e41cd63740564d91a018ba5de5faa9b85992561f946",
+    "observedInUserRepository": "d8aa87db68e2732896c976a9227639688a7e23b896677d734315b3282ecbae8d",
+    "productionResolverBaselinePassed": true,
+    "eventCaseResolutionSha256": "ae97854a2e8a5fd16bcd85189f23190f2447cf8ece5414f3175a6da18ea8e257"
+  },
+  "testContract": {
+    "plannerReentryMustBeFalse": true,
+    "result": "RESOLVED",
+    "recipeId": "time_count",
+    "operandBindingStatus": "NOT_APPLICABLE",
+    "operandBindingReasonCode": "NO_EXPLICIT_RECIPE_OPERANDS",
+    "periodColumnId": "sales_table.column_1",
+    "itemShaRetained": true,
+    "resolutionItemSha256": "7b3616e2e2f6c377bcf76582fdc96f7a18200e3d86f7d7f7536292358bde81bc",
+    "wholeResolutionShaPolicy": "FORMAT_ONLY_NOT_EXACT",
+    "semanticCompatibilityFingerprintSha256": "fcd34372b8d1316284e51e816bd0c95ad7c1625f7cd2be7ae0605c3fb8c1503a"
+  },
+  "scope": {
+    "resolverSourceChanged": false,
+    "plannerSourceChanged": false,
+    "shadowBridgeChanged": false,
+    "fixtureDataChanged": false,
+    "baselineRewriteAllowed": false
+  },
+  "expectedRegression": {
+    "shadowFixture": "PASS 1/1",
+    "plannerBaseline": "PASS 6/6 differences=0",
+    "rankerBaseline": "PASS 6/6 differences=0",
+    "feasibilityBaseline": "PASS 6/6 differences=0",
+    "familyBaseline": "PASS 6/6 differences=0",
+    "resolverBaseline": "PASS 6/6 differences=0"
+  },
+  "liveOpenAiCall": {
+    "rerunInThisPatch": false,
+    "previousFailureCode": "credit_balance_exhausted"
+  },
+  "localValidation": {
+    "compatibilitySmoke": "PASS",
+    "patch12_1_1SourceIntegrity": "PASS",
+    "patch12_1_1Manifest": "PASS",
+    "patch12_1_1_1SourceIntegrity": "PASS",
+    "patch12_1_1_1Manifest": "PASS",
+    "shadowFixture": "PASS 1/1",
+    "seedPlannerBaseline": "PASS 3/3",
+    "seedRankerBaseline": "PASS 3/3",
+    "seedFeasibilityBaseline": "PASS 3/3",
+    "seedFamilyBaseline": "PASS 3/3",
+    "seedResolverBaseline": "PASS 3/3",
+    "fullUserBaselines": "REQUIRES_USER_REPOSITORY_COMPARE_ONLY"
+  }
+}

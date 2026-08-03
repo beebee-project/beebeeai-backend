@@ -1,5 +1,3 @@
-"use strict";
-
 const { normalizeText, sha256 } = require("./queryCandidateObservation");
 
 const QUERY_CANDIDATE_FEASIBILITY_RESOLUTION_VERSION =
@@ -153,7 +151,11 @@ function columnBelongsToSource(columnId = "", rootIds = []) {
   if (!value) return false;
   return rootIds.some((rootId) => {
     const root = normalizeText(rootId);
-    return value === root || value.startsWith(`${root}.`) || value.startsWith(`${root}#`);
+    return (
+      value === root ||
+      value.startsWith(`${root}.`) ||
+      value.startsWith(`${root}#`)
+    );
   });
 }
 
@@ -203,19 +205,20 @@ function roleBindings(candidate = {}, rootIds = []) {
         .filter((columnId) => columnBelongsToSource(columnId, rootIds)),
     ),
     columnNames: sortedUnique(
-      asArray(role.matched).map((match) => normalizeText(match?.columnName || "")),
+      asArray(role.matched).map((match) =>
+        normalizeText(match?.columnName || ""),
+      ),
     ),
   }));
 }
 
 function timeCountPeriodFallbackBinding(candidate = {}, rootIds = []) {
-  const roleCandidates = roleBindings(candidate, rootIds)
-    .filter(
-      (binding) =>
-        normalizeLoose(binding.role) === "period" &&
-        binding.status === "PASS" &&
-        binding.columnIds.length > 0,
-    );
+  const roleCandidates = roleBindings(candidate, rootIds).filter(
+    (binding) =>
+      normalizeLoose(binding.role) === "period" &&
+      binding.status === "PASS" &&
+      binding.columnIds.length > 0,
+  );
   const roleColumnIds = sortedUnique(
     roleCandidates.flatMap((binding) => binding.columnIds),
   );
@@ -223,19 +226,26 @@ function timeCountPeriodFallbackBinding(candidate = {}, rootIds = []) {
     roleCandidates.flatMap((binding) => binding.columnNames),
   );
 
-  const matchedPeriodColumns = asArray(candidate.matchedColumns)
-    .filter((column) => {
+  const matchedPeriodColumns = asArray(candidate.matchedColumns).filter(
+    (column) => {
       const columnId = normalizeText(column?.columnId || "");
       if (!columnBelongsToSource(columnId, rootIds)) return false;
       const semanticRole = normalizeLoose(column?.semanticRole || "");
       const dataType = normalizeLoose(column?.dataType || "");
-      return semanticRole === "period" || dataType === "date" || dataType === "datetime";
-    });
+      return (
+        semanticRole === "period" ||
+        dataType === "date" ||
+        dataType === "datetime"
+      );
+    },
+  );
   const matchedColumnIds = sortedUnique(
     matchedPeriodColumns.map((column) => column.columnId),
   );
   const matchedColumnNames = sortedUnique(
-    matchedPeriodColumns.map((column) => column.header || column.columnName || ""),
+    matchedPeriodColumns.map(
+      (column) => column.header || column.columnName || "",
+    ),
   );
 
   const candidateColumnIds = roleColumnIds.length
@@ -258,7 +268,9 @@ function timeCountPeriodFallbackBinding(candidate = {}, rootIds = []) {
 }
 
 function familySelectionCheck(familyMember = {}, family = {}) {
-  const disposition = normalizeText(familyMember.familyDisposition || "").toUpperCase();
+  const disposition = normalizeText(
+    familyMember.familyDisposition || "",
+  ).toUpperCase();
   if (disposition !== "SELECTED") {
     return {
       status: "NOT_APPLICABLE",
@@ -267,7 +279,9 @@ function familySelectionCheck(familyMember = {}, family = {}) {
           ? "DUPLICATE_FAMILY_MEMBER_SUPPRESSED"
           : "CANDIDATE_NOT_SELECTED_FOR_FEASIBILITY",
       familyId: normalizeText(familyMember.familyId || ""),
-      selectedCandidateId: normalizeText(familyMember.selectedCandidateId || ""),
+      selectedCandidateId: normalizeText(
+        familyMember.selectedCandidateId || "",
+      ),
     };
   }
   const selectedCandidateId = normalizeText(family.selectedCandidateId || "");
@@ -285,7 +299,9 @@ function familySelectionCheck(familyMember = {}, family = {}) {
 
 function sourceScopeCheck(candidate = {}, family = {}) {
   const rootIds = sourceRootIds(candidate, family);
-  const sourceStatus = normalizeText(candidate.checks?.sourceScope?.status || "").toUpperCase();
+  const sourceStatus = normalizeText(
+    candidate.checks?.sourceScope?.status || "",
+  ).toUpperCase();
   const matchedPhysical = sortedUnique(candidate.matchedPhysicalTableIds);
   const matched = sortedUnique([
     ...asArray(candidate.matchedTableIds),
@@ -341,7 +357,9 @@ function outputContractCheck(candidate = {}, family = {}) {
 }
 
 function executorCheck(candidate = {}) {
-  const checkStatus = normalizeText(candidate.checks?.executorSupport?.status || "").toUpperCase();
+  const checkStatus = normalizeText(
+    candidate.checks?.executorSupport?.status || "",
+  ).toUpperCase();
   const declaredStatus = normalizeText(
     candidate.checks?.executorSupport?.declaredStatus || "UNKNOWN",
   ).toUpperCase();
@@ -385,7 +403,9 @@ function operationContractCheck(candidate = {}, family = {}, executor = {}) {
       reasonCode: "DECLARED_EXECUTOR_OPERATION_CONTRACT",
     };
   }
-  if (Object.prototype.hasOwnProperty.call(GENERIC_READY_OPERATIONS, operation)) {
+  if (
+    Object.prototype.hasOwnProperty.call(GENERIC_READY_OPERATIONS, operation)
+  ) {
     return {
       status: "PASS",
       operation,
@@ -394,7 +414,9 @@ function operationContractCheck(candidate = {}, family = {}, executor = {}) {
       reasonCode: "GENERIC_OPERATION_SUPPORTED",
     };
   }
-  if (Object.prototype.hasOwnProperty.call(GENERIC_REVIEW_OPERATIONS, operation)) {
+  if (
+    Object.prototype.hasOwnProperty.call(GENERIC_REVIEW_OPERATIONS, operation)
+  ) {
     const invalidSourceCount =
       (operation === "singlesourcedashboard" && rootIds.length !== 1) ||
       (operation === "multisourceschemaunion" && rootIds.length < 2);
@@ -417,7 +439,11 @@ function operationContractCheck(candidate = {}, family = {}, executor = {}) {
   };
 }
 
-function operandContractCheck(candidate = {}, family = {}, operationCheck = {}) {
+function operandContractCheck(
+  candidate = {},
+  family = {},
+  operationCheck = {},
+) {
   const rootIds = sourceRootIds(candidate, family);
   const bindings = matchedOperandBindings(candidate, rootIds);
   const operation = normalizeLoose(operationCheck.operation || "");
@@ -470,7 +496,8 @@ function operandContractCheck(candidate = {}, family = {}, operationCheck = {}) 
       (binding) => binding.kind === kind && binding.columnIds.length > 0,
     ).length;
     if (matching < count) {
-      for (let index = matching; index < count; index += 1) missingKinds.push(kind);
+      for (let index = matching; index < count; index += 1)
+        missingKinds.push(kind);
     }
   }
   const operandStatus = normalizeText(
@@ -525,10 +552,12 @@ function roleContractCheck(candidate = {}, family = {}) {
 }
 
 function capabilityContractCheck(candidate = {}) {
-  const capabilities = asArray(candidate.checks?.requiredCapabilities).map((item) => ({
-    capability: normalizeText(item.capability || ""),
-    status: normalizeText(item.status || "UNKNOWN").toUpperCase(),
-  }));
+  const capabilities = asArray(candidate.checks?.requiredCapabilities).map(
+    (item) => ({
+      capability: normalizeText(item.capability || ""),
+      status: normalizeText(item.status || "UNKNOWN").toUpperCase(),
+    }),
+  );
   const failed = capabilities.filter((item) => item.status !== "PASS");
   return {
     status: failed.length ? "FAIL" : "PASS",
@@ -561,7 +590,8 @@ function constraintContractCheck(candidate = {}) {
 function metricContractCheck(candidate = {}) {
   const source = candidate.checks?.metricFamily || {};
   const status = normalizeText(source.status || "NOT_APPLICABLE").toUpperCase();
-  const resultStatus = status === "FAIL" ? "FAIL" : status === "PASS" ? "PASS" : "NOT_APPLICABLE";
+  const resultStatus =
+    status === "FAIL" ? "FAIL" : status === "PASS" ? "PASS" : "NOT_APPLICABLE";
   return {
     status: resultStatus,
     reasonCode:
@@ -576,28 +606,34 @@ function metricContractCheck(candidate = {}) {
 }
 
 function buildExecutionPlan({ candidate = {}, family = {}, checks = {} } = {}) {
-  const sourceIds = checks.sourceScope?.sourceRootIds || sourceRootIds(candidate, family);
+  const sourceIds =
+    checks.sourceScope?.sourceRootIds || sourceRootIds(candidate, family);
   const plan = {
     version: QUERY_CANDIDATE_EXECUTION_PLAN_VERSION,
     candidateId: normalizeText(candidate.candidateId || ""),
     familyId: normalizeText(family.familyId || ""),
     recipeId: normalizeText(candidate.recipeId || ""),
     templateId: normalizeText(candidate.templateId || ""),
-    executorMode: normalizeText(checks.operationContract?.executionMode || "UNKNOWN"),
+    executorMode: normalizeText(
+      checks.operationContract?.executionMode || "UNKNOWN",
+    ),
     operation: normalizeText(checks.operationContract?.operation || ""),
     sourceTableIds: sourceIds,
     outputType: normalizeText(checks.outputContract?.selectedOutputType || ""),
-    operandBindings: asArray(checks.operandContract?.bindings).map((binding) => ({
-      kind: binding.kind,
-      expectedToken: binding.expectedToken,
-      columnIds: binding.columnIds,
-    })),
-    requiredRoleBindings: asArray(checks.roleContract?.bindings).map((binding) => ({
-      role: binding.role,
-      columnIds: binding.columnIds,
-    })),
-    requiresManualConfirmation:
-      checks.operationContract?.status === "REVIEW",
+    operandBindings: asArray(checks.operandContract?.bindings).map(
+      (binding) => ({
+        kind: binding.kind,
+        expectedToken: binding.expectedToken,
+        columnIds: binding.columnIds,
+      }),
+    ),
+    requiredRoleBindings: asArray(checks.roleContract?.bindings).map(
+      (binding) => ({
+        role: binding.role,
+        columnIds: binding.columnIds,
+      }),
+    ),
+    requiresManualConfirmation: checks.operationContract?.status === "REVIEW",
     confirmationReasonCodes:
       checks.operationContract?.status === "REVIEW"
         ? [checks.operationContract.reasonCode]
@@ -623,7 +659,8 @@ function statusFromChecks(checks = {}) {
     checks.constraintContract,
     checks.metricContract,
   ];
-  if (hardChecks.some((check) => check?.status === "FAIL")) return "UNSUPPORTED";
+  if (hardChecks.some((check) => check?.status === "FAIL"))
+    return "UNSUPPORTED";
   if (hardChecks.some((check) => check?.status === "REVIEW")) return "REVIEW";
   return "READY";
 }
@@ -642,7 +679,8 @@ function reasonsFromChecks(checks = {}, status = "") {
     ["metricContract", checks.metricContract],
   ];
   for (const [name, check] of entries) {
-    if (!check || check.status === "PASS" || check.status === "NOT_APPLICABLE") continue;
+    if (!check || check.status === "PASS" || check.status === "NOT_APPLICABLE")
+      continue;
     result.push(
       reason(
         check.status === "FAIL" ? "BLOCKING" : "WARNING",
@@ -666,13 +704,21 @@ function reasonsFromChecks(checks = {}, status = "") {
   return result;
 }
 
-function buildSelectedItem({ candidate = {}, familyMember = {}, family = {} } = {}) {
+function buildSelectedItem({
+  candidate = {},
+  familyMember = {},
+  family = {},
+} = {}) {
   const familySelection = familySelectionCheck(familyMember, family);
   const sourceScope = sourceScopeCheck(candidate, family);
   const outputContract = outputContractCheck(candidate, family);
   const executor = executorCheck(candidate);
   const operationContract = operationContractCheck(candidate, family, executor);
-  const operandContract = operandContractCheck(candidate, family, operationContract);
+  const operandContract = operandContractCheck(
+    candidate,
+    family,
+    operationContract,
+  );
   const roleContract = roleContractCheck(candidate, family);
   const capabilityContract = capabilityContractCheck(candidate);
   const constraintContract = constraintContractCheck(candidate);
@@ -729,24 +775,56 @@ function buildSelectedItem({ candidate = {}, familyMember = {}, family = {} } = 
 function buildNotApplicableItem({ candidate = {}, familyMember = {} } = {}) {
   const item = {
     version: QUERY_CANDIDATE_FEASIBILITY_ITEM_VERSION,
-    candidateId: normalizeText(candidate.candidateId || familyMember.candidateId || ""),
+    candidateId: normalizeText(
+      candidate.candidateId || familyMember.candidateId || "",
+    ),
     familyId: normalizeText(familyMember.familyId || ""),
-    familyRank: Number.isInteger(familyMember.familyRank) ? familyMember.familyRank : null,
-    familyDisposition: normalizeText(familyMember.familyDisposition || "NOT_APPLICABLE"),
+    familyRank: Number.isInteger(familyMember.familyRank)
+      ? familyMember.familyRank
+      : null,
+    familyDisposition: normalizeText(
+      familyMember.familyDisposition || "NOT_APPLICABLE",
+    ),
     feasibilityStatus: "NOT_APPLICABLE",
     recipeId: normalizeText(candidate.recipeId || familyMember.recipeId || ""),
-    templateId: normalizeText(candidate.templateId || familyMember.templateId || ""),
+    templateId: normalizeText(
+      candidate.templateId || familyMember.templateId || "",
+    ),
     checks: {
       familySelection: familySelectionCheck(familyMember, {}),
-      sourceScope: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      outputContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
+      sourceScope: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
+      outputContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
       executor: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      operationContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      operandContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      roleContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      capabilityContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      constraintContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
-      metricContract: { status: "NOT_APPLICABLE", reasonCode: "FEASIBILITY_NOT_RUN" },
+      operationContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
+      operandContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
+      roleContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
+      capabilityContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
+      constraintContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
+      metricContract: {
+        status: "NOT_APPLICABLE",
+        reasonCode: "FEASIBILITY_NOT_RUN",
+      },
     },
     executionPlan: null,
     reasons: [
@@ -790,12 +868,15 @@ function buildQueryCandidateFeasibilityResolution({
   const candidates = sourceCandidates.map((candidate) => {
     const familyMember = familyMemberById.get(candidate.candidateId) || {};
     const family = familiesById.get(familyMember.familyId) || {};
-    return normalizeText(familyMember.familyDisposition).toUpperCase() === "SELECTED"
+    return normalizeText(familyMember.familyDisposition).toUpperCase() ===
+      "SELECTED"
       ? buildSelectedItem({ candidate, familyMember, family })
       : buildNotApplicableItem({ candidate, familyMember });
   });
 
-  const selectedInputCount = asArray(candidateFamilyResolution.selectedCandidateIds).length;
+  const selectedInputCount = asArray(
+    candidateFamilyResolution.selectedCandidateIds,
+  ).length;
   const selectedItems = candidates.filter(
     (candidate) => candidate.familyDisposition === "SELECTED",
   );
@@ -804,7 +885,9 @@ function buildQueryCandidateFeasibilityResolution({
       .filter((candidate) => candidate.feasibilityStatus === status)
       .map((candidate) => candidate.candidateId);
   const familyCandidateIds = new Set(
-    asArray(candidateFamilyResolution.candidates).map((candidate) => candidate.candidateId),
+    asArray(candidateFamilyResolution.candidates).map(
+      (candidate) => candidate.candidateId,
+    ),
   );
   const missingFamilyCandidateIds = sourceCandidates
     .map((candidate) => candidate.candidateId)
@@ -836,7 +919,9 @@ function buildQueryCandidateFeasibilityResolution({
     source: {
       caseId: normalizeText(candidateResolution.source?.caseId || ""),
       fileName: normalizeText(candidateResolution.source?.fileName || ""),
-      candidateResolutionVersion: normalizeText(candidateResolution.version || ""),
+      candidateResolutionVersion: normalizeText(
+        candidateResolution.version || "",
+      ),
       candidateResolutionPolicyVersion: normalizeText(
         candidateResolution.policy?.version || "",
       ),
@@ -861,12 +946,14 @@ function buildQueryCandidateFeasibilityResolution({
     },
     integrity: {
       sourceCandidateCount: sourceCandidates.length,
-      familyCandidateCount: asArray(candidateFamilyResolution.candidates).length,
+      familyCandidateCount: asArray(candidateFamilyResolution.candidates)
+        .length,
       selectedFamilyRepresentativeCount: selectedInputCount,
       missingFamilyCandidateIds,
       orphanFamilyCandidateIds,
       candidateCoverageComplete:
-        missingFamilyCandidateIds.length === 0 && orphanFamilyCandidateIds.length === 0,
+        missingFamilyCandidateIds.length === 0 &&
+        orphanFamilyCandidateIds.length === 0,
       selectedCoverageComplete: selectedItems.length === selectedInputCount,
       statusPartitionComplete:
         candidates.length ===
@@ -887,7 +974,9 @@ function buildQueryCandidateFeasibilityResolution({
       review: statusIds("REVIEW").length,
       unsupported: statusIds("UNSUPPORTED").length,
       notApplicable: statusIds("NOT_APPLICABLE").length,
-      executionPlanCount: candidates.filter((candidate) => candidate.executionPlan).length,
+      executionPlanCount: candidates.filter(
+        (candidate) => candidate.executionPlan,
+      ).length,
     },
     readyCandidateIds: statusIds("READY"),
     reviewCandidateIds: statusIds("REVIEW"),
@@ -906,41 +995,105 @@ function validateQueryCandidateFeasibilityResolution(document = {}) {
   const errors = [];
   const warnings = [];
   if (document.version !== QUERY_CANDIDATE_FEASIBILITY_RESOLUTION_VERSION) {
-    errors.push(issue("version", "invalid_version", "feasibility resolution version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "version",
+        "invalid_version",
+        "feasibility resolution version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (document.itemVersion !== QUERY_CANDIDATE_FEASIBILITY_ITEM_VERSION) {
-    errors.push(issue("itemVersion", "invalid_version", "feasibility item version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "itemVersion",
+        "invalid_version",
+        "feasibility item version이 유효하지 않습니다.",
+      ),
+    );
   }
-  if (document.executionPlanVersion !== QUERY_CANDIDATE_EXECUTION_PLAN_VERSION) {
-    errors.push(issue("executionPlanVersion", "invalid_version", "execution plan version이 유효하지 않습니다."));
+  if (
+    document.executionPlanVersion !== QUERY_CANDIDATE_EXECUTION_PLAN_VERSION
+  ) {
+    errors.push(
+      issue(
+        "executionPlanVersion",
+        "invalid_version",
+        "execution plan version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (document.policy?.version !== QUERY_CANDIDATE_FEASIBILITY_POLICY_VERSION) {
-    errors.push(issue("policy.version", "invalid_version", "feasibility policy version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "policy.version",
+        "invalid_version",
+        "feasibility policy version이 유효하지 않습니다.",
+      ),
+    );
   }
   const candidates = asArray(document.candidates);
   const ids = new Set();
   for (const [index, candidate] of candidates.entries()) {
     const path = `candidates[${index}]`;
     if (candidate.version !== QUERY_CANDIDATE_FEASIBILITY_ITEM_VERSION) {
-      errors.push(issue(`${path}.version`, "invalid_version", "feasibility item version이 유효하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.version`,
+          "invalid_version",
+          "feasibility item version이 유효하지 않습니다.",
+        ),
+      );
     }
     if (!FEASIBILITY_STATUS.includes(candidate.feasibilityStatus)) {
-      errors.push(issue(`${path}.feasibilityStatus`, "invalid_enum", "feasibilityStatus가 유효하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.feasibilityStatus`,
+          "invalid_enum",
+          "feasibilityStatus가 유효하지 않습니다.",
+        ),
+      );
     }
     if (ids.has(candidate.candidateId)) {
-      errors.push(issue(`${path}.candidateId`, "duplicate", "candidateId가 중복됩니다."));
+      errors.push(
+        issue(`${path}.candidateId`, "duplicate", "candidateId가 중복됩니다."),
+      );
     }
     ids.add(candidate.candidateId);
     for (const [checkName, check] of Object.entries(candidate.checks || {})) {
       if (!CHECK_STATUS.includes(check?.status)) {
-        errors.push(issue(`${path}.checks.${checkName}.status`, "invalid_enum", "check status가 유효하지 않습니다."));
+        errors.push(
+          issue(
+            `${path}.checks.${checkName}.status`,
+            "invalid_enum",
+            "check status가 유효하지 않습니다.",
+          ),
+        );
       }
     }
-    if (candidate.feasibilityStatus === "NOT_APPLICABLE" && candidate.executionPlan != null) {
-      errors.push(issue(`${path}.executionPlan`, "unexpected_plan", "NOT_APPLICABLE 후보에는 execution plan이 없어야 합니다."));
+    if (
+      candidate.feasibilityStatus === "NOT_APPLICABLE" &&
+      candidate.executionPlan != null
+    ) {
+      errors.push(
+        issue(
+          `${path}.executionPlan`,
+          "unexpected_plan",
+          "NOT_APPLICABLE 후보에는 execution plan이 없어야 합니다.",
+        ),
+      );
     }
-    if (candidate.feasibilityStatus !== "NOT_APPLICABLE" && !candidate.executionPlan) {
-      errors.push(issue(`${path}.executionPlan`, "required", "평가된 후보에는 execution plan이 필요합니다."));
+    if (
+      candidate.feasibilityStatus !== "NOT_APPLICABLE" &&
+      !candidate.executionPlan
+    ) {
+      errors.push(
+        issue(
+          `${path}.executionPlan`,
+          "required",
+          "평가된 후보에는 execution plan이 필요합니다.",
+        ),
+      );
     }
     if (candidate.executionPlan) {
       const expectedPlanHash = sha256({
@@ -948,7 +1101,13 @@ function validateQueryCandidateFeasibilityResolution(document = {}) {
         executionPlanSha256: undefined,
       });
       if (candidate.executionPlan.executionPlanSha256 !== expectedPlanHash) {
-        errors.push(issue(`${path}.executionPlan.executionPlanSha256`, "hash_mismatch", "execution plan hash가 일치하지 않습니다."));
+        errors.push(
+          issue(
+            `${path}.executionPlan.executionPlanSha256`,
+            "hash_mismatch",
+            "execution plan hash가 일치하지 않습니다.",
+          ),
+        );
       }
     }
     if (candidate.feasibilityStatus === "READY") {
@@ -956,28 +1115,67 @@ function validateQueryCandidateFeasibilityResolution(document = {}) {
         (check) => check?.status === "FAIL" || check?.status === "REVIEW",
       );
       if (failed.length) {
-        errors.push(issue(path, "ready_with_nonpass_check", "READY 후보에 FAIL 또는 REVIEW 검사가 있습니다."));
+        errors.push(
+          issue(
+            path,
+            "ready_with_nonpass_check",
+            "READY 후보에 FAIL 또는 REVIEW 검사가 있습니다.",
+          ),
+        );
       }
       if (candidate.executionPlan?.outputType !== SUPPORTED_OUTPUT_TYPE) {
-        errors.push(issue(`${path}.executionPlan.outputType`, "unsupported_output", "READY 후보는 summarySheet 실행 계획이어야 합니다."));
+        errors.push(
+          issue(
+            `${path}.executionPlan.outputType`,
+            "unsupported_output",
+            "READY 후보는 summarySheet 실행 계획이어야 합니다.",
+          ),
+        );
       }
       if (candidate.executionPlan?.requiresManualConfirmation !== false) {
-        errors.push(issue(`${path}.executionPlan.requiresManualConfirmation`, "manual_confirmation", "READY 후보는 수동 확인이 없어야 합니다."));
+        errors.push(
+          issue(
+            `${path}.executionPlan.requiresManualConfirmation`,
+            "manual_confirmation",
+            "READY 후보는 수동 확인이 없어야 합니다.",
+          ),
+        );
       }
     }
-    if (candidate.feasibilityStatus === "REVIEW" && candidate.executionPlan?.requiresManualConfirmation !== true) {
-      errors.push(issue(`${path}.executionPlan.requiresManualConfirmation`, "review_confirmation", "REVIEW 후보는 수동 확인 사유가 필요합니다."));
+    if (
+      candidate.feasibilityStatus === "REVIEW" &&
+      candidate.executionPlan?.requiresManualConfirmation !== true
+    ) {
+      errors.push(
+        issue(
+          `${path}.executionPlan.requiresManualConfirmation`,
+          "review_confirmation",
+          "REVIEW 후보는 수동 확인 사유가 필요합니다.",
+        ),
+      );
     }
     const expectedItemHash = sha256({
       ...candidate,
       feasibilityItemSha256: undefined,
     });
     if (candidate.feasibilityItemSha256 !== expectedItemHash) {
-      errors.push(issue(`${path}.feasibilityItemSha256`, "hash_mismatch", "feasibility item hash가 일치하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.feasibilityItemSha256`,
+          "hash_mismatch",
+          "feasibility item hash가 일치하지 않습니다.",
+        ),
+      );
     }
     const serialized = stableStringify(candidate);
     if (/rawrows|samplevalues|\"rows\"/i.test(serialized)) {
-      errors.push(issue(path, "privacy_boundary", "raw row 또는 sample value가 포함되면 안 됩니다."));
+      errors.push(
+        issue(
+          path,
+          "privacy_boundary",
+          "raw row 또는 sample value가 포함되면 안 됩니다.",
+        ),
+      );
     }
   }
   const counts = document.counts || {};
@@ -987,32 +1185,85 @@ function validateQueryCandidateFeasibilityResolution(document = {}) {
     Number(counts.unsupported || 0) +
     Number(counts.notApplicable || 0);
   if (expectedTotal !== Number(counts.total || 0)) {
-    errors.push(issue("counts", "count_mismatch", "feasibility 상태 합계가 total과 다릅니다."));
+    errors.push(
+      issue(
+        "counts",
+        "count_mismatch",
+        "feasibility 상태 합계가 total과 다릅니다.",
+      ),
+    );
   }
-  if (Number(counts.selectedInput || 0) !== Number(counts.ready || 0) + Number(counts.review || 0) + Number(counts.unsupported || 0)) {
-    errors.push(issue("counts.selectedInput", "count_mismatch", "selectedInput이 평가 상태 합계와 다릅니다."));
+  if (
+    Number(counts.selectedInput || 0) !==
+    Number(counts.ready || 0) +
+      Number(counts.review || 0) +
+      Number(counts.unsupported || 0)
+  ) {
+    errors.push(
+      issue(
+        "counts.selectedInput",
+        "count_mismatch",
+        "selectedInput이 평가 상태 합계와 다릅니다.",
+      ),
+    );
   }
   if (!document.integrity?.candidateCoverageComplete) {
-    errors.push(issue("integrity.candidateCoverageComplete", "coverage", "family와 resolution 후보 coverage가 불완전합니다."));
+    errors.push(
+      issue(
+        "integrity.candidateCoverageComplete",
+        "coverage",
+        "family와 resolution 후보 coverage가 불완전합니다.",
+      ),
+    );
   }
   if (!document.integrity?.selectedCoverageComplete) {
-    errors.push(issue("integrity.selectedCoverageComplete", "coverage", "SELECTED 대표 후보 coverage가 불완전합니다."));
+    errors.push(
+      issue(
+        "integrity.selectedCoverageComplete",
+        "coverage",
+        "SELECTED 대표 후보 coverage가 불완전합니다.",
+      ),
+    );
   }
   if (!document.integrity?.statusPartitionComplete) {
-    errors.push(issue("integrity.statusPartitionComplete", "partition", "feasibility 상태 partition이 불완전합니다."));
+    errors.push(
+      issue(
+        "integrity.statusPartitionComplete",
+        "partition",
+        "feasibility 상태 partition이 불완전합니다.",
+      ),
+    );
   }
   if (!document.integrity?.sourceCandidatesPreserved) {
-    errors.push(issue("integrity.sourceCandidatesPreserved", "preservation", "source 후보가 보존되지 않았습니다."));
+    errors.push(
+      issue(
+        "integrity.sourceCandidatesPreserved",
+        "preservation",
+        "source 후보가 보존되지 않았습니다.",
+      ),
+    );
   }
   if (!document.integrity?.executionPlansContainNoSourceRecords) {
-    errors.push(issue("integrity.executionPlansContainNoSourceRecords", "privacy_boundary", "execution plan에 raw row가 포함됐습니다."));
+    errors.push(
+      issue(
+        "integrity.executionPlansContainNoSourceRecords",
+        "privacy_boundary",
+        "execution plan에 raw row가 포함됐습니다.",
+      ),
+    );
   }
   const expectedHash = sha256({
     ...document,
     feasibilityResolutionSha256: undefined,
   });
   if (document.feasibilityResolutionSha256 !== expectedHash) {
-    errors.push(issue("feasibilityResolutionSha256", "hash_mismatch", "feasibility resolution hash가 일치하지 않습니다."));
+    errors.push(
+      issue(
+        "feasibilityResolutionSha256",
+        "hash_mismatch",
+        "feasibility resolution hash가 일치하지 않습니다.",
+      ),
+    );
   }
   return {
     valid: errors.length === 0,

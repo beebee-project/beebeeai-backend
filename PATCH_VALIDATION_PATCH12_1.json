@@ -1,0 +1,90 @@
+{
+  "version": "query_candidate_patch12_1_validation_v1",
+  "patch": "Conditional LLM Candidate Planner Live Shadow and Resolver Re-entry Bridge",
+  "applicationOrder": "after_patch12",
+  "productionRouteChanged": false,
+  "liveShadow": {
+    "enabledByExplicitTestFlagOnly": true,
+    "defaultLiveCall": false,
+    "providerMode": "openai_responses_optional",
+    "shadowOnly": true,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false
+  },
+  "fixture": {
+    "caseId": "call_required_group_avg_time_count",
+    "triggerRequired": true,
+    "triggerReasonCode": "NO_READY_CANDIDATE",
+    "mockProviderCallCount": 1,
+    "acceptedProposalCount": 2,
+    "resolverResolvedCount": 2,
+    "feasibilityReadyCount": 2,
+    "rankedCount": 2
+  },
+  "reentry": {
+    "acceptedProposalsOnly": true,
+    "resolver": true,
+    "family": true,
+    "feasibility": true,
+    "ranker": true,
+    "sourceCandidateMutation": false,
+    "sourceCandidateMerge": false,
+    "timeCountOperandContract": true,
+    "plannerRecipePriority": true
+  },
+  "privacy": {
+    "rawRowsSent": false,
+    "sampleValuesSent": false,
+    "originalFileSent": false,
+    "fileNameSent": false,
+    "shadowArtifactContainsSourceRecords": false
+  },
+  "persistence": {
+    "plaintextPersistenceAllowed": false,
+    "existingEncryptedPlannerCachePreserved": true,
+    "liveOutputContainsSanitizedMetadataOnly": true
+  },
+  "failurePolicy": {
+    "providerFailure": "FAILED_SAFE",
+    "reentryFailure": "FAILED_SAFE",
+    "existingDeterministicCandidatesPreserved": true,
+    "productionOutputUnaffected": true
+  },
+  "localValidation": {
+    "newShadowSmokeTests": "PASS",
+    "fixtureWriteCompare": "PASS 1/1",
+    "resolverFamilyFeasibilityRankerValidation": "PASS",
+    "patch12Regression": "PASS",
+    "seedPlannerBaseline": "PASS 3/3",
+    "seedRankerBaseline": "PASS 3/3",
+    "seedFeasibilityBaseline": "PASS 3/3",
+    "seedFamilyBaseline": "PASS 3/3",
+    "seedResolverBaseline": "PASS 3/3",
+    "liveOpenAiCall": "NOT_RUN_BY_DEFAULT",
+    "plannerReentryResolverIsolation": "PASS",
+    "syntheticLegacyTimeCountParity": "PASS_SEMANTIC_FINGERPRINT",
+    "fullUserResolverBaseline": "PASS 6/6 differences=0"
+  },
+  "resolverIsolationHotfix": {
+    "patch": "12.1.1",
+    "plannerReentryGuard": "retrievalItem.provenance.plannerReentry === true",
+    "plannerOnlyOperandContracts": [
+      "count_rows",
+      "time_count"
+    ],
+    "plannerOnlyStructuralRecipes": [
+      "time_count"
+    ],
+    "ordinaryTimeCountUsesLegacyResolverPath": true,
+    "resolverBaselineRewriteAllowed": false,
+    "expectedEventResolutionSha256": "ae97854a2e8a5fd16bcd85189f23190f2447cf8ece5414f3175a6da18ea8e257"
+  },
+  "resolverIsolationHashFix": {
+    "patch": "12.1.1.1",
+    "productionCodeChanged": false,
+    "wholeResolutionExactHashRemoved": true,
+    "resolutionItemSha256": "7b3616e2e2f6c377bcf76582fdc96f7a18200e3d86f7d7f7536292358bde81bc",
+    "semanticCompatibilityFingerprintSha256": "fcd34372b8d1316284e51e816bd0c95ad7c1625f7cd2be7ae0605c3fb8c1503a",
+    "resolverBaselineResult": "PASS 6/6 differences=0"
+  }
+}

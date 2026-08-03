@@ -1,15 +1,9 @@
-"use strict";
-
-const {
-  normalizeText,
-  sha256,
-} = require("./queryCandidateObservation");
-const {
-  assessCandidate,
-} = require("./queryCandidateRetriever");
+const { normalizeText, sha256 } = require("./queryCandidateObservation");
+const { assessCandidate } = require("./queryCandidateRetriever");
 
 const QUERY_CANDIDATE_RESOLUTION_VERSION = "query_candidate_resolution_v1";
-const QUERY_CANDIDATE_RESOLUTION_ITEM_VERSION = "query_candidate_resolution_item_v1";
+const QUERY_CANDIDATE_RESOLUTION_ITEM_VERSION =
+  "query_candidate_resolution_item_v1";
 const PREVIOUS_QUERY_CANDIDATE_RESOLUTION_POLICY_VERSION =
   "deterministic_candidate_resolution_policy_v1_1";
 const QUERY_CANDIDATE_RESOLUTION_POLICY_VERSION =
@@ -20,121 +14,288 @@ const RESOLUTION_RESULT = Object.freeze([
   "STILL_DEFERRED",
   "EXCLUDED",
 ]);
-const CHECK_STATUS = Object.freeze(["PASS", "FAIL", "UNKNOWN", "NOT_APPLICABLE"]);
+const CHECK_STATUS = Object.freeze([
+  "PASS",
+  "FAIL",
+  "UNKNOWN",
+  "NOT_APPLICABLE",
+]);
 const REASON_LEVEL = Object.freeze(["INFO", "WARNING", "BLOCKING"]);
-
 
 const DOMAIN_EVIDENCE_TOKEN_MAP = Object.freeze({
   SALES_REVENUE: [
-    "sales", "revenue", "sales_amount", "product_sales",
-    "매출", "판매금액", "매출액", "판매수량",
+    "sales",
+    "revenue",
+    "sales_amount",
+    "product_sales",
+    "매출",
+    "판매금액",
+    "매출액",
+    "판매수량",
   ],
   FINANCE_BUDGET: [
-    "budget", "expense", "expenditure", "labor_cost", "budget_execution",
-    "예산", "집행", "지출", "비용", "인건비",
+    "budget",
+    "expense",
+    "expenditure",
+    "labor_cost",
+    "budget_execution",
+    "예산",
+    "집행",
+    "지출",
+    "비용",
+    "인건비",
   ],
   EVENT_ATTENDANCE: [
-    "attendance", "attendee", "applicant", "application_status", "event_participant",
-    "출석", "참석", "신청자", "참가자", "참석여부", "참가상태",
+    "attendance",
+    "attendee",
+    "applicant",
+    "application_status",
+    "event_participant",
+    "출석",
+    "참석",
+    "신청자",
+    "참가자",
+    "참석여부",
+    "참가상태",
   ],
   EDUCATION_EVALUATION: [
-    "course", "lecture", "instructor", "education_evaluation", "evaluation_score",
-    "강좌", "강의", "강사", "수업", "교육평가", "평가점수",
+    "course",
+    "lecture",
+    "instructor",
+    "education_evaluation",
+    "evaluation_score",
+    "강좌",
+    "강의",
+    "강사",
+    "수업",
+    "교육평가",
+    "평가점수",
   ],
   HR_PEOPLE: [
-    "employee", "staff", "personnel", "human_resource",
-    "직원", "인사", "근로자",
+    "employee",
+    "staff",
+    "personnel",
+    "human_resource",
+    "직원",
+    "인사",
+    "근로자",
   ],
   INVENTORY_LOGISTICS: [
-    "inventory", "warehouse", "shipment", "stock_quantity",
-    "재고", "창고", "입출고", "배송",
+    "inventory",
+    "warehouse",
+    "shipment",
+    "stock_quantity",
+    "재고",
+    "창고",
+    "입출고",
+    "배송",
   ],
   PROJECT_RESEARCH_ADMIN: [
-    "project", "research", "grant", "research_project",
-    "프로젝트", "연구", "과제", "지원사업",
+    "project",
+    "research",
+    "grant",
+    "research_project",
+    "프로젝트",
+    "연구",
+    "과제",
+    "지원사업",
   ],
   SURVEY_FEEDBACK: [
-    "survey", "feedback", "satisfaction", "questionnaire", "recommendation_score",
-    "설문", "피드백", "만족도", "의견", "추천점수",
+    "survey",
+    "feedback",
+    "satisfaction",
+    "questionnaire",
+    "recommendation_score",
+    "설문",
+    "피드백",
+    "만족도",
+    "의견",
+    "추천점수",
   ],
   CUSTOMER_VENDOR: [
-    "vendor", "supplier", "customer_inquiry", "client_inquiry",
-    "거래처", "공급업체", "고객문의", "문의유형",
+    "vendor",
+    "supplier",
+    "customer_inquiry",
+    "client_inquiry",
+    "거래처",
+    "공급업체",
+    "고객문의",
+    "문의유형",
   ],
 });
 
+const NAMED_TEMPLATE_AUXILIARY_DOMAINS = new Set(["SURVEY_FEEDBACK"]);
 
-const NAMED_TEMPLATE_AUXILIARY_DOMAINS = new Set([
-  "SURVEY_FEEDBACK",
-]);
+const STRUCTURAL_GENERIC_RECIPE_IDS = new Set(
+  [
+    "single_source_dashboard",
+    "multi_source_schema_union",
+    "time_sum",
+    "time_avg",
+    "group_sum",
+    "group_avg",
+    "group_summary",
+    "composition_ratio",
+    "cumulative_sum",
+    "top_bottom",
+    "cross_sum",
+    "cross_count",
+    "category_count",
+    "count_rows",
+  ].map(normalizeLoose),
+);
 
-const STRUCTURAL_GENERIC_RECIPE_IDS = new Set([
-  "single_source_dashboard",
-  "multi_source_schema_union",
-  "time_sum",
-  "time_avg",
-  "group_sum",
-  "group_avg",
-  "group_summary",
-  "composition_ratio",
-  "cumulative_sum",
-  "top_bottom",
-  "cross_sum",
-  "cross_count",
-  "category_count",
-  "count_rows",
-].map(normalizeLoose));
-
+const PLANNER_REENTRY_STRUCTURAL_GENERIC_RECIPE_IDS = new Set(
+  ["time_count"].map(normalizeLoose),
+);
 
 const RECIPE_OPERAND_SPECS = Object.freeze({
   timesum: { operation: "time_sum", operands: ["period", "measure"] },
   timeavg: { operation: "time_avg", operands: ["period", "measure"] },
-  cumulativesum: { operation: "cumulative_sum", operands: ["period", "measure"] },
+  cumulativesum: {
+    operation: "cumulative_sum",
+    operands: ["period", "measure"],
+  },
   groupsum: { operation: "group_sum", operands: ["group", "measure"] },
   groupavg: { operation: "group_avg", operands: ["group", "measure"] },
   groupsummary: { operation: "group_summary", operands: ["group", "measure"] },
-  compositionratio: { operation: "composition_ratio", operands: ["group", "measure"] },
+  compositionratio: {
+    operation: "composition_ratio",
+    operands: ["group", "measure"],
+  },
   topbottom: { operation: "top_bottom", operands: ["group", "measure"] },
   categorycount: { operation: "category_count", operands: ["group"] },
-  crosssum: { operation: "cross_sum", operands: ["dimension", "dimension", "measure"] },
-  crosscount: { operation: "cross_count", operands: ["dimension", "dimension"] },
+  crosssum: {
+    operation: "cross_sum",
+    operands: ["dimension", "dimension", "measure"],
+  },
+  crosscount: {
+    operation: "cross_count",
+    operands: ["dimension", "dimension"],
+  },
 });
 
-const GENERIC_PERIOD_OPERANDS = new Set([
-  "기간", "일자", "날짜", "연월", "월", "년월", "date", "period", "month", "yearmonth",
-].map(normalizeLoose));
+const PLANNER_REENTRY_RECIPE_OPERAND_SPECS = Object.freeze({
+  ...RECIPE_OPERAND_SPECS,
+  countrows: { operation: "count_rows", operands: [] },
+  timecount: { operation: "time_count", operands: ["period"] },
+});
+
+const GENERIC_PERIOD_OPERANDS = new Set(
+  [
+    "기간",
+    "일자",
+    "날짜",
+    "연월",
+    "월",
+    "년월",
+    "date",
+    "period",
+    "month",
+    "yearmonth",
+  ].map(normalizeLoose),
+);
 
 const DOMAIN_TOKEN_MAP = Object.freeze({
   SALES_REVENUE: [
-    "sales", "revenue", "selling", "product_sales", "customer_sales",
-    "매출", "판매", "매상",
+    "sales",
+    "revenue",
+    "selling",
+    "product_sales",
+    "customer_sales",
+    "매출",
+    "판매",
+    "매상",
   ],
   FINANCE_BUDGET: [
-    "budget", "finance", "expense", "expenditure", "cost", "spending",
-    "예산", "집행", "지출", "비용", "재정",
+    "budget",
+    "finance",
+    "expense",
+    "expenditure",
+    "cost",
+    "spending",
+    "예산",
+    "집행",
+    "지출",
+    "비용",
+    "재정",
   ],
   EVENT_ATTENDANCE: [
-    "attendance", "attendee", "participant", "applicant", "application",
-    "event", "workshop", "출석", "참석", "신청", "행사", "명단",
+    "attendance",
+    "attendee",
+    "participant",
+    "applicant",
+    "application",
+    "event",
+    "workshop",
+    "출석",
+    "참석",
+    "신청",
+    "행사",
+    "명단",
   ],
   EDUCATION_EVALUATION: [
-    "course", "education", "evaluation", "performance_evaluation", "class",
-    "lecture", "교육", "강좌", "강의", "수업", "평가", "교과",
+    "course",
+    "education",
+    "evaluation",
+    "performance_evaluation",
+    "class",
+    "lecture",
+    "교육",
+    "강좌",
+    "강의",
+    "수업",
+    "평가",
+    "교과",
   ],
   HR_PEOPLE: [
-    "employee", "staff", "personnel", "human_resource", "hr", "인사", "직원", "근로자",
+    "employee",
+    "staff",
+    "personnel",
+    "human_resource",
+    "hr",
+    "인사",
+    "직원",
+    "근로자",
   ],
   INVENTORY_LOGISTICS: [
-    "inventory", "stock", "warehouse", "logistics", "shipment", "재고", "물류", "입출고",
+    "inventory",
+    "stock",
+    "warehouse",
+    "logistics",
+    "shipment",
+    "재고",
+    "물류",
+    "입출고",
   ],
   PROJECT_RESEARCH_ADMIN: [
-    "project", "research", "grant", "task", "프로젝트", "과제", "연구", "사업",
+    "project",
+    "research",
+    "grant",
+    "task",
+    "프로젝트",
+    "과제",
+    "연구",
+    "사업",
   ],
   SURVEY_FEEDBACK: [
-    "survey", "feedback", "satisfaction", "questionnaire", "설문", "만족도", "의견",
+    "survey",
+    "feedback",
+    "satisfaction",
+    "questionnaire",
+    "설문",
+    "만족도",
+    "의견",
   ],
   CUSTOMER_VENDOR: [
-    "customer", "client", "vendor", "supplier", "고객", "거래처", "공급업체", "업체",
+    "customer",
+    "client",
+    "vendor",
+    "supplier",
+    "고객",
+    "거래처",
+    "공급업체",
+    "업체",
   ],
 });
 
@@ -199,7 +360,9 @@ function tablesForRoot(profile = {}, rootId = "") {
 
 function synthesizeCandidate(retrievalItem = {}, sourceTableIds = undefined) {
   return {
-    version: normalizeText(retrievalItem.provenance?.candidateItemVersion || ""),
+    version: normalizeText(
+      retrievalItem.provenance?.candidateItemVersion || "",
+    ),
     candidateId: normalizeText(retrievalItem.candidateId || ""),
     recipeId: normalizeText(retrievalItem.recipeId || ""),
     templateId: normalizeText(retrievalItem.templateId || ""),
@@ -216,7 +379,9 @@ function synthesizeCandidate(retrievalItem = {}, sourceTableIds = undefined) {
       sourceTableIds === undefined
         ? unique(retrievalItem.sourceTableIds)
         : unique(sourceTableIds),
-    status: normalizeText(retrievalItem.provenance?.candidateStatus || "UNASSESSED"),
+    status: normalizeText(
+      retrievalItem.provenance?.candidateStatus || "UNASSESSED",
+    ),
   };
 }
 
@@ -236,7 +401,11 @@ function rootAssessment(retrievalItem, capability, profile, rootId) {
   };
 }
 
-function enhancedSourceScope(retrievalItem = {}, capability = {}, profile = {}) {
+function enhancedSourceScope(
+  retrievalItem = {},
+  capability = {},
+  profile = {},
+) {
   const explicitIds = unique(retrievalItem.sourceTableIds);
   if (explicitIds.length) {
     const assessment = assessCandidate(
@@ -246,7 +415,8 @@ function enhancedSourceScope(retrievalItem = {}, capability = {}, profile = {}) 
     );
     return {
       status: assessment.checks?.sourceScope?.status || "UNKNOWN",
-      mode: assessment.checks?.sourceScope?.mode || "EXPLICIT_SOURCE_UNRESOLVED",
+      mode:
+        assessment.checks?.sourceScope?.mode || "EXPLICIT_SOURCE_UNRESOLVED",
       selectedRootIds: unique(assessment.matchedPhysicalTableIds),
       requestedSourceTableIds: explicitIds,
       assessment,
@@ -348,10 +518,15 @@ function domainsFromText(value = "", tokenMap = DOMAIN_TOKEN_MAP) {
     .filter(Boolean);
   const matches = [];
   for (const [domain, tokens] of Object.entries(tokenMap)) {
-    if (tokens.some((token) => {
-      const normalizedToken = normalizeLoose(token);
-      return normalizedToken && parts.some((part) => part.includes(normalizedToken));
-    })) {
+    if (
+      tokens.some((token) => {
+        const normalizedToken = normalizeLoose(token);
+        return (
+          normalizedToken &&
+          parts.some((part) => part.includes(normalizedToken))
+        );
+      })
+    ) {
       matches.push(domain);
     }
   }
@@ -387,11 +562,12 @@ function candidateDomainSignals(retrievalItem = {}, capability = {}) {
   const coreStrongDomains = strongDomains.filter(
     (domain) => !NAMED_TEMPLATE_AUXILIARY_DOMAINS.has(domain),
   );
-  const primaryAnchorDomains = templateId && strongDomains.length
-    ? coreStrongDomains.length
-      ? coreStrongDomains
-      : strongDomains
-    : [];
+  const primaryAnchorDomains =
+    templateId && strongDomains.length
+      ? coreStrongDomains.length
+        ? coreStrongDomains
+        : strongDomains
+      : [];
   return {
     expectedDomains,
     strongDomains,
@@ -440,11 +616,14 @@ function isStructuralGenericCandidate(retrievalItem = {}, capability = {}) {
     ...asArray(capability.recipeIds),
   ]).map(normalizeLoose);
   if (candidateId.startsWith("multisource")) return true;
-  return recipeIds.some((recipeId) =>
-    STRUCTURAL_GENERIC_RECIPE_IDS.has(recipeId),
+  const plannerReentry = retrievalItem.provenance?.plannerReentry === true;
+  return recipeIds.some(
+    (recipeId) =>
+      STRUCTURAL_GENERIC_RECIPE_IDS.has(recipeId) ||
+      (plannerReentry &&
+        PLANNER_REENTRY_STRUCTURAL_GENERIC_RECIPE_IDS.has(recipeId)),
   );
 }
-
 
 function identifierSegments(value = "") {
   return normalizeText(value)
@@ -456,27 +635,37 @@ function identifierSegments(value = "") {
 }
 
 function parsedRecipeOperandSpec(retrievalItem = {}, capability = {}) {
-  const identifiers = unique([
-    retrievalItem.candidateId,
-    retrievalItem.recipeId,
-    capability.recipeId,
-    ...asArray(capability.recipeIds),
-  ]);
+  const plannerReentry = retrievalItem.provenance?.plannerReentry === true;
+  const operandSpecs = plannerReentry
+    ? PLANNER_REENTRY_RECIPE_OPERAND_SPECS
+    : RECIPE_OPERAND_SPECS;
+  const identifiers = unique(
+    plannerReentry
+      ? [
+          retrievalItem.recipeId,
+          capability.recipeId,
+          ...asArray(capability.recipeIds),
+          retrievalItem.candidateId,
+        ]
+      : [
+          retrievalItem.candidateId,
+          retrievalItem.recipeId,
+          capability.recipeId,
+          ...asArray(capability.recipeIds),
+        ],
+  );
 
   for (const identifier of identifiers) {
     const segments = identifierSegments(identifier);
     for (let index = 0; index < segments.length; index += 1) {
       const one = segments[index];
-      const two = index + 1 < segments.length
-        ? `${segments[index]}${segments[index + 1]}`
-        : "";
-      const key = RECIPE_OPERAND_SPECS[one]
-        ? one
-        : RECIPE_OPERAND_SPECS[two]
-          ? two
+      const two =
+        index + 1 < segments.length
+          ? `${segments[index]}${segments[index + 1]}`
           : "";
+      const key = operandSpecs[one] ? one : operandSpecs[two] ? two : "";
       if (!key) continue;
-      const spec = RECIPE_OPERAND_SPECS[key];
+      const spec = operandSpecs[key];
       const operandStart = key === two ? index + 2 : index + 1;
       const values = segments.slice(operandStart);
       if (values.length < spec.operands.length) continue;
@@ -501,7 +690,9 @@ function parsedRecipeOperandSpec(retrievalItem = {}, capability = {}) {
 }
 
 function selectedScopeTables(profile = {}, scope = {}) {
-  const matchedIds = new Set(unique(scope.assessment?.matchedTableIds).map(normalizeLoose));
+  const matchedIds = new Set(
+    unique(scope.assessment?.matchedTableIds).map(normalizeLoose),
+  );
   if (matchedIds.size) {
     return eligibleTables(profile).filter((table) =>
       matchedIds.has(normalizeLoose(table.tableId)),
@@ -529,7 +720,9 @@ function columnHeaderTokens(column = {}) {
     column.sourceHeader,
     column.normalizedHeader,
     column.normalizedMeaning,
-  ]).map(normalizeLoose).filter(Boolean);
+  ])
+    .map(normalizeLoose)
+    .filter(Boolean);
 }
 
 function measureStem(value = "") {
@@ -558,10 +751,17 @@ function tokenMatchesHeader(expectedToken = "", headerToken = "", kind = "") {
   return expected.includes(header) || header.includes(expected);
 }
 
-function columnOperandEvidence(column = {}, kind = "", expectedToken = "", mode = "EXACT_HEADER") {
+function columnOperandEvidence(
+  column = {},
+  kind = "",
+  expectedToken = "",
+  mode = "EXACT_HEADER",
+) {
   return {
     columnId: normalizeText(column.columnId || ""),
-    columnName: normalizeText(column.sourceHeader || column.normalizedHeader || ""),
+    columnName: normalizeText(
+      column.sourceHeader || column.normalizedHeader || "",
+    ),
     expectedToken: normalizeText(expectedToken || ""),
     operandKind: kind,
     matchMode: mode,
@@ -579,8 +779,11 @@ function semanticPeriodColumns(columns = []) {
       ...asArray(column.roleAliases),
     ]).map((item) => normalizeLoose(item));
     const dataType = normalizeLoose(column.dataType || "");
-    return roles.some((role) => ["period", "date", "time", "month", "yearmonth"].includes(role)) ||
-      ["date", "datetime", "period"].includes(dataType);
+    return (
+      roles.some((role) =>
+        ["period", "date", "time", "month", "yearmonth"].includes(role),
+      ) || ["date", "datetime", "period"].includes(dataType)
+    );
   });
 }
 
@@ -598,7 +801,12 @@ function matchOperandColumns(columns = [], operand = {}) {
       expectedToken,
       matchMode: "EXACT_OR_COMPATIBLE_HEADER",
       matched: exact.map((column) =>
-        columnOperandEvidence(column, operand.kind, expectedToken, "EXACT_OR_COMPATIBLE_HEADER"),
+        columnOperandEvidence(
+          column,
+          operand.kind,
+          expectedToken,
+          "EXACT_OR_COMPATIBLE_HEADER",
+        ),
       ),
     };
   }
@@ -612,7 +820,12 @@ function matchOperandColumns(columns = [], operand = {}) {
         expectedToken,
         matchMode: "UNIQUE_SEMANTIC_PERIOD",
         matched: semantic.map((column) =>
-          columnOperandEvidence(column, operand.kind, expectedToken, "UNIQUE_SEMANTIC_PERIOD"),
+          columnOperandEvidence(
+            column,
+            operand.kind,
+            expectedToken,
+            "UNIQUE_SEMANTIC_PERIOD",
+          ),
         ),
       };
     }
@@ -623,7 +836,12 @@ function matchOperandColumns(columns = [], operand = {}) {
         expectedToken,
         matchMode: "MULTIPLE_SEMANTIC_PERIOD_COLUMNS",
         matched: semantic.map((column) =>
-          columnOperandEvidence(column, operand.kind, expectedToken, "MULTIPLE_SEMANTIC_PERIOD_COLUMNS"),
+          columnOperandEvidence(
+            column,
+            operand.kind,
+            expectedToken,
+            "MULTIPLE_SEMANTIC_PERIOD_COLUMNS",
+          ),
         ),
       };
     }
@@ -679,11 +897,7 @@ function recipeOperandBindingCheck(
   );
   const failed = operands.filter((operand) => operand.status === "FAIL");
   const ambiguous = operands.filter((operand) => operand.status === "UNKNOWN");
-  const status = failed.length
-    ? "FAIL"
-    : ambiguous.length
-      ? "UNKNOWN"
-      : "PASS";
+  const status = failed.length ? "FAIL" : ambiguous.length ? "UNKNOWN" : "PASS";
   return {
     status,
     operation: parsed.operation,
@@ -694,11 +908,12 @@ function recipeOperandBindingCheck(
         asArray(operand.matched).map((match) => match.columnId),
       ),
     ),
-    reasonCode: status === "PASS"
-      ? "RECIPE_OPERANDS_BOUND"
-      : status === "UNKNOWN"
-        ? "RECIPE_OPERAND_BINDING_AMBIGUOUS"
-        : "RECIPE_OPERAND_BINDING_NOT_CONFIRMED",
+    reasonCode:
+      status === "PASS"
+        ? "RECIPE_OPERANDS_BOUND"
+        : status === "UNKNOWN"
+          ? "RECIPE_OPERAND_BINDING_AMBIGUOUS"
+          : "RECIPE_OPERAND_BINDING_NOT_CONFIRMED",
   };
 }
 
@@ -715,11 +930,17 @@ function mergeEvidence(...groups) {
   return result;
 }
 
-function domainAlignmentCheck(retrievalItem = {}, capability = {}, profile = {}) {
+function domainAlignmentCheck(
+  retrievalItem = {},
+  capability = {},
+  profile = {},
+) {
   const signals = candidateDomainSignals(retrievalItem, capability);
   const expectedDomains = signals.expectedDomains;
   const classification = profile.classification || {};
-  const primaryDomain = normalizeText(classification.primaryDomain || "UNKNOWN");
+  const primaryDomain = normalizeText(
+    classification.primaryDomain || "UNKNOWN",
+  );
   const declaredDomains = unique([
     primaryDomain,
     ...asArray(classification.secondaryDomains),
@@ -801,9 +1022,14 @@ function domainAlignmentCheck(retrievalItem = {}, capability = {}, profile = {})
 }
 
 function executorSupportCheck(retrievalItem = {}, capability = {}) {
-  const recipePresent = Boolean(normalizeText(
-    retrievalItem.recipeId || capability.recipeId || asArray(capability.recipeIds)[0] || "",
-  ));
+  const recipePresent = Boolean(
+    normalizeText(
+      retrievalItem.recipeId ||
+        capability.recipeId ||
+        asArray(capability.recipeIds)[0] ||
+        "",
+    ),
+  );
   const declaredStatus = normalizeText(
     capability.executorSupport?.status || "UNKNOWN",
   ).toUpperCase();
@@ -872,7 +1098,12 @@ function sourceCheckFrom(scope = {}) {
   };
 }
 
-function scoreResolution({ assessment = {}, domain = {}, executor = {}, scope = {} }) {
+function scoreResolution({
+  assessment = {},
+  domain = {},
+  executor = {},
+  scope = {},
+}) {
   let score = Number(assessment.retrievalScore || 0);
   if (domain.status === "PASS") score += 5;
   if (domain.status === "FAIL") score -= 25;
@@ -957,7 +1188,9 @@ function carriedItem(retrievalItem = {}, result = "RESOLVED") {
     evidence: asArray(retrievalItem.evidence),
     provenance: {
       retrievalItemVersion: normalizeText(retrievalItem.version || ""),
-      retrievalItemSha256: normalizeText(retrievalItem.retrievalItemSha256 || ""),
+      retrievalItemSha256: normalizeText(
+        retrievalItem.retrievalItemSha256 || "",
+      ),
       candidateStatus: normalizeText(
         retrievalItem.provenance?.candidateStatus || "UNASSESSED",
       ),
@@ -965,7 +1198,10 @@ function carriedItem(retrievalItem = {}, result = "RESOLVED") {
       semanticReassessmentPerformed: false,
     },
   };
-  item.resolutionItemSha256 = sha256({ ...item, resolutionItemSha256: undefined });
+  item.resolutionItemSha256 = sha256({
+    ...item,
+    resolutionItemSha256: undefined,
+  });
   return item;
 }
 
@@ -980,12 +1216,14 @@ function resolveDeferredCandidate(
   ).toUpperCase();
 
   if (bindingStatus === "UNBOUND") {
-    reasons.push(resolutionReason(
-      "CAPABILITY_BINDING_UNBOUND",
-      "WARNING",
-      "후보 capability가 manifest에 연결되지 않아 의미 검증을 완료할 수 없습니다.",
-      {},
-    ));
+    reasons.push(
+      resolutionReason(
+        "CAPABILITY_BINDING_UNBOUND",
+        "WARNING",
+        "후보 capability가 manifest에 연결되지 않아 의미 검증을 완료할 수 없습니다.",
+        {},
+      ),
+    );
     return buildResolvedItem({
       retrievalItem,
       capability,
@@ -1002,7 +1240,11 @@ function resolveDeferredCandidate(
 
   const scope = enhancedSourceScope(retrievalItem, capability, resolvedProfile);
   const assessment = scope.assessment;
-  const domain = domainAlignmentCheck(retrievalItem, capability, resolvedProfile);
+  const domain = domainAlignmentCheck(
+    retrievalItem,
+    capability,
+    resolvedProfile,
+  );
   const executor = executorSupportCheck(retrievalItem, capability);
   const operandBinding = recipeOperandBindingCheck(
     retrievalItem,
@@ -1012,113 +1254,141 @@ function resolveDeferredCandidate(
   );
 
   if (scope.status === "FAIL") {
-    reasons.push(resolutionReason(
-      "NO_ANALYSIS_ELIGIBLE_TABLE",
-      "BLOCKING",
-      "분석 가능한 테이블이 없어 후보를 생성할 수 없습니다.",
-      {},
-    ));
+    reasons.push(
+      resolutionReason(
+        "NO_ANALYSIS_ELIGIBLE_TABLE",
+        "BLOCKING",
+        "분석 가능한 테이블이 없어 후보를 생성할 수 없습니다.",
+        {},
+      ),
+    );
   } else if (scope.status === "UNKNOWN") {
-    reasons.push(resolutionReason(
-      scope.reasonCode || "SOURCE_SCOPE_STILL_AMBIGUOUS",
-      "WARNING",
-      "병합된 의미를 적용해도 후보가 사용할 원본 테이블을 하나로 확정할 수 없습니다.",
-      { selectedRootIds: scope.selectedRootIds },
-    ));
+    reasons.push(
+      resolutionReason(
+        scope.reasonCode || "SOURCE_SCOPE_STILL_AMBIGUOUS",
+        "WARNING",
+        "병합된 의미를 적용해도 후보가 사용할 원본 테이블을 하나로 확정할 수 없습니다.",
+        { selectedRootIds: scope.selectedRootIds },
+      ),
+    );
   } else if (scope.mode === "SEMANTIC_UNIQUE_PHYSICAL_SOURCE") {
-    reasons.push(resolutionReason(
-      "SOURCE_SCOPE_RESOLVED_BY_SEMANTICS",
-      "INFO",
-      "필수 역할과 capability 충족도를 이용해 원본 테이블을 단일하게 확정했습니다.",
-      { selectedRootIds: scope.selectedRootIds },
-    ));
+    reasons.push(
+      resolutionReason(
+        "SOURCE_SCOPE_RESOLVED_BY_SEMANTICS",
+        "INFO",
+        "필수 역할과 capability 충족도를 이용해 원본 테이블을 단일하게 확정했습니다.",
+        { selectedRootIds: scope.selectedRootIds },
+      ),
+    );
   }
 
   if (domain.status === "FAIL") {
     const namedPrimaryConflict =
       domain.reasonCode === "NAMED_TEMPLATE_PRIMARY_DOMAIN_CONFLICT";
-    reasons.push(resolutionReason(
-      domain.reasonCode || "CANDIDATE_DOMAIN_CONFLICT",
-      "BLOCKING",
-      namedPrimaryConflict
-        ? "명명형 template 후보의 핵심 업무영역이 데이터의 primary domain과 일치하지 않습니다."
-        : "후보의 업무영역 신호가 데이터의 확정 업무영역과 충돌합니다.",
-      {
-        expectedDomains: domain.expectedDomains,
-        actualDomains: domain.actualDomains,
-        primaryDomain: domain.primaryDomain,
-        primaryAnchorDomains: domain.primaryAnchorDomains,
-        confidence: domain.confidence,
-      },
-    ));
+    reasons.push(
+      resolutionReason(
+        domain.reasonCode || "CANDIDATE_DOMAIN_CONFLICT",
+        "BLOCKING",
+        namedPrimaryConflict
+          ? "명명형 template 후보의 핵심 업무영역이 데이터의 primary domain과 일치하지 않습니다."
+          : "후보의 업무영역 신호가 데이터의 확정 업무영역과 충돌합니다.",
+        {
+          expectedDomains: domain.expectedDomains,
+          actualDomains: domain.actualDomains,
+          primaryDomain: domain.primaryDomain,
+          primaryAnchorDomains: domain.primaryAnchorDomains,
+          confidence: domain.confidence,
+        },
+      ),
+    );
   } else if (domain.status === "UNKNOWN") {
-    reasons.push(resolutionReason(
-      "DATASET_DOMAIN_NOT_CONFIDENT",
-      "WARNING",
-      "업무영역 confidence가 낮아 후보의 domain 적합성을 확정하지 않았습니다.",
-      { expectedDomains: domain.expectedDomains, actualDomains: domain.actualDomains },
-    ));
+    reasons.push(
+      resolutionReason(
+        "DATASET_DOMAIN_NOT_CONFIDENT",
+        "WARNING",
+        "업무영역 confidence가 낮아 후보의 domain 적합성을 확정하지 않았습니다.",
+        {
+          expectedDomains: domain.expectedDomains,
+          actualDomains: domain.actualDomains,
+        },
+      ),
+    );
   }
 
   if (executor.status === "UNKNOWN") {
-    reasons.push(resolutionReason(
-      executor.mode,
-      "WARNING",
-      "recipe 또는 executor 연결을 결정론적으로 확인하지 못했습니다.",
-      { declaredStatus: executor.declaredStatus, recipePresent: executor.recipePresent },
-    ));
+    reasons.push(
+      resolutionReason(
+        executor.mode,
+        "WARNING",
+        "recipe 또는 executor 연결을 결정론적으로 확인하지 못했습니다.",
+        {
+          declaredStatus: executor.declaredStatus,
+          recipePresent: executor.recipePresent,
+        },
+      ),
+    );
   } else if (executor.mode === "GENERIC_EXECUTOR_REQUIRES_FEASIBILITY_GATE") {
-    reasons.push(resolutionReason(
-      "GENERIC_EXECUTOR_REQUIRES_FEASIBILITY_GATE",
-      "INFO",
-      "generic executor 연결은 확인됐으며 실제 실행 가능성은 후속 Feasibility Gate에서 검증합니다.",
-      { outputTypes: executor.outputTypes },
-    ));
+    reasons.push(
+      resolutionReason(
+        "GENERIC_EXECUTOR_REQUIRES_FEASIBILITY_GATE",
+        "INFO",
+        "generic executor 연결은 확인됐으며 실제 실행 가능성은 후속 Feasibility Gate에서 검증합니다.",
+        { outputTypes: executor.outputTypes },
+      ),
+    );
   }
 
   if (operandBinding.status === "FAIL") {
-    reasons.push(resolutionReason(
-      "RECIPE_OPERAND_BINDING_NOT_CONFIRMED",
-      bindingStatus === "INFERRED" ? "WARNING" : "BLOCKING",
-      "recipe 식별자가 요구하는 그룹·기간·측정값 열을 실제 source table에서 모두 확인하지 못했습니다.",
-      {
-        operation: operandBinding.operation,
-        identifier: operandBinding.identifier,
-        missingOperands: operandBinding.operands
-          .filter((operand) => operand.status === "FAIL")
-          .map((operand) => ({
-            kind: operand.kind,
-            expectedToken: operand.expectedToken,
-          })),
-      },
-    ));
+    reasons.push(
+      resolutionReason(
+        "RECIPE_OPERAND_BINDING_NOT_CONFIRMED",
+        bindingStatus === "INFERRED" ? "WARNING" : "BLOCKING",
+        "recipe 식별자가 요구하는 그룹·기간·측정값 열을 실제 source table에서 모두 확인하지 못했습니다.",
+        {
+          operation: operandBinding.operation,
+          identifier: operandBinding.identifier,
+          missingOperands: operandBinding.operands
+            .filter((operand) => operand.status === "FAIL")
+            .map((operand) => ({
+              kind: operand.kind,
+              expectedToken: operand.expectedToken,
+            })),
+        },
+      ),
+    );
   } else if (operandBinding.status === "UNKNOWN") {
-    reasons.push(resolutionReason(
-      "RECIPE_OPERAND_BINDING_AMBIGUOUS",
-      "WARNING",
-      "recipe operand에 대응하는 열이 여러 개이거나 source scope가 불명확해 정확한 열 결속을 확정하지 못했습니다.",
-      {
-        operation: operandBinding.operation,
-        identifier: operandBinding.identifier,
-        ambiguousOperands: operandBinding.operands
-          .filter((operand) => operand.status === "UNKNOWN")
-          .map((operand) => ({
-            kind: operand.kind,
-            expectedToken: operand.expectedToken,
-            matchedColumnIds: asArray(operand.matched).map((match) => match.columnId),
-          })),
-      },
-    ));
+    reasons.push(
+      resolutionReason(
+        "RECIPE_OPERAND_BINDING_AMBIGUOUS",
+        "WARNING",
+        "recipe operand에 대응하는 열이 여러 개이거나 source scope가 불명확해 정확한 열 결속을 확정하지 못했습니다.",
+        {
+          operation: operandBinding.operation,
+          identifier: operandBinding.identifier,
+          ambiguousOperands: operandBinding.operands
+            .filter((operand) => operand.status === "UNKNOWN")
+            .map((operand) => ({
+              kind: operand.kind,
+              expectedToken: operand.expectedToken,
+              matchedColumnIds: asArray(operand.matched).map(
+                (match) => match.columnId,
+              ),
+            })),
+        },
+      ),
+    );
   } else if (operandBinding.status === "PASS") {
-    reasons.push(resolutionReason(
-      "RECIPE_OPERANDS_BOUND",
-      "INFO",
-      "recipe 식별자의 그룹·기간·측정값 operand를 실제 source table 열에 결속했습니다.",
-      {
-        operation: operandBinding.operation,
-        matchedColumnIds: operandBinding.matchedColumnIds,
-      },
-    ));
+    reasons.push(
+      resolutionReason(
+        "RECIPE_OPERANDS_BOUND",
+        "INFO",
+        "recipe 식별자의 그룹·기간·측정값 operand를 실제 source table 열에 결속했습니다.",
+        {
+          operation: operandBinding.operation,
+          matchedColumnIds: operandBinding.matchedColumnIds,
+        },
+      ),
+    );
   }
 
   const structuralGeneric = isStructuralGenericCandidate(
@@ -1130,29 +1400,33 @@ function resolveDeferredCandidate(
     domain.status === "PASS" ||
     structuralGeneric;
   if (!inferredIdentityConfirmed) {
-    reasons.push(resolutionReason(
-      "INFERRED_TEMPLATE_IDENTITY_NOT_CONFIRMED",
-      "WARNING",
-      "명명형 INFERRED 후보의 업무 의미를 후보 ID·template ID 또는 데이터 의미 근거로 확인하지 못했습니다.",
-      {
-        candidateId: normalizeText(retrievalItem.candidateId || ""),
-        templateId: normalizeText(retrievalItem.templateId || ""),
-        domainStatus: domain.status,
-        domainReasonCode: domain.reasonCode,
-      },
-    ));
+    reasons.push(
+      resolutionReason(
+        "INFERRED_TEMPLATE_IDENTITY_NOT_CONFIRMED",
+        "WARNING",
+        "명명형 INFERRED 후보의 업무 의미를 후보 ID·template ID 또는 데이터 의미 근거로 확인하지 못했습니다.",
+        {
+          candidateId: normalizeText(retrievalItem.candidateId || ""),
+          templateId: normalizeText(retrievalItem.templateId || ""),
+          domainStatus: domain.status,
+          domainReasonCode: domain.reasonCode,
+        },
+      ),
+    );
   }
 
   const assessmentBlocking = asArray(assessment?.reasons).filter(
     (item) => item.level === "BLOCKING",
   );
   for (const item of assessmentBlocking) {
-    reasons.push(resolutionReason(
-      item.code,
-      bindingStatus === "INFERRED" ? "WARNING" : "BLOCKING",
-      item.message,
-      item.details || {},
-    ));
+    reasons.push(
+      resolutionReason(
+        item.code,
+        bindingStatus === "INFERRED" ? "WARNING" : "BLOCKING",
+        item.message,
+        item.details || {},
+      ),
+    );
   }
 
   const operandConclusive = ["PASS", "NOT_APPLICABLE"].includes(
@@ -1179,19 +1453,23 @@ function resolveDeferredCandidate(
   }
 
   if (result === "RESOLVED") {
-    reasons.push(resolutionReason(
-      "SEMANTIC_REQUIREMENTS_RESOLVED",
-      "INFO",
-      "병합된 의미 profile로 필수 역할·operation·metric·source 조건을 확인했습니다.",
-      {},
-    ));
+    reasons.push(
+      resolutionReason(
+        "SEMANTIC_REQUIREMENTS_RESOLVED",
+        "INFO",
+        "병합된 의미 profile로 필수 역할·operation·metric·source 조건을 확인했습니다.",
+        {},
+      ),
+    );
   } else if (result === "STILL_DEFERRED" && bindingStatus === "INFERRED") {
-    reasons.push(resolutionReason(
-      "INFERRED_REQUIREMENTS_NOT_CONCLUSIVE",
-      "WARNING",
-      "식별자 기반 추론 요구조건만으로는 후보를 안전하게 확정하거나 제외할 수 없습니다.",
-      {},
-    ));
+    reasons.push(
+      resolutionReason(
+        "INFERRED_REQUIREMENTS_NOT_CONCLUSIVE",
+        "WARNING",
+        "식별자 기반 추론 요구조건만으로는 후보를 안전하게 확정하거나 제외할 수 없습니다.",
+        {},
+      ),
+    );
   }
 
   return buildResolvedItem({
@@ -1223,15 +1501,15 @@ function buildResolvedItem({
   const sourceCheck = scope
     ? sourceCheckFrom(scope)
     : {
-      status: "UNKNOWN",
-      mode: "NOT_ASSESSED",
-      selectedRootIds: [],
-      requestedSourceTableIds: unique(retrievalItem.sourceTableIds),
-      matchedTableIds: [],
-      matchedPhysicalTableIds: [],
-      reasonCode: "NOT_ASSESSED",
-      rootCandidates: [],
-    };
+        status: "UNKNOWN",
+        mode: "NOT_ASSESSED",
+        selectedRootIds: [],
+        requestedSourceTableIds: unique(retrievalItem.sourceTableIds),
+        matchedTableIds: [],
+        matchedPhysicalTableIds: [],
+        reasonCode: "NOT_ASSESSED",
+        rootCandidates: [],
+      };
   const assessed = assessment || {};
   const normalizedOperandBinding = operandBinding || {
     status: "NOT_APPLICABLE",
@@ -1241,20 +1519,35 @@ function buildResolvedItem({
     matchedColumnIds: [],
     reasonCode: "NOT_ASSESSED",
   };
-  const operandEvidence = asArray(normalizedOperandBinding.operands)
-    .flatMap((operand) => asArray(operand.matched));
+  const operandEvidence = asArray(normalizedOperandBinding.operands).flatMap(
+    (operand) => asArray(operand.matched),
+  );
   const evidence = mergeEvidence(assessed.evidence, operandEvidence);
-  const blockingReasons = asArray(reasons).filter((item) => item.level === "BLOCKING");
+  const blockingReasons = asArray(reasons).filter(
+    (item) => item.level === "BLOCKING",
+  );
   const item = {
     version: QUERY_CANDIDATE_RESOLUTION_ITEM_VERSION,
-    candidateId: normalizeText(retrievalItem.candidateId || capability.candidateId || ""),
-    recipeId: normalizeText(retrievalItem.recipeId || capability.recipeId || ""),
-    templateId: normalizeText(retrievalItem.templateId || capability.templateId || ""),
-    candidateType: normalizeText(retrievalItem.candidateType || capability.candidateType || "UNKNOWN"),
+    candidateId: normalizeText(
+      retrievalItem.candidateId || capability.candidateId || "",
+    ),
+    recipeId: normalizeText(
+      retrievalItem.recipeId || capability.recipeId || "",
+    ),
+    templateId: normalizeText(
+      retrievalItem.templateId || capability.templateId || "",
+    ),
+    candidateType: normalizeText(
+      retrievalItem.candidateType || capability.candidateType || "UNKNOWN",
+    ),
     result,
     previousRetrievalResult: normalizeText(retrievalItem.result || "DEFERRED"),
-    bindingStatus: normalizeText(capability.bindingStatus || retrievalItem.bindingStatus || "UNBOUND"),
-    bindingSource: normalizeText(capability.bindingSource || retrievalItem.bindingSource || "NONE"),
+    bindingStatus: normalizeText(
+      capability.bindingStatus || retrievalItem.bindingStatus || "UNBOUND",
+    ),
+    bindingSource: normalizeText(
+      capability.bindingSource || retrievalItem.bindingSource || "NONE",
+    ),
     originalRank: Number.isInteger(retrievalItem.originalRank)
       ? retrievalItem.originalRank
       : null,
@@ -1297,11 +1590,17 @@ function buildResolvedItem({
     evidence,
     provenance: {
       retrievalItemVersion: normalizeText(retrievalItem.version || ""),
-      retrievalItemSha256: normalizeText(retrievalItem.retrievalItemSha256 || ""),
+      retrievalItemSha256: normalizeText(
+        retrievalItem.retrievalItemSha256 || "",
+      ),
       capabilityItemVersion: normalizeText(capability.version || ""),
       capabilitySha256: normalizeText(capability.capabilitySha256 || ""),
-      resolvedSemanticProfileVersion: normalizeText(resolvedProfile.version || ""),
-      resolvedSemanticProfileSha256: normalizeText(resolvedProfile.profileSha256 || ""),
+      resolvedSemanticProfileVersion: normalizeText(
+        resolvedProfile.version || "",
+      ),
+      resolvedSemanticProfileSha256: normalizeText(
+        resolvedProfile.profileSha256 || "",
+      ),
       candidateStatus: normalizeText(
         retrievalItem.provenance?.candidateStatus || "UNASSESSED",
       ),
@@ -1309,7 +1608,10 @@ function buildResolvedItem({
       semanticReassessmentPerformed: true,
     },
   };
-  item.resolutionItemSha256 = sha256({ ...item, resolutionItemSha256: undefined });
+  item.resolutionItemSha256 = sha256({
+    ...item,
+    resolutionItemSha256: undefined,
+  });
   return item;
 }
 
@@ -1331,13 +1633,19 @@ function buildQueryCandidateResolution({
   const retrievalCandidates = asArray(retrieval.candidates);
   const capabilityCandidates = asArray(capabilityManifest.candidates);
   const capabilityById = candidateMap(capabilityCandidates);
-  const retrievalIds = unique(retrievalCandidates.map((item) => item.candidateId));
-  const capabilityIds = unique(capabilityCandidates.map((item) => item.candidateId));
+  const retrievalIds = unique(
+    retrievalCandidates.map((item) => item.candidateId),
+  );
+  const capabilityIds = unique(
+    capabilityCandidates.map((item) => item.candidateId),
+  );
   const retrievalIdSet = new Set(retrievalIds);
   const capabilityIdSet = new Set(capabilityIds);
 
   const candidates = retrievalCandidates.map((retrievalItem) => {
-    const capability = capabilityById.get(normalizeText(retrievalItem.candidateId)) || {
+    const capability = capabilityById.get(
+      normalizeText(retrievalItem.candidateId),
+    ) || {
       version: "",
       candidateId: retrievalItem.candidateId,
       recipeId: retrievalItem.recipeId,
@@ -1375,17 +1683,29 @@ function buildQueryCandidateResolution({
     },
     source: {
       caseId: normalizeText(
-        retrieval.source?.caseId || resolvedSemanticProfile.source?.caseId || "",
+        retrieval.source?.caseId ||
+          resolvedSemanticProfile.source?.caseId ||
+          "",
       ),
       fileName: normalizeText(
-        retrieval.source?.fileName || resolvedSemanticProfile.source?.fileName || "",
+        retrieval.source?.fileName ||
+          resolvedSemanticProfile.source?.fileName ||
+          "",
       ),
       retrievalVersion: normalizeText(retrieval.version || ""),
       retrievalSha256: normalizeText(retrieval.retrievalSha256 || ""),
-      capabilityManifestVersion: normalizeText(capabilityManifest.version || ""),
-      capabilityManifestSha256: normalizeText(capabilityManifest.manifestSha256 || ""),
-      resolvedSemanticProfileVersion: normalizeText(resolvedSemanticProfile.version || ""),
-      resolvedSemanticProfileSha256: normalizeText(resolvedSemanticProfile.profileSha256 || ""),
+      capabilityManifestVersion: normalizeText(
+        capabilityManifest.version || "",
+      ),
+      capabilityManifestSha256: normalizeText(
+        capabilityManifest.manifestSha256 || "",
+      ),
+      resolvedSemanticProfileVersion: normalizeText(
+        resolvedSemanticProfile.version || "",
+      ),
+      resolvedSemanticProfileSha256: normalizeText(
+        resolvedSemanticProfile.profileSha256 || "",
+      ),
       deterministicSemanticProfileSha256: normalizeText(
         resolvedSemanticProfile.source?.deterministicProfileSha256 || "",
       ),
@@ -1423,10 +1743,13 @@ function buildQueryCandidateResolution({
     counts: {
       total: candidates.length,
       resolved: candidates.filter((item) => item.result === "RESOLVED").length,
-      stillDeferred: candidates.filter((item) => item.result === "STILL_DEFERRED").length,
+      stillDeferred: candidates.filter(
+        (item) => item.result === "STILL_DEFERRED",
+      ).length,
       excluded: candidates.filter((item) => item.result === "EXCLUDED").length,
       carriedResolved: candidates.filter(
-        (item) => item.result === "RESOLVED" && item.provenance.terminalPriorResult,
+        (item) =>
+          item.result === "RESOLVED" && item.provenance.terminalPriorResult,
       ).length,
       semanticResolved: candidates.filter(
         (item) =>
@@ -1434,7 +1757,8 @@ function buildQueryCandidateResolution({
           item.previousRetrievalResult === "DEFERRED",
       ).length,
       carriedExcluded: candidates.filter(
-        (item) => item.result === "EXCLUDED" && item.provenance.terminalPriorResult,
+        (item) =>
+          item.result === "EXCLUDED" && item.provenance.terminalPriorResult,
       ).length,
       newlyExcluded: candidates.filter(
         (item) =>
@@ -1442,7 +1766,8 @@ function buildQueryCandidateResolution({
           item.previousRetrievalResult === "DEFERRED",
       ).length,
       inferredResolved: candidates.filter(
-        (item) => item.result === "RESOLVED" && item.bindingStatus === "INFERRED",
+        (item) =>
+          item.result === "RESOLVED" && item.bindingStatus === "INFERRED",
       ).length,
       unboundStillDeferred: candidates.filter(
         (item) =>
@@ -1470,16 +1795,44 @@ function validateResolutionItem(item = {}, index = 0) {
   const errors = [];
   const warnings = [];
   if (item.version !== QUERY_CANDIDATE_RESOLUTION_ITEM_VERSION) {
-    errors.push(validationIssue(`${path}.version`, "invalid_version", "resolution item version이 유효하지 않습니다."));
+    errors.push(
+      validationIssue(
+        `${path}.version`,
+        "invalid_version",
+        "resolution item version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (!normalizeText(item.candidateId)) {
-    errors.push(validationIssue(`${path}.candidateId`, "required", "candidateId가 필요합니다."));
+    errors.push(
+      validationIssue(
+        `${path}.candidateId`,
+        "required",
+        "candidateId가 필요합니다.",
+      ),
+    );
   }
   if (!RESOLUTION_RESULT.includes(item.result)) {
-    errors.push(validationIssue(`${path}.result`, "invalid_enum", "resolution result가 유효하지 않습니다."));
+    errors.push(
+      validationIssue(
+        `${path}.result`,
+        "invalid_enum",
+        "resolution result가 유효하지 않습니다.",
+      ),
+    );
   }
-  if (!Number.isFinite(Number(item.resolutionScore)) || item.resolutionScore < 0 || item.resolutionScore > 100) {
-    errors.push(validationIssue(`${path}.resolutionScore`, "invalid_range", "resolutionScore는 0~100이어야 합니다."));
+  if (
+    !Number.isFinite(Number(item.resolutionScore)) ||
+    item.resolutionScore < 0 ||
+    item.resolutionScore > 100
+  ) {
+    errors.push(
+      validationIssue(
+        `${path}.resolutionScore`,
+        "invalid_range",
+        "resolutionScore는 0~100이어야 합니다.",
+      ),
+    );
   }
   for (const check of [
     item.checks?.sourceScope,
@@ -1488,23 +1841,57 @@ function validateResolutionItem(item = {}, index = 0) {
     item.checks?.operandBinding,
   ]) {
     if (!CHECK_STATUS.includes(check?.status)) {
-      errors.push(validationIssue(`${path}.checks`, "invalid_check_status", "check status가 유효하지 않습니다."));
+      errors.push(
+        validationIssue(
+          `${path}.checks`,
+          "invalid_check_status",
+          "check status가 유효하지 않습니다.",
+        ),
+      );
     }
   }
   for (const reason of asArray(item.reasons)) {
     if (!REASON_LEVEL.includes(reason.level)) {
-      errors.push(validationIssue(`${path}.reasons`, "invalid_reason_level", "reason level이 유효하지 않습니다."));
+      errors.push(
+        validationIssue(
+          `${path}.reasons`,
+          "invalid_reason_level",
+          "reason level이 유효하지 않습니다.",
+        ),
+      );
     }
   }
-  if (!['UNASSESSED', ''].includes(normalizeText(item.provenance?.candidateStatus || ''))) {
-    warnings.push(validationIssue(`${path}.provenance.candidateStatus`, "candidate_status_mutated", "Resolver는 candidate status를 변경하지 않아야 합니다."));
+  if (
+    !["UNASSESSED", ""].includes(
+      normalizeText(item.provenance?.candidateStatus || ""),
+    )
+  ) {
+    warnings.push(
+      validationIssue(
+        `${path}.provenance.candidateStatus`,
+        "candidate_status_mutated",
+        "Resolver는 candidate status를 변경하지 않아야 합니다.",
+      ),
+    );
   }
   if (item.result === "STILL_DEFERRED") {
-    warnings.push(validationIssue(path, "candidate_still_deferred", "후속 manifest 보강 또는 조건부 Planner 검토가 필요합니다."));
+    warnings.push(
+      validationIssue(
+        path,
+        "candidate_still_deferred",
+        "후속 manifest 보강 또는 조건부 Planner 검토가 필요합니다.",
+      ),
+    );
   }
   const expectedSha = sha256({ ...item, resolutionItemSha256: undefined });
   if (item.resolutionItemSha256 !== expectedSha) {
-    errors.push(validationIssue(`${path}.resolutionItemSha256`, "sha_mismatch", "resolution item SHA-256이 일치하지 않습니다."));
+    errors.push(
+      validationIssue(
+        `${path}.resolutionItemSha256`,
+        "sha_mismatch",
+        "resolution item SHA-256이 일치하지 않습니다.",
+      ),
+    );
   }
   return { errors, warnings };
 }
@@ -1513,17 +1900,43 @@ function validateQueryCandidateResolution(resolution = {}) {
   const errors = [];
   const warnings = [];
   if (resolution.version !== QUERY_CANDIDATE_RESOLUTION_VERSION) {
-    errors.push(validationIssue("version", "invalid_version", "resolution version이 유효하지 않습니다."));
+    errors.push(
+      validationIssue(
+        "version",
+        "invalid_version",
+        "resolution version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (resolution.itemVersion !== QUERY_CANDIDATE_RESOLUTION_ITEM_VERSION) {
-    errors.push(validationIssue("itemVersion", "invalid_version", "resolution item version이 유효하지 않습니다."));
+    errors.push(
+      validationIssue(
+        "itemVersion",
+        "invalid_version",
+        "resolution item version이 유효하지 않습니다.",
+      ),
+    );
   }
-  if (resolution.policy?.version !== QUERY_CANDIDATE_RESOLUTION_POLICY_VERSION) {
-    errors.push(validationIssue("policy.version", "invalid_version", "resolution policy version이 유효하지 않습니다."));
+  if (
+    resolution.policy?.version !== QUERY_CANDIDATE_RESOLUTION_POLICY_VERSION
+  ) {
+    errors.push(
+      validationIssue(
+        "policy.version",
+        "invalid_version",
+        "resolution policy version이 유효하지 않습니다.",
+      ),
+    );
   }
   const candidates = asArray(resolution.candidates);
   if (!Array.isArray(resolution.candidates)) {
-    errors.push(validationIssue("candidates", "invalid_type", "candidates는 배열이어야 합니다."));
+    errors.push(
+      validationIssue(
+        "candidates",
+        "invalid_type",
+        "candidates는 배열이어야 합니다.",
+      ),
+    );
   }
   const ids = new Set();
   candidates.forEach((item, index) => {
@@ -1531,7 +1944,13 @@ function validateQueryCandidateResolution(resolution = {}) {
     errors.push(...validation.errors);
     warnings.push(...validation.warnings);
     if (ids.has(item.candidateId)) {
-      errors.push(validationIssue(`candidates[${index}].candidateId`, "duplicate", "candidateId가 중복됩니다."));
+      errors.push(
+        validationIssue(
+          `candidates[${index}].candidateId`,
+          "duplicate",
+          "candidateId가 중복됩니다.",
+        ),
+      );
     }
     ids.add(item.candidateId);
   });
@@ -1539,25 +1958,33 @@ function validateQueryCandidateResolution(resolution = {}) {
   const expectedCounts = {
     total: candidates.length,
     resolved: candidates.filter((item) => item.result === "RESOLVED").length,
-    stillDeferred: candidates.filter((item) => item.result === "STILL_DEFERRED").length,
+    stillDeferred: candidates.filter((item) => item.result === "STILL_DEFERRED")
+      .length,
     excluded: candidates.filter((item) => item.result === "EXCLUDED").length,
     carriedResolved: candidates.filter(
-      (item) => item.result === "RESOLVED" && item.provenance?.terminalPriorResult,
+      (item) =>
+        item.result === "RESOLVED" && item.provenance?.terminalPriorResult,
     ).length,
     semanticResolved: candidates.filter(
-      (item) => item.result === "RESOLVED" && item.previousRetrievalResult === "DEFERRED",
+      (item) =>
+        item.result === "RESOLVED" &&
+        item.previousRetrievalResult === "DEFERRED",
     ).length,
     carriedExcluded: candidates.filter(
-      (item) => item.result === "EXCLUDED" && item.provenance?.terminalPriorResult,
+      (item) =>
+        item.result === "EXCLUDED" && item.provenance?.terminalPriorResult,
     ).length,
     newlyExcluded: candidates.filter(
-      (item) => item.result === "EXCLUDED" && item.previousRetrievalResult === "DEFERRED",
+      (item) =>
+        item.result === "EXCLUDED" &&
+        item.previousRetrievalResult === "DEFERRED",
     ).length,
     inferredResolved: candidates.filter(
       (item) => item.result === "RESOLVED" && item.bindingStatus === "INFERRED",
     ).length,
     unboundStillDeferred: candidates.filter(
-      (item) => item.result === "STILL_DEFERRED" && item.bindingStatus === "UNBOUND",
+      (item) =>
+        item.result === "STILL_DEFERRED" && item.bindingStatus === "UNBOUND",
     ).length,
     sourceAmbiguous: candidates.filter(
       (item) => item.checks?.sourceScope?.status === "UNKNOWN",
@@ -1565,26 +1992,62 @@ function validateQueryCandidateResolution(resolution = {}) {
   };
   for (const [key, expected] of Object.entries(expectedCounts)) {
     if (Number(resolution.counts?.[key] || 0) !== expected) {
-      errors.push(validationIssue(`counts.${key}`, "count_mismatch", `${key} count가 실제 후보 수와 다릅니다.`));
+      errors.push(
+        validationIssue(
+          `counts.${key}`,
+          "count_mismatch",
+          `${key} count가 실제 후보 수와 다릅니다.`,
+        ),
+      );
     }
   }
 
   if (!resolution.integrity?.retrievalCapabilityHashMatch) {
-    errors.push(validationIssue("integrity.retrievalCapabilityHashMatch", "source_hash_mismatch", "retrieval과 capability manifest hash가 일치하지 않습니다."));
+    errors.push(
+      validationIssue(
+        "integrity.retrievalCapabilityHashMatch",
+        "source_hash_mismatch",
+        "retrieval과 capability manifest hash가 일치하지 않습니다.",
+      ),
+    );
   }
   if (!resolution.integrity?.retrievalDeterministicProfileHashMatch) {
-    errors.push(validationIssue("integrity.retrievalDeterministicProfileHashMatch", "source_hash_mismatch", "retrieval의 deterministic profile과 resolved profile source hash가 일치하지 않습니다."));
+    errors.push(
+      validationIssue(
+        "integrity.retrievalDeterministicProfileHashMatch",
+        "source_hash_mismatch",
+        "retrieval의 deterministic profile과 resolved profile source hash가 일치하지 않습니다.",
+      ),
+    );
   }
   if (asArray(resolution.integrity?.missingCapabilityCandidateIds).length) {
-    warnings.push(validationIssue("integrity.missingCapabilityCandidateIds", "capability_candidates_missing", "일부 후보 capability가 없어 UNBOUND로 처리됐습니다."));
+    warnings.push(
+      validationIssue(
+        "integrity.missingCapabilityCandidateIds",
+        "capability_candidates_missing",
+        "일부 후보 capability가 없어 UNBOUND로 처리됐습니다.",
+      ),
+    );
   }
   if (asArray(resolution.integrity?.orphanCapabilityCandidateIds).length) {
-    warnings.push(validationIssue("integrity.orphanCapabilityCandidateIds", "capability_candidates_orphaned", "retrieval에 없는 capability 후보가 있습니다."));
+    warnings.push(
+      validationIssue(
+        "integrity.orphanCapabilityCandidateIds",
+        "capability_candidates_orphaned",
+        "retrieval에 없는 capability 후보가 있습니다.",
+      ),
+    );
   }
 
   const expectedSha = sha256({ ...resolution, resolutionSha256: undefined });
   if (resolution.resolutionSha256 !== expectedSha) {
-    errors.push(validationIssue("resolutionSha256", "sha_mismatch", "resolution SHA-256이 일치하지 않습니다."));
+    errors.push(
+      validationIssue(
+        "resolutionSha256",
+        "sha_mismatch",
+        "resolution SHA-256이 일치하지 않습니다.",
+      ),
+    );
   }
   return {
     valid: errors.length === 0,

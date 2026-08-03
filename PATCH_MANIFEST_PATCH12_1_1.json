@@ -1,0 +1,53 @@
+{
+  "version": "query_candidate_patch12_1_1_manifest_v1",
+  "patch": "Planner Re-entry Resolver Isolation Hotfix",
+  "applicationOrder": "after_patch12_1",
+  "fileCount": 9,
+  "files": [
+    {
+      "path": "automation/queryCandidateResolver.js",
+      "bytes": 57372,
+      "sha256": "949548848b9540268c5806b8af559c138b91bb3f3e4c21cfc0f084c1b41a66c1"
+    },
+    {
+      "path": "tests/queryCandidatePlannerResolverIsolationSmokeTest.js",
+      "bytes": 2531,
+      "sha256": "cacbcfa4f28bcb5f4b907297916ecd99d9970adfae3b664059f67648bf2b4190"
+    },
+    {
+      "path": "tests/queryCandidatePlannerResolverLegacyTimeCountCompatibilitySmokeTest.js",
+      "bytes": 6457,
+      "sha256": "1e6b6390583a45a403a345e76db3ee928e844f505baf3ea04f3cacf425bfa3ff"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1SourceIntegritySmokeTest.js",
+      "bytes": 4299,
+      "sha256": "df09e44678daeded7a010e740a84ae17c91d6b70041e972c546fff579a402675"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1ManifestSmokeTest.js",
+      "bytes": 1225,
+      "sha256": "611216a949eed70d02ddea6b5946c8317fce00ccd918c6025f181e5d9d42ca5c"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_1_PLANNER_REENTRY_RESOLVER_ISOLATION_HOTFIX.md",
+      "bytes": 7128,
+      "sha256": "7c379c33b46563baa25a28b48c732b156ce0502afd72a9b7838a837d1fff57f6"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_1.json",
+      "bytes": 3201,
+      "sha256": "bb046625dfa5effe1611710fd7b7db44fa84deaad46f8b23a41c7c88798edcc9"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1.json",
+      "bytes": 3101,
+      "sha256": "be056bc93ba5da5c24b78476a739eeecfb8d87cec98cd22b6e232454f7a497d6"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH12_1.json",
+      "bytes": 6346,
+      "sha256": "2a63290a9eaed15547f913272cbf3e8e4dd1a400936295987b3beade79cebf9e"
+    }
+  ]
+}

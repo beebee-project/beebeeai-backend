@@ -1,16 +1,9 @@
-"use strict";
-
-const {
-  sha256,
-  normalizeText,
-} = require("./queryCandidateObservation");
+const { sha256, normalizeText } = require("./queryCandidateObservation");
 const {
   validateQueryJsonSemanticProfile,
   operationCapabilities,
 } = require("./queryJsonSemanticNormalizer");
-const {
-  validateSemanticProfile,
-} = require("./querySemanticProfiler");
+const { validateSemanticProfile } = require("./querySemanticProfiler");
 
 const RESOLVED_SEMANTIC_PROFILE_VERSION = "resolved_semantic_profile_v1";
 const RESOLVED_SEMANTIC_POLICY_VERSION = "semantic_profile_merge_policy_v1";
@@ -123,7 +116,10 @@ function sameMetricFamily(left = "", right = "") {
   return false;
 }
 
-function compatibleSemanticType(dataType = "unknown", semanticType = "unknown") {
+function compatibleSemanticType(
+  dataType = "unknown",
+  semanticType = "unknown",
+) {
   const data = normalizeRole(dataType);
   const semantic = normalizeRole(semanticType);
   if (!semantic || semantic === "unknown") return true;
@@ -141,8 +137,10 @@ function compatibleSemanticType(dataType = "unknown", semanticType = "unknown") 
 }
 
 function resolvedSemanticType({ baseColumn, llmColumn, roleAccepted }) {
-  const baseType = normalizeRole(baseColumn.semanticType || "unknown") || "unknown";
-  const llmType = normalizeRole(llmColumn.semanticType || "unknown") || "unknown";
+  const baseType =
+    normalizeRole(baseColumn.semanticType || "unknown") || "unknown";
+  const llmType =
+    normalizeRole(llmColumn.semanticType || "unknown") || "unknown";
   if (
     roleAccepted &&
     llmColumn.confidence >= METADATA_ACCEPT_THRESHOLD &&
@@ -154,7 +152,8 @@ function resolvedSemanticType({ baseColumn, llmColumn, roleAccepted }) {
 }
 
 function acceptedDefaultAggregation({ llmColumn, semanticType }) {
-  const aggregation = normalizeText(llmColumn.defaultAggregation || "none") || "none";
+  const aggregation =
+    normalizeText(llmColumn.defaultAggregation || "none") || "none";
   if (llmColumn.confidence < METADATA_ACCEPT_THRESHOLD) return "none";
   if (semanticType === "measure") {
     return [
@@ -172,10 +171,20 @@ function acceptedDefaultAggregation({ llmColumn, semanticType }) {
       ? aggregation
       : "none";
   }
-  if (["dimension", "identifier", "temporal", "text", "boolean"].includes(semanticType)) {
-    return ["none", "countRows", "countDistinct", "min", "max", "last", "first"].includes(
-      aggregation,
+  if (
+    ["dimension", "identifier", "temporal", "text", "boolean"].includes(
+      semanticType,
     )
+  ) {
+    return [
+      "none",
+      "countRows",
+      "countDistinct",
+      "min",
+      "max",
+      "last",
+      "first",
+    ].includes(aggregation)
       ? aggregation
       : "none";
   }
@@ -210,7 +219,8 @@ function indexProfiles(deterministicProfile, llmProfile) {
 }
 
 function assertMergeInputs(deterministicProfile, llmProfile) {
-  const deterministicValidation = validateQueryJsonSemanticProfile(deterministicProfile);
+  const deterministicValidation =
+    validateQueryJsonSemanticProfile(deterministicProfile);
   if (!deterministicValidation.valid) {
     const error = new Error("결정론적 Semantic Profile 검증에 실패했습니다.");
     error.code = "DETERMINISTIC_SEMANTIC_PROFILE_INVALID";
@@ -224,8 +234,13 @@ function assertMergeInputs(deterministicProfile, llmProfile) {
     error.validation = llmValidation;
     throw error;
   }
-  if (llmProfile.source?.semanticProfileSha256 !== deterministicProfile.profileSha256) {
-    const error = new Error("LLM profile이 다른 결정론적 profile을 참조합니다.");
+  if (
+    llmProfile.source?.semanticProfileSha256 !==
+    deterministicProfile.profileSha256
+  ) {
+    const error = new Error(
+      "LLM profile이 다른 결정론적 profile을 참조합니다.",
+    );
     error.code = "SEMANTIC_PROFILE_SOURCE_HASH_MISMATCH";
     throw error;
   }
@@ -234,12 +249,16 @@ function assertMergeInputs(deterministicProfile, llmProfile) {
     llmProfile,
   );
   if (llmTables.size > baseTables.size) {
-    const error = new Error("LLM table semantics 수가 결정론적 table 수보다 많습니다.");
+    const error = new Error(
+      "LLM table semantics 수가 결정론적 table 수보다 많습니다.",
+    );
     error.code = "TABLE_SEMANTIC_COUNT_OVERFLOW";
     throw error;
   }
   if (llmColumns.size > baseColumns.size) {
-    const error = new Error("LLM column semantics 수가 결정론적 column 수보다 많습니다.");
+    const error = new Error(
+      "LLM column semantics 수가 결정론적 column 수보다 많습니다.",
+    );
     error.code = "COLUMN_SEMANTIC_COUNT_OVERFLOW";
     throw error;
   }
@@ -253,7 +272,9 @@ function assertMergeInputs(deterministicProfile, llmProfile) {
   for (const [columnId, item] of llmColumns.entries()) {
     const base = baseColumns.get(columnId);
     if (!base || item.tableId !== base.table.tableId) {
-      const error = new Error(`LLM column 참조가 유효하지 않습니다: ${columnId}`);
+      const error = new Error(
+        `LLM column 참조가 유효하지 않습니다: ${columnId}`,
+      );
       error.code = "LLM_COLUMN_REFERENCE_INVALID";
       throw error;
     }
@@ -262,8 +283,10 @@ function assertMergeInputs(deterministicProfile, llmProfile) {
 }
 
 function resolveRole(baseColumn, llmColumn = {}) {
-  const baseRole = normalizeRole(baseColumn.semanticRole || "unknown") || "unknown";
-  const llmRole = normalizeRole(llmColumn.semanticRole || "unknown") || "unknown";
+  const baseRole =
+    normalizeRole(baseColumn.semanticRole || "unknown") || "unknown";
+  const llmRole =
+    normalizeRole(llmColumn.semanticRole || "unknown") || "unknown";
   const decision = normalizeText(llmColumn.decision || "UNKNOWN");
   const confidence = round(clamp(llmColumn.confidence));
   const protectedExplicit = isProtectedExplicit(baseColumn);
@@ -271,7 +294,9 @@ function resolveRole(baseColumn, llmColumn = {}) {
   const rejectedFields = [];
   const issues = [];
   let semanticRole = baseRole;
-  let selectedSource = protectedExplicit ? "ORIGINAL_EXPLICIT" : "DETERMINISTIC";
+  let selectedSource = protectedExplicit
+    ? "ORIGINAL_EXPLICIT"
+    : "DETERMINISTIC";
   let resolutionDecision = protectedExplicit
     ? "PRESERVE_EXPLICIT"
     : "PRESERVE_DETERMINISTIC";
@@ -468,8 +493,13 @@ function resolveColumn(baseColumn, llmColumn = {}, tableId) {
   const normalizedMeaning =
     llmColumn.confidence >= 0.7 && normalizeText(llmColumn.normalizedMeaning)
       ? normalizeText(llmColumn.normalizedMeaning)
-      : normalizeText(baseColumn.normalizedHeader || baseColumn.sourceHeader || "");
-  const defaultAggregation = acceptedDefaultAggregation({ llmColumn, semanticType });
+      : normalizeText(
+          baseColumn.normalizedHeader || baseColumn.sourceHeader || "",
+        );
+  const defaultAggregation = acceptedDefaultAggregation({
+    llmColumn,
+    semanticType,
+  });
   const unitSemantic =
     llmColumn.confidence >= METADATA_ACCEPT_THRESHOLD
       ? normalizeText(llmColumn.unitSemantic || "NONE") || "NONE"
@@ -478,8 +508,7 @@ function resolveColumn(baseColumn, llmColumn = {}, tableId) {
     ...asArray(baseColumn.supportedOperations),
     ...operationCapabilities({
       role: role.semanticRole,
-      semanticType:
-        semanticType === "temporal" ? "dimension" : semanticType,
+      semanticType: semanticType === "temporal" ? "dimension" : semanticType,
       dataType: baseColumn.dataType,
     }),
     defaultAggregation !== "none" ? defaultAggregation : "",
@@ -497,7 +526,9 @@ function resolveColumn(baseColumn, llmColumn = {}, tableId) {
     ...role.acceptedFields,
     ...metric.acceptedFields,
     llmColumn.confidence >= 0.7 ? "normalizedMeaning" : "",
-    llmColumn.confidence >= METADATA_ACCEPT_THRESHOLD ? "defaultAggregation" : "",
+    llmColumn.confidence >= METADATA_ACCEPT_THRESHOLD
+      ? "defaultAggregation"
+      : "",
     llmColumn.confidence >= METADATA_ACCEPT_THRESHOLD ? "unitSemantic" : "",
   ]);
   const rejectedFields = unique([
@@ -530,8 +561,10 @@ function resolveColumn(baseColumn, llmColumn = {}, tableId) {
     selectedSource: role.selectedSource,
     resolutionDecision: role.resolutionDecision,
     deterministic: {
-      semanticRole: normalizeRole(baseColumn.semanticRole || "unknown") || "unknown",
-      semanticType: normalizeRole(baseColumn.semanticType || "unknown") || "unknown",
+      semanticRole:
+        normalizeRole(baseColumn.semanticRole || "unknown") || "unknown",
+      semanticType:
+        normalizeRole(baseColumn.semanticType || "unknown") || "unknown",
       metricFamily: normalizeMetric(baseColumn.metricFamily || ""),
       roleConfidence: round(clamp(baseColumn.roleConfidence)),
       roleSource: normalizeText(baseColumn.roleSource || ""),
@@ -540,8 +573,10 @@ function resolveColumn(baseColumn, llmColumn = {}, tableId) {
       ),
     },
     llm: {
-      semanticRole: normalizeRole(llmColumn.semanticRole || "unknown") || "unknown",
-      semanticType: normalizeRole(llmColumn.semanticType || "unknown") || "unknown",
+      semanticRole:
+        normalizeRole(llmColumn.semanticRole || "unknown") || "unknown",
+      semanticType:
+        normalizeRole(llmColumn.semanticType || "unknown") || "unknown",
       metricFamily: normalizeMetric(llmColumn.metricFamily || ""),
       decision: normalizeText(llmColumn.decision || "UNKNOWN"),
       confidence: round(clamp(llmColumn.confidence)),
@@ -563,7 +598,9 @@ function relationKey(relation = {}) {
 }
 
 function buildResolvedRelations(deterministicProfile, llmProfile, issues) {
-  const tableIds = new Set(asArray(deterministicProfile.tables).map((item) => item.tableId));
+  const tableIds = new Set(
+    asArray(deterministicProfile.tables).map((item) => item.tableId),
+  );
   const columnIds = new Set(
     asArray(deterministicProfile.tables).flatMap((table) =>
       asArray(table.columns).map((column) => column.columnId),
@@ -644,7 +681,10 @@ function buildResolvedRelations(deterministicProfile, llmProfile, issues) {
   return relations;
 }
 
-function buildResolvedSemanticProfile({ deterministicProfile, llmProfile } = {}) {
+function buildResolvedSemanticProfile({
+  deterministicProfile,
+  llmProfile,
+} = {}) {
   const indexes = assertMergeInputs(deterministicProfile, llmProfile);
   const issues = [];
   const tables = asArray(deterministicProfile.tables).map((baseTable) => {
@@ -655,7 +695,8 @@ function buildResolvedSemanticProfile({ deterministicProfile, llmProfile } = {})
       evidenceCodes: [],
       description: "",
     };
-    const tablePurposeAccepted = llmTable.confidence >= RELATION_ACCEPT_THRESHOLD;
+    const tablePurposeAccepted =
+      llmTable.confidence >= RELATION_ACCEPT_THRESHOLD;
     const columns = asArray(baseTable.columns).map((baseColumn) =>
       resolveColumn(
         baseColumn,
@@ -719,7 +760,9 @@ function buildResolvedSemanticProfile({ deterministicProfile, llmProfile } = {})
       flags: { ...baseTable.flags },
       shape: { ...baseTable.shape },
       tablePurpose: tablePurposeAccepted ? llmTable.tablePurpose : "UNKNOWN",
-      rowGrain: tablePurposeAccepted ? normalizeText(llmTable.rowGrain || "") : "",
+      rowGrain: tablePurposeAccepted
+        ? normalizeText(llmTable.rowGrain || "")
+        : "",
       tableSemanticConfidence: tablePurposeAccepted
         ? round(clamp(llmTable.confidence))
         : 0,
@@ -754,11 +797,17 @@ function buildResolvedSemanticProfile({ deterministicProfile, llmProfile } = {})
     ...tables.flatMap((table) => table.capabilities),
     `business_domain:${llmProfile.classification.primaryDomain}`,
     `dataset_intent:${llmProfile.classification.datasetIntent}`,
-    ...tableRelations.map((relation) => `table_relation:${relation.relationType}`),
+    ...tableRelations.map(
+      (relation) => `table_relation:${relation.relationType}`,
+    ),
   ]);
   const allColumns = tables.flatMap((table) => table.columns);
-  const blockingIssues = issues.filter((item) => item.level === "BLOCKING").length;
-  const warningIssues = issues.filter((item) => item.level === "WARNING").length;
+  const blockingIssues = issues.filter(
+    (item) => item.level === "BLOCKING",
+  ).length;
+  const warningIssues = issues.filter(
+    (item) => item.level === "WARNING",
+  ).length;
   const infoIssues = issues.filter((item) => item.level === "INFO").length;
   const profile = {
     version: RESOLVED_SEMANTIC_PROFILE_VERSION,
@@ -852,7 +901,9 @@ function validateResolvedSemanticProfile(profile = {}) {
   if (profile.policyVersion !== RESOLVED_SEMANTIC_POLICY_VERSION) {
     errors.push({ code: "PROFILE_POLICY_VERSION_INVALID" });
   }
-  if (!/^[a-f0-9]{64}$/.test(profile.source?.deterministicProfileSha256 || "")) {
+  if (
+    !/^[a-f0-9]{64}$/.test(profile.source?.deterministicProfileSha256 || "")
+  ) {
     errors.push({ code: "DETERMINISTIC_PROFILE_SHA_INVALID" });
   }
   if (!/^[a-f0-9]{64}$/.test(profile.source?.llmProfileSha256 || "")) {
@@ -862,7 +913,10 @@ function validateResolvedSemanticProfile(profile = {}) {
   const columnIds = new Set();
   for (const table of asArray(profile.tables)) {
     if (!table.tableId || tableIds.has(table.tableId)) {
-      errors.push({ code: "TABLE_ID_INVALID_OR_DUPLICATED", tableId: table.tableId });
+      errors.push({
+        code: "TABLE_ID_INVALID_OR_DUPLICATED",
+        tableId: table.tableId,
+      });
     }
     tableIds.add(table.tableId);
     for (const column of asArray(table.columns)) {
@@ -878,15 +932,27 @@ function validateResolvedSemanticProfile(profile = {}) {
       }
       columnIds.add(column.columnId);
       if (!column.semanticRole || !column.semanticType) {
-        errors.push({ code: "COLUMN_RESOLUTION_REQUIRED", columnId: column.columnId });
+        errors.push({
+          code: "COLUMN_RESOLUTION_REQUIRED",
+          columnId: column.columnId,
+        });
       }
-      if (column.selectedSource === "LLM" && column.confidence < ROLE_ACCEPT_THRESHOLD) {
-        errors.push({ code: "LLM_ROLE_ACCEPTED_BELOW_THRESHOLD", columnId: column.columnId });
+      if (
+        column.selectedSource === "LLM" &&
+        column.confidence < ROLE_ACCEPT_THRESHOLD
+      ) {
+        errors.push({
+          code: "LLM_ROLE_ACCEPTED_BELOW_THRESHOLD",
+          columnId: column.columnId,
+        });
       }
     }
   }
   for (const relation of asArray(profile.tableRelations)) {
-    if (!tableIds.has(relation.leftTableId) || !tableIds.has(relation.rightTableId)) {
+    if (
+      !tableIds.has(relation.leftTableId) ||
+      !tableIds.has(relation.rightTableId)
+    ) {
       errors.push({ code: "RELATION_TABLE_REFERENCE_INVALID" });
     }
     if (asArray(relation.leftColumnIds).some((id) => !columnIds.has(id))) {

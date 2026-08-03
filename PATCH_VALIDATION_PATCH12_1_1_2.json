@@ -1,0 +1,62 @@
+{
+  "version": "query_candidate_patch12_1_1_2_validation_v1",
+  "patch": "Historical Manifest Supersession and Source Integrity Robustness Hotfix",
+  "applicationOrder": "after_patch12_1_1_1",
+  "productionCodeChanged": false,
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "rootCause": {
+    "sourceIntegrityFailure": "exact declaration regex no longer matched cumulative resolver source layout",
+    "manifestFailure": "historical patch12.1.1 manifest compared an intentionally superseded production file against its old byte size and SHA",
+    "observedResolverBytes": 60359,
+    "historicalResolverBytes": 57372,
+    "functionalRegressionObserved": false,
+    "fullResolverBaseline": "PASS 6/6 differences=0",
+    "shadowBaseline": "PASS 1/1 differences=0"
+  },
+  "sourceIntegrityPolicy": {
+    "behaviorBasedResolverValidation": true,
+    "declarationRegexParsingRemoved": true,
+    "ordinaryTimeCountLegacyPathChecked": true,
+    "plannerTimeCountReentryPathChecked": true,
+    "plannerCountRowsReentryPathChecked": true
+  },
+  "historicalManifestPolicy": {
+    "historicalManifestValuesPreserved": true,
+    "exactValidationForUnchangedArtifacts": true,
+    "supersededProductionFilesMayDrift": true,
+    "supersededPaths": [
+      "automation/queryCandidateResolver.js",
+      "tests/queryCandidatePatch12_1_1SourceIntegritySmokeTest.js",
+      "tests/queryCandidatePatch12_1_1ManifestSmokeTest.js",
+      "README_QUERY_CANDIDATE_PATCH12_1_1_PLANNER_REENTRY_RESOLVER_ISOLATION_HOTFIX.md"
+    ],
+    "currentFileMustExistAndBeNonEmpty": true,
+    "currentShaFormatRequired": true,
+    "patch12_1_1_1SupersededPaths": [
+      "tests/queryCandidatePatch12_1_1_1ManifestSmokeTest.js",
+      "README_QUERY_CANDIDATE_PATCH12_1_1_PLANNER_REENTRY_RESOLVER_ISOLATION_HOTFIX.md"
+    ]
+  },
+  "scope": {
+    "resolverSourceChanged": false,
+    "plannerSourceChanged": false,
+    "shadowBridgeChanged": false,
+    "fixtureDataChanged": false,
+    "historicalManifestRewritten": false,
+    "testsChanged": true
+  },
+  "expectedRegression": {
+    "legacyTimeCountCompatibility": "PASS",
+    "patch12_1_1SourceIntegrity": "PASS",
+    "patch12_1_1Manifest": "PASS superseded=3 or 4",
+    "patch12_1_1_1SourceIntegrity": "PASS",
+    "patch12_1_1_1Manifest": "PASS superseded=2",
+    "shadowFixture": "PASS 1/1 differences=0",
+    "plannerBaseline": "PASS 6/6 differences=0",
+    "rankerBaseline": "PASS 6/6 differences=0",
+    "feasibilityBaseline": "PASS 6/6 differences=0",
+    "familyBaseline": "PASS 6/6 differences=0",
+    "resolverBaseline": "PASS 6/6 differences=0"
+  }
+}

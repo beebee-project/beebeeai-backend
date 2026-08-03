@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   DEFAULT_MODEL,
   DEFAULT_REASONING_EFFORT,
@@ -23,11 +21,16 @@ function extractRefusal(response = {}) {
 function parseOutputText(response = {}) {
   const refusal = extractRefusal(response);
   if (refusal) {
-    const error = new Error(`OpenAI Candidate Planner가 거부되었습니다: ${refusal}`);
+    const error = new Error(
+      `OpenAI Candidate Planner가 거부되었습니다: ${refusal}`,
+    );
     error.code = "OPENAI_CANDIDATE_PLANNER_REFUSAL";
     throw error;
   }
-  if (typeof response.output_text !== "string" || !response.output_text.trim()) {
+  if (
+    typeof response.output_text !== "string" ||
+    !response.output_text.trim()
+  ) {
     const error = new Error("OpenAI Responses API의 output_text가 없습니다.");
     error.code = "OPENAI_CANDIDATE_PLANNER_OUTPUT_TEXT_MISSING";
     throw error;
@@ -35,7 +38,9 @@ function parseOutputText(response = {}) {
   try {
     return JSON.parse(response.output_text);
   } catch (cause) {
-    const error = new Error("OpenAI Candidate Planner JSON 파싱에 실패했습니다.");
+    const error = new Error(
+      "OpenAI Candidate Planner JSON 파싱에 실패했습니다.",
+    );
     error.code = "OPENAI_CANDIDATE_PLANNER_JSON_PARSE_FAILED";
     error.cause = cause;
     throw error;
@@ -60,11 +65,15 @@ function buildCandidatePlannerOpenAIRequest({
     input: [
       {
         role: "system",
-        content: [{ type: "input_text", text: buildCandidatePlannerSystemPrompt() }],
+        content: [
+          { type: "input_text", text: buildCandidatePlannerSystemPrompt() },
+        ],
       },
       {
         role: "user",
-        content: [{ type: "input_text", text: buildCandidatePlannerUserPrompt(input) }],
+        content: [
+          { type: "input_text", text: buildCandidatePlannerUserPrompt(input) },
+        ],
       },
     ],
     text: {
@@ -96,7 +105,11 @@ function createOpenAICandidatePlannerProvider({
     throw new TypeError("client.responses.create 함수가 필요합니다.");
   }
   return {
-    async plan({ input, model: requestedModel, reasoningEffort: requestedReasoning } = {}) {
+    async plan({
+      input,
+      model: requestedModel,
+      reasoningEffort: requestedReasoning,
+    } = {}) {
       const effectiveModel = requestedModel || model;
       const effectiveReasoning = requestedReasoning || reasoningEffort;
       const request = buildCandidatePlannerOpenAIRequest({

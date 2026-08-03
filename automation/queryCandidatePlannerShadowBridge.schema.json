@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidatePlannerShadowBridge.schema.json",
+  "title": "Conditional LLM Candidate Planner Live Shadow Resolution",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "policy",
+    "source",
+    "privacy",
+    "status",
+    "plannerResolution",
+    "counts",
+    "integrity",
+    "shadowResolutionSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_shadow_resolution_v1"
+    },
+    "status": {
+      "enum": ["SKIPPED", "REQUIRED_NOT_RUN", "FAILED_SAFE", "SHADOW_COMPLETED"]
+    },
+    "shadowResolutionSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

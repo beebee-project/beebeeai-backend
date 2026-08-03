@@ -1,0 +1,58 @@
+{
+  "version": "query_candidate_patch12_1_1_1_manifest_v1",
+  "patch": "Legacy Time Count Compatibility Test Hash Fix",
+  "applicationOrder": "after_patch12_1_1",
+  "fileCount": 10,
+  "files": [
+    {
+      "path": "tests/queryCandidatePlannerResolverLegacyTimeCountCompatibilitySmokeTest.js",
+      "bytes": 6457,
+      "sha256": "1e6b6390583a45a403a345e76db3ee928e844f505baf3ea04f3cacf425bfa3ff"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1_1SourceIntegritySmokeTest.js",
+      "bytes": 4056,
+      "sha256": "3a2f107a0e9ebff644ed0b5decbcf0bc1dce471e9aca133c51179405dedde48f"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1_1ManifestSmokeTest.js",
+      "bytes": 1238,
+      "sha256": "f0ae55f3daa11acedc343931261daff454ff56c6ab8bb846a5b6293b3844a36f"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_1_PLANNER_REENTRY_RESOLVER_ISOLATION_HOTFIX.md",
+      "bytes": 7128,
+      "sha256": "7c379c33b46563baa25a28b48c732b156ce0502afd72a9b7838a837d1fff57f6"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_1_1_LEGACY_TIME_COUNT_COMPATIBILITY_TEST_HASH_FIX.md",
+      "bytes": 4934,
+      "sha256": "3face4f0fd622f9eddc76722388832fedaafb00fc3285e0f13884e4e4d91a8e5"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_1_1.json",
+      "bytes": 2484,
+      "sha256": "9061aa22052c998295701282b2dc6fee1f0e97ddc5b4b1e503c0c9cc5a0be5a5"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_1.json",
+      "bytes": 3201,
+      "sha256": "bb046625dfa5effe1611710fd7b7db44fa84deaad46f8b23a41c7c88798edcc9"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH12_1_1.json",
+      "bytes": 1856,
+      "sha256": "95d8efa7851b4b988e3d7054a9c32e0084b56b4568079489459438830435c0da"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1.json",
+      "bytes": 3101,
+      "sha256": "be056bc93ba5da5c24b78476a739eeecfb8d87cec98cd22b6e232454f7a497d6"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH12_1.json",
+      "bytes": 6346,
+      "sha256": "2a63290a9eaed15547f913272cbf3e8e4dd1a400936295987b3beade79cebf9e"
+    }
+  ]
+}

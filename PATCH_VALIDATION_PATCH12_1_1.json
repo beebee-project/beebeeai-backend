@@ -1,0 +1,82 @@
+{
+  "version": "query_candidate_patch12_1_1_validation_v1",
+  "patch": "Planner Re-entry Resolver Isolation Hotfix",
+  "applicationOrder": "after_patch12_1",
+  "productionRouteChanged": false,
+  "rootCause": {
+    "caseId": "real_world_event_applicant_workshop",
+    "expectedResolutionSha256": "ae97854a2e8a5fd16bcd85189f23190f2447cf8ece5414f3175a6da18ea8e257",
+    "patch12_1UnexpectedResolutionSha256": "f0649967b741290e6fa874c146d38ed1a554eb86c9551be63174828a84279383",
+    "statusCountsChanged": false,
+    "globalTimeCountOperandContractLeaked": true
+  },
+  "isolation": {
+    "plannerReentryGuard": "retrievalItem.provenance.plannerReentry === true",
+    "plannerRecipePriorityScoped": true,
+    "plannerOnlyOperandContracts": [
+      "count_rows",
+      "time_count"
+    ],
+    "plannerOnlyStructuralRecipes": [
+      "time_count"
+    ],
+    "ordinaryTimeCountUsesLegacyResolverPath": true,
+    "ordinaryCountRowsUsesLegacyOperandPath": true
+  },
+  "shadowCompatibility": {
+    "fixtureCaseId": "call_required_group_avg_time_count",
+    "triggerRequired": true,
+    "mockProviderCallCount": 1,
+    "acceptedProposalCount": 2,
+    "resolverResolvedCount": 2,
+    "feasibilityReadyCount": 2,
+    "rankedCount": 2,
+    "status": "SHADOW_COMPLETED",
+    "productionCandidateMerge": false,
+    "productionRouteChanged": false
+  },
+  "legacyCompatibilityFixture": {
+    "caseId": "synthetic_ordinary_time_count",
+    "resolutionItemSha256": "7b3616e2e2f6c377bcf76582fdc96f7a18200e3d86f7d7f7536292358bde81bc",
+    "semanticCompatibilityFingerprintSha256": "fcd34372b8d1316284e51e816bd0c95ad7c1625f7cd2be7ae0605c3fb8c1503a",
+    "fullResolutionSha256Policy": "FORMAT_ONLY_NOT_EXACT",
+    "fullResolutionSha256Reason": "전체 resolution SHA는 seed fixture의 다른 후보 및 source hash에도 의존하므로 일반 time_count 호환성의 exact 기준으로 사용하지 않습니다.",
+    "operandBindingStatus": "NOT_APPLICABLE",
+    "reasonCode": "NO_EXPLICIT_RECIPE_OPERANDS",
+    "plannerReentry": false,
+    "periodColumnId": "sales_table.column_1"
+  },
+  "baselinePolicy": {
+    "resolverBaselineRewriteAllowed": false,
+    "resolverCompareRequired": true,
+    "expectedUserRepositoryResult": "PASS 6/6 differences=0"
+  },
+  "privacy": {
+    "rawRowsSent": false,
+    "sampleValuesSent": false,
+    "originalFileSent": false,
+    "fileNameSent": false,
+    "plaintextPersistenceAllowed": false
+  },
+  "localValidation": {
+    "newIsolationSmokeTests": "PASS",
+    "syntheticPatch12Parity": "PASS_SEMANTIC_FINGERPRINT",
+    "shadowFixtureRegression": "PASS",
+    "shadowFixtureWriteCompare": "PASS 1/1",
+    "seedPlannerBaseline": "PASS 3/3",
+    "seedRankerBaseline": "PASS 3/3",
+    "seedFeasibilityBaseline": "PASS 3/3",
+    "seedFamilyBaseline": "PASS 3/3",
+    "seedResolverBaseline": "PASS 3/3",
+    "fullUserResolverBaseline": "USER_VERIFIED_PASS_6_OF_6_DIFFERENCES_0",
+    "liveOpenAiCall": "NOT_RERUN_CREDIT_BALANCE_EXHAUSTED"
+  },
+  "testHashFix": {
+    "patch": "12.1.1.1",
+    "productionCodeChanged": false,
+    "brittleWholeResolutionHashRemoved": true,
+    "semanticAssertionsAdded": true,
+    "itemShaRetained": true,
+    "semanticCompatibilityFingerprintAdded": true
+  }
+}

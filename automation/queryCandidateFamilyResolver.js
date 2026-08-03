@@ -1,20 +1,14 @@
-"use strict";
-
 const { normalizeText, sha256 } = require("./queryCandidateObservation");
 
 const QUERY_CANDIDATE_FAMILY_RESOLUTION_VERSION =
   "query_candidate_family_resolution_v1";
-const QUERY_CANDIDATE_FAMILY_ITEM_VERSION =
-  "query_candidate_family_item_v1";
+const QUERY_CANDIDATE_FAMILY_ITEM_VERSION = "query_candidate_family_item_v1";
 const QUERY_CANDIDATE_FAMILY_MEMBER_VERSION =
   "query_candidate_family_member_v1";
 const QUERY_CANDIDATE_FAMILY_POLICY_VERSION =
   "deterministic_candidate_family_policy_v1";
 
-const FAMILY_TYPE = Object.freeze([
-  "NAMED_TEMPLATE",
-  "STRUCTURAL_RECIPE",
-]);
+const FAMILY_TYPE = Object.freeze(["NAMED_TEMPLATE", "STRUCTURAL_RECIPE"]);
 const FAMILY_DISPOSITION = Object.freeze([
   "SELECTED",
   "SUPPRESSED",
@@ -107,7 +101,9 @@ function canonicalOperation(candidate = {}) {
     candidate.checks?.operandBinding?.operation || "",
   );
   if (explicit) return explicit;
-  return normalizeLoose(candidate.recipeId || "unknownrecipe") || "unknownrecipe";
+  return (
+    normalizeLoose(candidate.recipeId || "unknownrecipe") || "unknownrecipe"
+  );
 }
 
 function canonicalRecipeClass(candidate = {}) {
@@ -115,7 +111,9 @@ function canonicalRecipeClass(candidate = {}) {
     candidate.checks?.operandBinding?.operation || "",
   );
   if (operation) return operation;
-  return normalizeLoose(candidate.recipeId || "unknownrecipe") || "unknownrecipe";
+  return (
+    normalizeLoose(candidate.recipeId || "unknownrecipe") || "unknownrecipe"
+  );
 }
 
 function canonicalTemplateAnchor(candidate = {}) {
@@ -126,8 +124,12 @@ function familyCategory(operation = "") {
   const value = normalizeLoose(operation);
   if (["singlesourcedashboard"].includes(value)) return "DASHBOARD";
   if (["multisourceschemaunion"].includes(value)) return "MULTI_SOURCE";
-  if (["timesum", "timeavg", "cumulativesum"].includes(value)) return "TIME_SERIES";
-  if (["groupsum", "groupavg", "groupsummary", "compositionratio"].includes(value)) return "GROUP_AGGREGATION";
+  if (["timesum", "timeavg", "cumulativesum"].includes(value))
+    return "TIME_SERIES";
+  if (
+    ["groupsum", "groupavg", "groupsummary", "compositionratio"].includes(value)
+  )
+    return "GROUP_AGGREGATION";
   if (["topbottom"].includes(value)) return "RANKING";
   if (["crosssum", "crosscount"].includes(value)) return "CROSS_TAB";
   if (["categorycount", "countrows"].includes(value)) return "COUNTING";
@@ -145,7 +147,9 @@ function familyDescriptor(candidate = {}) {
     recipeClass: canonicalRecipeClass(candidate),
     operands: canonicalOperands(candidate),
     outputTypes: sortedUnique(
-      asArray(candidate.checks?.executorSupport?.outputTypes).map(normalizeLoose),
+      asArray(candidate.checks?.executorSupport?.outputTypes).map(
+        normalizeLoose,
+      ),
     ),
   };
   const signature = stableStringify(descriptor);
@@ -157,35 +161,43 @@ function familyDescriptor(candidate = {}) {
 }
 
 function bindingPriority(value = "") {
-  return {
-    BOUND: 4,
-    PARTIAL: 3,
-    INFERRED: 2,
-    UNBOUND: 1,
-  }[normalizeText(value).toUpperCase()] || 0;
+  return (
+    {
+      BOUND: 4,
+      PARTIAL: 3,
+      INFERRED: 2,
+      UNBOUND: 1,
+    }[normalizeText(value).toUpperCase()] || 0
+  );
 }
 
 function executorPriority(candidate = {}) {
-  return {
-    DECLARED: 3,
-    GENERIC: 2,
-    UNKNOWN: 1,
-  }[
-    normalizeText(candidate.checks?.executorSupport?.declaredStatus || "")
-      .toUpperCase()
-  ] || 0;
+  return (
+    {
+      DECLARED: 3,
+      GENERIC: 2,
+      UNKNOWN: 1,
+    }[
+      normalizeText(
+        candidate.checks?.executorSupport?.declaredStatus || "",
+      ).toUpperCase()
+    ] || 0
+  );
 }
 
 function operandPriority(candidate = {}) {
-  return {
-    PASS: 3,
-    NOT_APPLICABLE: 2,
-    UNKNOWN: 1,
-    FAIL: 0,
-  }[
-    normalizeText(candidate.checks?.operandBinding?.status || "NOT_APPLICABLE")
-      .toUpperCase()
-  ] || 0;
+  return (
+    {
+      PASS: 3,
+      NOT_APPLICABLE: 2,
+      UNKNOWN: 1,
+      FAIL: 0,
+    }[
+      normalizeText(
+        candidate.checks?.operandBinding?.status || "NOT_APPLICABLE",
+      ).toUpperCase()
+    ] || 0
+  );
 }
 
 function candidatePriority(candidate = {}) {
@@ -297,7 +309,10 @@ function familySort(a = {}, b = {}) {
   const rankA = Number(selectedA.originalRank ?? Number.MAX_SAFE_INTEGER);
   const rankB = Number(selectedB.originalRank ?? Number.MAX_SAFE_INTEGER);
   if (rankA !== rankB) return rankA - rankB;
-  return normalizeText(a.familyId).localeCompare(normalizeText(b.familyId), "en");
+  return normalizeText(a.familyId).localeCompare(
+    normalizeText(b.familyId),
+    "en",
+  );
 }
 
 function buildCandidateMember(candidate, family, familyRank) {
@@ -344,7 +359,9 @@ function buildCandidateMember(candidate, family, familyRank) {
   return item;
 }
 
-function buildQueryCandidateFamilyResolution({ candidateResolution = {} } = {}) {
+function buildQueryCandidateFamilyResolution({
+  candidateResolution = {},
+} = {}) {
   const sourceCandidates = asArray(candidateResolution.candidates);
   const resolvedCandidates = sourceCandidates.filter(
     (candidate) => candidate.result === "RESOLVED",
@@ -410,7 +427,9 @@ function buildQueryCandidateFamilyResolution({ candidateResolution = {} } = {}) 
     source: {
       caseId: normalizeText(candidateResolution.source?.caseId || ""),
       fileName: normalizeText(candidateResolution.source?.fileName || ""),
-      candidateResolutionVersion: normalizeText(candidateResolution.version || ""),
+      candidateResolutionVersion: normalizeText(
+        candidateResolution.version || "",
+      ),
       candidateResolutionPolicyVersion: normalizeText(
         candidateResolution.policy?.version || "",
       ),
@@ -428,8 +447,8 @@ function buildQueryCandidateFamilyResolution({ candidateResolution = {} } = {}) 
       sourceCandidateCount: sourceCandidates.length,
       sourceResolvedCount: resolvedCandidates.length,
       sourceCandidateIdsUnique:
-        unique(sourceCandidates.map((candidate) => candidate.candidateId)).length ===
-        sourceCandidates.length,
+        unique(sourceCandidates.map((candidate) => candidate.candidateId))
+          .length === sourceCandidates.length,
       resolvedCoverageComplete:
         selectedCandidateIds.length + suppressedCandidateIds.length ===
         resolvedCandidates.length,
@@ -459,8 +478,9 @@ function buildQueryCandidateFamilyResolution({ candidateResolution = {} } = {}) 
       suppressed: suppressedCandidateIds.length,
       duplicateFamilyCount: families.filter((family) => family.memberCount > 1)
         .length,
-      singletonFamilyCount: families.filter((family) => family.memberCount === 1)
-        .length,
+      singletonFamilyCount: families.filter(
+        (family) => family.memberCount === 1,
+      ).length,
       nonResolvedPassThrough: sourceCandidates.filter(
         (candidate) => candidate.result !== "RESOLVED",
       ).length,
@@ -485,16 +505,40 @@ function validateQueryCandidateFamilyResolution(document = {}) {
   const errors = [];
   const warnings = [];
   if (document.version !== QUERY_CANDIDATE_FAMILY_RESOLUTION_VERSION) {
-    errors.push(issue("version", "invalid_version", "family resolution version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "version",
+        "invalid_version",
+        "family resolution version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (document.itemVersion !== QUERY_CANDIDATE_FAMILY_ITEM_VERSION) {
-    errors.push(issue("itemVersion", "invalid_version", "family item version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "itemVersion",
+        "invalid_version",
+        "family item version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (document.memberVersion !== QUERY_CANDIDATE_FAMILY_MEMBER_VERSION) {
-    errors.push(issue("memberVersion", "invalid_version", "family member version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "memberVersion",
+        "invalid_version",
+        "family member version이 유효하지 않습니다.",
+      ),
+    );
   }
   if (document.policy?.version !== QUERY_CANDIDATE_FAMILY_POLICY_VERSION) {
-    errors.push(issue("policy.version", "invalid_version", "family policy version이 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "policy.version",
+        "invalid_version",
+        "family policy version이 유효하지 않습니다.",
+      ),
+    );
   }
   const families = asArray(document.families);
   const candidates = asArray(document.candidates);
@@ -503,39 +547,85 @@ function validateQueryCandidateFamilyResolution(document = {}) {
   for (const [index, family] of families.entries()) {
     const path = `families[${index}]`;
     if (family.version !== QUERY_CANDIDATE_FAMILY_ITEM_VERSION) {
-      errors.push(issue(`${path}.version`, "invalid_version", "family item version이 유효하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.version`,
+          "invalid_version",
+          "family item version이 유효하지 않습니다.",
+        ),
+      );
     }
     if (!FAMILY_TYPE.includes(family.familyType)) {
-      errors.push(issue(`${path}.familyType`, "invalid_enum", "familyType이 유효하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.familyType`,
+          "invalid_enum",
+          "familyType이 유효하지 않습니다.",
+        ),
+      );
     }
     if (!normalizeText(family.familyId)) {
-      errors.push(issue(`${path}.familyId`, "required", "familyId가 필요합니다."));
+      errors.push(
+        issue(`${path}.familyId`, "required", "familyId가 필요합니다."),
+      );
     }
     if (familyIds.has(family.familyId)) {
-      errors.push(issue(`${path}.familyId`, "duplicate", "familyId가 중복됩니다."));
+      errors.push(
+        issue(`${path}.familyId`, "duplicate", "familyId가 중복됩니다."),
+      );
     }
     familyIds.add(family.familyId);
     const selected = asArray(family.members).filter(
       (member) => member.disposition === "SELECTED",
     );
     if (selected.length !== 1) {
-      errors.push(issue(`${path}.members`, "selected_count", "family마다 대표 후보가 정확히 하나여야 합니다."));
+      errors.push(
+        issue(
+          `${path}.members`,
+          "selected_count",
+          "family마다 대표 후보가 정확히 하나여야 합니다.",
+        ),
+      );
     }
     if (selected[0]?.candidateId !== family.selectedCandidateId) {
-      errors.push(issue(`${path}.selectedCandidateId`, "selected_mismatch", "selectedCandidateId가 member와 일치하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.selectedCandidateId`,
+          "selected_mismatch",
+          "selectedCandidateId가 member와 일치하지 않습니다.",
+        ),
+      );
     }
     if (Number(family.memberCount) !== asArray(family.members).length) {
-      errors.push(issue(`${path}.memberCount`, "count_mismatch", "memberCount가 실제 member 수와 다릅니다."));
+      errors.push(
+        issue(
+          `${path}.memberCount`,
+          "count_mismatch",
+          "memberCount가 실제 member 수와 다릅니다.",
+        ),
+      );
     }
     for (const member of asArray(family.members)) {
       if (resolvedMemberIds.has(member.candidateId)) {
-        errors.push(issue(`${path}.members`, "duplicate_membership", "RESOLVED 후보가 여러 family에 포함됐습니다."));
+        errors.push(
+          issue(
+            `${path}.members`,
+            "duplicate_membership",
+            "RESOLVED 후보가 여러 family에 포함됐습니다.",
+          ),
+        );
       }
       resolvedMemberIds.add(member.candidateId);
     }
     const expectedFamilySha = sha256({ ...family, familySha256: undefined });
     if (family.familySha256 !== expectedFamilySha) {
-      errors.push(issue(`${path}.familySha256`, "sha_mismatch", "family SHA-256이 일치하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.familySha256`,
+          "sha_mismatch",
+          "family SHA-256이 일치하지 않습니다.",
+        ),
+      );
     }
   }
 
@@ -543,33 +633,65 @@ function validateQueryCandidateFamilyResolution(document = {}) {
   for (const [index, candidate] of candidates.entries()) {
     const path = `candidates[${index}]`;
     if (candidate.version !== QUERY_CANDIDATE_FAMILY_MEMBER_VERSION) {
-      errors.push(issue(`${path}.version`, "invalid_version", "family member version이 유효하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.version`,
+          "invalid_version",
+          "family member version이 유효하지 않습니다.",
+        ),
+      );
     }
     if (!FAMILY_DISPOSITION.includes(candidate.familyDisposition)) {
-      errors.push(issue(`${path}.familyDisposition`, "invalid_enum", "family disposition이 유효하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.familyDisposition`,
+          "invalid_enum",
+          "family disposition이 유효하지 않습니다.",
+        ),
+      );
     }
     if (candidateIds.has(candidate.candidateId)) {
-      errors.push(issue(`${path}.candidateId`, "duplicate", "candidateId가 중복됩니다."));
+      errors.push(
+        issue(`${path}.candidateId`, "duplicate", "candidateId가 중복됩니다."),
+      );
     }
     candidateIds.add(candidate.candidateId);
     if (
       candidate.resolutionResult === "RESOLVED" &&
       candidate.familyDisposition === "NOT_APPLICABLE"
     ) {
-      errors.push(issue(path, "resolved_not_grouped", "RESOLVED 후보는 family에 포함돼야 합니다."));
+      errors.push(
+        issue(
+          path,
+          "resolved_not_grouped",
+          "RESOLVED 후보는 family에 포함돼야 합니다.",
+        ),
+      );
     }
     if (
       candidate.resolutionResult !== "RESOLVED" &&
       candidate.familyDisposition !== "NOT_APPLICABLE"
     ) {
-      errors.push(issue(path, "non_resolved_grouped", "RESOLVED가 아닌 후보는 family에 포함하면 안 됩니다."));
+      errors.push(
+        issue(
+          path,
+          "non_resolved_grouped",
+          "RESOLVED가 아닌 후보는 family에 포함하면 안 됩니다.",
+        ),
+      );
     }
     const expectedMemberSha = sha256({
       ...candidate,
       familyMemberSha256: undefined,
     });
     if (candidate.familyMemberSha256 !== expectedMemberSha) {
-      errors.push(issue(`${path}.familyMemberSha256`, "sha_mismatch", "family member SHA-256이 일치하지 않습니다."));
+      errors.push(
+        issue(
+          `${path}.familyMemberSha256`,
+          "sha_mismatch",
+          "family member SHA-256이 일치하지 않습니다.",
+        ),
+      );
     }
   }
 
@@ -601,27 +723,63 @@ function validateQueryCandidateFamilyResolution(document = {}) {
   };
   for (const [key, expected] of Object.entries(expectedCounts)) {
     if (Number(document.counts?.[key] || 0) !== expected) {
-      errors.push(issue(`counts.${key}`, "count_mismatch", `${key} count가 실제 값과 다릅니다.`));
+      errors.push(
+        issue(
+          `counts.${key}`,
+          "count_mismatch",
+          `${key} count가 실제 값과 다릅니다.`,
+        ),
+      );
     }
   }
   if (!document.integrity?.sourceCandidateIdsUnique) {
-    errors.push(issue("integrity.sourceCandidateIdsUnique", "source_duplicate", "source candidateId가 중복됩니다."));
+    errors.push(
+      issue(
+        "integrity.sourceCandidateIdsUnique",
+        "source_duplicate",
+        "source candidateId가 중복됩니다.",
+      ),
+    );
   }
   if (!document.integrity?.resolvedCoverageComplete) {
-    errors.push(issue("integrity.resolvedCoverageComplete", "coverage_incomplete", "RESOLVED 후보 family coverage가 불완전합니다."));
+    errors.push(
+      issue(
+        "integrity.resolvedCoverageComplete",
+        "coverage_incomplete",
+        "RESOLVED 후보 family coverage가 불완전합니다.",
+      ),
+    );
   }
   if (!document.integrity?.exactlyOneSelectedPerFamily) {
-    errors.push(issue("integrity.exactlyOneSelectedPerFamily", "selected_count", "family 대표 후보 수가 유효하지 않습니다."));
+    errors.push(
+      issue(
+        "integrity.exactlyOneSelectedPerFamily",
+        "selected_count",
+        "family 대표 후보 수가 유효하지 않습니다.",
+      ),
+    );
   }
   if (!document.integrity?.nonResolvedCandidatesPreserved) {
-    errors.push(issue("integrity.nonResolvedCandidatesPreserved", "pass_through_mismatch", "비RESOLVED 후보가 그대로 보존되지 않았습니다."));
+    errors.push(
+      issue(
+        "integrity.nonResolvedCandidatesPreserved",
+        "pass_through_mismatch",
+        "비RESOLVED 후보가 그대로 보존되지 않았습니다.",
+      ),
+    );
   }
   const expectedSha = sha256({
     ...document,
     familyResolutionSha256: undefined,
   });
   if (document.familyResolutionSha256 !== expectedSha) {
-    errors.push(issue("familyResolutionSha256", "sha_mismatch", "family resolution SHA-256이 일치하지 않습니다."));
+    errors.push(
+      issue(
+        "familyResolutionSha256",
+        "sha_mismatch",
+        "family resolution SHA-256이 일치하지 않습니다.",
+      ),
+    );
   }
   return {
     valid: errors.length === 0,

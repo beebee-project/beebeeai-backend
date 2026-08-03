@@ -1,8 +1,9 @@
-"use strict";
+const {
+  QUERY_CANDIDATE_PLANNER_MODEL_OUTPUT_VERSION,
+} = require("./queryCandidatePlanner");
 
-const { QUERY_CANDIDATE_PLANNER_MODEL_OUTPUT_VERSION } = require("./queryCandidatePlanner");
-
-const QUERY_CANDIDATE_PLANNER_PROMPT_VERSION = "query_candidate_planner_prompt_v1";
+const QUERY_CANDIDATE_PLANNER_PROMPT_VERSION =
+  "query_candidate_planner_prompt_v1";
 
 function buildCandidatePlannerSystemPrompt() {
   return [

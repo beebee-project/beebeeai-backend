@@ -1,23 +1,27 @@
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
 function assertCodecFunction(name, value) {
-  if (typeof value !== "function") throw new TypeError(`${name} 함수가 필요합니다.`);
+  if (typeof value !== "function")
+    throw new TypeError(`${name} 함수가 필요합니다.`);
 }
 
 function cacheFileName(cacheKey) {
   return `${crypto.createHash("sha256").update(String(cacheKey)).digest("hex")}.enc`;
 }
 
-function createEncryptedCandidatePlannerCache({ rootDir, encryptBuffer, decryptBuffer } = {}) {
+function createEncryptedCandidatePlannerCache({
+  rootDir,
+  encryptBuffer,
+  decryptBuffer,
+} = {}) {
   if (!rootDir) throw new Error("암호화 캐시 rootDir이 필요합니다.");
   assertCodecFunction("encryptBuffer", encryptBuffer);
   assertCodecFunction("decryptBuffer", decryptBuffer);
   const absoluteRoot = path.resolve(rootDir);
-  const filePath = (cacheKey) => path.join(absoluteRoot, cacheFileName(cacheKey));
+  const filePath = (cacheKey) =>
+    path.join(absoluteRoot, cacheFileName(cacheKey));
   return {
     async get(cacheKey) {
       const target = filePath(cacheKey);

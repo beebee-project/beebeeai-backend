@@ -1,0 +1,158 @@
+{
+  "version": "query_candidate_patch12_1_manifest_v1",
+  "patch": "Conditional LLM Candidate Planner Live Shadow and Resolver Re-entry Bridge",
+  "applicationOrder": "after_patch12",
+  "fileCount": 30,
+  "files": [
+    {
+      "path": "automation/queryCandidateResolver.js",
+      "bytes": 57372,
+      "sha256": "949548848b9540268c5806b8af559c138b91bb3f3e4c21cfc0f084c1b41a66c1"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowBridge.js",
+      "bytes": 25314,
+      "sha256": "81b2cae24f6f578c6f502d9862f48f5145db945c3c795264472d2fe954036aaf"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowBridge.schema.json",
+      "bytes": 732,
+      "sha256": "84a31abd2ced6154b748cfcd463ecc09fd09233a6e1a0dbd01424e2e54b1aa69"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowTestSupport.js",
+      "bytes": 2963,
+      "sha256": "57af99fea9881ca20aab79a2485e4f18e24ea6516e0386ff319a7af3379504a2"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowFixtureSmokeTest.js",
+      "bytes": 801,
+      "sha256": "5d2640bd910269a7a2768711f85bef00807435d235321c00525f44228cbfa464"
+    },
+    {
+      "path": "tests/queryCandidatePlannerResolverReentryBridgeSmokeTest.js",
+      "bytes": 1572,
+      "sha256": "77b69955219f4196a79dd4c98467aec5f5a2d7c64574f16836f56b8e279b7222"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowNoProductionMutationSmokeTest.js",
+      "bytes": 1244,
+      "sha256": "dd7d3e3bf58c02a68f8590aeb68bec783831b2f740f435ef44eaf2403247eee1"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowFailureSafeSmokeTest.js",
+      "bytes": 913,
+      "sha256": "0f425fae84984f127107c44b83471e242517287e6634d82b955f50c05c9d61b4"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowSchemaSmokeTest.js",
+      "bytes": 585,
+      "sha256": "db2cdbfe7e1e141eaab60fa7190311766ade94f3c6621af3cc9a6d6ad2f8007e"
+    },
+    {
+      "path": "tests/queryCandidatePlannerLiveShadowSmokeTest.js",
+      "bytes": 2307,
+      "sha256": "b8b1fd77707c16558d9002c6e9b8b135d2e2e08dc39c1aa540e7db1e3d6d82f0"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowCapture.js",
+      "bytes": 4565,
+      "sha256": "5fd9a825cf6710cad8817de531c2d27e2692d8f5b7dc35c850eaa30deefb7fa2"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowBaselineSmokeTest.js",
+      "bytes": 1558,
+      "sha256": "d847d2e902a4d6429374933ba8567395328fc8f488c562d73e4900df61bcd84b"
+    },
+    {
+      "path": "tests/queryCandidatePlannerShadowSampleAudit.js",
+      "bytes": 2880,
+      "sha256": "d3556e323841d0872ee2595f65c15981183f3d91c71547152313b59438d3d0b7"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1SourceIntegritySmokeTest.js",
+      "bytes": 5469,
+      "sha256": "b7b21efa4f6175a1c90d4f06a961beb6fa3e99417b7503c13cdffbbcc19d64e7"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1ManifestSmokeTest.js",
+      "bytes": 1254,
+      "sha256": "8e1719df2c946a3f601dac693df0029d0eddb1106736f9b584b31c2df630fe5c"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/candidate-planner-shadow-resolution-index.json",
+      "bytes": 787,
+      "sha256": "779fc9eef55b363d923c928defcd4867d33e52d2e24108955b52eb87ea283a6d"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/candidate-planner-shadow-sample-audit.json",
+      "bytes": 1157,
+      "sha256": "acde6df2950af63784d7b2748c6a73f05a8715c581f4515b43b67128870a775c"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/candidate-planner-shadow-sample-audit.md",
+      "bytes": 839,
+      "sha256": "7d13f530e38ed49b55c2400cc9000425d283304f26adaaf96cc7d000384f45cb"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/semantic-profile.json",
+      "bytes": 6499,
+      "sha256": "6bb66632ffd2c2ab28e9921dbb8bde0d91460435b4ff564e53727665807e8135"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/resolved-semantic-profile.json",
+      "bytes": 6630,
+      "sha256": "05c105d99216ef6263d8d99aa8365e420de559737ccfa45ceac803509713611d"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/candidate-resolution.json",
+      "bytes": 929,
+      "sha256": "f01737c533f6880d9a3991345a86fd9019df9a9bbc31ef6f8349a44e19545762"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/candidate-feasibility-resolution.json",
+      "bytes": 504,
+      "sha256": "b18db8ba9a1648b716e5b875c37b233c9036045ca6b01af985661d262beee3bf"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/candidate-ranking-resolution.json",
+      "bytes": 536,
+      "sha256": "613dd72069bb412bf6941cfbbeec9be12c199bfd2eb1a91134c1ec30186110aa"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/planner-model-output.mock.json",
+      "bytes": 1414,
+      "sha256": "a6aa6f7bd11eda02a863dadd9282802c3d918cc57e28144036fc7bde89c82edf"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/expected-shadow-summary.json",
+      "bytes": 251,
+      "sha256": "d91e68c4dbc6f9e06e76c607aae0603aa9393fdeb728052e80a362640f8bbd8e"
+    },
+    {
+      "path": "tests/fixtures/query-candidate-planner-shadow/call_required_group_avg_time_count/candidate-planner-shadow-resolution.json",
+      "bytes": 9301,
+      "sha256": "df798c8a31ebe9486cdfa96814ac0dbe4ded09cb50a97cf1c7ea174dde7d6c25"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_LIVE_SHADOW_RESOLVER_REENTRY_BRIDGE.md",
+      "bytes": 7780,
+      "sha256": "7153236ace5744975abcc24abc2dbfafb90962a910163a8f7e57d4869f9f1780"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1.json",
+      "bytes": 3101,
+      "sha256": "be056bc93ba5da5c24b78476a739eeecfb8d87cec98cd22b6e232454f7a497d6"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH12.json",
+      "bytes": 4404,
+      "sha256": "75a89078676e2337264c9ffb2fd5f6642479a5c54b34d5e792a1f7e79f405602"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12.json",
+      "bytes": 2916,
+      "sha256": "26dc8f466bacec41fe4a3cd3c5177847ba0568b4792aaf5293b3efab175237e0"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": "query_candidate_patch12_1_1_2_manifest_v1",
+  "patch": "Historical Manifest Supersession and Source Integrity Robustness Hotfix",
+  "applicationOrder": "after_patch12_1_1_1",
+  "fileCount": 7,
+  "files": [
+    {
+      "path": "tests/queryCandidatePatch12_1_1SourceIntegritySmokeTest.js",
+      "bytes": 5519,
+      "sha256": "fe30b9ea284058a91971d0242d1e53463eaf62923c254a35cdd3d19a91a27dec"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1ManifestSmokeTest.js",
+      "bytes": 2399,
+      "sha256": "aac86d4b116c23684f1296e87b2d0b8fa3896091ea28d044fccc28879f648bfc"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1_1ManifestSmokeTest.js",
+      "bytes": 1949,
+      "sha256": "8752ac82ac045747c1bd5e40ab999086157c47c842f59e1ee4b26338d36a96d3"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1_2SourceIntegritySmokeTest.js",
+      "bytes": 2938,
+      "sha256": "e6cb9c0db4a1d1041b353b58374e1783bf2ced08266e70f2a6a469414353ecda"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_1_2ManifestSmokeTest.js",
+      "bytes": 1273,
+      "sha256": "16fb294fee8b3cc8a67c79c7c75c833a9d3d77fe28402573e7b735e9b61d04d9"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_1_2.json",
+      "bytes": 2595,
+      "sha256": "a52bb01649ef9c5aac7215529dd3ec1ab22720b7ca7d11577d47548b00754a1a"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_1_2_HISTORICAL_MANIFEST_SOURCE_INTEGRITY_HOTFIX.md",
+      "bytes": 4840,
+      "sha256": "ec7db5a4458502744d32ea4cacb7bcb9d822143db1835a65e338b1d8f637c047"
+    }
+  ]
+}
