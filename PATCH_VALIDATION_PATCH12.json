@@ -1,0 +1,82 @@
+{
+  "version": "query_candidate_patch12_validation_v1",
+  "patch": "Conditional LLM Candidate Planner",
+  "applicationOrder": "after_patch10_1_and_patch11_1",
+  "policyVersion": "conditional_llm_candidate_planner_policy_v1",
+  "productionRouteChanged": false,
+  "openAiCallAdded": true,
+  "openAiCallMode": "conditional_only",
+  "baselineLiveOpenAiCall": false,
+  "newLlmCost": "only_when_triggered_and_cache_miss",
+  "sourceCandidateMutation": false,
+  "familyDispositionMutation": false,
+  "feasibilityStatusMutation": false,
+  "rankingMutation": false,
+  "plannerAssignsReady": false,
+  "plaintextProductionPersistenceAdded": false,
+  "triggerPolicy": {
+    "adequateReadyCount": 3,
+    "complexRowThreshold": 8,
+    "noReadyCandidateTriggers": true,
+    "lowCoverageTriggers": true,
+    "reviewAloneDoesNotTrigger": true,
+    "simpleDatasetWithReadySkips": true,
+    "noEligibleTableSkips": true
+  },
+  "proposalPolicy": {
+    "maximumProposals": 3,
+    "minimumConfidence": 0.72,
+    "summarySheetOnly": true,
+    "singlePhysicalTableOnly": true,
+    "knownTableIdsOnly": true,
+    "knownColumnIdsOnly": true,
+    "supportedOperationsOnly": true,
+    "duplicateSignatureRejected": true,
+    "acceptedDisposition": "ACCEPTED_FOR_REVALIDATION",
+    "resolverReentryRequired": true
+  },
+  "privacy": {
+    "rawRowsSent": false,
+    "sampleValuesSent": false,
+    "originalFileSent": false,
+    "fileNameSent": false,
+    "openAiStore": false,
+    "strictJsonSchema": true
+  },
+  "cache": {
+    "encryptedOnly": true,
+    "plaintextAllowed": false,
+    "tenantScopedHmacKey": true,
+    "cacheHitSkipsProvider": true
+  },
+  "failurePolicy": {
+    "providerFailure": "FAILED_SAFE",
+    "invalidModelOutput": "FAILED_SAFE",
+    "existingDeterministicCandidatesPreserved": true
+  },
+  "selfValidation": {
+    "triggerSmokePassed": true,
+    "conditionalInvocationSmokePassed": true,
+    "proposalValidationSmokePassed": true,
+    "invalidReferenceSmokePassed": true,
+    "duplicateProposalSmokePassed": true,
+    "failureSafeSmokePassed": true,
+    "encryptedCacheSmokePassed": true,
+    "privacyBoundarySmokePassed": true,
+    "openAiAdapterSmokePassed": true,
+    "schemaSmokePassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedBaselineSmokePassed": true,
+    "rankerRegressionPassed": true,
+    "feasibilityRegressionPassed": true,
+    "familyRegressionPassed": true,
+    "resolverRegressionPassed": true,
+    "zipReapplyPassed": true
+  },
+  "notes": [
+    "실제 6개 fixture 기준선 capture는 decision-only 모드이며 OpenAI 호출을 하지 않습니다.",
+    "현재 6개 대표 fixture는 모두 결정론적 READY가 충분하거나 분석 불가/소규모 조건이므로 SKIPPED가 예상됩니다.",
+    "ACCEPTED_FOR_REVALIDATION 제안은 후속 Candidate Contract 병합과 Resolver 재진입 전까지 사용자 노출 대상이 아닙니다."
+  ]
+}

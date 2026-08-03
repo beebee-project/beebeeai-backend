@@ -1,0 +1,123 @@
+{
+  "version": "query_candidate_patch12_manifest_v1",
+  "patch": "Conditional LLM Candidate Planner",
+  "applicationOrder": "after_patch10_1_and_patch11_1",
+  "fileCount": 23,
+  "files": [
+    {
+      "path": "automation/queryCandidatePlanner.js",
+      "bytes": 45979,
+      "sha256": "a60b2cfd7073420ca3b366d0ea5ab5eca2699e50a6b05b0864572bb03ebb4869"
+    },
+    {
+      "path": "automation/queryCandidatePlanner.schema.json",
+      "bytes": 1559,
+      "sha256": "4a0b950c3bbe0f52e766aa78c1a39d1a59622edf5b595a5f96cf6dead6c00213"
+    },
+    {
+      "path": "automation/queryCandidatePlannerPrompt.js",
+      "bytes": 1997,
+      "sha256": "9a1ea1e46d45f7438fd6bd142639412e05b38826cff43ff7cc46a0980f3d83b4"
+    },
+    {
+      "path": "automation/queryCandidatePlannerOpenAIAdapter.js",
+      "bytes": 4631,
+      "sha256": "265a1b42c4738581ef109c78132194a17053949aaaed66849df5d36d352efea2"
+    },
+    {
+      "path": "automation/queryCandidatePlannerEncryptedCache.js",
+      "bytes": 2131,
+      "sha256": "fe7bf5fda271ac38553ce6a325229e656cb207f594cee730d457c8407f8e676c"
+    },
+    {
+      "path": "tests/queryCandidatePlannerTestSupport.js",
+      "bytes": 7052,
+      "sha256": "acd7612515fb9854fb8849b69c56b7986d617fbbbc72bb850399b95ddb0cd3d5"
+    },
+    {
+      "path": "tests/queryCandidatePlannerTriggerSmokeTest.js",
+      "bytes": 1104,
+      "sha256": "1ae05a22b1b1806472d33f6bbbbceedb28e534f1d15f16285c2387373e80c29a"
+    },
+    {
+      "path": "tests/queryCandidatePlannerConditionalInvocationSmokeTest.js",
+      "bytes": 1349,
+      "sha256": "707f4555ee210632d35aa83d021408aaa485322e46ab52a5f2ebeaa037e5cd31"
+    },
+    {
+      "path": "tests/queryCandidatePlannerProposalValidationSmokeTest.js",
+      "bytes": 1156,
+      "sha256": "0675ae5e063d4b3f88458cba6645acdb35eaee44e832246df415ec0b710b9226"
+    },
+    {
+      "path": "tests/queryCandidatePlannerInvalidReferenceSmokeTest.js",
+      "bytes": 947,
+      "sha256": "197ab25d826b5af199501e9e098cc381abb11aa25403b70ee4b28ea82891d083"
+    },
+    {
+      "path": "tests/queryCandidatePlannerDuplicateProposalSmokeTest.js",
+      "bytes": 1225,
+      "sha256": "107b546cac782b892d7696b9f8246c06ae510506448871cc13146c1dae15da7e"
+    },
+    {
+      "path": "tests/queryCandidatePlannerFailureSafeSmokeTest.js",
+      "bytes": 834,
+      "sha256": "e84c6987a8bf344a454c2cee82511ceee66359e3f524dc8887a191396c02bf12"
+    },
+    {
+      "path": "tests/queryCandidatePlannerEncryptedCacheSmokeTest.js",
+      "bytes": 1785,
+      "sha256": "e4b21de3bad94834dbab3b1dbd3d8177d7f4b2a36d8dae95eb69c48607ec564a"
+    },
+    {
+      "path": "tests/queryCandidatePlannerPrivacyBoundarySmokeTest.js",
+      "bytes": 954,
+      "sha256": "1f8a54906f0809bc4e85a44f51e99af112083412931f750d75937d9873b51cb5"
+    },
+    {
+      "path": "tests/queryCandidatePlannerOpenAIAdapterSmokeTest.js",
+      "bytes": 1482,
+      "sha256": "b823a38ad3be3786f7d83651df7e8d1fde7ede30d43614b83341c30ad955d425"
+    },
+    {
+      "path": "tests/queryCandidatePlannerSchemaSmokeTest.js",
+      "bytes": 541,
+      "sha256": "a5abf5e0a5baff177ceffc7104079f880dfdb5c0e926306739212edb1347b46b"
+    },
+    {
+      "path": "tests/queryCandidatePlannerCapture.js",
+      "bytes": 5457,
+      "sha256": "01e1eb86fef145ce53a9013d13b863cdc1df6e164fdb5945aacda6ebc90878ea"
+    },
+    {
+      "path": "tests/queryCandidatePlannerBaselineSmokeTest.js",
+      "bytes": 1147,
+      "sha256": "eb1597d775094dd6f0664debffbe3e3045978486812b0f3e829f6bfd0bf746cf"
+    },
+    {
+      "path": "tests/queryCandidatePlannerSampleAudit.js",
+      "bytes": 3504,
+      "sha256": "0c17a2fcd22a7e0c83e3bbea94a929fa27f3301f0790d4c4b5bf291f951a0e73"
+    },
+    {
+      "path": "tests/queryCandidatePatch12SourceIntegritySmokeTest.js",
+      "bytes": 4289,
+      "sha256": "88890d133aaad9e3d3a2cd2a58de1f35f3ca6d7af9f1c815573b59a2248b9d08"
+    },
+    {
+      "path": "tests/queryCandidatePatch12ManifestSmokeTest.js",
+      "bytes": 1214,
+      "sha256": "0532eb44a55b3ada3e3d4e441168117b5357ee86ba50408f0e1014aa3835f552"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_CONDITIONAL_LLM_CANDIDATE_PLANNER.md",
+      "bytes": 9054,
+      "sha256": "31e46e24a9e1826227d55b417aeb78bee0d10ae1868e7fe3788fce06df945f47"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12.json",
+      "bytes": 2916,
+      "sha256": "26dc8f466bacec41fe4a3cd3c5177847ba0568b4792aaf5293b3efab175237e0"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidatePlanner.schema.json",
+  "title": "Query Candidate Planner Resolution",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "version",
+    "itemVersion",
+    "policy",
+    "source",
+    "privacy",
+    "trigger",
+    "invocation",
+    "decision",
+    "counts",
+    "proposals",
+    "integrity",
+    "plannerResolutionSha256"
+  ],
+  "properties": {
+    "version": { "const": "query_candidate_planner_resolution_v1" },
+    "itemVersion": { "const": "query_candidate_planner_item_v1" },
+    "decision": {
+      "enum": ["NOT_REQUIRED", "CALL_REQUIRED", "NO_ADDITION", "PROPOSED", "FAILED_SAFE"]
+    },
+    "invocation": {
+      "type": "object",
+      "required": ["status", "providerCallCount", "cacheHit"],
+      "properties": {
+        "status": {
+          "enum": ["SKIPPED", "REQUIRED_NOT_RUN", "CALLED", "CACHE_HIT", "FAILED_SAFE"]
+        },
+        "providerCallCount": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "cacheHit": { "type": "boolean" }
+      }
+    },
+    "proposals": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "candidateId",
+          "operation",
+          "sourceTableIds",
+          "operandBindings",
+          "disposition",
+          "readyStatusAssigned",
+          "plannerItemSha256"
+        ]
+      }
+    },
+    "plannerResolutionSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
