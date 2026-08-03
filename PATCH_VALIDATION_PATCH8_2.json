@@ -1,0 +1,31 @@
+{
+  "version": "query_candidate_patch8_2_validation_v1",
+  "patch": "Candidate Resolver Recipe Operand Binding Guard",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "candidateReadyStatusAssigned": false,
+  "candidateStatusMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "policyVersion": "deterministic_candidate_resolution_policy_v1_2",
+  "guardrails": {
+    "recipeOperandParsing": true,
+    "operandSpecificColumnBinding": true,
+    "genericRoleSubstitutionBlocked": true,
+    "uniqueSemanticPeriodFallback": true,
+    "safeMeasureSuffixCompatibility": true,
+    "operandEvidenceAddedToResolution": true
+  },
+  "selfValidation": {
+    "newSmokeTestsPassed": 4,
+    "existingPatch8And8_1SmokeTestsPassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedCaseCount": 3
+  },
+  "notes": [
+    "사용자 저장소에서는 실제 fixture 6개의 candidate-resolution 기준선을 다시 작성해야 합니다.",
+    "재감사 보고서에서 Recipe operand 결속 섹션을 확인해야 합니다.",
+    "패치 9 Candidate Family는 재감사 후 진행합니다."
+  ]
+}

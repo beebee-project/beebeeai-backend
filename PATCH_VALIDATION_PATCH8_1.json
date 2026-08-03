@@ -1,0 +1,30 @@
+{
+  "version": "query_candidate_patch8_1_validation_v1",
+  "patch": "Candidate Resolver Semantic Audit Guardrails",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "candidateReadyStatusAssigned": false,
+  "candidateStatusMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "policyVersion": "deterministic_candidate_resolution_policy_v1_1",
+  "guardrails": {
+    "strongIdentityBeforeDynamicRecipe": true,
+    "tokenBoundaryPreserved": true,
+    "semanticSecondaryDomainEvidence": true,
+    "inferredNamedTemplateIdentityRequired": true,
+    "structuralGenericCandidatesRemainSupported": true
+  },
+  "selfValidation": {
+    "newSmokeTestsPassed": 2,
+    "existingPatch8SmokeTestsPassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedCaseCount": 3
+  },
+  "notes": [
+    "사용자 저장소에서는 실제 fixture 6개의 candidate-resolution 기준선을 다시 작성해야 합니다.",
+    "패치 8 표본 감사에서 발견된 false RESOLVED와 domain-only false EXCLUDED를 우선 수정합니다.",
+    "패치 9 Candidate Family는 재감사 후 진행합니다."
+  ]
+}

@@ -1,0 +1,341 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beebeeai.kr/schemas/resolved-semantic-profile-v1.json",
+  "title": "BeeBee AI Resolved Semantic Profile v1",
+  "type": "object",
+  "required": [
+    "version",
+    "schemaVersion",
+    "policyVersion",
+    "source",
+    "policy",
+    "classification",
+    "counts",
+    "availableRoles",
+    "metricFamilies",
+    "supportedOperations",
+    "availableCapabilities",
+    "tables",
+    "tableRelations",
+    "ambiguities",
+    "issues",
+    "requiresHumanReview",
+    "profileSha256"
+  ],
+  "properties": {
+    "version": { "const": "resolved_semantic_profile_v1" },
+    "schemaVersion": { "const": "resolved_semantic_profile_schema_v1" },
+    "policyVersion": { "const": "semantic_profile_merge_policy_v1" },
+    "source": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "fileName",
+        "deterministicProfileVersion",
+        "deterministicProfileSha256",
+        "llmProfileVersion",
+        "llmProfileSha256",
+        "llmModel",
+        "llmPromptVersion"
+      ],
+      "properties": {
+        "caseId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "deterministicProfileVersion": { "const": "query_json_semantic_profile_v1" },
+        "deterministicProfileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "llmProfileVersion": { "const": "llm_semantic_profile_v1" },
+        "llmProfileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "llmModel": { "type": "string" },
+        "llmPromptVersion": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "roleAcceptThreshold",
+        "headerReplaceThreshold",
+        "metadataAcceptThreshold",
+        "relationAcceptThreshold",
+        "explicitRoleOverrideAllowed",
+        "structuralFieldsMutableByLlm"
+      ],
+      "properties": {
+        "roleAcceptThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "headerReplaceThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "metadataAcceptThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "relationAcceptThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "explicitRoleOverrideAllowed": { "const": false },
+        "structuralFieldsMutableByLlm": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "classification": {
+      "type": "object",
+      "required": [
+        "primaryDomain",
+        "secondaryDomains",
+        "datasetIntent",
+        "confidence",
+        "selectedSource",
+        "description"
+      ],
+      "properties": {
+        "primaryDomain": { "type": "string" },
+        "secondaryDomains": { "$ref": "#/$defs/stringArray" },
+        "datasetIntent": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "selectedSource": { "const": "LLM" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "required": [
+        "totalTables",
+        "totalColumns",
+        "llmRoleAcceptedColumns",
+        "explicitRolePreservedColumns",
+        "llmRoleRejectedColumns",
+        "resolvedRelationCount",
+        "blockingIssues",
+        "warningIssues",
+        "infoIssues"
+      ],
+      "properties": {
+        "totalTables": { "type": "integer", "minimum": 0 },
+        "totalColumns": { "type": "integer", "minimum": 0 },
+        "llmRoleAcceptedColumns": { "type": "integer", "minimum": 0 },
+        "explicitRolePreservedColumns": { "type": "integer", "minimum": 0 },
+        "llmRoleRejectedColumns": { "type": "integer", "minimum": 0 },
+        "resolvedRelationCount": { "type": "integer", "minimum": 0 },
+        "blockingIssues": { "type": "integer", "minimum": 0 },
+        "warningIssues": { "type": "integer", "minimum": 0 },
+        "infoIssues": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "availableRoles": { "$ref": "#/$defs/stringArray" },
+    "metricFamilies": { "$ref": "#/$defs/stringArray" },
+    "supportedOperations": { "$ref": "#/$defs/stringArray" },
+    "availableCapabilities": { "$ref": "#/$defs/stringArray" },
+    "tables": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/table" }
+    },
+    "tableRelations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/relation" }
+    },
+    "ambiguities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ambiguity" }
+    },
+    "issues": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/issue" }
+    },
+    "requiresHumanReview": { "type": "boolean" },
+    "profileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "issue": {
+      "type": "object",
+      "required": ["code", "level", "message", "details"],
+      "properties": {
+        "code": { "type": "string" },
+        "level": { "enum": ["INFO", "WARNING", "BLOCKING"] },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "column": {
+      "type": "object",
+      "required": [
+        "columnId",
+        "tableId",
+        "sourceHeader",
+        "normalizedHeader",
+        "dataType",
+        "semanticRole",
+        "roleAliases",
+        "semanticType",
+        "metricFamily",
+        "metricAliases",
+        "normalizedMeaning",
+        "defaultAggregation",
+        "unitSemantic",
+        "supportedOperations",
+        "capabilities",
+        "confidence",
+        "selectedSource",
+        "resolutionDecision",
+        "deterministic",
+        "llm",
+        "acceptedFields",
+        "rejectedFields",
+        "issues"
+      ],
+      "properties": {
+        "columnId": { "type": "string" },
+        "tableId": { "type": "string" },
+        "sourceHeader": { "type": "string" },
+        "normalizedHeader": { "type": "string" },
+        "dataType": { "enum": ["string", "number", "date", "boolean", "unknown"] },
+        "semanticRole": { "type": "string" },
+        "roleAliases": { "$ref": "#/$defs/stringArray" },
+        "semanticType": { "type": "string" },
+        "metricFamily": { "type": "string" },
+        "metricAliases": { "$ref": "#/$defs/stringArray" },
+        "normalizedMeaning": { "type": "string" },
+        "defaultAggregation": { "type": "string" },
+        "unitSemantic": { "type": "string" },
+        "supportedOperations": { "$ref": "#/$defs/stringArray" },
+        "capabilities": { "$ref": "#/$defs/stringArray" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "selectedSource": {
+          "enum": ["ORIGINAL_EXPLICIT", "DETERMINISTIC", "LLM", "UNKNOWN"]
+        },
+        "resolutionDecision": { "type": "string" },
+        "deterministic": {
+          "type": "object",
+          "required": [
+            "semanticRole",
+            "semanticType",
+            "metricFamily",
+            "roleConfidence",
+            "roleSource",
+            "explicitSemanticRole"
+          ],
+          "properties": {
+            "semanticRole": { "type": "string" },
+            "semanticType": { "type": "string" },
+            "metricFamily": { "type": "string" },
+            "roleConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "roleSource": { "type": "string" },
+            "explicitSemanticRole": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "llm": {
+          "type": "object",
+          "required": [
+            "semanticRole",
+            "semanticType",
+            "metricFamily",
+            "decision",
+            "confidence",
+            "evidenceCodes",
+            "description"
+          ],
+          "properties": {
+            "semanticRole": { "type": "string" },
+            "semanticType": { "type": "string" },
+            "metricFamily": { "type": "string" },
+            "decision": { "type": "string" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "evidenceCodes": { "$ref": "#/$defs/stringArray" },
+            "description": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "acceptedFields": { "$ref": "#/$defs/stringArray" },
+        "rejectedFields": { "$ref": "#/$defs/stringArray" },
+        "issues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/issue" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "table": {
+      "type": "object",
+      "required": [
+        "tableId",
+        "sourceTableId",
+        "sourceSheetName",
+        "flags",
+        "shape",
+        "tablePurpose",
+        "rowGrain",
+        "tableSemanticConfidence",
+        "tableSemanticSource",
+        "tableSemanticEvidenceCodes",
+        "availableRoles",
+        "metricFamilies",
+        "supportedOperations",
+        "capabilities",
+        "columns"
+      ],
+      "properties": {
+        "tableId": { "type": "string" },
+        "sourceTableId": { "type": "string" },
+        "sourceSheetName": { "type": "string" },
+        "flags": { "type": "object" },
+        "shape": { "type": "object" },
+        "tablePurpose": { "type": "string" },
+        "rowGrain": { "type": "string" },
+        "tableSemanticConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "tableSemanticSource": { "enum": ["LLM", "UNKNOWN"] },
+        "tableSemanticEvidenceCodes": { "$ref": "#/$defs/stringArray" },
+        "availableRoles": { "$ref": "#/$defs/stringArray" },
+        "metricFamilies": { "$ref": "#/$defs/stringArray" },
+        "supportedOperations": { "$ref": "#/$defs/stringArray" },
+        "capabilities": { "$ref": "#/$defs/stringArray" },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/column" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "relation": {
+      "type": "object",
+      "required": [
+        "leftTableId",
+        "rightTableId",
+        "relationType",
+        "cardinality",
+        "leftColumnIds",
+        "rightColumnIds",
+        "confidence",
+        "selectedSource",
+        "evidenceCodes",
+        "description"
+      ],
+      "properties": {
+        "leftTableId": { "type": "string" },
+        "rightTableId": { "type": "string" },
+        "relationType": { "type": "string" },
+        "cardinality": { "type": "string" },
+        "leftColumnIds": { "$ref": "#/$defs/stringArray" },
+        "rightColumnIds": { "$ref": "#/$defs/stringArray" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "selectedSource": { "enum": ["DETERMINISTIC_STRUCTURE", "LLM"] },
+        "evidenceCodes": { "$ref": "#/$defs/stringArray" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ambiguity": {
+      "type": "object",
+      "required": ["code", "description", "tableIds", "columnIds", "selectedSource"],
+      "properties": {
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "tableIds": { "$ref": "#/$defs/stringArray" },
+        "columnIds": { "$ref": "#/$defs/stringArray" },
+        "selectedSource": { "const": "LLM" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "version": "query_candidate_patch8_2_manifest_v1",
+  "patch": "Candidate Resolver Recipe Operand Binding Guard",
+  "fileCount": 17,
+  "files": [
+    {
+      "path": "automation/queryCandidateResolver.js",
+      "bytes": 56476,
+      "sha256": "265f9e1d107cccb9fbee476b2423e7c59eda93eb7ba041d8ae92f55c0a3c3cac"
+    },
+    {
+      "path": "automation/queryCandidateResolver.schema.json",
+      "bytes": 10584,
+      "sha256": "99ba597f2679df20d94540e61542a78dea6753e6df11c28484c58fdee0b6a6ab"
+    },
+    {
+      "path": "tests/queryCandidateResolverSampleAudit.js",
+      "bytes": 17974,
+      "sha256": "d48d79060494e57fc5bc3a60458ce763476de944151271ac0a87666e2d61cb3a"
+    },
+    {
+      "path": "tests/queryCandidateResolverOperandBindingSmokeTest.js",
+      "bytes": 2782,
+      "sha256": "2353a80f3f1a381d14554005161ec7fe71b511d856797ce495b989381f82de94"
+    },
+    {
+      "path": "tests/queryCandidateResolverOperandMismatchSmokeTest.js",
+      "bytes": 2263,
+      "sha256": "67df29d1c5d03093e3655d90075d5f6341525fa2400276207286a5d72e6259d4"
+    },
+    {
+      "path": "tests/queryCandidateResolverPeriodOperandSmokeTest.js",
+      "bytes": 2387,
+      "sha256": "71b849a896ca3bf65378d4f2aa70b98190e5438da43df63403ac583cee6ba6ac"
+    },
+    {
+      "path": "tests/queryCandidateResolverDynamicRecipeOperandSmokeTest.js",
+      "bytes": 3275,
+      "sha256": "2f70926eba69656b0a08643ff9bec560f02d6b61afa8ad0b8e19edb123abd7ca"
+    },
+    {
+      "path": "tests/queryCandidatePatch8_2SourceIntegritySmokeTest.js",
+      "bytes": 2467,
+      "sha256": "6ce3b2a402a0167c684b6a5b2caa5480d206372464f1fcb133f98b1e04d5a70e"
+    },
+    {
+      "path": "tests/queryCandidatePatch8_2ManifestSmokeTest.js",
+      "bytes": 1152,
+      "sha256": "bec4ac0d4714edda0ea5af835c3b166b4c5e39194b79f1283b927e38f2df8fd1"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_2_RECIPE_OPERAND_BINDING_GUARD.md",
+      "bytes": 6909,
+      "sha256": "23046cc2a81f287ca8802362aa7db9a61e3b1d3649077ca121561beffcffdbf1"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8_2.json",
+      "bytes": 1175,
+      "sha256": "3615a9139387b93eb160cd300168d0101314a570008acafc9d4ab6b86c760def"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH8.json",
+      "bytes": 3057,
+      "sha256": "66688f11656703dc08a987dfccab552f07c773d78cd5f0d512c9d67f08628b7b"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH8_1.json",
+      "bytes": 1952,
+      "sha256": "332d2232c3e99a9938be167af4dd1d29d92e7eed8220ccda078b32d96fd1df03"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8.json",
+      "bytes": 1189,
+      "sha256": "943fe99ffcf9829402fd5f2c0b0d6ab27fd56f573f6cf26fa6b298391c564629"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8_1.json",
+      "bytes": 1178,
+      "sha256": "4c751a969acecfe12f96d8d4b87661e9e2c03826e9ba98d60ac44bbdc7ccbc12"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_DETERMINISTIC_CANDIDATE_RESOLVER.md",
+      "bytes": 8537,
+      "sha256": "04f9aa0385dafd7e5926c73b37e4a74cad9e05013d0eeeb47e6476564f9cd236"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_1_SEMANTIC_AUDIT_GUARDRAILS.md",
+      "bytes": 5212,
+      "sha256": "c97d251abb48885f1e09b6bee1a076e23521da961a8adbee31875d0f3fefb79d"
+    }
+  ]
+}

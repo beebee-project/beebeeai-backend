@@ -1,0 +1,92 @@
+{
+  "version": "query_candidate_patch8_2_1_manifest_v1",
+  "patch": "Named Template Primary Domain Anchor and Policy Metadata Fix",
+  "fileCount": 17,
+  "files": [
+    {
+      "path": "automation/queryCandidateResolver.js",
+      "bytes": 56476,
+      "sha256": "265f9e1d107cccb9fbee476b2423e7c59eda93eb7ba041d8ae92f55c0a3c3cac"
+    },
+    {
+      "path": "tests/queryCandidateResolverCapture.js",
+      "bytes": 5431,
+      "sha256": "72409efdd1d9a127ffca0747dd01c37db03fb5ebe5bf08bf944d4d5c2ac93d3f"
+    },
+    {
+      "path": "tests/queryCandidateResolverNamedTemplatePrimaryDomainSmokeTest.js",
+      "bytes": 4173,
+      "sha256": "c15cba81ec70a898c49b2dc9f84c15fcf3301c17d93e7285750db0373501c0d5"
+    },
+    {
+      "path": "tests/queryCandidateResolverPolicyMetadataSmokeTest.js",
+      "bytes": 1632,
+      "sha256": "7f8855839568fefe1fc90906166084aaf953d33b40a4f555f42e90c54e7f2375"
+    },
+    {
+      "path": "tests/queryCandidatePatch8_2_1SourceIntegritySmokeTest.js",
+      "bytes": 2181,
+      "sha256": "5fa0f113824d3ad40cb353abaf9923237b575355412f4c7bfbd8af53af02ff85"
+    },
+    {
+      "path": "tests/queryCandidatePatch8_2_1ManifestSmokeTest.js",
+      "bytes": 1187,
+      "sha256": "3e215af6c4fd093e80b608cb10deb6d07a220e45f6a53d9b7a24c651a4708131"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_DETERMINISTIC_CANDIDATE_RESOLVER.md",
+      "bytes": 8537,
+      "sha256": "04f9aa0385dafd7e5926c73b37e4a74cad9e05013d0eeeb47e6476564f9cd236"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_1_SEMANTIC_AUDIT_GUARDRAILS.md",
+      "bytes": 5212,
+      "sha256": "c97d251abb48885f1e09b6bee1a076e23521da961a8adbee31875d0f3fefb79d"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_2_RECIPE_OPERAND_BINDING_GUARD.md",
+      "bytes": 6909,
+      "sha256": "23046cc2a81f287ca8802362aa7db9a61e3b1d3649077ca121561beffcffdbf1"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_2_1_NAMED_TEMPLATE_PRIMARY_DOMAIN_ANCHOR.md",
+      "bytes": 4722,
+      "sha256": "09ecc93615c50325cf21ba2b4e9e8d89fb2d90edf146e4bdaad7d91bb1f5242d"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8.json",
+      "bytes": 1189,
+      "sha256": "943fe99ffcf9829402fd5f2c0b0d6ab27fd56f573f6cf26fa6b298391c564629"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8_1.json",
+      "bytes": 1178,
+      "sha256": "4c751a969acecfe12f96d8d4b87661e9e2c03826e9ba98d60ac44bbdc7ccbc12"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8_2.json",
+      "bytes": 1175,
+      "sha256": "3615a9139387b93eb160cd300168d0101314a570008acafc9d4ab6b86c760def"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8_2_1.json",
+      "bytes": 1401,
+      "sha256": "e92351d60bc0fce331bbdcc7bfdc100d81d8028bce555470096ef5c0a06b61ec"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH8.json",
+      "bytes": 3057,
+      "sha256": "66688f11656703dc08a987dfccab552f07c773d78cd5f0d512c9d67f08628b7b"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH8_1.json",
+      "bytes": 1952,
+      "sha256": "332d2232c3e99a9938be167af4dd1d29d92e7eed8220ccda078b32d96fd1df03"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH8_2.json",
+      "bytes": 3230,
+      "sha256": "a1570289fb1c2c0427b64a3f3d4a238cbc01427d1799ecd5b2dd00d0750764a0"
+    }
+  ]
+}

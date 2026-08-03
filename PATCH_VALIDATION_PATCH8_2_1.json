@@ -1,0 +1,30 @@
+{
+  "version": "query_candidate_patch8_2_1_validation_v1",
+  "patch": "Named Template Primary Domain Anchor and Policy Metadata Fix",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "candidateReadyStatusAssigned": false,
+  "candidateStatusMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "policyVersion": "deterministic_candidate_resolution_policy_v1_2",
+  "guardrails": {
+    "namedTemplatePrimaryDomainAnchorRequired": true,
+    "auxiliarySurveyDomainCannotOverridePrimaryAnchor": true,
+    "structuralGenericSecondaryDomainCandidatesRemainSupported": true,
+    "capturePolicyVersionUsesResolverConstant": true
+  },
+  "selfValidation": {
+    "newSmokeTestsPassed": 2,
+    "existingPatch8To8_2SmokeTestsPassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedCaseCount": 3
+  },
+  "notes": [
+    "사용자 저장소에서는 실제 fixture 6개의 candidate-resolution 기준선을 다시 작성해야 합니다.",
+    "강좌평가 데이터에서 event_satisfaction_report가 NAMED_TEMPLATE_PRIMARY_DOMAIN_CONFLICT로 제외되는지 재감사합니다.",
+    "구조형 만족도 후보는 templateId가 없으므로 secondary semantic domain 근거를 계속 사용할 수 있습니다.",
+    "candidate-resolution-index policyVersion은 Resolver의 exported constant를 사용합니다."
+  ]
+}

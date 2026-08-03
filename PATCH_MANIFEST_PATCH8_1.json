@@ -1,0 +1,57 @@
+{
+  "version": "query_candidate_patch8_1_manifest_v1",
+  "patch": "Candidate Resolver Semantic Audit Guardrails",
+  "fileCount": 10,
+  "files": [
+    {
+      "path": "automation/queryCandidateResolver.js",
+      "bytes": 56476,
+      "sha256": "265f9e1d107cccb9fbee476b2423e7c59eda93eb7ba041d8ae92f55c0a3c3cac"
+    },
+    {
+      "path": "automation/queryCandidateResolver.schema.json",
+      "bytes": 10584,
+      "sha256": "99ba597f2679df20d94540e61542a78dea6753e6df11c28484c58fdee0b6a6ab"
+    },
+    {
+      "path": "tests/queryCandidateResolverCapture.js",
+      "bytes": 5431,
+      "sha256": "72409efdd1d9a127ffca0747dd01c37db03fb5ebe5bf08bf944d4d5c2ac93d3f"
+    },
+    {
+      "path": "tests/queryCandidateResolverDomainEvidenceSmokeTest.js",
+      "bytes": 4500,
+      "sha256": "e23a499bd8c440e740327d6291f8fdba97e1fcee23ddcaa5463561d5d2384893"
+    },
+    {
+      "path": "tests/queryCandidateResolverIdentityGuardrailSmokeTest.js",
+      "bytes": 3002,
+      "sha256": "0fa211582dd62c357babba4f49065fa9bc32e02a531b04a521d7de88da9dc896"
+    },
+    {
+      "path": "tests/queryCandidatePatch8_1SourceIntegritySmokeTest.js",
+      "bytes": 2004,
+      "sha256": "b2d2ca1352e49ef02c222f61fd0083e8accaae2f94551cce12a2412e3d214e67"
+    },
+    {
+      "path": "tests/queryCandidatePatch8_1ManifestSmokeTest.js",
+      "bytes": 1149,
+      "sha256": "ce346080ac4df95eb7c973a178f24de0ae1c7e88641ad6972ab8ddd0dda04624"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_1_SEMANTIC_AUDIT_GUARDRAILS.md",
+      "bytes": 5212,
+      "sha256": "c97d251abb48885f1e09b6bee1a076e23521da961a8adbee31875d0f3fefb79d"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8_1.json",
+      "bytes": 1178,
+      "sha256": "4c751a969acecfe12f96d8d4b87661e9e2c03826e9ba98d60ac44bbdc7ccbc12"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH8.json",
+      "bytes": 3057,
+      "sha256": "66688f11656703dc08a987dfccab552f07c773d78cd5f0d512c9d67f08628b7b"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "version": "query_candidate_patch8_manifest_v1",
+  "patch": "Deterministic Candidate Resolver",
+  "fileCount": 16,
+  "files": [
+    {
+      "path": "automation/queryCandidateResolver.js",
+      "bytes": 56476,
+      "sha256": "265f9e1d107cccb9fbee476b2423e7c59eda93eb7ba041d8ae92f55c0a3c3cac"
+    },
+    {
+      "path": "automation/queryCandidateResolver.schema.json",
+      "bytes": 10584,
+      "sha256": "99ba597f2679df20d94540e61542a78dea6753e6df11c28484c58fdee0b6a6ab"
+    },
+    {
+      "path": "tests/queryCandidateResolverTestSupport.js",
+      "bytes": 3801,
+      "sha256": "0834d783f2fa80e260ddb0a116a48257c9f6abd686d232e27d874eb36b715bc7"
+    },
+    {
+      "path": "tests/queryCandidateResolverSmokeTest.js",
+      "bytes": 1258,
+      "sha256": "2a2f0de058003f58e3128bbc20538e07ee56c061c3ba2258596d59fc7c3a4328"
+    },
+    {
+      "path": "tests/queryCandidateResolverInferredSemanticSmokeTest.js",
+      "bytes": 1530,
+      "sha256": "7c002be2da8aa976ade4fb8b262fe05d1fecf28ec7a291f720f1feef08e152c0"
+    },
+    {
+      "path": "tests/queryCandidateResolverSourceScopeSmokeTest.js",
+      "bytes": 2393,
+      "sha256": "6b26754413bfe1e6a093ccce82687890e53c82b57c1eaad8117ce475833e21af"
+    },
+    {
+      "path": "tests/queryCandidateResolverConservativeExclusionSmokeTest.js",
+      "bytes": 3865,
+      "sha256": "29893a4342ed703a12b5dc2ab13b7a218dfaf497288c373b45f0ee8af7e6f414"
+    },
+    {
+      "path": "tests/queryCandidateResolverIntegritySmokeTest.js",
+      "bytes": 1453,
+      "sha256": "4605bf2cf720e992e7cc775f1723b6d98164685025a8ff530a8e9adad813b035"
+    },
+    {
+      "path": "tests/queryCandidateResolverPrivacyBoundarySmokeTest.js",
+      "bytes": 1016,
+      "sha256": "6e8b79120f0d1f4bba3b610ee5c844776ed0c5e411c2559dca10d5c1b87492ef"
+    },
+    {
+      "path": "tests/queryCandidateResolverSchemaSmokeTest.js",
+      "bytes": 1141,
+      "sha256": "9355b38263ba9b8f67b38c844b5f4ec358990f501e5e27910b878a3d5129be15"
+    },
+    {
+      "path": "tests/queryCandidateResolverBaselineSmokeTest.js",
+      "bytes": 992,
+      "sha256": "7357e81dc6a7405fdbb78c238562b35193d9c913acb4b1d3f0125abd4cdebaea"
+    },
+    {
+      "path": "tests/queryCandidateResolverCapture.js",
+      "bytes": 5431,
+      "sha256": "72409efdd1d9a127ffca0747dd01c37db03fb5ebe5bf08bf944d4d5c2ac93d3f"
+    },
+    {
+      "path": "tests/queryCandidatePatch8SourceIntegritySmokeTest.js",
+      "bytes": 2461,
+      "sha256": "e00e55c80bd6cae0d381e1d01b2e9325ee7601096ec3a36f53c2d69bc7300627"
+    },
+    {
+      "path": "tests/queryCandidatePatch8ManifestSmokeTest.js",
+      "bytes": 1205,
+      "sha256": "d9aa5ea9e4cb5ef818524cc0493e008ae027dd0dc6f4b0935e5567c2b302d2bf"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH8_DETERMINISTIC_CANDIDATE_RESOLVER.md",
+      "bytes": 8537,
+      "sha256": "04f9aa0385dafd7e5926c73b37e4a74cad9e05013d0eeeb47e6476564f9cd236"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH8.json",
+      "bytes": 1189,
+      "sha256": "943fe99ffcf9829402fd5f2c0b0d6ab27fd56f573f6cf26fa6b298391c564629"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": "query_candidate_patch8_validation_v1",
+  "patch": "Deterministic Candidate Resolver",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "candidateReadyStatusAssigned": false,
+  "candidateStatusMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "selfValidation": {
+    "seedCaseCount": 3,
+    "newSmokeTestsPassed": 10,
+    "captureWritePassed": true,
+    "captureComparePassed": true,
+    "semanticProfileMergeRegressionPassed": true,
+    "semanticProfilerRegressionPassed": true,
+    "retrieverRegressionPassed": true,
+    "capabilityRegressionPassed": true,
+    "candidateContractRegressionPassed": true,
+    "queryJsonSemanticProfileRegressionPassed": true
+  },
+  "notes": [
+    "사용자 저장소에서는 실제 fixture 6개를 대상으로 기준선을 작성합니다.",
+    "기존 RETRIEVED와 EXCLUDED는 terminal prior result로 보수적으로 유지합니다.",
+    "GENERIC executor는 의미 resolution만 허용하며 최종 지원 여부는 Feasibility Gate에서 검증합니다.",
+    "Production 저장 시 candidate resolution은 기존 암호화 저장 계층을 사용해야 합니다."
+  ]
+}
