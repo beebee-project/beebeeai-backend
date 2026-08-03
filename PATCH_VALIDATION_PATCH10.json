@@ -1,0 +1,100 @@
+{
+  "version": "query_candidate_patch10_validation_v1",
+  "patch": "Deterministic Candidate Ranker",
+  "applicationOrder": "after_patch11_1",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "sourceCandidateMutation": false,
+  "familyDispositionMutation": false,
+  "feasibilityStatusMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "inputContract": {
+    "candidateResolutionRequired": true,
+    "candidateFamilyResolutionRequired": true,
+    "candidateFeasibilityResolutionRequired": true,
+    "rankedFeasibilityStatus": "READY",
+    "reviewRanked": false,
+    "unsupportedRanked": false,
+    "notApplicableRanked": false
+  },
+  "rankingContract": {
+    "policyVersion": "deterministic_candidate_ranking_policy_v1_1",
+    "allReadyCandidatesRanked": true,
+    "scoreRange": [
+      0,
+      100
+    ],
+    "primaryLimit": 3,
+    "recommendedLimit": 8,
+    "priorScoresAreSignalsNotGates": true,
+    "deterministicDiversityReranking": true,
+    "tieBreakOrder": [
+      "adjustedScoreDescending",
+      "baseScoreDescending",
+      "resolutionScoreDescending",
+      "originalScoreDescending",
+      "originalRankAscending",
+      "candidateIdLexicographic"
+    ]
+  },
+  "scoreSignals": {
+    "readyBaseline": true,
+    "priorRetrieval": true,
+    "bindingEvidence": true,
+    "executorConfidence": true,
+    "identitySpecificity": true,
+    "operationUtility": true,
+    "contractEvidence": true,
+    "domainAlignment": true,
+    "metricAlignment": true,
+    "sourceSimplicity": true,
+    "resolutionEvidenceBounded": true,
+    "originalEvidenceBounded": true,
+    "metricAggregationAffinity": true,
+    "degenerateGroupPenalty": true,
+    "semanticProfileStatsAreSignalsNotGates": true
+  },
+  "diversityContract": {
+    "repeatedOperationPenalty": true,
+    "repeatedAxisPenalty": true,
+    "repeatedMeasurePenalty": true,
+    "candidateRemoval": false,
+    "allReadyCandidatesRemainRanked": true
+  },
+  "guardrails": {
+    "sourceCandidatesPreserved": true,
+    "feasibilityResultsPreserved": true,
+    "rawRowsPersisted": false,
+    "sampleValuesPersisted": false,
+    "rankerDoesNotCallLlm": true,
+    "rankerDoesNotChangeProductionRoute": true
+  },
+  "selfValidation": {
+    "rankerSmokePassed": true,
+    "readyOnlySmokePassed": true,
+    "evidencePrioritySmokePassed": true,
+    "diversitySmokePassed": true,
+    "tierSmokePassed": true,
+    "determinismSmokePassed": true,
+    "privacyBoundarySmokePassed": true,
+    "schemaSmokePassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "seedBaselineSmokePassed": true,
+    "feasibilityRegressionPassed": true,
+    "familyRegressionPassed": true,
+    "resolverRegressionPassed": true,
+    "zipReapplyPassed": true,
+    "cumulativeIntegrityPassed": true,
+    "metricAggregationAffinitySmokePassed": true,
+    "additiveAggregationAffinitySmokePassed": true,
+    "degenerateGroupPenaltySmokePassed": true
+  },
+  "notes": [
+    "이 패치는 번호상 Patch 10이지만 Patch 11.1 Feasibility Gate 완료 후 적용합니다.",
+    "사용자 저장소의 실제 6개 fixture는 적용 후 ranking 기준선을 새로 작성합니다.",
+    "상위 8개는 recommendedCandidateIds로 제공하지만 나머지 READY 후보도 삭제하지 않고 ADDITIONAL로 유지합니다.",
+    "Patch 10.1부터 척도형 지표의 평균 우대, 가산형 지표의 합계 우대, 고카디널리티 category_count 감점을 적용합니다."
+  ]
+}

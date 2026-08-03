@@ -1,0 +1,188 @@
+{
+  "version": "query_candidate_patch10_1_manifest_v1",
+  "patch": "Metric Aggregation Affinity + Degenerate Group Penalty",
+  "applicationOrder": "after_patch10",
+  "fileCount": 36,
+  "files": [
+    {
+      "path": "PATCH_MANIFEST_PATCH8_2_1.json",
+      "bytes": 3229,
+      "sha256": "687bda19851d917c0222608ac7f30114b33908f8f28707c45fb81b8c712d2c8c"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH9.json",
+      "bytes": 3515,
+      "sha256": "8813fec1b58aee825e71362b5119c1aec8e45db64e5322398267e5c7fd7dc8b5"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH9.json",
+      "bytes": 1631,
+      "sha256": "d5d032999efd2eae1a9d0d20454c0db0e7d3f0c30fec469005cfea9e87dd1210"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH9_CANDIDATE_FAMILY_DEDUPLICATION.md",
+      "bytes": 5668,
+      "sha256": "cf6dc1075ccde0b3cdb242b5d558f4b4f6b31a3ecc79d8e3264b39c8285f78b1"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH11.json",
+      "bytes": 5393,
+      "sha256": "8da4b63ea37e56dc45f872c0d46afaca0e27a885a923a0a7adac4447cfb8342c"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH11.json",
+      "bytes": 2081,
+      "sha256": "fbee740de55a000c0fb3d3e0811e63c9f084c43ab972c920e487e6cc44ea4a2c"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH11_DETERMINISTIC_FEASIBILITY_GATE.md",
+      "bytes": 5861,
+      "sha256": "de9b9772b0fb65ab768d7be3cbd61784bee750c7fcf8267b99655829b423432e"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH11_1.json",
+      "bytes": 6301,
+      "sha256": "bf845fe7d4c06a1134391781b46266014b6c42ff39cf32d615a2904fdced35b4"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH11_1.json",
+      "bytes": 1781,
+      "sha256": "3da2c76be1fed6e8e33464b8eb4d905fa7b2a8d7e3954f6ab69ba024f011ed23"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH11_1_TIME_COUNT_FEASIBILITY_CONTRACT.md",
+      "bytes": 5120,
+      "sha256": "aa882c31e6957e9d8e8afa3739d2eea9bd45560706dc38adffdb2e1a9df2c498"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH10.json",
+      "bytes": 3488,
+      "sha256": "ff49b9d50914b2661f7e7bc515727a0a21d1fbc564081922014cb90fb25856a8"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH10_DETERMINISTIC_CANDIDATE_RANKER.md",
+      "bytes": 5167,
+      "sha256": "ab00201aeb6150133e8f4eb700aeca787d4ceeacbea4299cc75779026ee15234"
+    },
+    {
+      "path": "automation/queryCandidateRanker.js",
+      "bytes": 33233,
+      "sha256": "04ef57478fdf5a409bd258a5740806c30ceddec1b9804d9c467885a36f2f12ad"
+    },
+    {
+      "path": "automation/queryCandidateRanker.schema.json",
+      "bytes": 9640,
+      "sha256": "060c55b519808a3dc14d7dca4b7ce6693a1052188973c6a6c3ceb00497986b9b"
+    },
+    {
+      "path": "tests/queryCandidateRankerTestSupport.js",
+      "bytes": 4152,
+      "sha256": "2668b363137587a96a21c30517af25e0fd81376e68dd2bdba11b5b3960d2eddc"
+    },
+    {
+      "path": "tests/queryCandidateRankerCapture.js",
+      "bytes": 4904,
+      "sha256": "ba5817813a8b1054e826bd6fd90c529576f23e00d5fdc4841e4c518cd6334e09"
+    },
+    {
+      "path": "tests/queryCandidateRankerSampleAudit.js",
+      "bytes": 4427,
+      "sha256": "96fdfef7b231fe38e116beead74c6253819d15d86fff0c38186255a113cfd908"
+    },
+    {
+      "path": "tests/queryCandidateRankerSmokeTest.js",
+      "bytes": 1654,
+      "sha256": "af5fc59f48898cd9947de5cdd20741791ac06bae2f7e5b14b087a891122af9c3"
+    },
+    {
+      "path": "tests/queryCandidateRankerReadyOnlySmokeTest.js",
+      "bytes": 1141,
+      "sha256": "3ce3d7a39508f57bb66bca99580a5f7d9a4e473a5dde8cfc17a75afac1bb22e4"
+    },
+    {
+      "path": "tests/queryCandidateRankerEvidencePrioritySmokeTest.js",
+      "bytes": 1277,
+      "sha256": "93ef5360f3d23ad684cfceb4ee542b9f261690fe6f7acedd8fdb76e5d2f4a8bf"
+    },
+    {
+      "path": "tests/queryCandidateRankerDiversitySmokeTest.js",
+      "bytes": 1454,
+      "sha256": "609c1391fa19ae6c53a7772a870d7cf2628c56549d79a02da8247274f5858412"
+    },
+    {
+      "path": "tests/queryCandidateRankerTierSmokeTest.js",
+      "bytes": 1170,
+      "sha256": "f229504d34f2fe5ae04b1dc8340aa4308e3df050e62cc23a939f8badabd51c31"
+    },
+    {
+      "path": "tests/queryCandidateRankerDeterminismSmokeTest.js",
+      "bytes": 809,
+      "sha256": "5783f41bae995e0fe565b17fd4d65881d78bdeba177235cc70daf458aabe0d7c"
+    },
+    {
+      "path": "tests/queryCandidateRankerPrivacyBoundarySmokeTest.js",
+      "bytes": 741,
+      "sha256": "20dfdbfeb5cef640d73913d2dfc391dfea0e1ba035275b4976b2d5c0fa3f748d"
+    },
+    {
+      "path": "tests/queryCandidateRankerSchemaSmokeTest.js",
+      "bytes": 935,
+      "sha256": "e2fe3239c5552268b255b876b5757853310c339851f4f6925e09aa00f168bc37"
+    },
+    {
+      "path": "tests/queryCandidateRankerBaselineSmokeTest.js",
+      "bytes": 1049,
+      "sha256": "f41881e888e4be5b95a79f88aa40d23c03d6146ee47053d1835baeb85e269639"
+    },
+    {
+      "path": "tests/queryCandidatePatch10SourceIntegritySmokeTest.js",
+      "bytes": 5226,
+      "sha256": "af2c71e3ac0e29f5fe8f3853a32f9fca506cb1649cce34cdcb08fa88a0833b26"
+    },
+    {
+      "path": "tests/queryCandidatePatch10ManifestSmokeTest.js",
+      "bytes": 1197,
+      "sha256": "78e585f3b57fc1d9b8d49a8ceea364d75f8126a40d947f7f6baba8bce67b3a65"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH10_1_METRIC_AGGREGATION_AFFINITY_DEGENERATE_GROUP_PENALTY.md",
+      "bytes": 4305,
+      "sha256": "e789d9385461f211c922af940627f38332a758f1651b4f2e375e7c71cadd22bf"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH10_1.json",
+      "bytes": 2405,
+      "sha256": "d5bf056d3ed7edd19ffbc0821cb131493af3903efaa9f63ba38689f610d9c9ba"
+    },
+    {
+      "path": "tests/queryCandidateRankerMetricAggregationAffinitySmokeTest.js",
+      "bytes": 1590,
+      "sha256": "bd0255a3d70ce9bf01d43b064237ac58d14e0fd6e8d3f3975401c1bfc721a006"
+    },
+    {
+      "path": "tests/queryCandidateRankerAdditiveAggregationAffinitySmokeTest.js",
+      "bytes": 1634,
+      "sha256": "cfa6599824f1d11fa80817e663e607d6255271cd321aae2b1c4d083f89e12d61"
+    },
+    {
+      "path": "tests/queryCandidateRankerDegenerateGroupPenaltySmokeTest.js",
+      "bytes": 2085,
+      "sha256": "cfc4a0fe0c7171a365b20f43cb21b15c141cff8c26c12522ebcd25026ff23fb1"
+    },
+    {
+      "path": "tests/queryCandidatePatch10_1SourceIntegritySmokeTest.js",
+      "bytes": 3514,
+      "sha256": "a83eb61f9e06a2e4d34780c26d8acd35f48185b4c552cd2951478b6abd1b0d78"
+    },
+    {
+      "path": "tests/queryCandidatePatch10_1ManifestSmokeTest.js",
+      "bytes": 1234,
+      "sha256": "8a82f6a1bcb0abaa3456ff2d5f9803fc6eca4df6755759cd14f7e2069c86b046"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH10.json",
+      "bytes": 6513,
+      "sha256": "2f307986758eae46b563a0c8f9d6b9a06414bc3a4e110b819cc607841c21d128"
+    }
+  ]
+}

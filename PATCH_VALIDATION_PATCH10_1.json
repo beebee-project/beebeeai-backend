@@ -1,0 +1,76 @@
+{
+  "version": "query_candidate_patch10_1_validation_v1",
+  "patch": "Metric Aggregation Affinity + Degenerate Group Penalty",
+  "applicationOrder": "after_patch10",
+  "productionRouteChanged": false,
+  "openAiCallAdded": false,
+  "newLlmCost": false,
+  "sourceCandidateMutation": false,
+  "familyDispositionMutation": false,
+  "feasibilityStatusMutation": false,
+  "plaintextProductionPersistenceAdded": false,
+  "policyVersion": "deterministic_candidate_ranking_policy_v1_1",
+  "metricAggregationAffinity": {
+    "scaleAverageBonus": 1.5,
+    "scaleTopBottomBonus": 0.5,
+    "scaleSumPenalty": -3,
+    "scaleCumulativePenalty": -4,
+    "additiveSumBonus": 1,
+    "additiveTopBottomBonus": 1,
+    "additiveCumulativeBonus": 0.5,
+    "additiveAveragePenalty": -1.5,
+    "statusMutation": false
+  },
+  "degenerateGroupPenalty": {
+    "operation": "category_count",
+    "minimumRowCount": 8,
+    "uniqueRatioThresholds": [
+      {
+        "minimum": 0.98,
+        "penalty": -12
+      },
+      {
+        "minimum": 0.9,
+        "penalty": -10
+      },
+      {
+        "minimum": 0.8,
+        "penalty": -7
+      },
+      {
+        "minimum": 0.65,
+        "penalty": -4
+      }
+    ],
+    "semanticProfileOptional": true,
+    "statsAreSignalsNotGates": true
+  },
+  "guardrails": {
+    "readyCandidatesOnly": true,
+    "allReadyCandidatesRemainRanked": true,
+    "primaryLimit": 3,
+    "recommendedLimit": 8,
+    "sourceCandidatesPreserved": true,
+    "feasibilityResultsPreserved": true,
+    "rawRowsPersisted": false,
+    "sampleValuesPersisted": false
+  },
+  "selfValidation": {
+    "metricAggregationAffinitySmokePassed": true,
+    "additiveAggregationAffinitySmokePassed": true,
+    "degenerateGroupPenaltySmokePassed": true,
+    "patch10RegressionPassed": true,
+    "seedCaptureWritePassed": true,
+    "seedCaptureComparePassed": true,
+    "feasibilityRegressionPassed": true,
+    "familyRegressionPassed": true,
+    "resolverRegressionPassed": true,
+    "zipReapplyPassed": true,
+    "cumulativeIntegrityPassed": true
+  },
+  "notes": [
+    "사용자 저장소의 실제 6개 fixture는 적용 후 Ranking 기준선을 다시 작성합니다.",
+    "semantic-profile.json이 없으면 cardinality 감점 없이 기존 결정론적 Ranker가 동작합니다.",
+    "실제 세 케이스에서 상위 후보의 업무 효용 순서를 표본 감사로 확인해야 최종 완료 처리합니다."
+  ]
+}
