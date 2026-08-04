@@ -1,8 +1,4 @@
-"use strict";
-
-const {
-  OPERATIONS,
-} = require("./queryCandidatePlannerFeatureControl");
+const { OPERATIONS } = require("./queryCandidatePlannerFeatureControl");
 const {
   compareCandidatePlannerShadow,
 } = require("./queryCandidatePlannerShadowComparator");
@@ -12,10 +8,8 @@ const {
   runQueryCandidatePlannerApiShadow,
 } = require("./queryCandidatePlannerApiShadowRunner");
 
-const SERVICE_VERSION =
-  "query_candidate_planner_api_shadow_service_v1";
-const OBSERVATION_VERSION =
-  "query_candidate_planner_api_shadow_observation_v1";
+const SERVICE_VERSION = "query_candidate_planner_api_shadow_service_v1";
+const OBSERVATION_VERSION = "query_candidate_planner_api_shadow_observation_v1";
 const DEFAULT_TIMEOUT_MS = 30000;
 
 function errorCode(error) {
@@ -84,9 +78,7 @@ async function observeQueryCandidatePlannerApiShadow({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   now = Date.now,
 } = {}) {
-  const shadowDecision = featureControl.evaluate(
-    OPERATIONS.SHADOW_EXECUTION,
-  );
+  const shadowDecision = featureControl.evaluate(OPERATIONS.SHADOW_EXECUTION);
   if (!shadowDecision.allowed) {
     return blockedObservation({
       decision: shadowDecision,
@@ -94,15 +86,9 @@ async function observeQueryCandidatePlannerApiShadow({
     });
   }
 
-  const providerDecision = featureControl.evaluate(
-    OPERATIONS.PROVIDER_CALL,
-  );
-  const cacheReadDecision = featureControl.evaluate(
-    OPERATIONS.CACHE_READ,
-  );
-  const cacheWriteDecision = featureControl.evaluate(
-    OPERATIONS.CACHE_WRITE,
-  );
+  const providerDecision = featureControl.evaluate(OPERATIONS.PROVIDER_CALL);
+  const cacheReadDecision = featureControl.evaluate(OPERATIONS.CACHE_READ);
+  const cacheWriteDecision = featureControl.evaluate(OPERATIONS.CACHE_WRITE);
 
   const startedAt = nowMs(now);
   const primaryResponseSha256 = primaryResponseContractSha256(primaryPayload);
@@ -140,15 +126,12 @@ async function observeQueryCandidatePlannerApiShadow({
       version: OBSERVATION_VERSION,
       serviceVersion: SERVICE_VERSION,
       status: completedStatus,
-      reason: String(
-        shadowResolution?.status || "SHADOW_RESULT_OBSERVED",
-      ),
+      reason: String(shadowResolution?.status || "SHADOW_RESULT_OBSERVED"),
       featureDecision: shadowDecision,
       providerDecision,
       cacheReadDecision,
       cacheWriteDecision,
-      requestFingerprintSha256:
-        safeContext.requestFingerprintSha256,
+      requestFingerprintSha256: safeContext.requestFingerprintSha256,
       primaryResponseSha256,
       primaryResponseUnchanged:
         primaryResponseSha256 === primaryResponseContractSha256(primaryPayload),
@@ -160,8 +143,7 @@ async function observeQueryCandidatePlannerApiShadow({
             "",
         ),
         providerCallCount: Number(
-          shadowResolution?.plannerResolution?.invocation
-            ?.providerCallCount ??
+          shadowResolution?.plannerResolution?.invocation?.providerCallCount ??
             shadowResolution?.providerCallCount ??
             0,
         ),
@@ -201,8 +183,7 @@ async function observeQueryCandidatePlannerApiShadow({
       providerDecision,
       cacheReadDecision,
       cacheWriteDecision,
-      requestFingerprintSha256:
-        safeContext.requestFingerprintSha256,
+      requestFingerprintSha256: safeContext.requestFingerprintSha256,
       primaryResponseSha256,
       primaryResponseUnchanged:
         primaryResponseSha256 === primaryResponseContractSha256(primaryPayload),

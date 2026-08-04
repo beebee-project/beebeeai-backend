@@ -1,10 +1,5 @@
-"use strict";
-
 const path = require("path");
-const {
-  normalizeText,
-  sha256,
-} = require("./queryCandidateObservation");
+const { normalizeText, sha256 } = require("./queryCandidateObservation");
 const {
   compareReplaySafeShadowResolutions,
 } = require("./queryCandidatePlannerCacheOperationalControls");
@@ -283,7 +278,8 @@ function buildLiveProviderCacheHitParityAudit({
 
 function evaluateCandidatePlannerProductionReadiness({ parityAudit } = {}) {
   const blockingReasons = [];
-  const audit = parityAudit && typeof parityAudit === "object" ? parityAudit : {};
+  const audit =
+    parityAudit && typeof parityAudit === "object" ? parityAudit : {};
   const checks = {
     parityAuditVersionValid:
       audit.version === QUERY_CANDIDATE_PLANNER_LIVE_CACHE_PARITY_AUDIT_VERSION,
@@ -305,10 +301,11 @@ function evaluateCandidatePlannerProductionReadiness({ parityAudit } = {}) {
   const eligible = blockingReasons.length === 0;
   const document = {
     version: QUERY_CANDIDATE_PLANNER_PRODUCTION_READINESS_GATE_VERSION,
-    policyVersion:
-      QUERY_CANDIDATE_PLANNER_PRODUCTION_READINESS_POLICY_VERSION,
+    policyVersion: QUERY_CANDIDATE_PLANNER_PRODUCTION_READINESS_POLICY_VERSION,
     eligible,
-    decision: eligible ? READINESS_DECISION.ELIGIBLE : READINESS_DECISION.BLOCKED,
+    decision: eligible
+      ? READINESS_DECISION.ELIGIBLE
+      : READINESS_DECISION.BLOCKED,
     blockingReasonCount: blockingReasons.length,
     blockingReasons,
     checks,

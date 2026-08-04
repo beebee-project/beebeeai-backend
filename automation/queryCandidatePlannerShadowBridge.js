@@ -1,12 +1,5 @@
-"use strict";
-
-const {
-  normalizeText,
-  sha256,
-} = require("./queryCandidateObservation");
-const {
-  assessCandidate,
-} = require("./queryCandidateRetriever");
+const { normalizeText, sha256 } = require("./queryCandidateObservation");
+const { assessCandidate } = require("./queryCandidateRetriever");
 const {
   runConditionalCandidatePlanner,
   validateQueryCandidatePlannerResolution,
@@ -102,7 +95,6 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value == null ? {} : value));
 }
 
-
 function sanitizeSemanticProfileForPersistentCache(profile = {}) {
   const clone = deepClone(profile);
   function visit(value) {
@@ -111,7 +103,14 @@ function sanitizeSemanticProfileForPersistentCache(profile = {}) {
     const output = {};
     for (const [key, item] of Object.entries(value)) {
       const normalizedKey = normalizeLoose(key);
-      if (["samplevalues", "rawrows", "originalfile", "originalfilebytes"].includes(normalizedKey)) {
+      if (
+        [
+          "samplevalues",
+          "rawrows",
+          "originalfile",
+          "originalfilebytes",
+        ].includes(normalizedKey)
+      ) {
         output[key] = Array.isArray(item) ? [] : "";
         continue;
       }
@@ -146,10 +145,23 @@ function persistentCachePrivacyBoundaryValid(value) {
     for (const [key, nested] of Object.entries(item)) {
       const normalizedKey = normalizeLoose(key);
       if (["samplevalues", "rawrows"].includes(normalizedKey)) {
-        if (Array.isArray(nested) ? nested.length > 0 : Boolean(nested)) valid = false;
+        if (Array.isArray(nested) ? nested.length > 0 : Boolean(nested))
+          valid = false;
       }
-      if (["filename", "originalfilename", "originalfile", "originalfilebytes"].includes(normalizedKey)) {
-        if (Array.isArray(nested) ? nested.length > 0 : Boolean(normalizeText(nested || ""))) valid = false;
+      if (
+        [
+          "filename",
+          "originalfilename",
+          "originalfile",
+          "originalfilebytes",
+        ].includes(normalizedKey)
+      ) {
+        if (
+          Array.isArray(nested)
+            ? nested.length > 0
+            : Boolean(normalizeText(nested || ""))
+        )
+          valid = false;
       }
       visit(nested);
     }
@@ -166,13 +178,16 @@ function plannerProposalSetSha256(plannerResolution = {}) {
       candidateId: normalizeText(proposal.candidateId || ""),
       plannerItemSha256: normalizeText(proposal.plannerItemSha256 || ""),
     }))
-    .sort((left, right) =>
-      left.proposalIndex - right.proposalIndex ||
-      left.candidateId.localeCompare(right.candidateId, "ko"),
+    .sort(
+      (left, right) =>
+        left.proposalIndex - right.proposalIndex ||
+        left.candidateId.localeCompare(right.candidateId, "ko"),
     );
   return sha256({
     version: QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_INTEGRATION_VERSION,
-    plannerInputSha256: normalizeText(plannerResolution.source?.inputSha256 || ""),
+    plannerInputSha256: normalizeText(
+      plannerResolution.source?.inputSha256 || "",
+    ),
     semanticProfileSha256: normalizeText(
       plannerResolution.source?.semanticProfileSha256 || "",
     ),
@@ -206,7 +221,8 @@ function plannerResolutionCacheIdentity({
     schemaVersion: QUERY_CANDIDATE_PLANNER_MODEL_OUTPUT_VERSION,
     plannerPolicyVersion: QUERY_CANDIDATE_PLANNER_POLICY_VERSION,
     extraIdentity: {
-      integrationVersion: QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_INTEGRATION_VERSION,
+      integrationVersion:
+        QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_INTEGRATION_VERSION,
     },
   });
 }
@@ -227,15 +243,19 @@ function shadowReentryCacheIdentity({
     model: hierarchicalCacheConfig.model,
     reasoningEffort: hierarchicalCacheConfig.reasoningEffort,
     promptVersion: hierarchicalCacheConfig.promptVersion,
-    schemaVersion: QUERY_CANDIDATE_PLANNER_SHADOW_REENTRY_CACHE_ARTIFACT_VERSION,
+    schemaVersion:
+      QUERY_CANDIDATE_PLANNER_SHADOW_REENTRY_CACHE_ARTIFACT_VERSION,
     plannerPolicyVersion: QUERY_CANDIDATE_PLANNER_POLICY_VERSION,
     resolverPolicyVersion: QUERY_CANDIDATE_RESOLUTION_POLICY_VERSION,
     familyPolicyVersion: QUERY_CANDIDATE_FAMILY_POLICY_VERSION,
     feasibilityPolicyVersion: QUERY_CANDIDATE_FEASIBILITY_POLICY_VERSION,
     rankerPolicyVersion: QUERY_CANDIDATE_RANKING_POLICY_VERSION,
     extraIdentity: {
-      integrationVersion: QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_INTEGRATION_VERSION,
-      plannerInputSha256: normalizeText(plannerResolution.source?.inputSha256 || ""),
+      integrationVersion:
+        QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_INTEGRATION_VERSION,
+      plannerInputSha256: normalizeText(
+        plannerResolution.source?.inputSha256 || "",
+      ),
       semanticProfileSha256: normalizeText(
         sanitizedSemanticProfile.profileSha256 || "",
       ),
@@ -295,7 +315,9 @@ function buildShadowReentryCacheArtifact({
     },
     source: {
       caseId: normalizeText(plannerResolution.source?.caseId || ""),
-      plannerInputSha256: normalizeText(plannerResolution.source?.inputSha256 || ""),
+      plannerInputSha256: normalizeText(
+        plannerResolution.source?.inputSha256 || "",
+      ),
       semanticProfileSha256: normalizeText(
         plannerResolution.source?.semanticProfileSha256 || "",
       ),
@@ -349,7 +371,10 @@ function validateShadowReentryCacheArtifact(
   ) {
     errors.push({ code: "INVALID_ARTIFACT_VERSION" });
   }
-  if (artifact.policy?.version !== QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_POLICY_VERSION) {
+  if (
+    artifact.policy?.version !==
+    QUERY_CANDIDATE_PLANNER_SHADOW_CACHE_POLICY_VERSION
+  ) {
     errors.push({ code: "INVALID_CACHE_POLICY_VERSION" });
   }
   if (
@@ -362,7 +387,9 @@ function validateShadowReentryCacheArtifact(
     errors.push({ code: "PERSISTENT_PRIVACY_BOUNDARY_VIOLATION" });
   }
   const validations = {
-    resolver: validateQueryCandidateResolution(documents.candidateResolution || {}),
+    resolver: validateQueryCandidateResolution(
+      documents.candidateResolution || {},
+    ),
     family: validateQueryCandidateFamilyResolution(
       documents.candidateFamilyResolution || {},
     ),
@@ -373,7 +400,9 @@ function validateShadowReentryCacheArtifact(
       documents.candidateRankingResolution || {},
     ),
   };
-  if (!Object.values(validations).every((validation) => validation.valid === true)) {
+  if (
+    !Object.values(validations).every((validation) => validation.valid === true)
+  ) {
     errors.push({ code: "DETERMINISTIC_VALIDATION_FAILED" });
   }
   const bundle = documents.bundle || {};
@@ -382,7 +411,8 @@ function validateShadowReentryCacheArtifact(
     acceptedCandidateIds: asArray(bundle.acceptedCandidateIds),
     capabilityManifestSha256: bundle.capabilityManifest?.manifestSha256,
     retrievalSha256: bundle.retrieval?.retrievalSha256,
-    resolvedSemanticProfileSha256: bundle.resolvedSemanticProfile?.profileSha256,
+    resolvedSemanticProfileSha256:
+      bundle.resolvedSemanticProfile?.profileSha256,
   });
   if (bundle.bundleSha256 !== expectedBundleSha256) {
     errors.push({ code: "BUNDLE_SHA_MISMATCH" });
@@ -465,7 +495,8 @@ function canonicalOperation(operation = "") {
 }
 
 function orderedBindings(proposal = {}) {
-  const definition = ALLOWED_OPERATIONS[normalizeLoose(proposal.operation || "")];
+  const definition =
+    ALLOWED_OPERATIONS[normalizeLoose(proposal.operation || "")];
   const remaining = asArray(proposal.operandBindings).map((binding, index) => ({
     index,
     kind: normalizeLoose(binding.kind || ""),
@@ -484,7 +515,10 @@ function recipeIdForProposal(proposal = {}, deterministicSemanticProfile = {}) {
   const operation = canonicalOperation(proposal.operation);
   const columns = columnMap(deterministicSemanticProfile);
   const tokens = orderedBindings(proposal).map((binding, index) =>
-    safeOperandToken(columns.get(binding.columnId), `${binding.kind || "operand"}${index + 1}`),
+    safeOperandToken(
+      columns.get(binding.columnId),
+      `${binding.kind || "operand"}${index + 1}`,
+    ),
   );
   return [operation, ...tokens].filter(Boolean).join("_");
 }
@@ -492,7 +526,10 @@ function recipeIdForProposal(proposal = {}, deterministicSemanticProfile = {}) {
 function roleRequirement(binding = {}, column = {}, index = 0) {
   const kind = normalizeLoose(binding.kind || "operand") || "operand";
   const header = normalizeText(
-    column.normalizedHeader || column.sourceHeader || column.normalizedMeaning || "",
+    column.normalizedHeader ||
+      column.sourceHeader ||
+      column.normalizedMeaning ||
+      "",
   );
   const semanticType = normalizeText(column.semanticType || "unknown");
   const dataType = normalizeText(column.dataType || "unknown");
@@ -513,21 +550,57 @@ function capabilitiesForOperation(operation = "") {
     case "categorycount":
       return ["group_by", "operation:countRows", "single_table"];
     case "groupsum":
-      return ["group_by", "operation:sum", "metric_kind:aggregate", "single_table"];
+      return [
+        "group_by",
+        "operation:sum",
+        "metric_kind:aggregate",
+        "single_table",
+      ];
     case "groupavg":
-      return ["group_by", "operation:average", "metric_kind:aggregate", "single_table"];
+      return [
+        "group_by",
+        "operation:average",
+        "metric_kind:aggregate",
+        "single_table",
+      ];
     case "topbottom":
-      return ["group_by", "operation:rank", "metric_kind:rank", "ranking", "single_table"];
+      return [
+        "group_by",
+        "operation:rank",
+        "metric_kind:rank",
+        "ranking",
+        "single_table",
+      ];
     case "timesum":
-      return ["operation:sum", "operation:timeSeries", "metric_kind:aggregate", "single_table"];
+      return [
+        "operation:sum",
+        "operation:timeSeries",
+        "metric_kind:aggregate",
+        "single_table",
+      ];
     case "timeavg":
-      return ["operation:average", "operation:timeSeries", "metric_kind:aggregate", "single_table"];
+      return [
+        "operation:average",
+        "operation:timeSeries",
+        "metric_kind:aggregate",
+        "single_table",
+      ];
     case "timecount":
       return ["operation:countRows", "operation:timeSeries", "single_table"];
     case "cumulativesum":
-      return ["operation:sum", "operation:timeSeries", "metric_kind:aggregate", "single_table"];
+      return [
+        "operation:sum",
+        "operation:timeSeries",
+        "metric_kind:aggregate",
+        "single_table",
+      ];
     case "crosssum":
-      return ["group_by", "operation:sum", "metric_kind:aggregate", "single_table"];
+      return [
+        "group_by",
+        "operation:sum",
+        "metric_kind:aggregate",
+        "single_table",
+      ];
     case "crosscount":
       return ["group_by", "operation:countRows", "single_table"];
     default:
@@ -535,7 +608,10 @@ function capabilitiesForOperation(operation = "") {
   }
 }
 
-function capabilityItemForProposal(proposal = {}, deterministicSemanticProfile = {}) {
+function capabilityItemForProposal(
+  proposal = {},
+  deterministicSemanticProfile = {},
+) {
   const columns = columnMap(deterministicSemanticProfile);
   const bindings = orderedBindings(proposal);
   const operation = canonicalOperation(proposal.operation);
@@ -604,7 +680,11 @@ function retrievalItemForProposal(
     sourceTableIds: sortedUnique(proposal.sourceTableIds),
     status: "UNASSESSED",
   };
-  const assessment = assessCandidate(candidate, capability, resolvedSemanticProfile);
+  const assessment = assessCandidate(
+    candidate,
+    capability,
+    resolvedSemanticProfile,
+  );
   assessment.provenance = {
     ...(assessment.provenance || {}),
     candidateItemVersion: "query_candidate_item_v1",
@@ -666,8 +746,12 @@ function buildRetrievalDocument(candidates = [], source = {}) {
       contractVersion: "query_candidate_contract_v1",
       contractSha256: normalizeText(source.plannerResolutionSha256 || ""),
       capabilityManifestVersion: "query_candidate_capability_manifest_v1",
-      capabilityManifestSha256: normalizeText(source.capabilityManifestSha256 || ""),
-      semanticProfileVersion: normalizeText(source.semanticProfileVersion || ""),
+      capabilityManifestSha256: normalizeText(
+        source.capabilityManifestSha256 || "",
+      ),
+      semanticProfileVersion: normalizeText(
+        source.semanticProfileVersion || "",
+      ),
       semanticProfileSha256: normalizeText(source.semanticProfileSha256 || ""),
       shadowOnly: true,
     },
@@ -680,19 +764,24 @@ function buildRetrievalDocument(candidates = [], source = {}) {
     },
     counts: {
       total: candidates.length,
-      retrieved: candidates.filter((item) => item.result === "RETRIEVED").length,
+      retrieved: candidates.filter((item) => item.result === "RETRIEVED")
+        .length,
       deferred: candidates.filter((item) => item.result === "DEFERRED").length,
       excluded: candidates.filter((item) => item.result === "EXCLUDED").length,
       boundRetrieved: 0,
       partialRetrieved: 0,
       inferredDeferred: candidates.filter(
-        (item) => item.result === "DEFERRED" && item.bindingStatus === "INFERRED",
+        (item) =>
+          item.result === "DEFERRED" && item.bindingStatus === "INFERRED",
       ).length,
       unboundDeferred: 0,
     },
     candidates,
   };
-  document.retrievalSha256 = sha256({ ...document, retrievalSha256: undefined });
+  document.retrievalSha256 = sha256({
+    ...document,
+    retrievalSha256: undefined,
+  });
   return document;
 }
 
@@ -713,7 +802,8 @@ function normalizedResolvedProfile(
   profile.source = {
     ...(profile.source || {}),
     deterministicProfileSha256:
-      normalizeText(profile.source?.deterministicProfileSha256 || "") || deterministicHash,
+      normalizeText(profile.source?.deterministicProfileSha256 || "") ||
+      deterministicHash,
   };
   if (!profile.profileSha256) {
     profile.profileSha256 = sha256({ ...profile, profileSha256: undefined });
@@ -731,7 +821,9 @@ function buildPlannerReentryBundle({
     (proposal) => proposal.disposition === "ACCEPTED_FOR_REVALIDATION",
   );
   const effectivePlannerReentrySourceSha256 = normalizeText(
-    plannerReentrySourceSha256 || plannerResolution.plannerResolutionSha256 || "",
+    plannerReentrySourceSha256 ||
+      plannerResolution.plannerResolutionSha256 ||
+      "",
   );
   const resolvedProfile = normalizedResolvedProfile(
     deterministicSemanticProfile,
@@ -767,7 +859,9 @@ function buildPlannerReentryBundle({
       resolvedProfile.source?.caseId,
     plannerResolutionSha256: effectivePlannerReentrySourceSha256,
     capabilityManifestSha256: capabilityManifest.manifestSha256,
-    semanticProfileVersion: normalizeText(deterministicSemanticProfile.version || ""),
+    semanticProfileVersion: normalizeText(
+      deterministicSemanticProfile.version || "",
+    ),
     semanticProfileSha256: deterministicHash,
   });
   return {
@@ -808,10 +902,11 @@ function runPlannerResolverReentry({
   const candidateFamilyResolution = buildQueryCandidateFamilyResolution({
     candidateResolution,
   });
-  const candidateFeasibilityResolution = buildQueryCandidateFeasibilityResolution({
-    candidateFamilyResolution,
-    candidateResolution,
-  });
+  const candidateFeasibilityResolution =
+    buildQueryCandidateFeasibilityResolution({
+      candidateFamilyResolution,
+      candidateResolution,
+    });
   const candidateRankingResolution = buildQueryCandidateRankingResolution({
     candidateResolution,
     candidateFamilyResolution,
@@ -824,10 +919,15 @@ function runPlannerResolverReentry({
     feasibility: validateQueryCandidateFeasibilityResolution(
       candidateFeasibilityResolution,
     ),
-    ranking: validateQueryCandidateRankingResolution(candidateRankingResolution),
+    ranking: validateQueryCandidateRankingResolution(
+      candidateRankingResolution,
+    ),
   };
   const candidateById = new Map(
-    asArray(candidateResolution.candidates).map((item) => [item.candidateId, item]),
+    asArray(candidateResolution.candidates).map((item) => [
+      item.candidateId,
+      item,
+    ]),
   );
   const feasibilityById = new Map(
     asArray(candidateFeasibilityResolution.candidates).map((item) => [
@@ -866,7 +966,10 @@ function runPlannerResolverReentry({
   };
 }
 
-function baseShadowDocument({ plannerResolution = {}, mode = QUERY_CANDIDATE_PLANNER_SHADOW_MODE } = {}) {
+function baseShadowDocument({
+  plannerResolution = {},
+  mode = QUERY_CANDIDATE_PLANNER_SHADOW_MODE,
+} = {}) {
   return {
     version: QUERY_CANDIDATE_PLANNER_SHADOW_RESOLUTION_VERSION,
     policy: {
@@ -930,9 +1033,9 @@ async function runCandidatePlannerLiveShadow({
 } = {}) {
   const cacheIntegrationEnabled = Boolean(
     hierarchicalCache &&
-      typeof hierarchicalCache.get === "function" &&
-      typeof hierarchicalCache.set === "function" &&
-      typeof hierarchicalCache.delete === "function",
+    typeof hierarchicalCache.get === "function" &&
+    typeof hierarchicalCache.set === "function" &&
+    typeof hierarchicalCache.delete === "function",
   );
   const effectiveModel = normalizeText(model || DEFAULT_MODEL);
   const effectiveReasoningEffort = normalizeText(
@@ -993,9 +1096,8 @@ async function runCandidatePlannerLiveShadow({
     reasoningEffort: effectiveReasoningEffort,
     pricing,
   });
-  const plannerValidation = validateQueryCandidatePlannerResolution(
-    plannerResolution,
-  );
+  const plannerValidation =
+    validateQueryCandidatePlannerResolution(plannerResolution);
   const base = baseShadowDocument({ plannerResolution, mode });
   const acceptedCount = Number(plannerResolution.counts?.accepted || 0);
   const proposalSetSha256 = acceptedCount
@@ -1060,7 +1162,9 @@ async function runCandidatePlannerLiveShadow({
     cacheAudit.plannerResolution.keyDigest = identity.keyDigest;
     const cached = await hierarchicalCache.get({ identity });
     if (cached.hit) {
-      const cachedValidation = validateQueryCandidatePlannerResolution(cached.value);
+      const cachedValidation = validateQueryCandidatePlannerResolution(
+        cached.value,
+      );
       const cachedProposalSetSha256 = plannerProposalSetSha256(cached.value);
       const valid =
         cachedValidation.valid === true &&
@@ -1077,7 +1181,9 @@ async function runCandidatePlannerLiveShadow({
         cacheAudit.plannerResolution.reason = "INVALID_CACHE_ENTRY_DELETED";
       }
     } else {
-      cacheAudit.plannerResolution.reason = normalizeText(cached.reason || "MISS");
+      cacheAudit.plannerResolution.reason = normalizeText(
+        cached.reason || "MISS",
+      );
     }
     if (!cacheAudit.plannerResolution.hit) {
       const stored = await hierarchicalCache.set({
@@ -1087,7 +1193,9 @@ async function runCandidatePlannerLiveShadow({
         metadata: {
           cacheable: true,
           validationValid: plannerValidation.valid === true,
-          outcomeStatus: normalizeText(plannerResolution.invocation?.status || ""),
+          outcomeStatus: normalizeText(
+            plannerResolution.invocation?.status || "",
+          ),
           failureCode: normalizeText(
             plannerResolution.invocation?.failureCode || "",
           ),
@@ -1106,7 +1214,9 @@ async function runCandidatePlannerLiveShadow({
   }
 
   function finalizeWithOptionalCache(document) {
-    return finalizeShadow(cacheAudit ? { ...document, cache: cacheAudit } : document);
+    return finalizeShadow(
+      cacheAudit ? { ...document, cache: cacheAudit } : document,
+    );
   }
 
   if (plannerResolution.invocation?.status === "REQUIRED_NOT_RUN") {
@@ -1179,9 +1289,12 @@ async function runCandidatePlannerLiveShadow({
       cacheAudit.reentry.keyDigest = identity.keyDigest;
       const cached = await hierarchicalCache.get({ identity });
       if (cached.hit) {
-        const cachedValidation = validateShadowReentryCacheArtifact(cached.value, {
-          expectedProposalSetSha256: proposalSetSha256,
-        });
+        const cachedValidation = validateShadowReentryCacheArtifact(
+          cached.value,
+          {
+            expectedProposalSetSha256: proposalSetSha256,
+          },
+        );
         if (cachedValidation.valid) {
           cacheAudit.reentry.hit = true;
           cacheAudit.reentry.source = cached.source;
@@ -1239,9 +1352,12 @@ async function runCandidatePlannerLiveShadow({
           proposalSetSha256,
           plannerResolution,
         });
-        const artifactValidation = validateShadowReentryCacheArtifact(artifact, {
-          expectedProposalSetSha256: proposalSetSha256,
-        });
+        const artifactValidation = validateShadowReentryCacheArtifact(
+          artifact,
+          {
+            expectedProposalSetSha256: proposalSetSha256,
+          },
+        );
         if (artifactValidation.valid) {
           const stored = await hierarchicalCache.set({
             identity,
@@ -1290,7 +1406,9 @@ async function runCandidatePlannerLiveShadow({
       resolvedSemanticProfile,
     });
     const validationList = Object.values(reentry.validations);
-    const allValid = validationList.every((validation) => validation.valid === true);
+    const allValid = validationList.every(
+      (validation) => validation.valid === true,
+    );
     const publicReentry = buildPublicReentry(reentry);
     const counts = reentryCounts(publicReentry);
     return finalizeWithOptionalCache({
@@ -1339,7 +1457,9 @@ function validateCandidatePlannerShadowResolution(document = {}) {
   if (document.version !== QUERY_CANDIDATE_PLANNER_SHADOW_RESOLUTION_VERSION) {
     errors.push({ path: "version", code: "INVALID_VERSION" });
   }
-  if (document.policy?.version !== QUERY_CANDIDATE_PLANNER_SHADOW_POLICY_VERSION) {
+  if (
+    document.policy?.version !== QUERY_CANDIDATE_PLANNER_SHADOW_POLICY_VERSION
+  ) {
     errors.push({ path: "policy.version", code: "INVALID_POLICY_VERSION" });
   }
   if (!SHADOW_STATUS.includes(document.status)) {
@@ -1362,8 +1482,14 @@ function validateCandidatePlannerShadowResolution(document = {}) {
     errors.push({ path: "privacy", code: "PRIVACY_BOUNDARY_VIOLATION" });
   }
   for (const item of asArray(document.reentry?.items)) {
-    if (item.productionCandidateMerged !== false || item.productionReadyAssigned !== false) {
-      errors.push({ path: `reentry.items.${item.candidateId}`, code: "PRODUCTION_MUTATION" });
+    if (
+      item.productionCandidateMerged !== false ||
+      item.productionReadyAssigned !== false
+    ) {
+      errors.push({
+        path: `reentry.items.${item.candidateId}`,
+        code: "PRODUCTION_MUTATION",
+      });
     }
   }
   if (document.cache) {

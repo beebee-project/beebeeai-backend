@@ -1,5 +1,3 @@
-"use strict";
-
 const CONTROL_VERSION = "query_candidate_planner_feature_control_v1";
 const POLICY_VERSION = "candidate_planner_feature_flags_kill_switch_policy_v1";
 const READINESS_DECISION =
@@ -33,13 +31,11 @@ const ENV_KEYS = Object.freeze({
     "QUERY_CANDIDATE_PLANNER_PRODUCTION_CANDIDATE_MERGE_ENABLED",
   productionReadyAssignmentEnabled:
     "QUERY_CANDIDATE_PLANNER_PRODUCTION_READY_ASSIGNMENT_ENABLED",
-  productionRouteEnabled:
-    "QUERY_CANDIDATE_PLANNER_PRODUCTION_ROUTE_ENABLED",
+  productionRouteEnabled: "QUERY_CANDIDATE_PLANNER_PRODUCTION_ROUTE_ENABLED",
   globalKillSwitch: "QUERY_CANDIDATE_PLANNER_KILL_SWITCH",
   providerKillSwitch: "QUERY_CANDIDATE_PLANNER_PROVIDER_KILL_SWITCH",
   cacheKillSwitch: "QUERY_CANDIDATE_PLANNER_CACHE_KILL_SWITCH",
-  productionKillSwitch:
-    "QUERY_CANDIDATE_PLANNER_PRODUCTION_KILL_SWITCH",
+  productionKillSwitch: "QUERY_CANDIDATE_PLANNER_PRODUCTION_KILL_SWITCH",
 });
 
 const DEFAULTS = Object.freeze({
@@ -144,20 +140,23 @@ function evaluateReadinessGate(readinessGate) {
     failClosed: guardrails.failClosed === true,
     routeNotAutoWired: guardrails.productionRouteAutoWired === false,
     mergeNotAutoAllowed: guardrails.productionCandidateMergeAllowed === false,
-    readyNotAutoAllowed:
-      guardrails.productionReadyAssignmentAllowed === false,
+    readyNotAutoAllowed: guardrails.productionReadyAssignmentAllowed === false,
   };
 
   const valid = Object.values(checks).every(Boolean);
   return Object.freeze({
     valid,
     checks: Object.freeze(checks),
-    reason: valid ? "PATCH13_3_READINESS_EVIDENCE_VALID" : "READINESS_EVIDENCE_INVALID",
+    reason: valid
+      ? "PATCH13_3_READINESS_EVIDENCE_VALID"
+      : "READINESS_EVIDENCE_INVALID",
   });
 }
 
 function normalizeScope(scope) {
-  const value = String(scope || "").trim().toUpperCase();
+  const value = String(scope || "")
+    .trim()
+    .toUpperCase();
   if (!Object.values(SCOPES).includes(value)) {
     throw new Error(`Unsupported kill-switch scope: ${scope}`);
   }
@@ -189,7 +188,9 @@ function createQueryCandidatePlannerFeatureControl({
 
   function timestamp() {
     const value = now();
-    return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+    return value instanceof Date
+      ? value.toISOString()
+      : new Date(value).toISOString();
   }
 
   function record(event) {
@@ -202,7 +203,10 @@ function createQueryCandidatePlannerFeatureControl({
       }),
     );
     if (runtime.auditEvents.length > maxAuditEvents) {
-      runtime.auditEvents.splice(0, runtime.auditEvents.length - maxAuditEvents);
+      runtime.auditEvents.splice(
+        0,
+        runtime.auditEvents.length - maxAuditEvents,
+      );
     }
   }
 
@@ -283,9 +287,7 @@ function createQueryCandidatePlannerFeatureControl({
 
     if (!boot.configurationValid) {
       return deny(operation, "INVALID_ENVIRONMENT_CONFIGURATION", {
-        invalidEnvironmentKeys: Object.freeze([
-          ...boot.invalidEnvironmentKeys,
-        ]),
+        invalidEnvironmentKeys: Object.freeze([...boot.invalidEnvironmentKeys]),
       });
     }
 
@@ -302,11 +304,15 @@ function createQueryCandidatePlannerFeatureControl({
 
     if (operation === OPERATIONS.PROVIDER_CALL) {
       if (kills.provider) return deny(operation, "PROVIDER_KILL_SWITCH_ACTIVE");
-      if (!boot.flags.providerEnabled) return deny(operation, "PROVIDER_DISABLED");
+      if (!boot.flags.providerEnabled)
+        return deny(operation, "PROVIDER_DISABLED");
       return allow(operation);
     }
 
-    if (operation === OPERATIONS.CACHE_READ || operation === OPERATIONS.CACHE_WRITE) {
+    if (
+      operation === OPERATIONS.CACHE_READ ||
+      operation === OPERATIONS.CACHE_WRITE
+    ) {
       if (kills.cache) return deny(operation, "CACHE_KILL_SWITCH_ACTIVE");
       const enabled =
         operation === OPERATIONS.CACHE_READ
@@ -339,7 +345,8 @@ function createQueryCandidatePlannerFeatureControl({
         [OPERATIONS.PRODUCTION_ROUTE]: boot.flags.productionRouteEnabled,
       }[operation];
 
-      if (!operationFlag) return deny(operation, "PRODUCTION_OPERATION_DISABLED");
+      if (!operationFlag)
+        return deny(operation, "PRODUCTION_OPERATION_DISABLED");
 
       const readiness = evaluateReadinessGate(readinessGate);
       if (!readiness.valid) {

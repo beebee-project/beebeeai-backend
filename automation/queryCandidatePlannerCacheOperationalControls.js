@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   normalizeText,
   sha256,
@@ -30,9 +28,11 @@ function normalizeSha(value, fieldName, { required = false } = {}) {
 function acceptedPlannerItemSha256s(resolution = {}) {
   return asArray(resolution.plannerResolution?.proposals)
     .filter((proposal) => proposal.disposition === "ACCEPTED_FOR_REVALIDATION")
-    .map((proposal) => normalizeSha(proposal.plannerItemSha256, "plannerItemSha256", {
-      required: true,
-    }))
+    .map((proposal) =>
+      normalizeSha(proposal.plannerItemSha256, "plannerItemSha256", {
+        required: true,
+      }),
+    )
     .sort();
 }
 
@@ -52,7 +52,10 @@ function buildReplaySafeShadowFingerprint(resolution = {}) {
       ),
     },
     reentry: {
-      bundleSha256: normalizeSha(resolution.reentry?.bundleSha256, "bundleSha256"),
+      bundleSha256: normalizeSha(
+        resolution.reentry?.bundleSha256,
+        "bundleSha256",
+      ),
       candidateResolutionSha256: normalizeSha(
         resolution.reentry?.candidateResolutionSha256,
         "candidateResolutionSha256",
@@ -114,13 +117,20 @@ function compareReplaySafeShadowResolutions({ origin, replay } = {}) {
   if (normalizeText(replay?.status || "") !== "SHADOW_COMPLETED") {
     errors.push({ code: "REPLAY_NOT_COMPLETED" });
   }
-  if (normalizeText(replay?.plannerResolution?.invocation?.status || "") !== "CACHE_HIT") {
+  if (
+    normalizeText(replay?.plannerResolution?.invocation?.status || "") !==
+    "CACHE_HIT"
+  ) {
     errors.push({ code: "REPLAY_NOT_CACHE_HIT" });
   }
-  if (Number(replay?.plannerResolution?.invocation?.providerCallCount || 0) !== 0) {
+  if (
+    Number(replay?.plannerResolution?.invocation?.providerCallCount || 0) !== 0
+  ) {
     errors.push({ code: "REPLAY_PROVIDER_CALL_OCCURRED" });
   }
-  if (originFingerprint.fingerprintSha256 !== replayFingerprint.fingerprintSha256) {
+  if (
+    originFingerprint.fingerprintSha256 !== replayFingerprint.fingerprintSha256
+  ) {
     errors.push({
       code: "REPLAY_FINGERPRINT_MISMATCH",
       originFingerprintSha256: originFingerprint.fingerprintSha256,
@@ -168,7 +178,9 @@ function buildUploadInvalidationTags({
     queryJsonSha256: normalizeSha(queryJsonSha256, "queryJsonSha256"),
   };
   if (!tags.uploadFingerprintSha256 && !tags.queryJsonSha256) {
-    throw new Error("업로드 무효화에는 uploadFingerprintSha256 또는 queryJsonSha256가 필요합니다.");
+    throw new Error(
+      "업로드 무효화에는 uploadFingerprintSha256 또는 queryJsonSha256가 필요합니다.",
+    );
   }
   return Object.freeze(tags);
 }
@@ -180,8 +192,13 @@ async function invalidateCandidatePlannerUploadCache({
   uploadFingerprintSha256,
   queryJsonSha256,
 } = {}) {
-  if (!hierarchicalCache || typeof hierarchicalCache.invalidateByTags !== "function") {
-    throw new TypeError("hierarchicalCache.invalidateByTags 함수가 필요합니다.");
+  if (
+    !hierarchicalCache ||
+    typeof hierarchicalCache.invalidateByTags !== "function"
+  ) {
+    throw new TypeError(
+      "hierarchicalCache.invalidateByTags 함수가 필요합니다.",
+    );
   }
   const tags = buildUploadInvalidationTags({
     uploadFingerprintSha256,

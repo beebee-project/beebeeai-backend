@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   getQueryCandidatePlannerFeatureControl,
 } = require("./queryCandidatePlannerFeatureControlRuntime");
@@ -7,8 +5,7 @@ const {
   observeQueryCandidatePlannerApiShadow,
 } = require("./queryCandidatePlannerApiShadowService");
 
-const BOUNDARY_VERSION =
-  "query_candidate_planner_api_shadow_boundary_v1";
+const BOUNDARY_VERSION = "query_candidate_planner_api_shadow_boundary_v1";
 
 function defaultObservationLogger(observation = {}) {
   if (observation.status === "BLOCKED") return;
@@ -16,17 +13,12 @@ function defaultObservationLogger(observation = {}) {
     version: observation.version,
     status: observation.status,
     reason: observation.reason,
-    requestFingerprintSha256:
-      observation.requestFingerprintSha256 || "",
+    requestFingerprintSha256: observation.requestFingerprintSha256 || "",
     latencyMs: observation.latencyMs || 0,
-    comparisonVerdict:
-      observation.comparison?.verdict || "NOT_AVAILABLE",
-    primaryCount:
-      observation.comparison?.counts?.primary || 0,
-    shadowCount:
-      observation.comparison?.counts?.shadow || 0,
-    providerCallCount:
-      observation.shadow?.providerCallCount || 0,
+    comparisonVerdict: observation.comparison?.verdict || "NOT_AVAILABLE",
+    primaryCount: observation.comparison?.counts?.primary || 0,
+    shadowCount: observation.comparison?.counts?.shadow || 0,
+    providerCallCount: observation.shadow?.providerCallCount || 0,
     productionCandidateMerge: false,
     productionReadyAssignment: false,
     productionRouteChanged: false,
@@ -47,11 +39,7 @@ function createQueryCandidatePlannerApiShadowBoundary({
     throw new TypeError("API shadow boundary handler must be a function");
   }
 
-  return async function queryCandidatePlannerApiShadowBoundary(
-    req,
-    res,
-    next,
-  ) {
+  return async function queryCandidatePlannerApiShadowBoundary(req, res, next) {
     const originalJson = res.json.bind(res);
     let responseObserved = false;
 
@@ -83,8 +71,7 @@ function createQueryCandidatePlannerApiShadowBoundary({
         })
         .catch((error) => {
           const observation = Object.freeze({
-            version:
-              "query_candidate_planner_api_shadow_observation_v1",
+            version: "query_candidate_planner_api_shadow_observation_v1",
             status: "BOUNDARY_FAILED_SAFE",
             reason: String(error?.code || "BOUNDARY_OBSERVER_FAILED"),
             guardrails: Object.freeze({

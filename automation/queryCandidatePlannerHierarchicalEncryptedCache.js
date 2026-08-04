@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -76,11 +74,14 @@ const NON_CACHEABLE_OUTCOME_STATUSES = new Set([
 ]);
 
 function assertFunction(name, value) {
-  if (typeof value !== "function") throw new TypeError(`${name} 함수가 필요합니다.`);
+  if (typeof value !== "function")
+    throw new TypeError(`${name} 함수가 필요합니다.`);
 }
 
 function asObject(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
 }
 
 function asPositiveInteger(value, fallback) {
@@ -108,7 +109,9 @@ function hmacHex(secret, label, value) {
 function validateLayer(layer) {
   const normalized = normalizeText(layer);
   if (!Object.values(CACHE_LAYERS).includes(normalized)) {
-    throw new Error(`지원하지 않는 cache layer입니다: ${normalized || "(empty)"}`);
+    throw new Error(
+      `지원하지 않는 cache layer입니다: ${normalized || "(empty)"}`,
+    );
   }
   return normalized;
 }
@@ -116,7 +119,9 @@ function validateLayer(layer) {
 function validateArtifactType(artifactType) {
   const normalized = normalizeText(artifactType);
   if (!Object.values(CACHE_ARTIFACT_TYPES).includes(normalized)) {
-    throw new Error(`지원하지 않는 cache artifactType입니다: ${normalized || "(empty)"}`);
+    throw new Error(
+      `지원하지 않는 cache artifactType입니다: ${normalized || "(empty)"}`,
+    );
   }
   return normalized;
 }
@@ -236,7 +241,8 @@ function buildHierarchicalCacheIdentity({
 
 function normalizeAesKey(key) {
   if (Buffer.isBuffer(key)) {
-    if (key.length !== 32) throw new Error("AES-256-GCM key는 32바이트여야 합니다.");
+    if (key.length !== 32)
+      throw new Error("AES-256-GCM key는 32바이트여야 합니다.");
     return Buffer.from(key);
   }
   const text = normalizeText(key || "");
@@ -247,13 +253,17 @@ function normalizeAesKey(key) {
   } catch (_) {
     // fall through
   }
-  throw new Error("AES-256-GCM key는 32바이트 Buffer, 64자리 hex 또는 base64여야 합니다.");
+  throw new Error(
+    "AES-256-GCM key는 32바이트 Buffer, 64자리 hex 또는 base64여야 합니다.",
+  );
 }
 
 function aadForContext(context = {}) {
   return Buffer.from(
     stableStringify({
-      purpose: normalizeText(context.purpose || "query-candidate-planner-hierarchical-cache"),
+      purpose: normalizeText(
+        context.purpose || "query-candidate-planner-hierarchical-cache",
+      ),
       layer: normalizeText(context.layer || ""),
       artifactType: normalizeText(context.artifactType || ""),
       tenantDigest: normalizeText(context.tenantDigest || ""),
@@ -274,7 +284,9 @@ function parseEncryptedWrapper(encrypted) {
     throw error;
   }
   if (wrapper.version !== AES_WRAPPER_VERSION) {
-    const error = new Error("암호화 cache wrapper version이 유효하지 않습니다.");
+    const error = new Error(
+      "암호화 cache wrapper version이 유효하지 않습니다.",
+    );
     error.code = "CACHE_WRAPPER_VERSION_INVALID";
     throw error;
   }
@@ -366,7 +378,9 @@ function createRotatingAes256GcmCacheCodec({ primary, legacy = [] } = {}) {
       const wrapper = parseEncryptedWrapper(encrypted);
       const codec = codecs.get(normalizeText(wrapper.keyId));
       if (!codec) {
-        const error = new Error("암호화 cache rotation keyId를 찾을 수 없습니다.");
+        const error = new Error(
+          "암호화 cache rotation keyId를 찾을 수 없습니다.",
+        );
         error.code = "CACHE_ROTATION_KEY_NOT_FOUND";
         throw error;
       }
@@ -383,7 +397,9 @@ function createRotatingAes256GcmCacheCodec({ primary, legacy = [] } = {}) {
     },
     keyId: primaryCodec.keyId,
     activeKeyId: primaryCodec.keyId,
-    legacyKeyIds: [...codecs.keys()].filter((keyId) => keyId !== primaryCodec.keyId),
+    legacyKeyIds: [...codecs.keys()].filter(
+      (keyId) => keyId !== primaryCodec.keyId,
+    ),
   };
 }
 
@@ -426,7 +442,9 @@ function evaluateCacheability(metadata = {}) {
 }
 
 function validateIdentity(identity = {}) {
-  if (identity.version !== QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_KEY_VERSION) {
+  if (
+    identity.version !== QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_KEY_VERSION
+  ) {
     throw new Error("hierarchical cache identity version이 유효하지 않습니다.");
   }
   validateLayer(identity.layer);
@@ -458,7 +476,8 @@ function createEncryptedHierarchicalCandidatePlannerCache({
   memoryTtlMs = DEFAULT_MEMORY_TTL_MS,
   deleteCorrupt = true,
 } = {}) {
-  if (!rootDir) throw new Error("암호화 hierarchical cache rootDir이 필요합니다.");
+  if (!rootDir)
+    throw new Error("암호화 hierarchical cache rootDir이 필요합니다.");
   assertFunction("encryptBuffer", encryptBuffer);
   assertFunction("decryptBuffer", decryptBuffer);
   assertFunction("now", now);
@@ -468,7 +487,10 @@ function createEncryptedHierarchicalCandidatePlannerCache({
   if (auditSink !== undefined) assertFunction("auditSink", auditSink);
   const absoluteRoot = path.resolve(rootDir);
   const memory = new Map();
-  const normalizedMemoryTtlMs = asPositiveInteger(memoryTtlMs, DEFAULT_MEMORY_TTL_MS);
+  const normalizedMemoryTtlMs = asPositiveInteger(
+    memoryTtlMs,
+    DEFAULT_MEMORY_TTL_MS,
+  );
   const normalizedActiveKeyId = normalizeText(activeKeyId || "");
 
   function emitAudit(action, identity = {}, details = {}) {
@@ -531,7 +553,10 @@ function createEncryptedHierarchicalCandidatePlannerCache({
   function persistentTtl(identity, explicitTtlMs) {
     return asPositiveInteger(
       explicitTtlMs,
-      asPositiveInteger(ttlByLayer?.[identity.layer], DEFAULT_TTL_MS[identity.layer]),
+      asPositiveInteger(
+        ttlByLayer?.[identity.layer],
+        DEFAULT_TTL_MS[identity.layer],
+      ),
     );
   }
 
@@ -564,7 +589,9 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       const result = await decryptBufferWithMetadata(encrypted, context);
       if (!result || !Buffer.isBuffer(result.plaintext)) {
         throw Object.assign(
-          new TypeError("decryptBufferWithMetadata.plaintext는 Buffer여야 합니다."),
+          new TypeError(
+            "decryptBufferWithMetadata.plaintext는 Buffer여야 합니다.",
+          ),
           { code: "CACHE_DECRYPT_METADATA_INVALID" },
         );
       }
@@ -596,7 +623,9 @@ function createEncryptedHierarchicalCandidatePlannerCache({
     const encrypted = fs.readFileSync(target);
     const context = codecContext(pathIdentity);
     const decrypted = await decryptEncrypted(encrypted, context);
-    const envelope = JSON.parse(Buffer.from(decrypted.plaintext).toString("utf8"));
+    const envelope = JSON.parse(
+      Buffer.from(decrypted.plaintext).toString("utf8"),
+    );
     return { encrypted, decrypted, envelope, context };
   }
 
@@ -606,7 +635,10 @@ function createEncryptedHierarchicalCandidatePlannerCache({
     const key = memoryKey(identity);
     const resident = memory.get(key);
     if (resident) {
-      if (resident.expiresAt > current && Number(resident.envelope.expiresAt) > current) {
+      if (
+        resident.expiresAt > current &&
+        Number(resident.envelope.expiresAt) > current
+      ) {
         emitAudit("READ_HIT", identity, {
           source: CACHE_READ_SOURCE.L1_MEMORY,
           reason: "VALID_CACHE_HIT",
@@ -625,8 +657,15 @@ function createEncryptedHierarchicalCandidatePlannerCache({
 
     const target = filePath(identity);
     if (!fs.existsSync(target)) {
-      emitAudit("READ_MISS", identity, { source: CACHE_READ_SOURCE.MISS, reason: "NOT_FOUND" });
-      return { hit: false, source: CACHE_READ_SOURCE.MISS, reason: "NOT_FOUND" };
+      emitAudit("READ_MISS", identity, {
+        source: CACHE_READ_SOURCE.MISS,
+        reason: "NOT_FOUND",
+      });
+      return {
+        hit: false,
+        source: CACHE_READ_SOURCE.MISS,
+        reason: "NOT_FOUND",
+      };
     }
     try {
       const { decrypted, envelope, context } = await readEnvelopeFromFile(
@@ -641,7 +680,13 @@ function createEncryptedHierarchicalCandidatePlannerCache({
           code: "CACHE_ENTRY_VERSION_MISMATCH",
         });
       }
-      for (const field of ["layer", "artifactType", "tenantDigest", "keyDigest", "materialSha256"]) {
+      for (const field of [
+        "layer",
+        "artifactType",
+        "tenantDigest",
+        "keyDigest",
+        "materialSha256",
+      ]) {
         if (envelope[field] !== identity[field]) {
           throw Object.assign(new Error(`cache identity mismatch: ${field}`), {
             code: "CACHE_IDENTITY_MISMATCH",
@@ -655,7 +700,11 @@ function createEncryptedHierarchicalCandidatePlannerCache({
           reason: CACHE_INVALIDATION_REASONS.TTL_EXPIRED,
           payloadSha256: envelope.payloadSha256,
         });
-        return { hit: false, source: CACHE_READ_SOURCE.MISS, reason: "EXPIRED" };
+        return {
+          hit: false,
+          source: CACHE_READ_SOURCE.MISS,
+          reason: "EXPIRED",
+        };
       }
       if (sha256(envelope.payload) !== envelope.payloadSha256) {
         throw Object.assign(new Error("cache payload SHA mismatch"), {
@@ -664,16 +713,22 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       }
       const cacheability = evaluateCacheability(envelope.metadata);
       if (!cacheability.cacheable) {
-        throw Object.assign(new Error(`cache policy mismatch: ${cacheability.reason}`), {
-          code: "CACHE_POLICY_MISMATCH",
-        });
+        throw Object.assign(
+          new Error(`cache policy mismatch: ${cacheability.reason}`),
+          {
+            code: "CACHE_POLICY_MISMATCH",
+          },
+        );
       }
       if (decrypted.needsRotation && rotateOnRead) {
         const rotated = await encryptBuffer(decrypted.plaintext, context);
         if (!Buffer.isBuffer(rotated)) {
-          throw Object.assign(new TypeError("rotation encryptBuffer는 Buffer를 반환해야 합니다."), {
-            code: "CACHE_ROTATION_ENCRYPT_INVALID",
-          });
+          throw Object.assign(
+            new TypeError("rotation encryptBuffer는 Buffer를 반환해야 합니다."),
+            {
+              code: "CACHE_ROTATION_ENCRYPT_INVALID",
+            },
+          );
         }
         atomicWrite(target, rotated, current);
         emitAudit("ROTATE", identity, {
@@ -724,8 +779,7 @@ function createEncryptedHierarchicalCandidatePlannerCache({
     const effectiveTtlMs = persistentTtl(identity, ttlMs);
     const envelope = {
       version: QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_ENTRY_VERSION,
-      policyVersion:
-        QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_POLICY_VERSION,
+      policyVersion: QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_POLICY_VERSION,
       layer: identity.layer,
       artifactType: identity.artifactType,
       tenantDigest: identity.tenantDigest,
@@ -759,7 +813,10 @@ function createEncryptedHierarchicalCandidatePlannerCache({
     };
   }
 
-  async function deleteEntry({ identity, reason = CACHE_INVALIDATION_REASONS.MANUAL_DELETE } = {}) {
+  async function deleteEntry({
+    identity,
+    reason = CACHE_INVALIDATION_REASONS.MANUAL_DELETE,
+  } = {}) {
     validateIdentity(identity);
     memory.delete(memoryKey(identity));
     const removed = removeFile(filePath(identity));
@@ -789,7 +846,8 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
         const fullPath = path.join(current, entry.name);
         if (entry.isDirectory()) walk(fullPath);
-        else if (entry.isFile() && entry.name.endsWith(".enc")) files.push(fullPath);
+        else if (entry.isFile() && entry.name.endsWith(".enc"))
+          files.push(fullPath);
       }
     }
     walk(directory);
@@ -818,10 +876,18 @@ function createEncryptedHierarchicalCandidatePlannerCache({
   function metadataTagsMatch(metadata = {}, tags = {}) {
     const expected = asObject(tags);
     const actual = asObject(metadata.invalidationTags);
-    const entries = Object.entries(expected).filter(([, value]) => normalizeText(value || ""));
-    return entries.length > 0 && entries.every(([key, value]) => {
-      return normalizeText(actual[key] || "").toLowerCase() === normalizeText(value).toLowerCase();
-    });
+    const entries = Object.entries(expected).filter(([, value]) =>
+      normalizeText(value || ""),
+    );
+    return (
+      entries.length > 0 &&
+      entries.every(([key, value]) => {
+        return (
+          normalizeText(actual[key] || "").toLowerCase() ===
+          normalizeText(value).toLowerCase()
+        );
+      })
+    );
   }
 
   async function inspectAndMaybeRemove(target, predicate, reason) {
@@ -830,10 +896,12 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       const { envelope } = await readEnvelopeFromFile(target, pathIdentity);
       const identity = identityFromEnvelope(envelope);
       validateIdentity(identity);
-      if (!predicate(envelope, identity)) return { removed: false, corrupt: false };
+      if (!predicate(envelope, identity))
+        return { removed: false, corrupt: false };
       memory.delete(memoryKey(identity));
       const removed = removeFile(target);
-      if (removed) emitAudit("INVALIDATE", identity, { reason, source: identity.layer });
+      if (removed)
+        emitAudit("INVALIDATE", identity, { reason, source: identity.layer });
       return { removed, corrupt: false };
     } catch (error) {
       const removed = deleteCorrupt ? removeFile(target) : false;
@@ -845,7 +913,11 @@ function createEncryptedHierarchicalCandidatePlannerCache({
     }
   }
 
-  function invalidateTenant({ tenantId, cacheSecret, reason = CACHE_INVALIDATION_REASONS.TENANT_DELETED } = {}) {
+  function invalidateTenant({
+    tenantId,
+    cacheSecret,
+    reason = CACHE_INVALIDATION_REASONS.TENANT_DELETED,
+  } = {}) {
     const tenantDigest = tenantDigestFor({ tenantId, cacheSecret });
     const target = path.join(absoluteRoot, tenantDigest);
     let diskRemoved = false;
@@ -864,7 +936,12 @@ function createEncryptedHierarchicalCandidatePlannerCache({
     return { tenantDigest, diskRemoved, memoryRemoved, reason };
   }
 
-  async function invalidateByTags({ tenantId, cacheSecret, tags, reason = CACHE_INVALIDATION_REASONS.UPLOAD_DELETED } = {}) {
+  async function invalidateByTags({
+    tenantId,
+    cacheSecret,
+    tags,
+    reason = CACHE_INVALIDATION_REASONS.UPLOAD_DELETED,
+  } = {}) {
     const tenantDigest = tenantDigestFor({ tenantId, cacheSecret });
     const tenantRoot = path.join(absoluteRoot, tenantDigest);
     const files = listEncryptedFiles(tenantRoot);
@@ -879,10 +956,22 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       if (result.removed) removed += 1;
       if (result.corrupt) corruptRemoved += 1;
     }
-    return { tenantDigest, scanned: files.length, removed, corruptRemoved, reason };
+    return {
+      tenantDigest,
+      scanned: files.length,
+      removed,
+      corruptRemoved,
+      reason,
+    };
   }
 
-  async function invalidateLayer({ tenantId, cacheSecret, layer, artifactType = "", reason = CACHE_INVALIDATION_REASONS.LAYER_INVALIDATED } = {}) {
+  async function invalidateLayer({
+    tenantId,
+    cacheSecret,
+    layer,
+    artifactType = "",
+    reason = CACHE_INVALIDATION_REASONS.LAYER_INVALIDATED,
+  } = {}) {
     const tenantDigest = tenantDigestFor({ tenantId, cacheSecret });
     const normalizedLayer = validateLayer(layer);
     const normalizedArtifact = normalizeText(artifactType || "");
@@ -899,17 +988,28 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       const pathIdentity = pathIdentityForFile(target);
       removeFile(target);
       memory.delete(memoryKey(pathIdentity));
-      emitAudit("INVALIDATE", pathIdentity, { reason, source: normalizedLayer });
+      emitAudit("INVALIDATE", pathIdentity, {
+        reason,
+        source: normalizedLayer,
+      });
       removed += 1;
     }
-    return { tenantDigest, layer: normalizedLayer, artifactType: normalizedArtifact, removed, reason };
+    return {
+      tenantDigest,
+      layer: normalizedLayer,
+      artifactType: normalizedArtifact,
+      removed,
+      reason,
+    };
   }
 
   async function sweepExpired({ tenantId, cacheSecret } = {}) {
     const tenantDigest = tenantId
       ? tenantDigestFor({ tenantId, cacheSecret })
       : "";
-    const base = tenantDigest ? path.join(absoluteRoot, tenantDigest) : absoluteRoot;
+    const base = tenantDigest
+      ? path.join(absoluteRoot, tenantDigest)
+      : absoluteRoot;
     const files = listEncryptedFiles(base);
     const current = Number(now());
     let expiredRemoved = 0;
@@ -923,13 +1023,17 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       if (result.removed && !result.corrupt) expiredRemoved += 1;
       if (result.corrupt) corruptRemoved += 1;
     }
-    return { scanned: files.length, expiredRemoved, corruptRemoved, tenantDigest };
+    return {
+      scanned: files.length,
+      expiredRemoved,
+      corruptRemoved,
+      tenantDigest,
+    };
   }
 
   return {
     version: QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_VERSION,
-    policyVersion:
-      QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_POLICY_VERSION,
+    policyVersion: QUERY_CANDIDATE_PLANNER_HIERARCHICAL_CACHE_POLICY_VERSION,
     operationalControlVersion:
       QUERY_CANDIDATE_PLANNER_CACHE_OPERATIONAL_CONTROL_VERSION,
     get,
@@ -944,7 +1048,11 @@ function createEncryptedHierarchicalCandidatePlannerCache({
       return filePath(identity);
     },
     stats() {
-      return { memoryEntryCount: memory.size, rootDir: absoluteRoot, activeKeyId: normalizedActiveKeyId };
+      return {
+        memoryEntryCount: memory.size,
+        rootDir: absoluteRoot,
+        activeKeyId: normalizedActiveKeyId,
+      };
     },
   };
 }
@@ -990,7 +1098,9 @@ function createPlannerProviderHierarchicalCacheAdapter({
 
   return {
     async get(cacheKey) {
-      const result = await hierarchicalCache.get({ identity: identityFor(cacheKey) });
+      const result = await hierarchicalCache.get({
+        identity: identityFor(cacheKey),
+      });
       return result.hit ? result.value : null;
     },
     async set(cacheKey, value) {
