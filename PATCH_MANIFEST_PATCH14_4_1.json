@@ -1,0 +1,189 @@
+{
+  "version": "query_candidate_patch14_4_1_manifest_v1",
+  "patch": "Controlled Production Promotion Gate",
+  "createdAt": "2026-08-04T10:52:00Z",
+  "fileCount": 25,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH14_4_1.json",
+      "bytes": 1601,
+      "sha256": "ac574e81e78aaa1725c547ad25b531c466a822f117e6bf86e76b94271d81cb6a"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_4_1_CONTROLLED_PRODUCTION_PROMOTION_GATE.md",
+      "bytes": 6405,
+      "sha256": "e40f5f282d49a19dc0891845d914d73a2e650cce349376675cb08fdffccbb06c"
+    },
+    {
+      "path": "automation/queryCandidatePlannerControlledProductionPromotionGate.js",
+      "bytes": 15746,
+      "sha256": "803e745ab95681b24b25ebefe216adcf9710fd89d237a91f768f38e4e59b7ef6"
+    },
+    {
+      "path": "automation/queryCandidatePlannerControlledProductionPromotionGate.schema.json",
+      "bytes": 4880,
+      "sha256": "d350d9f387ec1dfa081281434c707477dc7cd9b7afba41869d23e40ad57415f3"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1AllowlistSmokeTest.js",
+      "bytes": 1134,
+      "sha256": "596e9a75ca60b21e5aeff5926f5dc23b05096c0a528a587f3605b7a3d5066c1b"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1AudienceModeBlockedSmokeTest.js",
+      "bytes": 848,
+      "sha256": "42f4f5c3c3eee23992e7285ea1b35a83deb14a7b4c254795620d9cfb335f9d2f"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1ConfigurationFailClosedSmokeTest.js",
+      "bytes": 1357,
+      "sha256": "aa01f49bcd4858f7c06f70f9e9b99d0a2963269dec8f2e4703a6d23fab456c6a"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1DecisionContractSmokeTest.js",
+      "bytes": 1434,
+      "sha256": "45b8f367b75ae7edc336b92257ab0559f5bed2646309eee92fc97ec8cb5a1e75"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1DefaultBlockedSmokeTest.js",
+      "bytes": 835,
+      "sha256": "4eac3ec1879be1999f183c14aee2a4e02af3d9b922f3ba575a114203603d3a53"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1GlobalKillSwitchSmokeTest.js",
+      "bytes": 811,
+      "sha256": "5ef1748e4701b076eae14a02dc757a50ef496b1c79196bdc162d0e4cfed15821"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1ManifestSmokeTest.js",
+      "bytes": 2494,
+      "sha256": "bb771ab7f0db38fdeb0ccfa286cd57acab13401d3c2d412f8731b92bb37c044e"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1MergeAdapterIntegrationSmokeTest.js",
+      "bytes": 1375,
+      "sha256": "c33784c352204bf45978c877f27c90598a0e844fd3c1f17a84f3ca3aedf2e398"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1NoMutationSmokeTest.js",
+      "bytes": 1016,
+      "sha256": "2163781134c3ac469d2ecd00c9a25ceafa01fe3b6784c6d98938b3e7f22e4689"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1ProductionKillSwitchSmokeTest.js",
+      "bytes": 841,
+      "sha256": "f44b6007d9e3af947cf250cce53da3a6497e7a90540bd67855c164fdfea49440"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1ReadinessEvidenceSmokeTest.js",
+      "bytes": 838,
+      "sha256": "1fbad044f5f46ceb50c5d6209ca6f6bc5f92c47dcc1a4792b0f58305f64d69a2"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1RolloutAllowlistBypassSmokeTest.js",
+      "bytes": 952,
+      "sha256": "f1f8f773f1775e8f508c2b619df46475044efce33a7632c19f4d226344f9e3fa"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1RolloutBoundarySmokeTest.js",
+      "bytes": 986,
+      "sha256": "a71e37640b8c3570a91586ac016cf95bad35b4b4425efc1e9da4af67fdf40834"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1RolloutDeterminismSmokeTest.js",
+      "bytes": 1294,
+      "sha256": "650fc2e5de849bdd55cd54f9aab7ff2768fae4b603c7d1769199fe85b4e5d9b7"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1RouteIsolationSmokeTest.js",
+      "bytes": 564,
+      "sha256": "9fc699ed45e1f5139bfa3b8fae2bf7a1839e6c6986561e78404df60e67b98dda"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1RuntimeKillSwitchSmokeTest.js",
+      "bytes": 1006,
+      "sha256": "7717af0f18e30bacb57ad2b2727dbd24e759bd332bfd07f107c849bca085e446"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1SchemaSmokeTest.js",
+      "bytes": 975,
+      "sha256": "5d0d232f40e4f14b43017b9e8481c7e34157ff78a3862e6b4545d0853fcf915e"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1SourceIntegritySmokeTest.js",
+      "bytes": 1149,
+      "sha256": "769fdd6042cc206033ed36c77388aa75249c035ea4453f2e738c630d4297068e"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1SubjectPrivacySmokeTest.js",
+      "bytes": 1116,
+      "sha256": "73379785970b141ff484bf204dd8b20fa249f1ed72bf47efd8544585f8e6c71e"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1SubjectRequiredSmokeTest.js",
+      "bytes": 787,
+      "sha256": "dd11bd5bf18c7bb7b808b225a72a4dadfa8ff87108ac982f1ba0680b4c676399"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4_1TestSupport.js",
+      "bytes": 2122,
+      "sha256": "05f790d385599030f84a7d37bd886b01063e86c654b8b6146a11d2d73078cb06"
+    }
+  ],
+  "changeSet": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0,
+    "featureControlFilesChanged": 0,
+    "mergeAdapterFilesChanged": 0,
+    "predecessorManifestFilesChanged": 0,
+    "undeclaredDriftAllowed": false
+  },
+  "authorization": {
+    "defaultDecision": "BLOCK",
+    "gateEnabledDefault": false,
+    "promotionGateImplemented": true,
+    "decisionVersion": "query_candidate_planner_controlled_production_promotion_gate_decision_v1",
+    "featureControlRequired": true,
+    "readinessEvidenceRequired": true,
+    "adapterVersionRequired": "query_candidate_planner_controlled_production_merge_adapter_v1",
+    "failClosed": true
+  },
+  "audience": {
+    "modes": [
+      "BLOCKED",
+      "ALLOWLIST",
+      "ROLLOUT"
+    ],
+    "defaultMode": "BLOCKED",
+    "allowlistUsesSha256Only": true,
+    "allowlistDefaultEmpty": true,
+    "rawIdentityAccepted": false,
+    "rawAllowlistExposed": false
+  },
+  "rollout": {
+    "algorithm": "SHA256_MOD_10000_V1",
+    "defaultPercent": 0,
+    "minimumPercent": 0,
+    "maximumPercent": 100,
+    "stableAssignment": true,
+    "saltRequiredWhenPercentPositive": true,
+    "allowlistBypass": true,
+    "saltExposed": false
+  },
+  "guardrails": {
+    "defaultBlocked": true,
+    "routeWired": false,
+    "controllerWired": false,
+    "primaryResponseAuthority": true,
+    "primaryResponseMutation": false,
+    "responseHeaderMutation": false,
+    "responseStatusMutation": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCalls": 0,
+    "railwayEnvironmentChanged": false,
+    "failClosed": true
+  }
+}
