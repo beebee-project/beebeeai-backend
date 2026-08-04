@@ -1,0 +1,53 @@
+{
+  "version": "query_candidate_patch13_1_manifest_v1",
+  "patch": "Shadow Re-entry Cache Integration",
+  "applicationOrder": "after_patch13",
+  "fileCount": 9,
+  "files": [
+    {
+      "path": "automation/queryCandidatePlannerShadowBridge.js",
+      "bytes": 49409,
+      "sha256": "f887e02d2da9a5b7e3838f5b392790cb53b7dbdcce3c19277f65d05cee0828c7"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1TestSupport.js",
+      "bytes": 3422,
+      "sha256": "76c616dedc4f7d8d19d4292f20bc5c68c682b2099c5a960ea9bcf1e9cfea26b6"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1ShadowReentryCacheIntegrationSmokeTest.js",
+      "bytes": 3405,
+      "sha256": "5e97f120755aef691d4c99cb51dbda7bedfe051221ff7e0da6fbf06cec00d5e2"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1CorruptFallbackSmokeTest.js",
+      "bytes": 1614,
+      "sha256": "b5adbcf552c3f5e3a421335dd32af5eb949a3d2e4b3217f79c498372f2b7deb5"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1PrivacyBoundarySmokeTest.js",
+      "bytes": 1714,
+      "sha256": "bcac7ac94a9bc614daa114b8ec16d1826cd32c538e863625f339998d4241c32a"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1SourceIntegritySmokeTest.js",
+      "bytes": 4316,
+      "sha256": "75025a681e887d0c8be41815e618eaef831728f1f0883af4eff1ff2d7bbbe67a"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1ManifestSmokeTest.js",
+      "bytes": 1208,
+      "sha256": "9dec14c7aa65e7eba89f6f82aa8edc99167eae82b832a20cfbc31950260a2aa2"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH13_1.json",
+      "bytes": 3059,
+      "sha256": "ece35bad4190720dc59303e13c845210bba2d902add34c0e83d60e0bf0406481"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH13_1_SHADOW_REENTRY_CACHE_INTEGRATION.md",
+      "bytes": 8696,
+      "sha256": "265ff0ac0a818a8ac4639bb1044b8667b8db89a193aafb8264661e2c3cfedc3e"
+    }
+  ]
+}

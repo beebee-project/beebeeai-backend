@@ -1,0 +1,91 @@
+{
+  "version": "query_candidate_patch12_1_2_2_validation_v1",
+  "patch": "Historical Shadow Bridge Supersession Completion",
+  "applicationOrder": "after_patch12_1_2_1",
+  "productionCodeChanged": false,
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "rootCause": {
+    "remainingHistoricalManifestFailure": "Patch 12.1 historical manifest did not recognize automation/queryCandidatePlannerShadowBridge.js as a validated superseded artifact in the cumulative repository",
+    "observedFailure": "historical manifest mismatch: automation/queryCandidatePlannerShadowBridge.js",
+    "functionalRegressionObserved": false,
+    "shadowBaseline": "PASS 1/1 differences=0",
+    "plannerBaseline": "PASS 6/6 differences=0",
+    "rankerBaseline": "PASS 6/6 differences=0",
+    "feasibilityBaseline": "PASS 6/6 differences=0",
+    "familyBaseline": "PASS 6/6 differences=0",
+    "resolverBaseline": "PASS 6/6 differences=0",
+    "windowsPowerShellUtf8Verification": "PASS"
+  },
+  "historicalManifestPolicy": {
+    "historicalManifestValuesPreserved": true,
+    "exactValidationForUnchangedArtifacts": true,
+    "supersededFilesMayDriftOnlyWhenExplicitlyListed": true,
+    "patch12_1SupersededPaths": [
+      "automation/queryCandidatePlannerShadowBridge.js"
+    ],
+    "patch12_1_2_1SupersededPaths": [
+      "tests/queryCandidatePatch12_1ManifestSmokeTest.js",
+      "tests/queryCandidatePatch12_1_2_1ManifestSmokeTest.js"
+    ],
+    "currentFileMustExistAndBeNonEmpty": true,
+    "currentShaFormatRequired": true
+  },
+  "bridgeSupersessionPolicy": {
+    "behaviorValidationRequired": true,
+    "mockProviderCallCount": 1,
+    "expectedStatus": "SHADOW_COMPLETED",
+    "expectedInvocationStatus": "CALLED",
+    "expectedAccepted": 2,
+    "expectedResolved": 2,
+    "expectedReady": 2,
+    "expectedRanked": 2,
+    "shadowValidationMustPass": true,
+    "sourceCandidatesMustRemainUnchanged": true,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false
+  },
+  "scope": {
+    "shadowBridgeChangedByThisPatch": false,
+    "resolverSourceChanged": false,
+    "plannerSourceChanged": false,
+    "fixtureDataChanged": false,
+    "historicalManifestRewritten": false,
+    "qaTestsChanged": true,
+    "qaDocumentationAdded": true
+  },
+  "patch13TransitionGate": {
+    "nextPatch": "Patch 13 - Encrypted Hierarchical Cache",
+    "startAfterPatch12_1_2_2Passes": true,
+    "requiredChecks": [
+      "Patch 12.1 source integrity PASS",
+      "Patch 12.1 historical manifest PASS superseded=4 in the cumulative user repository",
+      "Patch 12.1.2 manifest PASS superseded=5",
+      "Patch 12.1.2.1 historical manifest PASS superseded=2",
+      "Patch 12.1.2.2 source integrity and manifest PASS",
+      "Shadow baseline PASS 1/1 differences=0",
+      "Planner Ranker Feasibility Family Resolver PASS 6/6 differences=0"
+    ],
+    "additionalLiveProviderCallRequired": false
+  },
+  "expectedRegression": {
+    "patch12_1SourceIntegrity": "PASS",
+    "patch12_1ManifestUserRepository": "PASS superseded=4",
+    "patch12_1ManifestCleanBuildRepository": "PASS superseded=2, 3, or 4 depending on cumulative superseded artifacts",
+    "patch12_1_1_2SourceIntegrity": "PASS",
+    "patch12_1_1_2Manifest": "PASS",
+    "patch12_1_2Documentation": "PASS",
+    "patch12_1_2Manifest": "PASS superseded=5",
+    "patch12_1_2_1SourceIntegrity": "PASS",
+    "patch12_1_2_1Manifest": "PASS superseded=2",
+    "patch12_1_2_2SourceIntegrity": "PASS",
+    "patch12_1_2_2Manifest": "PASS",
+    "shadowFixture": "PASS 1/1 differences=0",
+    "plannerBaseline": "PASS 6/6 differences=0",
+    "rankerBaseline": "PASS 6/6 differences=0",
+    "feasibilityBaseline": "PASS 6/6 differences=0",
+    "familyBaseline": "PASS 6/6 differences=0",
+    "resolverBaseline": "PASS 6/6 differences=0"
+  }
+}

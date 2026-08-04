@@ -1,0 +1,58 @@
+{
+  "version": "query_candidate_patch13_manifest_v1",
+  "patch": "Encrypted Hierarchical Cache Foundation",
+  "applicationOrder": "after_patch12_1_2_2",
+  "fileCount": 10,
+  "files": [
+    {
+      "path": "automation/queryCandidatePlannerHierarchicalEncryptedCache.js",
+      "bytes": 22257,
+      "sha256": "428b8a09a1b9b4a471d341013998f722690cac4d49ad3499eb5a72172fb8c7e8"
+    },
+    {
+      "path": "automation/queryCandidatePlannerHierarchicalEncryptedCache.schema.json",
+      "bytes": 2533,
+      "sha256": "1e81c7ba98e148a01d9e0b949921eb99eaabb3800586125fad47e2b16d4989c9"
+    },
+    {
+      "path": "tests/queryCandidatePatch13HierarchicalCacheKeySmokeTest.js",
+      "bytes": 2650,
+      "sha256": "9568dd5b436bb8478c2dca2f1b2d8fcc318a8e6d33d8c620a407ce23edc982c6"
+    },
+    {
+      "path": "tests/queryCandidatePatch13EncryptedHierarchySmokeTest.js",
+      "bytes": 4436,
+      "sha256": "fd92c467f62f3fe5365094a66bbe3994233306963470bd031ebececc0be6781e"
+    },
+    {
+      "path": "tests/queryCandidatePatch13CachePolicySmokeTest.js",
+      "bytes": 3570,
+      "sha256": "edf88fdc15fd02e6289ca1531da926a61d0b5047f9c174d3ab1aafcc71f848b3"
+    },
+    {
+      "path": "tests/queryCandidatePatch13PlannerAdapterSmokeTest.js",
+      "bytes": 3810,
+      "sha256": "c8a9fe24228fe5865742a613310d59ac063407988ecda3c250daf5ebe8423b78"
+    },
+    {
+      "path": "tests/queryCandidatePatch13SourceIntegritySmokeTest.js",
+      "bytes": 4149,
+      "sha256": "4091a57f8fc1a4d41c405f46cd9242e70d6e84a41c5b060a00522f6f61d9eed0"
+    },
+    {
+      "path": "tests/queryCandidatePatch13ManifestSmokeTest.js",
+      "bytes": 1212,
+      "sha256": "a7532e53c4086fab9f697ecd7b3ed79fcc1d09385b1bddc88b62434b896e7a60"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH13.json",
+      "bytes": 2332,
+      "sha256": "24eba8e99d44d26eedfd4ebf6e45afc6485c5f91d4ffa92ac737b84ccc3019c3"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH13_ENCRYPTED_HIERARCHICAL_CACHE_FOUNDATION.md",
+      "bytes": 8409,
+      "sha256": "9d13cf0b5c3c71a376203fc8bd570aa52b78d1fd674bd6691315d789fb17b161"
+    }
+  ]
+}

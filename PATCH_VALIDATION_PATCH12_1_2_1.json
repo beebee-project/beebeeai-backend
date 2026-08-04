@@ -1,0 +1,87 @@
+{
+  "version": "query_candidate_patch12_1_2_1_validation_v1",
+  "patch": "Historical Manifest Supersession Restore and Windows PowerShell Node Quoting Fix",
+  "applicationOrder": "after_patch12_1_2",
+  "productionCodeChanged": false,
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "rootCause": {
+    "patch12_1ManifestFailure": "Patch 12.1.2 overwrote the cumulative historical supersession logic and compared automation/queryCandidateResolver.js against the original Patch 12.1 byte size and SHA",
+    "windowsPowerShellNodeFailure": "Windows PowerShell removed JavaScript double quotes from a single-quoted native node -e argument, producing require(fs), utf8, and console.log(PASS syntax corruption",
+    "functionalRegressionObserved": false,
+    "liveProviderIntegration": "SHADOW_COMPLETED CALLED proposed=3 accepted=3 resolved=3 ready=3 ranked=3",
+    "fullDeterministicRegression": "Planner Ranker Feasibility Family Resolver PASS 6/6 differences=0"
+  },
+  "historicalManifestPolicy": {
+    "historicalManifestValuesPreserved": true,
+    "exactValidationForUnchangedArtifacts": true,
+    "supersededFilesMayDrift": true,
+    "patch12_1SupersededPaths": [
+      "README_QUERY_CANDIDATE_PATCH12_1_LIVE_SHADOW_RESOLVER_REENTRY_BRIDGE.md",
+      "tests/queryCandidatePatch12_1ManifestSmokeTest.js"
+    ],
+    "patch12_1_2SupersededPaths": [
+      "README_QUERY_CANDIDATE_PATCH12_1_LIVE_SHADOW_RESOLVER_REENTRY_BRIDGE.md",
+      "tests/queryCandidatePatch12_1ManifestSmokeTest.js",
+      "tests/queryCandidatePatch12_1_2DocumentationSmokeTest.js",
+      "tests/queryCandidatePatch12_1_2ManifestSmokeTest.js",
+      "README_QUERY_CANDIDATE_PATCH12_1_2_LIVE_SHADOW_UTF8_QA_DOCUMENTATION_HOTFIX.md"
+    ],
+    "currentFileMustExistAndBeNonEmpty": true,
+    "currentShaFormatRequired": true
+  },
+  "windowsPowerShellNodePolicy": {
+    "outerPowerShellArgumentQuotes": "double",
+    "innerJavaScriptStringQuotes": "single",
+    "providerOutputArgumentQuoted": true,
+    "hereStringNodeEvalForbidden": true,
+    "singleQuotedNativeNodeEvalForbidden": true,
+    "utf8ReadRequired": true
+  },
+  "scope": {
+    "resolverSourceChanged": false,
+    "plannerSourceChanged": false,
+    "shadowBridgeChanged": false,
+    "fixtureDataChanged": false,
+    "historicalManifestRewritten": false,
+    "qaDocumentationChanged": true,
+    "qaTestsChanged": true
+  },
+  "patch13TransitionGate": {
+    "nextPatch": "Patch 13 - Encrypted Hierarchical Cache",
+    "startAfterPatch12_1_2_1Passes": true,
+    "requiredChecks": [
+      "Patch 12.1 historical manifest PASS with superseded count",
+      "Patch 12.1.2 historical manifest PASS with superseded count",
+      "Patch 12.1.2 documentation smoke PASS",
+      "Patch 12.1.2.1 source integrity and manifest PASS",
+      "Shadow baseline PASS 1/1 differences=0",
+      "Planner Ranker Feasibility Family Resolver PASS 6/6 differences=0"
+    ],
+    "alreadySatisfiedFunctionalPrerequisites": [
+      "Live provider access verified",
+      "Response ID and non-zero token usage verified",
+      "Accepted proposals re-enter Resolver Family Feasibility Ranker",
+      "Production candidate merge remains false",
+      "Production route remains unchanged",
+      "Encrypted planner cache primitive already exists"
+    ],
+    "reasonToWaitForQaClosure": "Cache key and invalidation behavior should be added only after the caller, live response, re-entry chain, and historical QA contracts are stable, so cache failures are not confused with unresolved Patch 12 regressions."
+  },
+  "expectedRegression": {
+    "patch12_1SourceIntegrity": "PASS",
+    "patch12_1Manifest": "PASS superseded=3",
+    "patch12_1_1_2SourceIntegrity": "PASS",
+    "patch12_1_1_2Manifest": "PASS",
+    "patch12_1_2Documentation": "PASS",
+    "patch12_1_2Manifest": "PASS superseded=5",
+    "patch12_1_2_1SourceIntegrity": "PASS",
+    "patch12_1_2_1Manifest": "PASS",
+    "shadowFixture": "PASS 1/1 differences=0",
+    "plannerBaseline": "PASS 6/6 differences=0",
+    "rankerBaseline": "PASS 6/6 differences=0",
+    "feasibilityBaseline": "PASS 6/6 differences=0",
+    "familyBaseline": "PASS 6/6 differences=0",
+    "resolverBaseline": "PASS 6/6 differences=0"
+  }
+}

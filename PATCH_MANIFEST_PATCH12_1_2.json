@@ -1,0 +1,38 @@
+{
+  "version": "query_candidate_patch12_1_2_manifest_v1",
+  "patch": "Live Shadow UTF-8 QA Documentation Hotfix",
+  "applicationOrder": "after_patch12_1_1_2",
+  "fileCount": 6,
+  "files": [
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_LIVE_SHADOW_RESOLVER_REENTRY_BRIDGE.md",
+      "bytes": 11452,
+      "sha256": "6028794c8529a29c885d34ff91834c7c77f1aba03f94f9a45c6131d4447f5eca"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1ManifestSmokeTest.js",
+      "bytes": 1981,
+      "sha256": "47bfc5342ad80df4e8369dbfe80511fea7fa95634c00f4386d5453fe5b62ecea"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2DocumentationSmokeTest.js",
+      "bytes": 2168,
+      "sha256": "474a1889281c64bc30599955b5f1e0f9c79174d365428c903dccb85c4dc4e508"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2ManifestSmokeTest.js",
+      "bytes": 1230,
+      "sha256": "8b2a629af9fd504575968a4803acc339eaf87a256f05d852d7f5349e46826992"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_2.json",
+      "bytes": 1587,
+      "sha256": "4d45b6b34d9229fc5780f12da1819e787b99c62d3da2124c0c6dd2436d07fefc"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_2_LIVE_SHADOW_UTF8_QA_DOCUMENTATION_HOTFIX.md",
+      "bytes": 4360,
+      "sha256": "0d980d508e6934d9a941c839e88f92f93f45413fe2ae0a8a0cacfc5fa26bcf55"
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "version": "query_candidate_patch13_3_validation_v1",
+  "patch": "Live Provider Cache-Hit Parity & Production Readiness Gate",
+  "applicationOrder": "after_patch13_2",
+  "productionRouteChanged": false,
+  "productionPromotionAllowed": false,
+  "baselineRewriteAllowed": false,
+  "plaintextPersistenceAllowed": false,
+  "existingProductionFilesModified": false,
+  "scope": {
+    "liveProviderOriginCalledRequired": true,
+    "persistentReplayCacheHitRequired": true,
+    "observedProviderCallCountExactlyOne": true,
+    "acceptedResolvedReadyRankedParityRequired": true,
+    "l3PlannerResolutionHitRequired": true,
+    "l4ReentryHitRequired": true,
+    "encryptedPersistentArtifactCountMinimum": 3,
+    "plaintextPersistentArtifactCountMaximum": 0,
+    "replaySafeFingerprintEqualityRequired": true,
+    "productionIsolationRequired": true,
+    "failClosedReadinessGateAdded": true,
+    "productionRouteAutoWired": false
+  },
+  "contracts": {
+    "parityAuditVersion": "query_candidate_planner_live_cache_parity_audit_v1",
+    "readinessGateVersion": "query_candidate_planner_production_readiness_gate_v1",
+    "readinessPolicyVersion": "candidate_planner_production_readiness_policy_v1",
+    "eligibleDecision": "ELIGIBLE_FOR_CONTROLLED_PRODUCTION_PROMOTION_REVIEW",
+    "blockedDecision": "NOT_ELIGIBLE"
+  },
+  "liveParity": {
+    "firstInvocation": "CALLED",
+    "secondInvocation": "CACHE_HIT",
+    "secondProviderCallCount": 0,
+    "observedProviderCalls": 1,
+    "originResponseIdRequired": true,
+    "originPositiveTokenUsageRequired": true,
+    "originFailureCodeAllowed": false,
+    "acceptedProposalRequired": true,
+    "newCacheInstanceReplayRequired": true,
+    "plannerResolutionSource": "L3_SEMANTIC",
+    "reentrySource": "L4_REENTRY"
+  },
+  "readinessGate": {
+    "eligibleMeansAutomaticPromotion": false,
+    "manualPromotionReviewRequired": true,
+    "shadowOnlyEvidence": true,
+    "productionCandidateMergeAllowed": false,
+    "productionReadyAssignmentAllowed": false,
+    "productionRouteAutoWired": false,
+    "failClosed": true
+  },
+  "privacy": {
+    "responseIdValueInAudit": false,
+    "tokenUsageValuesInAudit": false,
+    "tenantIdInAudit": false,
+    "originalFileNameInAudit": false,
+    "rawRowsInAudit": false,
+    "sampleValuesInAudit": false,
+    "persistentPathListInAudit": false,
+    "persistentFileCountsOnly": true
+  },
+  "tests": {
+    "mockContractSmokeCount": 2,
+    "sourceIntegritySmokeCount": 1,
+    "manifestSmokeCount": 1,
+    "optionalLiveProviderSmokeCount": 1,
+    "liveProviderEnvironmentFlag": "QUERY_CANDIDATE_PLANNER_LIVE_CACHE_PARITY=1",
+    "liveProviderExpectedCalls": 1,
+    "baselineCompareMode": "compare_only"
+  },
+  "localVerification": {
+    "mockReadinessGate": "PASS",
+    "mockFailClosedGate": "PASS",
+    "sourceIntegrity": "PASS",
+    "patch13_2Regression": "PASS",
+    "patch13_1Regression": "PASS",
+    "patch13Regression": "PASS",
+    "shadowCapture": "PASS 1/1 differences=0",
+    "actualOpenAILiveParity": "USER_ENVIRONMENT_REQUIRED"
+  }
+}

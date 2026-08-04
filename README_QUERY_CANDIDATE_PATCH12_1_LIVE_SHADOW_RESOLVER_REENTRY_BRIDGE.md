@@ -207,7 +207,7 @@ $env:QUERY_CANDIDATE_PLANNER_LIVE_SHADOW = "1"
 $env:OPENAI_API_KEY = "실제_API_키"
 
 # 배포 환경에서 사용 가능한 Responses API 모델로 명시
-$env:QUERY_CANDIDATE_PLANNER_MODEL = "현재_사용_모델"
+$env:QUERY_CANDIDATE_PLANNER_MODEL = "gpt-5.6-terra"
 $env:QUERY_CANDIDATE_PLANNER_REASONING_EFFORT = "low"
 
 node .\tests\queryCandidatePlannerLiveShadowSmokeTest.js
@@ -219,6 +219,89 @@ proposal까지 반드시 확인할 때:
 $env:QUERY_CANDIDATE_PLANNER_LIVE_SHADOW_REQUIRE_PROPOSAL = "1"
 node .\tests\queryCandidatePlannerLiveShadowSmokeTest.js
 ```
+
+## Live Shadow 결과 JSON 검증 — UTF-8 필수
+
+Windows PowerShell을 포함한 실행 환경에서 한국어가 포함된 JSON을 기본 인코딩으로 읽으면 문자열이 깨지고 `ConvertFrom-Json`이 실패할 수 있습니다. 결과 파일은 항상 UTF-8로 명시해 읽습니다.
+
+```powershell
+$providerOutput = Join-Path `
+  $PWD `
+  "tests\fixtures\query-candidate-planner-shadow\call_required_group_avg_time_count\candidate-planner-live-shadow-resolution.provider.json"
+
+$env:QUERY_CANDIDATE_PLANNER_LIVE_SHADOW_OUTPUT = $providerOutput
+
+node .\tests\queryCandidatePlannerLiveShadowSmokeTest.js
+
+if ($LASTEXITCODE -ne 0) {
+  throw "Live Shadow 테스트 프로세스 실패: exitCode=$LASTEXITCODE"
+}
+
+if (-not (Test-Path $providerOutput)) {
+  throw "Provider 결과 파일이 생성되지 않았습니다: $providerOutput"
+}
+
+$result = Get-Content `
+  $providerOutput `
+  -Raw `
+  -Encoding UTF8 |
+  ConvertFrom-Json
+```
+
+Provider와 Resolver Re-entry 결과를 확인합니다.
+
+```powershell
+[pscustomobject]@{
+  Status                   = $result.status
+  InvocationStatus         = $result.plannerResolution.invocation.status
+  ProviderCalls            = $result.plannerResolution.invocation.providerCallCount
+  Model                    = $result.plannerResolution.invocation.model
+  ResponseId               = $result.plannerResolution.invocation.responseId
+  FailureCode              = $result.plannerResolution.invocation.failureCode
+  TotalTokens              = $result.plannerResolution.usage.totalTokens
+  Proposed                 = $result.plannerResolution.counts.proposed
+  Accepted                 = $result.counts.accepted
+  Resolved                 = $result.counts.resolved
+  Ready                    = $result.counts.ready
+  Ranked                   = $result.counts.ranked
+  ProductionCandidateMerge = $result.integrity.productionCandidateMerge
+  ProductionRouteChanged   = $result.integrity.productionRouteChanged
+} | Format-List
+```
+
+Node.js에서도 같은 파일을 UTF-8 JSON으로 검증할 때는 PowerShell here-string을 `node -e`에 직접 붙이지 않고 다음 한 줄 명령을 사용합니다.
+
+```powershell
+node -e "const fs=require('fs'); const filePath=process.argv[1]; const result=JSON.parse(fs.readFileSync(filePath,'utf8')); console.log({status:result.status, invocationStatus:result.plannerResolution?.invocation?.status, responseId:result.plannerResolution?.invocation?.responseId, accepted:result.counts?.accepted, resolved:result.counts?.resolved, ready:result.counts?.ready, ranked:result.counts?.ranked, productionCandidateMerge:result.integrity?.productionCandidateMerge, productionRouteChanged:result.integrity?.productionRouteChanged}); console.log('PASS Node UTF-8 JSON parse');" "$providerOutput"
+```
+
+다음 형태는 PowerShell과 `node -e` 사이의 따옴표 처리로 JavaScript 문자열이 손상될 수 있으므로 사용하지 않습니다.
+
+```powershell
+# 사용 금지
+node -e @'
+...
+'@ $providerOutput
+```
+
+실제 Provider 통합 성공 기준:
+
+```text
+Status                   SHADOW_COMPLETED
+InvocationStatus         CALLED
+ProviderCalls            1
+ResponseId               resp_...
+FailureCode              빈 값
+TotalTokens              1 이상
+Accepted                 1 이상
+Resolved                 Accepted와 동일
+Ready                    Accepted와 동일
+Ranked                   Accepted와 동일
+ProductionCandidateMerge false
+ProductionRouteChanged   false
+```
+
+`FAILED_SAFE`, 빈 `ResponseId`, `TotalTokens = 0`인 경우에는 Provider 성공으로 판정하지 않습니다. `Write-Host "PASS ..."`는 모든 조건 검사가 끝난 뒤에만 출력합니다.
 
 실행 후 환경변수 제거:
 

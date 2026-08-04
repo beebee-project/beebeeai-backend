@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_production_readiness_gate.schema.json",
+  "title": "BeeBee AI Candidate Planner Live Cache Parity and Production Readiness",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "valid",
+        "errorCount",
+        "errors",
+        "originInvocation",
+        "replayInvocation",
+        "originProviderCallCount",
+        "replayProviderCallCount",
+        "observedProviderCallCount",
+        "originResponseIdPresent",
+        "originTokenUsagePositive",
+        "originFailureCodePresent",
+        "originCounts",
+        "replayCounts",
+        "cacheSources",
+        "persistentFiles",
+        "checks",
+        "replayAuditSha256",
+        "originFingerprintSha256",
+        "replayFingerprintSha256",
+        "productionIsolation",
+        "responseIdIncluded",
+        "tokenUsageValuesIncluded",
+        "plaintextIdentifiersIncluded",
+        "auditSha256"
+      ],
+      "properties": {
+        "version": {
+          "const": "query_candidate_planner_live_cache_parity_audit_v1"
+        },
+        "valid": { "type": "boolean" },
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "errors": { "type": "array" },
+        "originInvocation": { "type": "string" },
+        "replayInvocation": { "type": "string" },
+        "originProviderCallCount": { "type": "integer", "minimum": 0 },
+        "replayProviderCallCount": { "type": "integer", "minimum": 0 },
+        "observedProviderCallCount": { "type": "integer", "minimum": 0 },
+        "originResponseIdPresent": { "type": "boolean" },
+        "originTokenUsagePositive": { "type": "boolean" },
+        "originFailureCodePresent": { "type": "boolean" },
+        "originCounts": { "$ref": "#/$defs/counts" },
+        "replayCounts": { "$ref": "#/$defs/counts" },
+        "cacheSources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plannerResolution", "reentry"],
+          "properties": {
+            "plannerResolution": { "type": "string" },
+            "reentry": { "type": "string" }
+          }
+        },
+        "persistentFiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "totalFileCount",
+            "encryptedFileCount",
+            "plaintextFileCount",
+            "encryptedOnly"
+          ],
+          "properties": {
+            "totalFileCount": { "type": "integer", "minimum": 0 },
+            "encryptedFileCount": { "type": "integer", "minimum": 0 },
+            "plaintextFileCount": { "type": "integer", "minimum": 0 },
+            "encryptedOnly": { "type": "boolean" }
+          }
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "liveProviderVerified",
+            "persistentCacheHitVerified",
+            "countsParityVerified",
+            "replaySafeVerified",
+            "encryptedPersistenceVerified",
+            "privacyBoundaryVerified",
+            "productionIsolationVerified"
+          ],
+          "properties": {
+            "liveProviderVerified": { "type": "boolean" },
+            "persistentCacheHitVerified": { "type": "boolean" },
+            "countsParityVerified": { "type": "boolean" },
+            "replaySafeVerified": { "type": "boolean" },
+            "encryptedPersistenceVerified": { "type": "boolean" },
+            "privacyBoundaryVerified": { "type": "boolean" },
+            "productionIsolationVerified": { "type": "boolean" }
+          }
+        },
+        "replayAuditSha256": { "$ref": "#/$defs/sha256" },
+        "originFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "replayFingerprintSha256": { "$ref": "#/$defs/sha256" },
+        "productionIsolation": { "$ref": "#/$defs/productionIsolation" },
+        "responseIdIncluded": { "const": false },
+        "tokenUsageValuesIncluded": { "const": false },
+        "plaintextIdentifiersIncluded": { "const": false },
+        "auditSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "policyVersion",
+        "eligible",
+        "decision",
+        "blockingReasonCount",
+        "blockingReasons",
+        "checks",
+        "evidence",
+        "guardrails",
+        "privacy",
+        "gateSha256"
+      ],
+      "properties": {
+        "version": {
+          "const": "query_candidate_planner_production_readiness_gate_v1"
+        },
+        "policyVersion": {
+          "const": "candidate_planner_production_readiness_policy_v1"
+        },
+        "eligible": { "type": "boolean" },
+        "decision": {
+          "enum": [
+            "ELIGIBLE_FOR_CONTROLLED_PRODUCTION_PROMOTION_REVIEW",
+            "NOT_ELIGIBLE"
+          ]
+        },
+        "blockingReasonCount": { "type": "integer", "minimum": 0 },
+        "blockingReasons": { "type": "array", "items": { "type": "string" } },
+        "checks": { "type": "object" },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "parityAuditSha256",
+            "replayAuditSha256",
+            "originFingerprintSha256",
+            "replayFingerprintSha256",
+            "encryptedPersistentFileCount"
+          ],
+          "properties": {
+            "parityAuditSha256": { "$ref": "#/$defs/sha256OrEmpty" },
+            "replayAuditSha256": { "$ref": "#/$defs/sha256OrEmpty" },
+            "originFingerprintSha256": { "$ref": "#/$defs/sha256OrEmpty" },
+            "replayFingerprintSha256": { "$ref": "#/$defs/sha256OrEmpty" },
+            "encryptedPersistentFileCount": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "guardrails": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "shadowOnlyEvidence",
+            "productionPromotionAllowed",
+            "productionRouteAutoWired",
+            "productionCandidateMergeAllowed",
+            "productionReadyAssignmentAllowed",
+            "manualPromotionReviewRequired",
+            "failClosed"
+          ],
+          "properties": {
+            "shadowOnlyEvidence": { "const": true },
+            "productionPromotionAllowed": { "const": false },
+            "productionRouteAutoWired": { "const": false },
+            "productionCandidateMergeAllowed": { "const": false },
+            "productionReadyAssignmentAllowed": { "const": false },
+            "manualPromotionReviewRequired": { "const": true },
+            "failClosed": { "const": true }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "responseIdIncluded",
+            "tokenUsageValuesIncluded",
+            "originalFileNameIncluded",
+            "tenantIdIncluded",
+            "rawRowsIncluded",
+            "sampleValuesIncluded"
+          ],
+          "properties": {
+            "responseIdIncluded": { "const": false },
+            "tokenUsageValuesIncluded": { "const": false },
+            "originalFileNameIncluded": { "const": false },
+            "tenantIdIncluded": { "const": false },
+            "rawRowsIncluded": { "const": false },
+            "sampleValuesIncluded": { "const": false }
+          }
+        },
+        "gateSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sha256OrEmpty": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "resolved", "ready", "ranked"],
+      "properties": {
+        "accepted": { "type": "integer", "minimum": 0 },
+        "resolved": { "type": "integer", "minimum": 0 },
+        "ready": { "type": "integer", "minimum": 0 },
+        "ranked": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "productionIsolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "productionCandidateMerge",
+        "productionReadyAssignment",
+        "productionRouteChanged"
+      ],
+      "properties": {
+        "productionCandidateMerge": { "const": false },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false }
+      }
+    }
+  }
+}

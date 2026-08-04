@@ -1,0 +1,83 @@
+{
+  "version": "query_candidate_patch13_2_manifest_v1",
+  "patch": "Cache TTL, Invalidation, Rotation & Replay-Safe Audit",
+  "applicationOrder": "after_patch13_1",
+  "fileCount": 15,
+  "files": [
+    {
+      "path": "automation/queryCandidatePlannerHierarchicalEncryptedCache.js",
+      "bytes": 35173,
+      "sha256": "339b6659f45734e87f7fce70678c522988d268d6fed5d4107daa55923d1df58f"
+    },
+    {
+      "path": "automation/queryCandidatePlannerCacheOperationalControls.js",
+      "bytes": 8870,
+      "sha256": "0c01aae8094fed7a5801400b7e9ffc1532cd58880f2e7027d585ad2c814ead85"
+    },
+    {
+      "path": "automation/queryCandidatePlannerCacheOperationalControls.schema.json",
+      "bytes": 2922,
+      "sha256": "01c2aa259f192190583dd7432b8257a3380bdca9a72b8fe9415722a85c772375"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowBridge.js",
+      "bytes": 50135,
+      "sha256": "8330562c39b54c074260ad42ed9074114493e30070230768b7ca04f8db8756cf"
+    },
+    {
+      "path": "tests/queryCandidatePatch13ManifestSmokeTest.js",
+      "bytes": 1553,
+      "sha256": "adcda4e0c87ae60a6401448df5f37151b031db330984059a33345f7a3602a06a"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_1ManifestSmokeTest.js",
+      "bytes": 1537,
+      "sha256": "a65964ca327a11e51900c734edfdbd1640b93b14dc6d5707b4b59a67631ca261"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2TtlSweepAuditSmokeTest.js",
+      "bytes": 3322,
+      "sha256": "06c1f23ea50b4aa2cbf090554831137ee95095bf9060bcc60cdd1fd8fdb1f10d"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2UploadInvalidationSmokeTest.js",
+      "bytes": 4414,
+      "sha256": "27b94eb471d045fdb27c193199a3b221554a4c39f098c1fa7cf7448f6c0e9e4a"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2KeyRotationSmokeTest.js",
+      "bytes": 3236,
+      "sha256": "f7d233f8616e6b05af6837ca9108fcedcec1fb911d107122125058b54050b083"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2ReplaySafeAuditSmokeTest.js",
+      "bytes": 2847,
+      "sha256": "60c8c46d0a620c590b3354550b58bf846047906ea9cb36b15b7a482a0b473d51"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2ShadowUploadDeletionBridgeSmokeTest.js",
+      "bytes": 2190,
+      "sha256": "f08cd762805abc8439bd410d1f00062d30af2d13eb0c145bd5db869eb03a45ba"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2SourceIntegritySmokeTest.js",
+      "bytes": 3719,
+      "sha256": "b39bc7e1ee9e68fc6c9dc6861edfc8623183ca533478b45fb83f0a240a615d9c"
+    },
+    {
+      "path": "tests/queryCandidatePatch13_2ManifestSmokeTest.js",
+      "bytes": 1237,
+      "sha256": "21c95947e1a307e2ff107ab21bfc62a9f610ee5eac9cf22e82acd41dd9b609bb"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH13_2.json",
+      "bytes": 3480,
+      "sha256": "8bf0fcdbf87a57a6af1f186873cff4dce164c006b92d4c815e0f6581aa3ce060"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH13_2_CACHE_TTL_INVALIDATION_ROTATION_REPLAY_SAFE_AUDIT.md",
+      "bytes": 9526,
+      "sha256": "f2990ecc2d444caafa07cd8b1fac979c482d9b5bd341854016efbf291c6b9be9"
+    }
+  ]
+}

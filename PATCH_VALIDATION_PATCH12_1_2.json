@@ -1,0 +1,44 @@
+{
+  "version": "query_candidate_patch12_1_2_validation_v1",
+  "patch": "Live Shadow UTF-8 QA Documentation Hotfix",
+  "applicationOrder": "after_patch12_1_1_2",
+  "productionCodeChanged": false,
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "rootCause": {
+    "providerCall": "PASS",
+    "shadowStatus": "SHADOW_COMPLETED",
+    "accepted": 3,
+    "resolved": 3,
+    "ready": 3,
+    "ranked": 3,
+    "powerShellFailure": "Get-Content without explicit UTF-8 decoding corrupted Korean JSON text before ConvertFrom-Json",
+    "nodeFailure": "PowerShell here-string quoting damaged the JavaScript passed to node -e"
+  },
+  "documentationPolicy": {
+    "powerShellJsonEncoding": "UTF8_REQUIRED",
+    "nodeJsonEncoding": "utf8",
+    "nodeExecutionForm": "SINGLE_LINE_NODE_E",
+    "powerShellHereStringNodeEAllowed": false,
+    "manualPassOutputBeforeAssertionsAllowed": false
+  },
+  "scope": {
+    "bridgeReadmeChanged": true,
+    "historicalPatch12_1ManifestTestChanged": true,
+    "documentationTestAdded": true,
+    "productionSourceChanged": false,
+    "fixtureChanged": false,
+    "baselineChanged": false
+  },
+  "expectedRegression": {
+    "patch12_1HistoricalManifest": "PASS superseded=2",
+    "documentationSmoke": "PASS",
+    "patch12_1_2Manifest": "PASS",
+    "shadowBaseline": "PASS 1/1 differences=0",
+    "plannerBaseline": "PASS 6/6 differences=0",
+    "rankerBaseline": "PASS 6/6 differences=0",
+    "feasibilityBaseline": "PASS 6/6 differences=0",
+    "familyBaseline": "PASS 6/6 differences=0",
+    "resolverBaseline": "PASS 6/6 differences=0"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_cache_operational_controls.schema.json",
+  "title": "BeeBee AI Candidate Planner Cache Operational Audit",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "valid",
+        "errorCount",
+        "errors",
+        "originInvocation",
+        "replayInvocation",
+        "replayProviderCallCount",
+        "originFingerprintSha256",
+        "replayFingerprintSha256",
+        "productionIsolation",
+        "auditSha256"
+      ],
+      "properties": {
+        "version": {
+          "const": "query_candidate_planner_cache_replay_audit_v1"
+        },
+        "valid": { "type": "boolean" },
+        "errorCount": { "type": "integer", "minimum": 0 },
+        "errors": { "type": "array" },
+        "originInvocation": { "type": "string" },
+        "replayInvocation": { "type": "string" },
+        "replayProviderCallCount": { "type": "integer", "minimum": 0 },
+        "originFingerprintSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "replayFingerprintSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "productionIsolation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "productionCandidateMerge",
+            "productionReadyAssignment",
+            "productionRouteChanged"
+          ],
+          "properties": {
+            "productionCandidateMerge": { "const": false },
+            "productionReadyAssignment": { "const": false },
+            "productionRouteChanged": { "const": false }
+          }
+        },
+        "auditSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "reason",
+        "tenantDigest",
+        "tagDigestSha256",
+        "scanned",
+        "removed",
+        "corruptRemoved",
+        "plaintextIdentifiersIncluded",
+        "invalidationSha256"
+      ],
+      "properties": {
+        "version": {
+          "const": "query_candidate_planner_upload_invalidation_v1"
+        },
+        "reason": { "const": "UPLOAD_DELETED" },
+        "tenantDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "tagDigestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "scanned": { "type": "integer", "minimum": 0 },
+        "removed": { "type": "integer", "minimum": 0 },
+        "corruptRemoved": { "type": "integer", "minimum": 0 },
+        "plaintextIdentifiersIncluded": { "const": false },
+        "invalidationSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  ]
+}

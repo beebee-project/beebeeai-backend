@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_hierarchical_encrypted_cache.schema.json",
+  "title": "BeeBee AI Candidate Planner Hierarchical Encrypted Cache Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "policyVersion",
+    "layer",
+    "artifactType",
+    "tenantDigest",
+    "keyDigest",
+    "materialSha256",
+    "createdAt",
+    "expiresAt",
+    "payloadSha256",
+    "metadata",
+    "payload"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_hierarchical_cache_entry_v1"
+    },
+    "policyVersion": {
+      "const": "encrypted_hierarchical_candidate_planner_cache_policy_v1"
+    },
+    "layer": {
+      "enum": ["L2_UPLOAD", "L3_SEMANTIC", "L4_REENTRY"]
+    },
+    "artifactType": {
+      "enum": [
+        "UPLOAD_QUERY",
+        "PLANNER_PROVIDER_RESULT",
+        "PLANNER_RESOLUTION",
+        "SHADOW_REENTRY"
+      ]
+    },
+    "tenantDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "keyDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "materialSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "createdAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expiresAt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "payloadSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "cacheable",
+        "validationValid",
+        "outcomeStatus",
+        "failureCode",
+        "privacy"
+      ],
+      "properties": {
+        "cacheable": { "const": true },
+        "validationValid": { "const": true },
+        "outcomeStatus": {
+          "enum": ["CALLED", "CACHE_HIT", "VALIDATED", "READY", "SHADOW_COMPLETED"]
+        },
+        "failureCode": { "const": "" },
+        "privacy": {
+          "type": "object",
+          "properties": {
+            "rawRowsIncluded": { "const": false },
+            "sampleValuesIncluded": { "const": false },
+            "originalFileIncluded": { "const": false },
+            "fileNameIncluded": { "const": false },
+            "rawRowsSent": { "const": false },
+            "sampleValuesSent": { "const": false },
+            "originalFileSent": { "const": false },
+            "fileNameSent": { "const": false }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "payload": {}
+  }
+}

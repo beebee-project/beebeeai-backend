@@ -1,0 +1,63 @@
+{
+  "version": "query_candidate_patch13_validation_v1",
+  "patch": "Encrypted Hierarchical Cache Foundation",
+  "applicationOrder": "after_patch12_1_2_2",
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "plaintextPersistenceAllowed": false,
+  "existingProductionFilesModified": false,
+  "scope": {
+    "hierarchicalCacheContractAdded": true,
+    "deterministicHmacKeyAdded": true,
+    "l1MemoryLayerAdded": true,
+    "l2UploadEncryptedLayerAdded": true,
+    "l3SemanticEncryptedLayerAdded": true,
+    "l4ReentryEncryptedLayerAdded": true,
+    "aes256GcmCodecAdded": true,
+    "plannerLegacyCacheAdapterAdded": true,
+    "ttlAndInvalidationAdded": true,
+    "corruptEntryFailSafeAdded": true,
+    "failureResultCachingBlocked": true,
+    "productionPlannerAutoWired": false,
+    "productionShadowBridgeAutoWired": false
+  },
+  "contracts": {
+    "cacheVersion": "query_candidate_planner_hierarchical_cache_v1",
+    "keyVersion": "query_candidate_planner_hierarchical_cache_key_v1",
+    "entryVersion": "query_candidate_planner_hierarchical_cache_entry_v1",
+    "policyVersion": "encrypted_hierarchical_candidate_planner_cache_policy_v1",
+    "layers": ["L1_MEMORY", "L2_UPLOAD", "L3_SEMANTIC", "L4_REENTRY"],
+    "persistentExtension": ".enc"
+  },
+  "security": {
+    "tenantIdPersistedInPath": false,
+    "tenantDirectoryUsesHmacDigest": true,
+    "cacheKeyUsesHmacSha256": true,
+    "encryption": "AES-256-GCM",
+    "aadBindsLayerArtifactTenantAndKey": true,
+    "atomicEncryptedWrite": true,
+    "plaintextTempFile": false,
+    "failedSafeCached": false,
+    "failureCodeCached": false,
+    "privacyBoundaryRequired": true
+  },
+  "integration": {
+    "existingRunConditionalCandidatePlannerCompatible": true,
+    "adapterLayer": "L3_SEMANTIC",
+    "firstInvocationExpected": "CALLED",
+    "secondInvocationExpected": "CACHE_HIT",
+    "crossInstanceEncryptedHitExpected": true,
+    "providerCallCountExpected": 1
+  },
+  "nextPatch": {
+    "name": "Patch 13.1 - Shadow Re-entry Cache Integration",
+    "requiredBeforeProductionPromotion": true,
+    "goals": [
+      "wire validated planner resolution to L3",
+      "wire validated shadow re-entry artifact to L4",
+      "verify CALLED then CACHE_HIT parity",
+      "keep productionCandidateMerge false",
+      "keep productionRouteChanged false"
+    ]
+  }
+}

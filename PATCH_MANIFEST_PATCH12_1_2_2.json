@@ -1,0 +1,38 @@
+{
+  "version": "query_candidate_patch12_1_2_2_manifest_v1",
+  "patch": "Historical Shadow Bridge Supersession Completion",
+  "applicationOrder": "after_patch12_1_2_1",
+  "fileCount": 6,
+  "files": [
+    {
+      "path": "tests/queryCandidatePatch12_1ManifestSmokeTest.js",
+      "bytes": 3143,
+      "sha256": "5d7014ed907e404b42a6c30da55ff2998e9332d429c2bc6161488385ab860eba"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2_1ManifestSmokeTest.js",
+      "bytes": 2084,
+      "sha256": "fec70384a038df70ea07ced7fd115c0035ad814d29c23f91d9334b323874bac0"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2_2SourceIntegritySmokeTest.js",
+      "bytes": 3900,
+      "sha256": "752cfb6271f351d9645f4e4ea478e8820ce9488f7873a15768f0aacbc151db4e"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2_2ManifestSmokeTest.js",
+      "bytes": 1252,
+      "sha256": "2caa75a1df57770bb60c18781c0132b1a7286a745201b377687c8faf5115756e"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_2_2.json",
+      "bytes": 3835,
+      "sha256": "33d7c0fbe99c0c51cf247cba20293e9a9081c6a7c71b82ac43624135d57464eb"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_2_2_HISTORICAL_SHADOW_BRIDGE_SUPERSESSION_COMPLETION.md",
+      "bytes": 5590,
+      "sha256": "dfe8d0bfbc54f4013acaefdb45932904acf58f28af1987cf45f4a6ca3e4d1406"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "version": "query_candidate_patch13_2_validation_v1",
+  "patch": "Cache TTL, Invalidation, Rotation & Replay-Safe Audit",
+  "applicationOrder": "after_patch13_1",
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "plaintextPersistenceAllowed": false,
+  "existingProductionFilesModified": true,
+  "modifiedProductionFiles": [
+    "automation/queryCandidatePlannerHierarchicalEncryptedCache.js",
+    "automation/queryCandidatePlannerShadowBridge.js"
+  ],
+  "scope": {
+    "ttlReadExpirationAuditAdded": true,
+    "explicitExpiredSweepAdded": true,
+    "uploadDeletionInvalidationAdded": true,
+    "layerInvalidationAdded": true,
+    "tenantInvalidationReasonAdded": true,
+    "aesKeyRingRotationAdded": true,
+    "readTimeReencryptionAdded": true,
+    "contractVersionRotationProbeAdded": true,
+    "replaySafeShadowAuditAdded": true,
+    "shadowCacheInvalidationTagsAdded": true,
+    "productionRouteAutoWired": false
+  },
+  "contracts": {
+    "operationalControlVersion": "query_candidate_planner_cache_operational_control_v1",
+    "auditEventVersion": "query_candidate_planner_cache_audit_event_v1",
+    "replayAuditVersion": "query_candidate_planner_cache_replay_audit_v1",
+    "uploadInvalidationVersion": "query_candidate_planner_upload_invalidation_v1",
+    "persistentExtension": ".enc",
+    "rotationMode": "primary_encrypt_legacy_decrypt_reencrypt_on_read"
+  },
+  "ttl": {
+    "expiredReadReturnsMiss": true,
+    "expiredFileDeleted": true,
+    "explicitSweepSupported": true,
+    "expiredReason": "TTL_EXPIRED",
+    "payloadExcludedFromAudit": true
+  },
+  "invalidation": {
+    "tenantDeletionSupported": true,
+    "uploadFingerprintSha256Supported": true,
+    "queryJsonSha256Supported": true,
+    "layerAndArtifactInvalidationSupported": true,
+    "uploadDeletionReason": "UPLOAD_DELETED",
+    "plaintextUploadIdentifierPersisted": false,
+    "shadowProviderPlannerAndReentryEntriesTagged": true
+  },
+  "rotation": {
+    "primaryKeyWrites": true,
+    "legacyKeyReads": true,
+    "legacyReadReencryptedWithPrimary": true,
+    "unknownLegacyKeyFailsSafe": true,
+    "modelPromptSchemaPolicyAndEpochChangeKeyDigest": true
+  },
+  "replayAudit": {
+    "requiresShadowCompleted": true,
+    "requiresReplayCacheHit": true,
+    "requiresReplayProviderCallCountZero": true,
+    "proposalItemHashesCompared": true,
+    "resolverFamilyFeasibilityRankerHashesCompared": true,
+    "responseIdExcluded": true,
+    "tokenUsageExcluded": true,
+    "productionIsolationRequired": true
+  },
+  "security": {
+    "persistentFilesEncryptedOnly": true,
+    "rawRowsInAudit": false,
+    "sampleValuesInAudit": false,
+    "originalFileNameInAudit": false,
+    "tenantIdInAudit": false,
+    "auditSinkFailureBreaksCache": false,
+    "corruptEntryDeleted": true,
+    "failedSafeCached": false
+  },
+  "historicalManifest": {
+    "patch13SupersededCount": 2,
+    "patch13_1SupersededCount": 2,
+    "otherHistoricalFilesRemainExact": true
+  },
+  "tests": {
+    "newSmokeTestCount": 7,
+    "liveProviderRequired": false,
+    "baselineCompareMode": "compare_only"
+  },
+  "nextPatch": {
+    "name": "Patch 13.3 - Operational Metrics, Retention Budget & Cache Promotion Eligibility",
+    "productionPromotionAllowed": false,
+    "goals": [
+      "add bounded operational counters without payload logging",
+      "add storage retention and size budgets",
+      "add shadow cache promotion eligibility gate",
+      "keep production merge and route changes disabled"
+    ]
+  }
+}

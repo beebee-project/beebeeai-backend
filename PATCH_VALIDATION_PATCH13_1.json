@@ -1,0 +1,82 @@
+{
+  "version": "query_candidate_patch13_1_validation_v1",
+  "patch": "Shadow Re-entry Cache Integration",
+  "applicationOrder": "after_patch13",
+  "productionRouteChanged": false,
+  "baselineRewriteAllowed": false,
+  "plaintextPersistenceAllowed": false,
+  "existingProductionFilesModified": true,
+  "modifiedProductionFiles": [
+    "automation/queryCandidatePlannerShadowBridge.js"
+  ],
+  "scope": {
+    "shadowBridgeHierarchicalCacheOptInAdded": true,
+    "productionRouteAutoWired": false,
+    "legacyShadowPathPreserved": true,
+    "plannerProviderResultL3CacheReused": true,
+    "validatedPlannerResolutionL3CacheAdded": true,
+    "validatedShadowReentryL4CacheAdded": true,
+    "crossProcessEncryptedCacheHitAdded": true,
+    "corruptL4DeterministicFallbackAdded": true,
+    "canonicalProposalSetReentrySourceAdded": true,
+    "directPlannerReadyAssignmentAllowed": false
+  },
+  "contracts": {
+    "integrationVersion": "query_candidate_planner_shadow_cache_integration_v1",
+    "reentryArtifactVersion": "query_candidate_planner_shadow_reentry_cache_artifact_v1",
+    "policyVersion": "encrypted_shadow_reentry_cache_policy_v1",
+    "plannerLayer": "L3_SEMANTIC",
+    "reentryLayer": "L4_REENTRY",
+    "plannerArtifactType": "PLANNER_RESOLUTION",
+    "reentryArtifactType": "SHADOW_REENTRY"
+  },
+  "execution": {
+    "firstInvocation": "CALLED",
+    "sameProcessSecondInvocation": "CACHE_HIT",
+    "crossInstanceThirdInvocation": "CACHE_HIT",
+    "providerCallCount": 1,
+    "sameProcessPlannerResolutionSource": "L1_MEMORY",
+    "sameProcessReentrySource": "L1_MEMORY",
+    "crossInstancePlannerResolutionSource": "L3_SEMANTIC",
+    "crossInstanceReentrySource": "L4_REENTRY",
+    "proposalAndDeterministicHashesStable": true
+  },
+  "security": {
+    "persistentFilesEncryptedOnly": true,
+    "persistentExtension": ".enc",
+    "fileNamePersisted": false,
+    "sampleValuesPersisted": false,
+    "rawRowsPersisted": false,
+    "originalFilePersisted": false,
+    "failedSafeCached": false,
+    "partialReentryCached": false,
+    "corruptEntryDeleted": true,
+    "corruptEntryFallsBackToDeterministicReentry": true
+  },
+  "integrity": {
+    "cachedPlannerResolutionValidated": true,
+    "cachedReentryArtifactValidated": true,
+    "resolverValidationRerunOnCacheRead": true,
+    "familyValidationRerunOnCacheRead": true,
+    "feasibilityValidationRerunOnCacheRead": true,
+    "rankingValidationRerunOnCacheRead": true,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false
+  },
+  "tests": {
+    "newSmokeTestCount": 5,
+    "liveProviderRequired": false,
+    "baselineCompareMode": "compare_only"
+  },
+  "nextPatch": {
+    "name": "Patch 13.2 - TTL Invalidation and Operational Cache Controls",
+    "productionPromotionAllowed": false,
+    "goals": [
+      "add explicit cache invalidation reason audit",
+      "add model and policy version rotation tests",
+      "add tenant deletion and upload deletion bridge",
+      "add operational metrics without plaintext payload logging"
+    ]
+  }
+}

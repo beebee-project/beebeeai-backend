@@ -1,0 +1,53 @@
+{
+  "version": "query_candidate_patch12_1_2_1_manifest_v1",
+  "patch": "Historical Manifest Supersession Restore and Windows PowerShell Node Quoting Fix",
+  "applicationOrder": "after_patch12_1_2",
+  "fileCount": 9,
+  "files": [
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_LIVE_SHADOW_RESOLVER_REENTRY_BRIDGE.md",
+      "bytes": 11454,
+      "sha256": "aee31c6aafd80d529b0f211b557ec2261021e1a485ab00100f04bf2347f6ce0f"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_2_LIVE_SHADOW_UTF8_QA_DOCUMENTATION_HOTFIX.md",
+      "bytes": 4362,
+      "sha256": "d90e40056e55d53e6b5900338731a4194784b8ff00c30277e858c16d861ddfd9"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1ManifestSmokeTest.js",
+      "bytes": 2890,
+      "sha256": "acabcf1a67750000b41101549bb4e8304a24bca4f5d42366ac03ef3a0d57f153"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2DocumentationSmokeTest.js",
+      "bytes": 2889,
+      "sha256": "8ba6d9022f0849d3aed98d306deaf534c732a3872beab7e5b589286a22e8abba"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2ManifestSmokeTest.js",
+      "bytes": 2030,
+      "sha256": "ecde924a71d72069a1643e921637d8bfac2fff3a1b7f6e015cc0faaa38a856b7"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2_1SourceIntegritySmokeTest.js",
+      "bytes": 3947,
+      "sha256": "bd4fa0fc1f58b1c9a3ade26059974a502238475caeb7f99098fe4e8a247524b7"
+    },
+    {
+      "path": "tests/queryCandidatePatch12_1_2_1ManifestSmokeTest.js",
+      "bytes": 1282,
+      "sha256": "6419afffcb3d0ea135badc80058858063efc8588e2a4a869807968a699824b22"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH12_1_2_1.json",
+      "bytes": 4194,
+      "sha256": "e3ee1e91fcbd1e734828f206bb36a9760b46d3cb5bff7afb9a4e6aa4ac07d09d"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH12_1_2_1_HISTORICAL_MANIFEST_SUPERSESSION_RESTORE_WINDOWS_POWERSHELL_NODE_QUOTING_FIX.md",
+      "bytes": 9503,
+      "sha256": "d9c278236125d95ee271aacdbe91912df9214a4b34de0cefae97e225db0e538d"
+    }
+  ]
+}
