@@ -31,4 +31,5 @@ feedback-*.json
 .DS_Store
 Thumbs.db
 .vscode/
-.idea/
+.idea/_patch*/
+.patch_backups/
