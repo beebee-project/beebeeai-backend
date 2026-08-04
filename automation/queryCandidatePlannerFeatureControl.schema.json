@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidatePlannerFeatureControl.schema.json",
+  "title": "Query Candidate Planner Feature Control Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "policyVersion",
+    "configurationValid",
+    "invalidEnvironmentKeys",
+    "flags",
+    "killSwitches",
+    "runtimeRevision",
+    "failClosed",
+    "productionRouteChanged",
+    "productionCandidateMerge",
+    "productionReadyAssignment"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_feature_control_v1"
+    },
+    "policyVersion": {
+      "const": "candidate_planner_feature_flags_kill_switch_policy_v1"
+    },
+    "configurationValid": {
+      "type": "boolean"
+    },
+    "invalidEnvironmentKeys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "flags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "killSwitches": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "global",
+        "provider",
+        "cache",
+        "production"
+      ],
+      "properties": {
+        "global": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "boolean"
+        },
+        "cache": {
+          "type": "boolean"
+        },
+        "production": {
+          "type": "boolean"
+        }
+      }
+    },
+    "killSwitchSources": {
+      "type": "object"
+    },
+    "runtimeRevision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failClosed": {
+      "const": true
+    },
+    "productionRouteChanged": {
+      "const": false
+    },
+    "productionCandidateMerge": {
+      "const": false
+    },
+    "productionReadyAssignment": {
+      "const": false
+    }
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "version": "query_candidate_patch14_1_validation_v1",
+  "patch": "Service Boundary Integration: API Shadow Wiring + Shadow Comparator",
+  "validationDate": "2026-08-04",
+  "nodeChecks": [
+    {
+      "file": "automation/queryCandidatePlannerApiShadowBoundary.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "automation/queryCandidatePlannerApiShadowRunner.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "automation/queryCandidatePlannerApiShadowService.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "automation/queryCandidatePlannerFeatureControlRuntime.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "automation/queryCandidatePlannerShadowComparator.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "routes/automationRoutes.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1ApiShadowWiringSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1DefaultBlockedSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1DefaultBridgeAdapterSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1FailureIsolationSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1KillSwitchBoundarySmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1ManifestSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1PrivacyBoundarySmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1RouteContractSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1ShadowComparatorSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1SourceIntegritySmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1TestSupport.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "tests/queryCandidatePatch14_1TimeoutIsolationSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "smokeResults": [
+    {
+      "test": "queryCandidatePatch14_1DefaultBlockedSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 default blocked smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1ApiShadowWiringSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 API shadow wiring smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1DefaultBridgeAdapterSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 default bridge adapter smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1FailureIsolationSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 failure isolation smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1TimeoutIsolationSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 timeout isolation smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1ShadowComparatorSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 shadow comparator smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1PrivacyBoundarySmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 privacy boundary smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1KillSwitchBoundarySmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 kill-switch boundary smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1RouteContractSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 route contract smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1SourceIntegritySmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 source integrity smoke",
+      "stderr": ""
+    },
+    {
+      "test": "queryCandidatePatch14_1ManifestSmokeTest.js",
+      "returnCode": 0,
+      "stdout": "PASS query candidate patch14.1 manifest smoke",
+      "stderr": ""
+    }
+  ],
+  "summary": {
+    "syntaxPass": true,
+    "smokePassCount": 11,
+    "smokeTotal": 11,
+    "paidProviderCalls": 0,
+    "primaryResponseMutation": false,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false
+  },
+  "notRun": [
+    "backend server restart",
+    "live OpenAI API shadow",
+    "Railway deployment",
+    "API/UI browser E2E"
+  ]
+}

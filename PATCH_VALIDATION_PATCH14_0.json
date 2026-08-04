@@ -1,0 +1,21 @@
+{
+  "version": "query_candidate_patch_validation_v1",
+  "patchId": "QUERY_CANDIDATE_PATCH14_0",
+  "title": "Feature Flags + Kill Switch",
+  "productionCodeChanged": false,
+  "productionRouteChanged": false,
+  "productionCandidateMerge": false,
+  "productionReadyAssignment": false,
+  "liveProviderCallRequired": false,
+  "baselineRewriteAllowed": false,
+  "checks": [
+    "default_fail_closed",
+    "strict_boolean_environment",
+    "runtime_kill_switch_precedence",
+    "environment_kill_switch_authority",
+    "patch13_3_readiness_evidence_required",
+    "no_secret_or_raw_environment_values_in_snapshot",
+    "source_integrity",
+    "manifest_integrity"
+  ]
+}

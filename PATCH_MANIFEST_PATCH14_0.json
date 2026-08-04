@@ -1,0 +1,71 @@
+{
+  "version": "query_candidate_patch_manifest_v1",
+  "patchId": "QUERY_CANDIDATE_PATCH14_0",
+  "title": "Feature Flags + Kill Switch",
+  "productionRouteChanged": false,
+  "productionCandidateMerge": false,
+  "productionReadyAssignment": false,
+  "baselineRewriteAllowed": false,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH14_0.json",
+      "bytes": 663,
+      "sha256": "3d7229bb645b8e2ae548801358e044cb13e84ad8d6b5b80b70e2964d16f31eec"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_0_FEATURE_FLAGS_KILL_SWITCH.md",
+      "bytes": 6812,
+      "sha256": "a770daf83a89167f154c5804ab1cdb43b9e692fb75f4395a9e4bd66f91f6c1dc"
+    },
+    {
+      "path": "automation/queryCandidatePlannerFeatureControl.js",
+      "bytes": 13101,
+      "sha256": "96aebf745cae02089a778457743482c381259352c39ddedac539bac1527e5302"
+    },
+    {
+      "path": "automation/queryCandidatePlannerFeatureControl.schema.json",
+      "bytes": 1868,
+      "sha256": "268965fc55e751fda1454f351ce3faaacba44d79baa4ba02094aa23367b12681"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0DefaultFailClosedSmokeTest.js",
+      "bytes": 981,
+      "sha256": "86e34f15aaff4640b415c3ac3c4427bb8614309618a4685b3d000a98ec21d198"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0FlagMatrixSmokeTest.js",
+      "bytes": 1208,
+      "sha256": "b002a8d8ce813f99b8c76c917f7464ca3988847d46518a1e0765f13ccf896020"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0InvalidEnvironmentSmokeTest.js",
+      "bytes": 1003,
+      "sha256": "2d30885db68bce62d8f5c53245d7661f95256ea3c5019803300603b5a47ebef3"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0KillSwitchPrecedenceSmokeTest.js",
+      "bytes": 1957,
+      "sha256": "5031b8b965d8571051d7c3d49b0abb1d517b471a0d16080c012c35ecbe72c257"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0ManifestSmokeTest.js",
+      "bytes": 1182,
+      "sha256": "c55ff7ebe846425d0a2216804c7bea20a8522e47bc507d61114a95aa17e85011"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0ReadinessEvidenceSmokeTest.js",
+      "bytes": 1341,
+      "sha256": "c5f8ce68a41baf25b8f664e0fbdc755e52d1d765197bc9e5d8b82b16d8b02455"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0SourceIntegritySmokeTest.js",
+      "bytes": 1318,
+      "sha256": "47111a468153c008daa218ba2ffd2eb5de07fe127b04b2338f74679ad7c466d8"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_0TestSupport.js",
+      "bytes": 1517,
+      "sha256": "6e4bcc939fbf98f8bfef86422f318a418e514e08d48ebc96a6c42a38216da707"
+    }
+  ]
+}

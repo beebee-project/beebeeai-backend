@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_api_shadow_observation_v1",
+  "title": "Query Candidate Planner API Shadow Observation",
+  "type": "object",
+  "required": [
+    "version",
+    "status",
+    "reason",
+    "guardrails"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_api_shadow_observation_v1"
+    },
+    "status": {
+      "enum": [
+        "BLOCKED",
+        "COMPLETED",
+        "COMPLETED_SAFE",
+        "FAILED_SAFE",
+        "TIMEOUT_SAFE",
+        "BOUNDARY_FAILED_SAFE"
+      ]
+    },
+    "reason": { "type": "string" },
+    "requestFingerprintSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "primaryResponseSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "comparison": {
+      "type": ["object", "null"]
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "productionCandidateMerge",
+        "productionReadyAssignment",
+        "productionRouteChanged"
+      ],
+      "properties": {
+        "productionCandidateMerge": { "const": false },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false }
+      }
+    }
+  }
+}

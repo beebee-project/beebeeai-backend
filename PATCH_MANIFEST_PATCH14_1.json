@@ -1,0 +1,122 @@
+{
+  "version": "query_candidate_patch14_1_manifest_v1",
+  "patch": "Service Boundary Integration: API Shadow Wiring + Shadow Comparator",
+  "createdAt": "2026-08-04T08:45:00Z",
+  "fileCount": 21,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH14_1.json",
+      "bytes": 5404,
+      "sha256": "4491fc72e46769c8def14df3f9bc543c813f6831d5f59b449a09013576bd5656"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_1_SERVICE_BOUNDARY_API_SHADOW.md",
+      "bytes": 9954,
+      "sha256": "ff8a82648f4aaffff5a9eb6ac60fe00f73e1355d4a33d0a2e043074ddd6c5549"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiShadowBoundary.js",
+      "bytes": 3741,
+      "sha256": "2eff9cebc23d8695a3bb27a6007d4f7bc8419b4c6b3e41292f2a1f2f357f8aff"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiShadowObservation.schema.json",
+      "bytes": 1265,
+      "sha256": "16983f3a5eb1e46371616e71583172d558b1b303e02c93a3d691147dc5b0b630"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiShadowRunner.js",
+      "bytes": 10275,
+      "sha256": "fc307ba6aa7896408f1d7ff5486a174a90933ecd64204f9d47d7bef6d20a2e7c"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiShadowService.js",
+      "bytes": 6692,
+      "sha256": "56784dd3f8538e121c0677691e54e0d8f78519611a6b9113c6c662e67ddc398e"
+    },
+    {
+      "path": "automation/queryCandidatePlannerFeatureControlRuntime.js",
+      "bytes": 1314,
+      "sha256": "4b36bae518fc1e748a8c9f78f145fadd800cd0d6062cc7f37946e4d98a4adc9a"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowComparator.js",
+      "bytes": 7225,
+      "sha256": "bc7e86d242a9a97d45946c185c6b99e0423afd59c8faae2ac7dc10fbf525c81d"
+    },
+    {
+      "path": "routes/automationRoutes.js",
+      "bytes": 1569,
+      "sha256": "a4cf4dfde353bc4ca7d68829ba17d574a9e024aa80a94079b1f0983acabaccd1"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1ApiShadowWiringSmokeTest.js",
+      "bytes": 2653,
+      "sha256": "a9786c3d4af90948af87a05a91933acfef4e043203705a1c21b75e9eb1bd18d0"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1DefaultBlockedSmokeTest.js",
+      "bytes": 1698,
+      "sha256": "c1d3c20e8ebbdf4ff4cca6d61e9d8bc027a892dd420dd2ac4bcf0cd19884f35c"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1DefaultBridgeAdapterSmokeTest.js",
+      "bytes": 2337,
+      "sha256": "e6987809bb20c649f99b80a8a6d3b76bdd71ab7eb10a4a37d9b20dbd8942c2e3"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1FailureIsolationSmokeTest.js",
+      "bytes": 1540,
+      "sha256": "d62a83719bbf154222c39aaa5e65e4442e280b418a7abe4c562fddc2778ce1f5"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1KillSwitchBoundarySmokeTest.js",
+      "bytes": 1320,
+      "sha256": "2174c2c48cccac452c201a67511cccd8cab4c02e27ffeec073b508ea20766393"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1ManifestSmokeTest.js",
+      "bytes": 1212,
+      "sha256": "516e5ceaf517a513bfe9c44f3e9c5474e14c931d43532c865e25934766c35920"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1PrivacyBoundarySmokeTest.js",
+      "bytes": 1216,
+      "sha256": "cbcb06ea01adba16e1599e22b49e84256176bf9a93fac301cc6ed0140af12982"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1RouteContractSmokeTest.js",
+      "bytes": 1718,
+      "sha256": "b63433addf70ab89585a5a44232d19a409184538b782b2ecc69e90a2358804db"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1ShadowComparatorSmokeTest.js",
+      "bytes": 1354,
+      "sha256": "c80251d5521ea446bc0070d43a77d732b34143fb4b5c5bc76b1ddbd860b9b777"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1SourceIntegritySmokeTest.js",
+      "bytes": 1649,
+      "sha256": "3ec97baacc6240738cc9e18cd8e8d62df94a378511a904acdc932db9bd81ee48"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1TestSupport.js",
+      "bytes": 2423,
+      "sha256": "7384d2dec98bcd01dee10971e50a16995a9e585c5e392bde41b51cbc3f6bd55a"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_1TimeoutIsolationSmokeTest.js",
+      "bytes": 1393,
+      "sha256": "2d398a470a0c7de05feff2f064c4517918dfa41beab0ec2569032f2d28315ebe"
+    }
+  ],
+  "guardrails": {
+    "primaryResponseAuthority": true,
+    "responsePayloadMutation": false,
+    "responseHeaderMutation": false,
+    "responseStatusMutation": false,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false
+  }
+}
