@@ -1,0 +1,34 @@
+{
+  "version": "query_candidate_patch14_2_1_manifest_v1",
+  "patch": "API Shadow Boundary Manifest Drift Restore",
+  "createdAt": "2026-08-04T09:30:00Z",
+  "fileCount": 3,
+  "files": [
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_2_1_BOUNDARY_MANIFEST_DRIFT_RESTORE.md",
+      "bytes": 1567,
+      "sha256": "4e8af18ab7e293f701a8b08908221032d03d39142f0d319421a85b205aba957c"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiShadowBoundary.js",
+      "bytes": 3741,
+      "sha256": "2eff9cebc23d8695a3bb27a6007d4f7bc8419b4c6b3e41292f2a1f2f357f8aff"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_2_1BoundaryRestoreSmokeTest.js",
+      "bytes": 1233,
+      "sha256": "3176f8fec149e54d4a4c928efa4d705e46139a39b2ac1df673b714257598bb1c"
+    }
+  ],
+  "restores": {
+    "path": "automation/queryCandidatePlannerApiShadowBoundary.js",
+    "bytes": 3741,
+    "sha256": "2eff9cebc23d8695a3bb27a6007d4f7bc8419b4c6b3e41292f2a1f2f357f8aff"
+  },
+  "guardrails": {
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCalls": 0
+  }
+}

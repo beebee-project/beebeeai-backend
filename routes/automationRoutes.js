@@ -7,12 +7,20 @@ const {
 const {
   createQueryCandidatePlannerApiShadowBoundary,
 } = require("../automation/queryCandidatePlannerApiShadowBoundary");
+const {
+  createQueryCandidatePlannerDownloadRetentionBoundary,
+} = require("../automation/queryCandidatePlannerFileLifecycleBoundary");
 
 router.use(protect);
 
 const getAnalysisCandidatesShadowObserved =
   createQueryCandidatePlannerApiShadowBoundary({
     handler: automationController.getAnalysisCandidates,
+  });
+const downloadGeneratedFileCacheRetained =
+  createQueryCandidatePlannerDownloadRetentionBoundary({
+    handler: automationController.downloadGeneratedFile,
+    action: "GENERATED_DOWNLOAD",
   });
 
 router.post("/query-preview", automationController.previewQueryTables);
@@ -22,7 +30,7 @@ router.post("/query-analyze", automationController.analyzeQueryIntent);
 router.post("/query-execute", automationController.executeQuery);
 router.post("/export-xlsx", automationController.exportXlsx);
 router.post("/summary-sheet", automationController.createSummarySheet);
-router.get("/download", automationController.downloadGeneratedFile);
+router.get("/download", downloadGeneratedFileCacheRetained);
 router.post("/export-report-json", automationController.exportReportJson);
 router.post(
   "/export-analysis-report",

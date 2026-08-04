@@ -23,7 +23,9 @@
         "BOUNDARY_FAILED_SAFE"
       ]
     },
-    "reason": { "type": "string" },
+    "reason": {
+      "type": "string"
+    },
     "requestFingerprintSha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
@@ -33,7 +35,10 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "comparison": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "guardrails": {
       "type": "object",
@@ -43,9 +48,35 @@
         "productionRouteChanged"
       ],
       "properties": {
-        "productionCandidateMerge": { "const": false },
-        "productionReadyAssignment": { "const": false },
-        "productionRouteChanged": { "const": false }
+        "productionCandidateMerge": {
+          "const": false
+        },
+        "productionReadyAssignment": {
+          "const": false
+        },
+        "productionRouteChanged": {
+          "const": false
+        }
+      }
+    },
+    "cacheLifecycle": {
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "object"
+        },
+        "cacheReadAllowed": {
+          "type": "boolean"
+        },
+        "cacheWriteAllowed": {
+          "type": "boolean"
+        },
+        "tenantIdIncluded": {
+          "const": false
+        },
+        "cacheSecretIncluded": {
+          "const": false
+        }
       }
     }
   }

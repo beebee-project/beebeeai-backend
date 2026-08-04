@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_upload_lifecycle_v1",
+  "title": "Query Candidate Planner Upload Lifecycle Observation",
+  "type": "object",
+  "required": [
+    "version",
+    "action",
+    "cacheDisposition",
+    "privacy"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_file_lifecycle_boundary_v1"
+    },
+    "action": {
+      "enum": [
+        "UPLOAD_REPLACEMENT",
+        "DELETE",
+        "SOURCE_DOWNLOAD",
+        "GENERATED_DOWNLOAD"
+      ]
+    },
+    "cacheDisposition": {
+      "enum": [
+        "RETAINED",
+        "INVALIDATION_PENDING",
+        "INVALIDATED",
+        "INVALIDATION_FAILED_SAFE",
+        "NO_PREVIOUS_UPLOAD",
+        "NO_ACTIVE_CACHE",
+        "IDENTITY_UNAVAILABLE"
+      ]
+    },
+    "identity": {
+      "type": "object"
+    },
+    "invalidation": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "privacy": {
+      "type": "object",
+      "required": [
+        "tenantIdIncluded",
+        "originalFileNameIncluded",
+        "queryTablesKeyIncluded",
+        "storageObjectKeyIncluded",
+        "cacheSecretIncluded"
+      ],
+      "properties": {
+        "tenantIdIncluded": {
+          "const": false
+        },
+        "originalFileNameIncluded": {
+          "const": false
+        },
+        "queryTablesKeyIncluded": {
+          "const": false
+        },
+        "storageObjectKeyIncluded": {
+          "const": false
+        },
+        "cacheSecretIncluded": {
+          "const": false
+        }
+      }
+    }
+  }
+}

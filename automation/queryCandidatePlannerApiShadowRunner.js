@@ -3,7 +3,12 @@ const {
   candidateIdentity,
 } = require("./queryCandidatePlannerShadowComparator");
 
-const RUNNER_VERSION = "query_candidate_planner_api_shadow_runner_v1";
+const {
+  getQueryCandidatePlannerCacheRuntime,
+} = require("./queryCandidatePlannerCacheRuntime");
+
+const RUNNER_VERSION =
+  "query_candidate_planner_api_shadow_runner_v2_cache_lifecycle";
 const INPUT_VERSION = "query_candidate_planner_api_shadow_input_v1";
 
 const FORBIDDEN_KEYS = new Set([
@@ -263,11 +268,51 @@ function assertNoForbiddenKeys(value, path = "root") {
   return true;
 }
 
+function buildShadowCacheRuntimeOptions({
+  lifecycleIdentity = {},
+  cacheReadDecision = {},
+  cacheWriteDecision = {},
+  runtimeProvider = getQueryCandidatePlannerCacheRuntime,
+} = {}) {
+  const cacheAllowed =
+    cacheReadDecision?.allowed === true || cacheWriteDecision?.allowed === true;
+  if (!cacheAllowed) {
+    return Object.freeze({
+      enabled: false,
+      reason: "CACHE_BLOCKED_BY_FEATURE_CONTROL",
+    });
+  }
+  if (!lifecycleIdentity?.complete) {
+    return Object.freeze({
+      enabled: false,
+      reason: String(lifecycleIdentity?.reason || "UPLOAD_IDENTITY_INCOMPLETE"),
+    });
+  }
+  const runtime = runtimeProvider();
+  if (!runtime?.enabled || !runtime.hierarchicalCache || !runtime.cacheSecret) {
+    return Object.freeze({
+      enabled: false,
+      reason: String(runtime?.reason || "CACHE_RUNTIME_UNAVAILABLE"),
+    });
+  }
+  return Object.freeze({
+    enabled: true,
+    reason: "CACHE_LIFECYCLE_WIRING_READY",
+    hierarchicalCache: runtime.hierarchicalCache,
+    tenantId: lifecycleIdentity.tenantId,
+    cacheSecret: runtime.cacheSecret,
+    uploadFingerprintSha256: lifecycleIdentity.uploadFingerprintSha256,
+    queryJsonSha256: lifecycleIdentity.queryJsonSha256,
+  });
+}
+
 async function runQueryCandidatePlannerApiShadow({
   safeContext,
+  lifecycleIdentity = null,
   providerDecision,
   cacheReadDecision,
   cacheWriteDecision,
+  runtimeProvider = getQueryCandidatePlannerCacheRuntime,
   signal,
 } = {}) {
   assertNoForbiddenKeys(safeContext);
@@ -281,6 +326,12 @@ async function runQueryCandidatePlannerApiShadow({
   }
 
   const provider = providerDecision?.allowed ? undefined : blockedProvider();
+  const cacheRuntime = buildShadowCacheRuntimeOptions({
+    lifecycleIdentity,
+    cacheReadDecision,
+    cacheWriteDecision,
+    runtimeProvider,
+  });
   return bridge.runCandidatePlannerLiveShadow({
     caseId: safeContext.semanticProfile.source.caseId,
     semanticProfile: safeContext.semanticProfile,
@@ -295,6 +346,21 @@ async function runQueryCandidatePlannerApiShadow({
     cacheWriteAllowed: cacheWriteDecision?.allowed === true,
     apiShadow: true,
     requestFingerprintSha256: safeContext.requestFingerprintSha256,
+    ...(cacheRuntime.enabled
+      ? {
+          hierarchicalCache: cacheRuntime.hierarchicalCache,
+          tenantId: cacheRuntime.tenantId,
+          cacheSecret: cacheRuntime.cacheSecret,
+          uploadFingerprintSha256: cacheRuntime.uploadFingerprintSha256,
+          queryJsonSha256: cacheRuntime.queryJsonSha256,
+        }
+      : {}),
+    cacheLifecycleWiring: Object.freeze({
+      enabled: cacheRuntime.enabled === true,
+      reason: cacheRuntime.reason,
+      tenantIdIncludedInObservation: false,
+      cacheSecretIncludedInObservation: false,
+    }),
     signal,
   });
 }
@@ -306,5 +372,6 @@ module.exports = Object.freeze({
   buildSafeApiShadowContext,
   primaryResponseContractSha256,
   assertNoForbiddenKeys,
+  buildShadowCacheRuntimeOptions,
   runQueryCandidatePlannerApiShadow,
 });

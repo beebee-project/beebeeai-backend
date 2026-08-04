@@ -1,0 +1,63 @@
+{
+  "version": "query_candidate_patch14_2_validation_v1",
+  "patch": "Upload Lifecycle + Cache Invalidation Wiring",
+  "validatedAt": "2026-08-04T09:30:00Z",
+  "environment": {
+    "providerCalls": 0,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "railwayEnvironmentChanged": false
+  },
+  "checks": {
+    "syntax": {
+      "status": "PASS",
+      "files": 26
+    },
+    "newSmokeTests": {
+      "status": "PASS",
+      "passed": 15,
+      "failed": 0
+    },
+    "contracts": {
+      "sameUploadIdentityStable": true,
+      "downloadRetainsCache": true,
+      "deleteInvalidatesUploadCache": true,
+      "replacementUploadInvalidatesPreviousCache": true,
+      "reuploadCreatesNewIdentity": true,
+      "cacheKillSwitchAvoidsRuntimeInitialization": true,
+      "defaultUnconfiguredRuntimeIsInactive": true,
+      "invalidationFailureIsolated": true,
+      "primaryResponseAuthority": true,
+      "privacyBoundary": true
+    },
+    "patch14_1Supersession": {
+      "status": "PASS",
+      "historicalManifestDriftMustBeDeclaredByPatch14_2": true
+    },
+    "patch14_1Regression": {
+      "status": "PASS",
+      "passed": 11,
+      "failed": 0,
+      "manifestSuperseded": 7
+    },
+    "patch14_0Regression": {
+      "status": "PASS",
+      "passed": 7,
+      "failed": 0
+    }
+  },
+  "privacy": {
+    "rawRowsPersisted": false,
+    "sampleValuesPersisted": false,
+    "originalFileNameInLifecycleObservation": false,
+    "queryTablesKeyInLifecycleObservation": false,
+    "tenantIdInLifecycleObservation": false,
+    "cacheSecretInLifecycleObservation": false
+  },
+  "notes": [
+    "Validation uses mock cache/provider adapters and does not call OpenAI.",
+    "Actual encrypted cache hit and post-delete provider recall are deferred to Patch 15.1 evaluation.",
+    "Feature flags remain OFF and cache runtime environment remains unconfigured by default."
+  ]
+}

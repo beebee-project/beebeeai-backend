@@ -7,8 +7,13 @@ const {
   primaryResponseContractSha256,
   runQueryCandidatePlannerApiShadow,
 } = require("./queryCandidatePlannerApiShadowRunner");
+const {
+  deriveQueryCandidatePlannerUploadIdentity,
+  publicUploadIdentity,
+} = require("./queryCandidatePlannerUploadLifecycle");
 
-const SERVICE_VERSION = "query_candidate_planner_api_shadow_service_v1";
+const SERVICE_VERSION =
+  "query_candidate_planner_api_shadow_service_v2_cache_lifecycle";
 const OBSERVATION_VERSION = "query_candidate_planner_api_shadow_observation_v1";
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -96,6 +101,10 @@ async function observeQueryCandidatePlannerApiShadow({
     request,
     primaryPayload,
   });
+  const lifecycleIdentity = deriveQueryCandidatePlannerUploadIdentity({
+    request,
+    primaryPayload,
+  });
   const abortController = new AbortController();
 
   try {
@@ -103,6 +112,7 @@ async function observeQueryCandidatePlannerApiShadow({
       Promise.resolve(
         shadowRunner({
           safeContext,
+          lifecycleIdentity,
           providerDecision,
           cacheReadDecision,
           cacheWriteDecision,
@@ -132,6 +142,13 @@ async function observeQueryCandidatePlannerApiShadow({
       cacheReadDecision,
       cacheWriteDecision,
       requestFingerprintSha256: safeContext.requestFingerprintSha256,
+      cacheLifecycle: Object.freeze({
+        identity: publicUploadIdentity(lifecycleIdentity),
+        cacheReadAllowed: cacheReadDecision?.allowed === true,
+        cacheWriteAllowed: cacheWriteDecision?.allowed === true,
+        tenantIdIncluded: false,
+        cacheSecretIncluded: false,
+      }),
       primaryResponseSha256,
       primaryResponseUnchanged:
         primaryResponseSha256 === primaryResponseContractSha256(primaryPayload),
@@ -184,6 +201,13 @@ async function observeQueryCandidatePlannerApiShadow({
       cacheReadDecision,
       cacheWriteDecision,
       requestFingerprintSha256: safeContext.requestFingerprintSha256,
+      cacheLifecycle: Object.freeze({
+        identity: publicUploadIdentity(lifecycleIdentity),
+        cacheReadAllowed: cacheReadDecision?.allowed === true,
+        cacheWriteAllowed: cacheWriteDecision?.allowed === true,
+        tenantIdIncluded: false,
+        cacheSecretIncluded: false,
+      }),
       primaryResponseSha256,
       primaryResponseUnchanged:
         primaryResponseSha256 === primaryResponseContractSha256(primaryPayload),
