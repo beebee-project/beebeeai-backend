@@ -1,0 +1,192 @@
+{
+  "version": "query_candidate_patch14_3_manifest_v1",
+  "patch": "Internal UI Preview",
+  "createdAt": "2026-08-04T09:58:00Z",
+  "fileCount": 26,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH14_3.json",
+      "bytes": 2893,
+      "sha256": "44ca86b5c87f3baf780cfbdb78ff89771a28bc99282dddff85204d58bc0070b9"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_3_INTERNAL_UI_PREVIEW.md",
+      "bytes": 8830,
+      "sha256": "d58441dabf965aae96b06922df58993123ca0d7348d9a82af4821da04a33951d"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalPreviewConfig.js",
+      "bytes": 4369,
+      "sha256": "b8af9dc7d75a53001e0237b4df8dfd75de94c4465b1ba5c23e76cb8379a582cc"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalPreviewStore.js",
+      "bytes": 10596,
+      "sha256": "f33c8ab9bc820a310adabcec2e5ff1c1e950db09554d27d136ede8c540d88076"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalPreviewAccess.js",
+      "bytes": 1509,
+      "sha256": "6497dcd4e49a23eb284e05905bd576c46fc5ce19c45532802cd139f0f3d41890"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalPreviewPage.js",
+      "bytes": 11827,
+      "sha256": "c6f16e8e0eec0badca21bbf0a665e87f71322c23dd83463dda8f89f199798490"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalPreviewController.js",
+      "bytes": 3399,
+      "sha256": "6e03ff45e924b6eae4cf87e2e1b6b088175fced4fe9a49477084f5483da03f68"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalPreview.schema.json",
+      "bytes": 1931,
+      "sha256": "10a1806cf8a0d9d14aa69ff47aa781e34f62225ff2622ac6deed4b5b1781098f"
+    },
+    {
+      "path": "routes/automationRoutes.js",
+      "bytes": 3024,
+      "sha256": "2c1c932ac857c5d1f6cdf43ff229efe72ca8d15a48111f24741f8a6fae234583"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_2ManifestSmokeTest.js",
+      "bytes": 2723,
+      "sha256": "903c8e72b40c515176bf0f406ac669c5819dd1a7eaa96e92f72e93b6fc46ad51"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3TestSupport.js",
+      "bytes": 1162,
+      "sha256": "c2ba6ff680b3945518b80ff3a2669c0f901996b008f33d4b7f7ee4602651f00a"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3DefaultDisabledSmokeTest.js",
+      "bytes": 1220,
+      "sha256": "07b387dcfa277ec329517d36380f930eb1ec76d0f33c04ff308ee42071495d3d"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3AccessControlSmokeTest.js",
+      "bytes": 1636,
+      "sha256": "febfef342a8432984bbafe0c7c2400e39690aa497b157b3d4528c03917c1e0bc"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3StorePrivacySmokeTest.js",
+      "bytes": 1917,
+      "sha256": "bdb6b3d9538809539418cd20de802fe4961c79446a130bb102c5e9b0b0e21e65"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3RetentionSmokeTest.js",
+      "bytes": 1042,
+      "sha256": "199a09e87f374439be161d960c11836e5dd111fd1166a90ac81b76e7310349bb"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3FilterSmokeTest.js",
+      "bytes": 805,
+      "sha256": "c7e20fcac02501d7da1eb1749dc932356b712c979381889340d3052e77034057"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3ObservationWiringSmokeTest.js",
+      "bytes": 2285,
+      "sha256": "0ecdb4bb7010e68df8bef06add3e93d128a337c1759a5c1e7310e8be7058ecac"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3ControllerSmokeTest.js",
+      "bytes": 1897,
+      "sha256": "2809b02fd459dcc48a3367119ae87929dd1fbec94440b0258d0738dbb9becbe9"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3PageContractSmokeTest.js",
+      "bytes": 1006,
+      "sha256": "bb9542704b899f47a3a7b6b9347038f7fbe433c2a2ce55b76e523ac1c6331f2d"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3SecurityHeadersSmokeTest.js",
+      "bytes": 1469,
+      "sha256": "ef19e92a548d33df894b435bbcec19fa62a5f0042f0256d2ddfc9fa396bb8f3d"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3ReadOnlyIsolationSmokeTest.js",
+      "bytes": 1448,
+      "sha256": "a468af96315fa12ab0a7ba43427e5f3919f93f8c2ec0224606fdcbb9bc78f936"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3RouteContractSmokeTest.js",
+      "bytes": 935,
+      "sha256": "052f48a0d5037e01ad33f94bd1085bede3a97e785f7eee75e76a971cf680e32c"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3SchemaSmokeTest.js",
+      "bytes": 794,
+      "sha256": "6fb1c70e5bcadfd08a8915c3b60dc8735719530294bb3c7d31a345e33132536b"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3SourceIntegritySmokeTest.js",
+      "bytes": 1649,
+      "sha256": "85c146de5ae8e30961c4cb45bcf5c9e504027a39c05a9de3c95300fdd31e93d5"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3DisabledRecorderNoopSmokeTest.js",
+      "bytes": 1011,
+      "sha256": "c5d6600992ef0ee7d5ab5b5ba69c06db02cb3b8122def7a2885fa40821cd59e8"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3ManifestSmokeTest.js",
+      "bytes": 2183,
+      "sha256": "c66d11228b053ab767d0fa1b2b1b85f701f8618cd4b8cfe58c02ac2d1bc021fa"
+    }
+  ],
+  "supersedes": {
+    "patch14_2Files": [
+      "routes/automationRoutes.js",
+      "tests/queryCandidatePatch14_2ManifestSmokeTest.js"
+    ],
+    "undeclaredDriftAllowed": false
+  },
+  "routes": {
+    "page": "GET /api/automation/internal/query-candidate-shadow-preview",
+    "status": "GET /api/automation/internal/query-candidate-shadow-preview/status",
+    "observations": "GET /api/automation/internal/query-candidate-shadow-preview/observations",
+    "writeRoutesAdded": false
+  },
+  "access": {
+    "defaultEnabled": false,
+    "authenticatedRouteRequired": true,
+    "internalTokenRequired": true,
+    "minimumTokenBytes": 24,
+    "headerName": "x-beebee-internal-preview-token",
+    "queryTokenAccepted": false,
+    "tokenLogged": false
+  },
+  "storage": {
+    "persistence": "MEMORY_ONLY",
+    "defaultMaxEntries": 100,
+    "maximumMaxEntries": 500,
+    "defaultTtlMs": 86400000,
+    "clearedOnRestart": true
+  },
+  "privacy": {
+    "rawRowsIncluded": false,
+    "sampleValuesIncluded": false,
+    "fileNameIncluded": false,
+    "originalFileNameIncluded": false,
+    "queryTablesKeyIncluded": false,
+    "tenantIdIncluded": false,
+    "emailIncluded": false,
+    "rawCandidatePayloadIncluded": false,
+    "rawIdentifiersIncluded": false,
+    "rawErrorMessageIncluded": false
+  },
+  "guardrails": {
+    "readOnly": true,
+    "observationOnly": true,
+    "primaryResponseAuthority": true,
+    "responsePayloadMutation": false,
+    "responseHeaderMutation": false,
+    "responseStatusMutation": false,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "candidateExecutionAvailable": false,
+    "candidateSelectionAvailable": false
+  }
+}

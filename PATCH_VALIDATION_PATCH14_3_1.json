@@ -1,0 +1,66 @@
+{
+  "version": "query_candidate_patch14_3_1_validation_v1",
+  "patch": "Cumulative Predecessor Integrity Convergence",
+  "validatedAt": "2026-08-04T10:16:00Z",
+  "runtime": {
+    "node": "v22.16.0",
+    "providerCalls": 0,
+    "externalNetworkCalls": 0
+  },
+  "reproduction": {
+    "patch14_1ManifestFailureReproduced": "automation/queryCandidatePlannerApiShadowBoundary.js",
+    "patch14_2ManifestFailureReproduced": "automation/queryCandidatePlannerApiShadowRunner.js"
+  },
+  "apply": {
+    "protectedFiles": 42,
+    "manifestContracts": 3,
+    "restored": 2,
+    "created": 0,
+    "alreadyCanonical": 43,
+    "restoredPaths": [
+      "automation/queryCandidatePlannerApiShadowBoundary.js",
+      "automation/queryCandidatePlannerApiShadowRunner.js"
+    ]
+  },
+  "qa": {
+    "patch14_0": {
+      "pass": 7,
+      "total": 7
+    },
+    "patch14_1": {
+      "pass": 11,
+      "total": 11
+    },
+    "patch14_2": {
+      "pass": 15,
+      "total": 15
+    },
+    "patch14_2_1": {
+      "pass": 1,
+      "total": 1
+    },
+    "patch14_2_2": {
+      "pass": 1,
+      "total": 1
+    },
+    "patch14_3": {
+      "pass": 15,
+      "total": 15
+    },
+    "patch14_3_1": {
+      "pass": 1,
+      "total": 1
+    },
+    "cumulativePass": 51,
+    "cumulativeTotal": 51
+  },
+  "guardrails": {
+    "patch14_3FilesOverwritten": false,
+    "featureFlagsChanged": false,
+    "railwayEnvironmentChanged": false,
+    "primaryResponseChanged": false,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false
+  },
+  "status": "PASS"
+}

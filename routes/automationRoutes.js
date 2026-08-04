@@ -6,16 +6,37 @@ const {
 } = require("../automation/semanticExecutionRouteBridge");
 const {
   createQueryCandidatePlannerApiShadowBoundary,
+  defaultObservationLogger,
 } = require("../automation/queryCandidatePlannerApiShadowBoundary");
 const {
   createQueryCandidatePlannerDownloadRetentionBoundary,
 } = require("../automation/queryCandidatePlannerFileLifecycleBoundary");
+const {
+  recordQueryCandidatePlannerInternalPreviewObservation,
+} = require("../automation/queryCandidatePlannerInternalPreviewStore");
+const {
+  requireQueryCandidatePlannerInternalPreviewAccess,
+} = require("../automation/queryCandidatePlannerInternalPreviewAccess");
+const {
+  internalPreviewPage,
+  internalPreviewStatus,
+  internalPreviewObservations,
+} = require("../automation/queryCandidatePlannerInternalPreviewController");
 
 router.use(protect);
+
+function observeQueryCandidatePlannerForInternalPreview(
+  observation,
+  context,
+) {
+  defaultObservationLogger(observation, context);
+  recordQueryCandidatePlannerInternalPreviewObservation(observation);
+}
 
 const getAnalysisCandidatesShadowObserved =
   createQueryCandidatePlannerApiShadowBoundary({
     handler: automationController.getAnalysisCandidates,
+    onObservation: observeQueryCandidatePlannerForInternalPreview,
   });
 const downloadGeneratedFileCacheRetained =
   createQueryCandidatePlannerDownloadRetentionBoundary({
@@ -42,5 +63,20 @@ router.post(
   automationController.executeAnalysisCandidate,
 );
 router.post("/execute-business-template", executeBusinessTemplateObserved);
+
+router.get(
+  "/internal/query-candidate-shadow-preview",
+  internalPreviewPage,
+);
+router.get(
+  "/internal/query-candidate-shadow-preview/status",
+  requireQueryCandidatePlannerInternalPreviewAccess,
+  internalPreviewStatus,
+);
+router.get(
+  "/internal/query-candidate-shadow-preview/observations",
+  requireQueryCandidatePlannerInternalPreviewAccess,
+  internalPreviewObservations,
+);
 
 module.exports = router;

@@ -1,0 +1,284 @@
+{
+  "version": "query_candidate_patch14_3_1_active_predecessor_files_v1",
+  "patch14_1Version": "query_candidate_patch14_1_manifest_v1",
+  "patch14_2Version": "query_candidate_patch14_2_manifest_v1",
+  "patch14_3Version": "query_candidate_patch14_3_manifest_v1",
+  "patch14_1ProtectedCount": 14,
+  "patch14_2ProtectedCount": 28,
+  "totalProtectedCount": 42,
+  "patch14_3SupersededPaths": [
+    "routes/automationRoutes.js",
+    "tests/queryCandidatePatch14_2ManifestSmokeTest.js"
+  ],
+  "manifestContracts": [
+    {
+      "path": "PATCH_MANIFEST_PATCH14_1.json",
+      "bytes": 4442,
+      "sha256": "51e583da2bc802e1ec46caa408ab6e1cf99c6cfbb16a0244be018902692d1c5b"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH14_2.json",
+      "bytes": 6656,
+      "sha256": "6b7794755703496c3ed85cd71d8337dd096b39f8d56cdd4044db069739597d37"
+    },
+    {
+      "path": "PATCH_MANIFEST_PATCH14_3.json",
+      "bytes": 6736,
+      "sha256": "d8275ee473092173f407acb3e62fbfd3dda852f4965da4a9752bc872db29482d"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "layer": "PATCH14_1",
+      "path": "PATCH_VALIDATION_PATCH14_1.json",
+      "bytes": 5404,
+      "sha256": "4491fc72e46769c8def14df3f9bc543c813f6831d5f59b449a09013576bd5656"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "README_QUERY_CANDIDATE_PATCH14_1_SERVICE_BOUNDARY_API_SHADOW.md",
+      "bytes": 9954,
+      "sha256": "ff8a82648f4aaffff5a9eb6ac60fe00f73e1355d4a33d0a2e043074ddd6c5549"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "automation/queryCandidatePlannerApiShadowBoundary.js",
+      "bytes": 3741,
+      "sha256": "2eff9cebc23d8695a3bb27a6007d4f7bc8419b4c6b3e41292f2a1f2f357f8aff"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "automation/queryCandidatePlannerFeatureControlRuntime.js",
+      "bytes": 1314,
+      "sha256": "4b36bae518fc1e748a8c9f78f145fadd800cd0d6062cc7f37946e4d98a4adc9a"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "automation/queryCandidatePlannerShadowComparator.js",
+      "bytes": 7225,
+      "sha256": "bc7e86d242a9a97d45946c185c6b99e0423afd59c8faae2ac7dc10fbf525c81d"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1ApiShadowWiringSmokeTest.js",
+      "bytes": 2653,
+      "sha256": "a9786c3d4af90948af87a05a91933acfef4e043203705a1c21b75e9eb1bd18d0"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1DefaultBlockedSmokeTest.js",
+      "bytes": 1698,
+      "sha256": "c1d3c20e8ebbdf4ff4cca6d61e9d8bc027a892dd420dd2ac4bcf0cd19884f35c"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1DefaultBridgeAdapterSmokeTest.js",
+      "bytes": 2337,
+      "sha256": "e6987809bb20c649f99b80a8a6d3b76bdd71ab7eb10a4a37d9b20dbd8942c2e3"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1FailureIsolationSmokeTest.js",
+      "bytes": 1540,
+      "sha256": "d62a83719bbf154222c39aaa5e65e4442e280b418a7abe4c562fddc2778ce1f5"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1KillSwitchBoundarySmokeTest.js",
+      "bytes": 1320,
+      "sha256": "2174c2c48cccac452c201a67511cccd8cab4c02e27ffeec073b508ea20766393"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1PrivacyBoundarySmokeTest.js",
+      "bytes": 1216,
+      "sha256": "cbcb06ea01adba16e1599e22b49e84256176bf9a93fac301cc6ed0140af12982"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1ShadowComparatorSmokeTest.js",
+      "bytes": 1354,
+      "sha256": "c80251d5521ea446bc0070d43a77d732b34143fb4b5c5bc76b1ddbd860b9b777"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1TestSupport.js",
+      "bytes": 2423,
+      "sha256": "7384d2dec98bcd01dee10971e50a16995a9e585c5e392bde41b51cbc3f6bd55a"
+    },
+    {
+      "layer": "PATCH14_1",
+      "path": "tests/queryCandidatePatch14_1TimeoutIsolationSmokeTest.js",
+      "bytes": 1393,
+      "sha256": "2d398a470a0c7de05feff2f064c4517918dfa41beab0ec2569032f2d28315ebe"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "PATCH_VALIDATION_PATCH14_2.json",
+      "bytes": 1934,
+      "sha256": "d75774c5e858823c65ff1fd13a7fd5eceb475e66811d312a8c639fdb3bcdf6c1"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "README_QUERY_CANDIDATE_PATCH14_2_UPLOAD_LIFECYCLE_CACHE_WIRING.md",
+      "bytes": 12720,
+      "sha256": "ce1337cdfe6bcdee45a42419bc929f46906f4ba8aa44034f3c7f885f8083f801"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerApiShadowObservation.schema.json",
+      "bytes": 1771,
+      "sha256": "c6c8139a5c84f191133924107fae8c1973367161f8ea9e8e313c67a69c18df14"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerApiShadowRunner.js",
+      "bytes": 12482,
+      "sha256": "c5eeff2be47988b66097a4b53ff7fe782c070a0bd11a34a12c58607e6901fe25"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerApiShadowService.js",
+      "bytes": 7598,
+      "sha256": "536c85e7385ce26b95a824333792ec35c0eee47256d632213685cf412ae352a5"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerCacheRuntime.js",
+      "bytes": 4705,
+      "sha256": "5f88769fce4e36da97c3ef7202aba047bd8a18b2944242cf843be6a5e387b508"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerFileLifecycleBoundary.js",
+      "bytes": 6476,
+      "sha256": "4beaf1cc63742eaa9f65a85bf58e23fb383ff69ebdfd87e036acecacede98c77"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerUploadLifecycle.js",
+      "bytes": 8615,
+      "sha256": "97b6da939c53512310a5fa76e7b6a9300236264de08b50013c2955b4b6462be8"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "automation/queryCandidatePlannerUploadLifecycle.schema.json",
+      "bytes": 1575,
+      "sha256": "c0b7e0d8ee865e103b4bc1c32c60011dcda6159cf5a6fa449624b3ae848357fb"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "routes/fileRoutes.js",
+      "bytes": 1316,
+      "sha256": "08d923772737bc0cfe9118da8e23ed749e8b62dd4ca42cef0d25288e4e91cf57"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_1ManifestSmokeTest.js",
+      "bytes": 1770,
+      "sha256": "8211a9312c95b87f9cd232b585d43243f208bdf3c234875cdbd37585803e13b2"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_1RouteContractSmokeTest.js",
+      "bytes": 1951,
+      "sha256": "ead1b5a6d2690106f24de7ef3a0c6dcd4170938055b24525493f27b96155728f"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_1SourceIntegritySmokeTest.js",
+      "bytes": 2009,
+      "sha256": "fdfbf2eead45a5b2bd8dd5612ff0504db89717a8e8098eb45023b04e3cc7020d"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2ApiCacheWiringSmokeTest.js",
+      "bytes": 2838,
+      "sha256": "bdaaab4e938254f00fde8f203f3547390bef4ff3ae749a9bed09963500e14dcd"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2ApiLifecycleObservationSmokeTest.js",
+      "bytes": 2144,
+      "sha256": "7b369abae93944dda6b18895d31a298b0c57755a410be9ac4d15a6114b0e8d5c"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2CacheBlockedBoundarySmokeTest.js",
+      "bytes": 803,
+      "sha256": "7ae3606ca6ac5d11c39a5bc4bf945990e8f637223d13769c9cabdf5fd7bda326"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2CacheRuntimeDefaultSmokeTest.js",
+      "bytes": 491,
+      "sha256": "53cc955d9757c62c1714fb3f2114b5db94b647f5bc10e903913c5923d79167b8"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2DefaultInactiveLifecycleSmokeTest.js",
+      "bytes": 1271,
+      "sha256": "12ae42944fb52f0897e34a92fc2887ab46aa825386639050b98660b69c8df74f"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2DeleteInvalidationSmokeTest.js",
+      "bytes": 1448,
+      "sha256": "d9efd1cea96498b7e6f728c52f396fadc4a95e43bc47644b06004a341cc0155e"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2DownloadRetentionSmokeTest.js",
+      "bytes": 1161,
+      "sha256": "3f367b368a35c5a0fa5f4d783ef6cd160004ae041030d4fcd5abad5a7a2a5200"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2InvalidationFailureIsolationSmokeTest.js",
+      "bytes": 1534,
+      "sha256": "ef79c63a18794ce502d9709d1287276dde96e38786f8e21a64d1187013cbe0cb"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2OperationalInvalidationAdapterSmokeTest.js",
+      "bytes": 2586,
+      "sha256": "b5a75e596498ae7de705f694e56b4e017ef3a2aa8897ea12af704b93c3101386"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2ReuploadInvalidationSmokeTest.js",
+      "bytes": 2814,
+      "sha256": "6c58b4af682010833905c150d1e5af0abfe493cc30c6fd53a510f14c50e94ead"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2RouteContractSmokeTest.js",
+      "bytes": 1124,
+      "sha256": "ce69a8d5e2127792155cfec44758f83d7451013145cabf84753de4b24fcfd918"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2SchemaSmokeTest.js",
+      "bytes": 865,
+      "sha256": "dfaa4ae2f354c644e4e882509183ea741dd2b5377809d8afa7144961d5848f1e"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2SourceIntegritySmokeTest.js",
+      "bytes": 1556,
+      "sha256": "6abcfc1eb235e221e294a39a56bdf6dc7996516b78f23588de597adebefd39d7"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2TestSupport.js",
+      "bytes": 2518,
+      "sha256": "77cd93154f7000391fd5011d378eb630a9e0b1a6afa7fadf746a00be72f8f979"
+    },
+    {
+      "layer": "PATCH14_2",
+      "path": "tests/queryCandidatePatch14_2UploadIdentitySmokeTest.js",
+      "bytes": 1774,
+      "sha256": "f9793ce2b373dbf61804de28b9f7af5872730466373dfcdf55d5c5ef9415195a"
+    }
+  ]
+}

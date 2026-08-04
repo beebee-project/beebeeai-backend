@@ -1,0 +1,66 @@
+{
+  "version": "query_candidate_patch14_3_1_manifest_v1",
+  "patch": "Cumulative Predecessor Integrity Convergence",
+  "mode": "CUMULATIVE_PREDECESSOR_INTEGRITY_CONVERGENCE",
+  "createdAt": "2026-08-04T10:20:00Z",
+  "predecessorContracts": {
+    "patch14_1": "query_candidate_patch14_1_manifest_v1",
+    "patch14_2": "query_candidate_patch14_2_manifest_v1",
+    "patch14_3": "query_candidate_patch14_3_manifest_v1"
+  },
+  "protected": {
+    "patch14_1ActiveFiles": 14,
+    "patch14_2ActiveFiles": 28,
+    "totalActiveFiles": 42,
+    "manifestFiles": 3
+  },
+  "excludedSuccessorFiles": [
+    "routes/automationRoutes.js",
+    "tests/queryCandidatePatch14_2ManifestSmokeTest.js"
+  ],
+  "recovery": {
+    "backupBeforeOverwrite": true,
+    "restoreOnlyOnByteOrHashMismatch": true,
+    "missingActiveFilesCreated": true,
+    "reportsAllRestoredPaths": true
+  },
+  "guardrails": {
+    "productionCodeChanged": false,
+    "patch14_3FilesOverwritten": false,
+    "featureFlagsChanged": false,
+    "railwayEnvironmentChanged": false,
+    "providerCalls": 0,
+    "primaryResponseChanged": false,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false
+  },
+  "packageFiles": [
+    {
+      "path": "applyPatch14_3_1CumulativeIntegrityConvergence.js",
+      "bytes": 6296,
+      "sha256": "26734125cdc5ff58a2084d365b138d7d801ecdb02a69ef746171fc165958d1a0"
+    },
+    {
+      "path": "active_predecessor_files.json",
+      "bytes": 10162,
+      "sha256": "cb73715dad2aa27fa6f36f0c12ed540a5eb28a551fa96242ea67df08e5130d72"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_3_1_CUMULATIVE_INTEGRITY_CONVERGENCE.md",
+      "bytes": 4526,
+      "sha256": "4161b709aac120f4afe886b5b0be7e34717219ca2c0276bdb8a7fe20e0f72f46"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH14_3_1.json",
+      "bytes": 1535,
+      "sha256": "073fd0b38e40880e52d2c5379321c833ce14d7cdb5dddd6825968d86e6f72a1a"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3_1CumulativeIntegrityConvergenceSmokeTest.js",
+      "bytes": 3869,
+      "sha256": "37b6e7086bb37e647546d5d3900790d788b87589c3a217b57ae08b4453e4a09e"
+    }
+  ],
+  "canonicalPayloadFiles": 45,
+  "validation": "PASS_51_OF_51"
+}

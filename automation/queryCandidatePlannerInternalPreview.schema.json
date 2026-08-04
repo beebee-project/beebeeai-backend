@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_internal_preview_v1",
+  "title": "Query Candidate Planner Internal Preview",
+  "type": "object",
+  "required": [
+    "ok",
+    "version",
+    "readOnly",
+    "entries",
+    "summary",
+    "privacy",
+    "productionCandidateMerge",
+    "productionReadyAssignment",
+    "productionRouteChanged"
+  ],
+  "properties": {
+    "ok": { "const": true },
+    "version": { "const": "query_candidate_planner_internal_preview_controller_v1" },
+    "readOnly": { "const": true },
+    "entries": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "id",
+          "observedAt",
+          "status",
+          "latencyMs",
+          "guardrails",
+          "privacy"
+        ],
+        "properties": {
+          "version": { "const": "query_candidate_planner_internal_preview_entry_v1" },
+          "id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "observedAt": { "type": "string", "format": "date-time" },
+          "status": { "type": "string", "maxLength": 60 },
+          "reason": { "type": "string", "maxLength": 120 },
+          "requestFingerprintSha256": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+          "primaryResponseSha256": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+          "latencyMs": { "type": "number", "minimum": 0 },
+          "comparison": { "type": ["object", "null"] },
+          "guardrails": { "type": "object" },
+          "privacy": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": { "type": "object" },
+    "privacy": { "type": "object" },
+    "productionCandidateMerge": { "const": false },
+    "productionReadyAssignment": { "const": false },
+    "productionRouteChanged": { "const": false }
+  },
+  "additionalProperties": false
+}

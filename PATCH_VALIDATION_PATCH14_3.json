@@ -1,0 +1,87 @@
+{
+  "version": "query_candidate_patch14_3_validation_v1",
+  "patch": "Internal UI Preview",
+  "validatedAt": "2026-08-04T09:55:00Z",
+  "runtime": {
+    "node": "v22.16.0",
+    "providerCalls": 0,
+    "externalNetworkCalls": 0
+  },
+  "qa": {
+    "newSmokeCount": 15,
+    "newSmokePass": 15,
+    "syntaxPass": true,
+    "routeCompatibilityPass": true,
+    "sourceCompatibilityPass": true,
+    "schemaPass": true,
+    "manifestSuccessorCompatibilityPass": true
+  },
+  "newSmokeTests": [
+    "queryCandidatePatch14_3DefaultDisabledSmokeTest.js",
+    "queryCandidatePatch14_3AccessControlSmokeTest.js",
+    "queryCandidatePatch14_3StorePrivacySmokeTest.js",
+    "queryCandidatePatch14_3RetentionSmokeTest.js",
+    "queryCandidatePatch14_3FilterSmokeTest.js",
+    "queryCandidatePatch14_3ObservationWiringSmokeTest.js",
+    "queryCandidatePatch14_3ControllerSmokeTest.js",
+    "queryCandidatePatch14_3PageContractSmokeTest.js",
+    "queryCandidatePatch14_3SecurityHeadersSmokeTest.js",
+    "queryCandidatePatch14_3ReadOnlyIsolationSmokeTest.js",
+    "queryCandidatePatch14_3RouteContractSmokeTest.js",
+    "queryCandidatePatch14_3SchemaSmokeTest.js",
+    "queryCandidatePatch14_3SourceIntegritySmokeTest.js",
+    "queryCandidatePatch14_3DisabledRecorderNoopSmokeTest.js",
+    "queryCandidatePatch14_3ManifestSmokeTest.js"
+  ],
+  "compatibility": {
+    "patch14_1RouteContract": "PASS",
+    "patch14_1SourceIntegrity": "PASS",
+    "patch14_2RouteContract": "PASS",
+    "patch14_2SourceIntegrity": "PASS",
+    "patch14_2Schema": "PASS",
+    "patch14_2_1BoundaryRestore": "PASS",
+    "patch14_2_2ProtectedIntegrity": "PASS",
+    "patch14_2Manifest": "SUCCESSOR_COMPATIBLE"
+  },
+  "access": {
+    "defaultEnabled": false,
+    "authenticatedRouteRequired": true,
+    "internalTokenRequired": true,
+    "minimumTokenBytes": 24,
+    "queryTokenAccepted": false,
+    "tokenStorageInPage": "SESSION_STORAGE_ONLY",
+    "tokenLogged": false
+  },
+  "storage": {
+    "persistence": "MEMORY_ONLY",
+    "defaultMaxEntries": 100,
+    "maximumMaxEntries": 500,
+    "defaultTtlMs": 86400000,
+    "clearedOnRestart": true
+  },
+  "privacy": {
+    "rawRowsIncluded": false,
+    "sampleValuesIncluded": false,
+    "fileNameIncluded": false,
+    "originalFileNameIncluded": false,
+    "queryTablesKeyIncluded": false,
+    "tenantIdIncluded": false,
+    "emailIncluded": false,
+    "rawCandidatePayloadIncluded": false,
+    "rawIdentifiersIncluded": false,
+    "rawErrorMessageIncluded": false
+  },
+  "guardrails": {
+    "readOnly": true,
+    "observationOnly": true,
+    "primaryResponseAuthority": true,
+    "responsePayloadMutation": false,
+    "responseHeaderMutation": false,
+    "responseStatusMutation": false,
+    "productionCandidateMerge": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "candidateExecutionAvailable": false,
+    "candidateSelectionAvailable": false
+  }
+}
