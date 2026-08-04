@@ -1,7 +1,11 @@
+"use strict";
+
 const crypto = require("crypto");
 
-const LIFECYCLE_VERSION = "query_candidate_planner_upload_lifecycle_v1";
-const IDENTITY_VERSION = "query_candidate_planner_upload_identity_v1";
+const LIFECYCLE_VERSION =
+  "query_candidate_planner_upload_lifecycle_v1";
+const IDENTITY_VERSION =
+  "query_candidate_planner_upload_identity_v1";
 const INVALIDATION_VERSION =
   "query_candidate_planner_upload_invalidation_wiring_v1";
 
@@ -10,7 +14,8 @@ function text(value) {
 }
 
 function sha256(value) {
-  const serialized = typeof value === "string" ? value : JSON.stringify(value);
+  const serialized =
+    typeof value === "string" ? value : JSON.stringify(value);
   return crypto.createHash("sha256").update(serialized).digest("hex");
 }
 
@@ -68,7 +73,9 @@ function findUploadFileInfo({
   }
   const fileName = requestFileName(request, primaryPayload);
   if (fileName) {
-    const byName = files.find((file) => text(file?.originalName) === fileName);
+    const byName = files.find(
+      (file) => text(file?.originalName) === fileName,
+    );
     if (byName) return byName;
   }
   return null;
@@ -140,9 +147,7 @@ function deriveQueryCandidatePlannerUploadIdentity({
     primaryPayload.sheetStateSig || resolvedFile?.sheetStateSig,
   );
   const stableUploadObject =
-    queryObjectIdentity ||
-    storageObjectIdentity ||
-    `${fileHash}:${sheetStateSig}`;
+    queryObjectIdentity || storageObjectIdentity || `${fileHash}:${sheetStateSig}`;
 
   if (!stableUploadObject) {
     return Object.freeze({
@@ -215,9 +220,7 @@ function resolveInvalidationFunction(moduleValue = {}) {
   if (typeof moduleValue.invalidateCandidatePlannerUploadCache === "function") {
     return moduleValue.invalidateCandidatePlannerUploadCache;
   }
-  if (
-    typeof moduleValue.invalidateQueryCandidatePlannerUploadCache === "function"
-  ) {
+  if (typeof moduleValue.invalidateQueryCandidatePlannerUploadCache === "function") {
     return moduleValue.invalidateQueryCandidatePlannerUploadCache;
   }
   return null;
@@ -281,16 +284,13 @@ async function invalidateQueryCandidatePlannerUploadCache({
     status: "INVALIDATED",
     reason,
     invalidated: true,
-    result:
-      result && typeof result === "object"
-        ? Object.freeze({
-            version: text(result.version),
-            status: text(result.status),
-            invalidatedCount: Number(
-              result.invalidatedCount || result.count || 0,
-            ),
-          })
-        : null,
+    result: result && typeof result === "object"
+      ? Object.freeze({
+          version: text(result.version),
+          status: text(result.status),
+          invalidatedCount: Number(result.invalidatedCount || result.count || 0),
+        })
+      : null,
     identity: publicUploadIdentity(identity),
     privacy: Object.freeze({
       tenantIdIncluded: false,

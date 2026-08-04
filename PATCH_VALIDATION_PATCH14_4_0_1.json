@@ -1,0 +1,35 @@
+{
+  "version": "query_candidate_patch14_4_0_1_validation_v1",
+  "patch": "Install Packaging + Cumulative Integrity Repair",
+  "assembledAt": "2026-08-04T10:55:00.000Z",
+  "validated": true,
+  "findings": {
+    "originalPatch14_4ArchiveHadExtraTopLevelDirectory": true,
+    "originalPatch14_4WasInstalledAtRepositoryRoot": false,
+    "patch14_4TestsWereDiscovered": false,
+    "predecessorManifestDriftWasIndependentOfPatch14_4RuntimeCode": true
+  },
+  "repair": {
+    "patch14_1And14_2ConvergenceReused": true,
+    "patch14_3CanonicalPayloadRestored": true,
+    "patch14_4RootPayloadInstalled": true,
+    "backupBeforeOverwrite": true,
+    "productionMergeWired": false,
+    "providerCalls": 0
+  },
+  "expected": {
+    "patch14_4SmokeTests": 15,
+    "productionMergeDefaultEnabled": false,
+    "routeChangedByPatch14_4": false,
+    "controllerChangedByPatch14_4": false
+  },
+  "qa": {
+    "repairSimulation": "PASS",
+    "simulatedPredecessorDriftFiles": 8,
+    "simulatedPatch14_3DriftFiles": 1,
+    "patch14_4FilesCreated": 20,
+    "patch14_0Through14_4SmokeTests": "67/67 PASS",
+    "providerCalls": 0,
+    "productionMergeWired": false
+  }
+}

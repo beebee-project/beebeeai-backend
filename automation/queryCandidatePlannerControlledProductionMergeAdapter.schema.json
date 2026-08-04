@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_controlled_production_merge_adapter.schema.json",
+  "title": "Query Candidate Planner Controlled Production Merge Adapter Result",
+  "type": "object",
+  "required": [
+    "version",
+    "adapterVersion",
+    "status",
+    "reason",
+    "applied",
+    "plan",
+    "guardrails"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_controlled_production_merge_result_v1"
+    },
+    "adapterVersion": {
+      "const": "query_candidate_planner_controlled_production_merge_adapter_v1"
+    },
+    "status": {
+      "enum": ["BLOCKED", "DRY_RUN_READY", "MERGED_COPY_READY"]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "applied": { "type": "boolean" },
+    "authorization": { "type": ["object", "null"] },
+    "plan": {
+      "type": "object",
+      "required": [
+        "version",
+        "adapterVersion",
+        "status",
+        "reason",
+        "candidateProjection",
+        "counts",
+        "fingerprints",
+        "guardrails"
+      ]
+    },
+    "mergedPayload": { "type": ["object", "null"] },
+    "primaryPayloadUnchanged": { "type": "boolean" },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "defaultEnabled",
+        "routeWired",
+        "controllerWired",
+        "primaryResponseAuthority",
+        "primaryPayloadMutated",
+        "responsePayloadMutation",
+        "responseHeaderMutation",
+        "responseStatusMutation",
+        "productionReadyAssignment",
+        "productionRouteChanged",
+        "sourceCandidateStatusMutation",
+        "promotionGateRequired",
+        "failClosed"
+      ],
+      "properties": {
+        "defaultEnabled": { "const": false },
+        "routeWired": { "const": false },
+        "controllerWired": { "const": false },
+        "primaryResponseAuthority": { "const": true },
+        "primaryPayloadMutated": { "const": false },
+        "responsePayloadMutation": { "const": false },
+        "responseHeaderMutation": { "const": false },
+        "responseStatusMutation": { "const": false },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false },
+        "sourceCandidateStatusMutation": { "const": false },
+        "promotionGateRequired": { "const": true },
+        "failClosed": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,74 @@
+{
+  "version": "query_candidate_patch14_4_validation_v1",
+  "patch": "Controlled Production Merge Adapter",
+  "validatedAt": "2026-08-04T11:30:00Z",
+  "runtime": {
+    "node": "v22.16.0",
+    "providerCalls": 0,
+    "externalNetworkCalls": 0
+  },
+  "qa": {
+    "newSmokeCount": 15,
+    "newSmokePass": 15,
+    "syntaxPass": true,
+    "defaultOffPass": true,
+    "productionKillSwitchPass": true,
+    "readinessEvidencePass": true,
+    "promotionGateRequiredPass": true,
+    "candidateContractProjectionPass": true,
+    "deterministicRankingPass": true,
+    "primaryPayloadNoMutationPass": true,
+    "routeIsolationPass": true,
+    "schemaPass": true,
+    "sourceIntegrityPass": true,
+    "manifestPass": true
+  },
+  "newSmokeTests": [
+    "queryCandidatePatch14_4CandidateMappingSmokeTest.js",
+    "queryCandidatePatch14_4DefaultOffSmokeTest.js",
+    "queryCandidatePatch14_4DeterministicRankingSmokeTest.js",
+    "queryCandidatePatch14_4DryRunSmokeTest.js",
+    "queryCandidatePatch14_4InvalidInputSmokeTest.js",
+    "queryCandidatePatch14_4ManifestSmokeTest.js",
+    "queryCandidatePatch14_4NoMutationSmokeTest.js",
+    "queryCandidatePatch14_4NoShadowCandidatesSmokeTest.js",
+    "queryCandidatePatch14_4ProductionKillSwitchSmokeTest.js",
+    "queryCandidatePatch14_4PromotionGateRequiredSmokeTest.js",
+    "queryCandidatePatch14_4ReadinessEvidenceSmokeTest.js",
+    "queryCandidatePatch14_4ReadyAssignmentGuardrailSmokeTest.js",
+    "queryCandidatePatch14_4RouteIsolationSmokeTest.js",
+    "queryCandidatePatch14_4SchemaSmokeTest.js",
+    "queryCandidatePatch14_4SourceIntegritySmokeTest.js"
+  ],
+  "compatibility": {
+    "existingFilesReplaced": 0,
+    "routeChanges": 0,
+    "controllerChanges": 0,
+    "patch14_0Regression": "PASS",
+    "patch14_1Regression": "PASS",
+    "patch14_2Regression": "PASS",
+    "patch14_3Regression": "PASS",
+    "patch14_3_1Regression": "PASS"
+  },
+  "authorization": {
+    "featureControlRequired": true,
+    "readinessEvidenceRequired": true,
+    "promotionGateDecisionRequired": true,
+    "promotionGateImplementedByPatch14_4": false,
+    "defaultAllowed": false,
+    "failClosed": true
+  },
+  "guardrails": {
+    "defaultEnabled": false,
+    "routeWired": false,
+    "controllerWired": false,
+    "primaryResponseAuthority": true,
+    "primaryPayloadMutated": false,
+    "responsePayloadMutation": false,
+    "responseHeaderMutation": false,
+    "responseStatusMutation": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "sourceCandidateStatusMutation": false
+  }
+}

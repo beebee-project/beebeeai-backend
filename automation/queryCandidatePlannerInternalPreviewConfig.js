@@ -1,9 +1,13 @@
+"use strict";
+
 const crypto = require("crypto");
 
-const CONFIG_VERSION = "query_candidate_planner_internal_preview_config_v1";
+const CONFIG_VERSION =
+  "query_candidate_planner_internal_preview_config_v1";
 const ENABLED_ENV = "QUERY_CANDIDATE_INTERNAL_PREVIEW_ENABLED";
 const TOKEN_ENV = "QUERY_CANDIDATE_INTERNAL_PREVIEW_TOKEN";
-const MAX_ENTRIES_ENV = "QUERY_CANDIDATE_INTERNAL_PREVIEW_MAX_ENTRIES";
+const MAX_ENTRIES_ENV =
+  "QUERY_CANDIDATE_INTERNAL_PREVIEW_MAX_ENTRIES";
 const TTL_MS_ENV = "QUERY_CANDIDATE_INTERNAL_PREVIEW_TTL_MS";
 const MIN_TOKEN_BYTES = 24;
 const DEFAULT_MAX_ENTRIES = 100;

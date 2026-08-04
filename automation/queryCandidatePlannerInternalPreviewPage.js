@@ -1,4 +1,7 @@
-const PAGE_VERSION = "query_candidate_planner_internal_preview_page_v1";
+"use strict";
+
+const PAGE_VERSION =
+  "query_candidate_planner_internal_preview_page_v1";
 
 function buildQueryCandidatePlannerInternalPreviewHtml({ nonce = "" } = {}) {
   const safeNonce = String(nonce || "").replace(/[^a-zA-Z0-9_-]/g, "");

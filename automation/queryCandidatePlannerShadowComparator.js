@@ -1,6 +1,9 @@
+"use strict";
+
 const crypto = require("crypto");
 
-const COMPARATOR_VERSION = "query_candidate_planner_api_shadow_comparator_v1";
+const COMPARATOR_VERSION =
+  "query_candidate_planner_api_shadow_comparator_v1";
 const COMPARATOR_POLICY_VERSION =
   "api_shadow_candidate_rank_comparison_policy_v1";
 
@@ -16,7 +19,9 @@ function canonicalize(value) {
 
 function sha256(value) {
   const text =
-    typeof value === "string" ? value : JSON.stringify(canonicalize(value));
+    typeof value === "string"
+      ? value
+      : JSON.stringify(canonicalize(value));
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
@@ -39,8 +44,12 @@ function candidateIdentity(candidate = {}, fallbackIndex = 0) {
       text(candidate.candidateType) ||
       text(candidate.type) ||
       text(candidate.recipeType),
-    tableId: text(candidate.tableId) || text(candidate.sourceTableId),
-    operation: text(candidate.operation) || text(candidate.recipeType),
+    tableId:
+      text(candidate.tableId) ||
+      text(candidate.sourceTableId),
+    operation:
+      text(candidate.operation) ||
+      text(candidate.recipeType),
     fallbackIndex,
   };
   return `structural:${sha256(structural)}`;
@@ -100,16 +109,10 @@ function extractShadowCandidates(shadowResolution = {}) {
 
   const ordered = [...ranked].sort((left, right) => {
     const leftRank = Number(
-      left.shadowRank ??
-        left.rank ??
-        left.ranking?.rank ??
-        Number.MAX_SAFE_INTEGER,
+      left.shadowRank ?? left.rank ?? left.ranking?.rank ?? Number.MAX_SAFE_INTEGER,
     );
     const rightRank = Number(
-      right.shadowRank ??
-        right.rank ??
-        right.ranking?.rank ??
-        Number.MAX_SAFE_INTEGER,
+      right.shadowRank ?? right.rank ?? right.ranking?.rank ?? Number.MAX_SAFE_INTEGER,
     );
     return leftRank - rightRank;
   });
@@ -122,9 +125,9 @@ function round(value, digits = 4) {
 }
 
 function hashedIdentities(entries = [], limit = 20) {
-  return entries
-    .slice(0, limit)
-    .map((entry) => sha256(`candidate-identity:${entry.identity}`));
+  return entries.slice(0, limit).map((entry) =>
+    sha256(`candidate-identity:${entry.identity}`),
+  );
 }
 
 function compareCandidatePlannerShadow({
@@ -172,7 +175,9 @@ function compareCandidatePlannerShadow({
     primaryIds.length === shadowIds.length &&
     primaryIds.every((id, index) => shadowIds[index] === id);
   const top1Same = Boolean(
-    primaryIds.length && shadowIds.length && primaryIds[0] === shadowIds[0],
+    primaryIds.length &&
+      shadowIds.length &&
+      primaryIds[0] === shadowIds[0],
   );
   const jaccard = unionSize ? shared.length / unionSize : 1;
 

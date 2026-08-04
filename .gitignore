@@ -33,3 +33,5 @@ Thumbs.db
 .vscode/
 .idea/_patch*/
 .patch_backups/
+_patch*/
+query_candidate_patch*.zip

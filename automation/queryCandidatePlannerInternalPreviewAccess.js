@@ -1,8 +1,11 @@
+"use strict";
+
 const {
   getQueryCandidatePlannerInternalPreviewConfig,
 } = require("./queryCandidatePlannerInternalPreviewConfig");
 
-const ACCESS_VERSION = "query_candidate_planner_internal_preview_access_v1";
+const ACCESS_VERSION =
+  "query_candidate_planner_internal_preview_access_v1";
 const TOKEN_HEADER = "x-beebee-internal-preview-token";
 
 function headerValue(req, name) {
@@ -27,7 +30,11 @@ function forbidden(res) {
   });
 }
 
-function requireQueryCandidatePlannerInternalPreviewAccess(req, res, next) {
+function requireQueryCandidatePlannerInternalPreviewAccess(
+  req,
+  res,
+  next,
+) {
   const config = getQueryCandidatePlannerInternalPreviewConfig();
   if (!config.enabled) return notFound(res);
 

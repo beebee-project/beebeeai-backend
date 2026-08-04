@@ -1,8 +1,11 @@
+"use strict";
+
 const {
   createQueryCandidatePlannerFeatureControl,
 } = require("./queryCandidatePlannerFeatureControl");
 
-const RUNTIME_VERSION = "query_candidate_planner_feature_control_runtime_v1";
+const RUNTIME_VERSION =
+  "query_candidate_planner_feature_control_runtime_v1";
 
 let runtimeControl = null;
 

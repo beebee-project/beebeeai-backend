@@ -1,15 +1,17 @@
+"use strict";
+
 const crypto = require("crypto");
 const {
   getQueryCandidatePlannerInternalPreviewConfig,
 } = require("./queryCandidatePlannerInternalPreviewConfig");
 
-const STORE_VERSION = "query_candidate_planner_internal_preview_store_v1";
-const ENTRY_VERSION = "query_candidate_planner_internal_preview_entry_v1";
+const STORE_VERSION =
+  "query_candidate_planner_internal_preview_store_v1";
+const ENTRY_VERSION =
+  "query_candidate_planner_internal_preview_entry_v1";
 
 function text(value, maxLength = 160) {
-  return String(value == null ? "" : value)
-    .trim()
-    .slice(0, maxLength);
+  return String(value == null ? "" : value).trim().slice(0, maxLength);
 }
 
 function number(value, fallback = 0) {
@@ -73,8 +75,12 @@ function sanitizeComparison(comparison = null) {
       primaryOrderSha256: safeSha256(
         comparison.fingerprints?.primaryOrderSha256,
       ),
-      shadowOrderSha256: safeSha256(comparison.fingerprints?.shadowOrderSha256),
-      sharedSetSha256: safeSha256(comparison.fingerprints?.sharedSetSha256),
+      shadowOrderSha256: safeSha256(
+        comparison.fingerprints?.shadowOrderSha256,
+      ),
+      sharedSetSha256: safeSha256(
+        comparison.fingerprints?.sharedSetSha256,
+      ),
       rawIdentifiersIncluded: false,
     }),
   });
@@ -86,7 +92,9 @@ function sanitizeCacheIdentity(identity = {}) {
     complete: identity.complete === true,
     reason: text(identity.reason, 120),
     source: text(identity.source, 80),
-    uploadFingerprintSha256: safeSha256(identity.uploadFingerprintSha256),
+    uploadFingerprintSha256: safeSha256(
+      identity.uploadFingerprintSha256,
+    ),
     queryJsonSha256: safeSha256(identity.queryJsonSha256),
     tenantIdIncluded: false,
     originalFileNameIncluded: false,
@@ -97,7 +105,8 @@ function sanitizeCacheIdentity(identity = {}) {
 function sanitizeGuardrails(guardrails = {}) {
   return Object.freeze({
     shadowOnly: guardrails.shadowOnly !== false,
-    primaryResponseAuthority: guardrails.primaryResponseAuthority !== false,
+    primaryResponseAuthority:
+      guardrails.primaryResponseAuthority !== false,
     responsePayloadMutation: false,
     responseHeaderMutation: false,
     responseStatusMutation: false,
@@ -109,23 +118,23 @@ function sanitizeGuardrails(guardrails = {}) {
   });
 }
 
-function sanitizeObservation(
-  observation = {},
-  { observedAt = new Date().toISOString(), sequence = 0 } = {},
-) {
+function sanitizeObservation(observation = {}, {
+  observedAt = new Date().toISOString(),
+  sequence = 0,
+} = {}) {
   const requestFingerprintSha256 = safeSha256(
     observation.requestFingerprintSha256,
   );
-  const primaryResponseSha256 = safeSha256(observation.primaryResponseSha256);
-  const id = sha256(
-    [
-      ENTRY_VERSION,
-      observedAt,
-      sequence,
-      requestFingerprintSha256,
-      text(observation.status),
-    ].join(":"),
+  const primaryResponseSha256 = safeSha256(
+    observation.primaryResponseSha256,
   );
+  const id = sha256([
+    ENTRY_VERSION,
+    observedAt,
+    sequence,
+    requestFingerprintSha256,
+    text(observation.status),
+  ].join(":"));
 
   return Object.freeze({
     version: ENTRY_VERSION,
@@ -135,7 +144,8 @@ function sanitizeObservation(
     reason: text(observation.reason, 120),
     requestFingerprintSha256,
     primaryResponseSha256,
-    primaryResponseUnchanged: observation.primaryResponseUnchanged !== false,
+    primaryResponseUnchanged:
+      observation.primaryResponseUnchanged !== false,
     latencyMs: Math.max(0, number(observation.latencyMs)),
     decisions: Object.freeze({
       shadow: sanitizeDecision(observation.featureDecision),
@@ -145,7 +155,10 @@ function sanitizeObservation(
     }),
     shadow: Object.freeze({
       status: text(observation.shadow?.status, 80),
-      invocationStatus: text(observation.shadow?.invocationStatus, 80),
+      invocationStatus: text(
+        observation.shadow?.invocationStatus,
+        80,
+      ),
       providerCallCount: Math.max(
         0,
         number(observation.shadow?.providerCallCount),
@@ -156,9 +169,13 @@ function sanitizeObservation(
       productionRouteChanged: false,
     }),
     cacheLifecycle: Object.freeze({
-      identity: sanitizeCacheIdentity(observation.cacheLifecycle?.identity),
-      cacheReadAllowed: observation.cacheLifecycle?.cacheReadAllowed === true,
-      cacheWriteAllowed: observation.cacheLifecycle?.cacheWriteAllowed === true,
+      identity: sanitizeCacheIdentity(
+        observation.cacheLifecycle?.identity,
+      ),
+      cacheReadAllowed:
+        observation.cacheLifecycle?.cacheReadAllowed === true,
+      cacheWriteAllowed:
+        observation.cacheLifecycle?.cacheWriteAllowed === true,
       tenantIdIncluded: false,
       cacheSecretIncluded: false,
     }),
@@ -311,7 +328,9 @@ function recordQueryCandidatePlannerInternalPreviewObservation(
   const config = getQueryCandidatePlannerInternalPreviewConfig();
   if (!config.enabled) return null;
   try {
-    return getQueryCandidatePlannerInternalPreviewStore().record(observation);
+    return getQueryCandidatePlannerInternalPreviewStore().record(
+      observation,
+    );
   } catch (_error) {
     return null;
   }

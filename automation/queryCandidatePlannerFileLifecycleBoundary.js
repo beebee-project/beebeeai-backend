@@ -1,3 +1,5 @@
+"use strict";
+
 const {
   getQueryCandidatePlannerCacheRuntime,
 } = require("./queryCandidatePlannerCacheRuntime");
@@ -7,7 +9,8 @@ const {
   invalidateQueryCandidatePlannerUploadCache,
 } = require("./queryCandidatePlannerUploadLifecycle");
 
-const BOUNDARY_VERSION = "query_candidate_planner_file_lifecycle_boundary_v1";
+const BOUNDARY_VERSION =
+  "query_candidate_planner_file_lifecycle_boundary_v1";
 
 function text(value) {
   return String(value == null ? "" : value).trim();
@@ -32,7 +35,9 @@ function existingUploadForRequest(request = {}, action = "") {
       ? requestedOriginalName(request)
       : text(request.params?.originalName);
   if (!targetName) return null;
-  return files.find((file) => text(file?.originalName) === targetName) || null;
+  return files.find(
+    (file) => text(file?.originalName) === targetName,
+  ) || null;
 }
 
 function lifecycleObservation({
@@ -75,12 +80,11 @@ function setObservation(res, observation, task = null) {
 }
 
 function defaultLogger(observation = {}) {
-  if (
-    ["RETAINED", "NO_ACTIVE_CACHE", "NO_PREVIOUS_UPLOAD"].includes(
-      observation.cacheDisposition,
-    )
-  )
-    return;
+  if ([
+    "RETAINED",
+    "NO_ACTIVE_CACHE",
+    "NO_PREVIOUS_UPLOAD",
+  ].includes(observation.cacheDisposition)) return;
   console.info("[query-candidate-cache-lifecycle]", {
     version: observation.version,
     action: observation.action,
@@ -183,9 +187,7 @@ function createQueryCandidatePlannerDownloadRetentionBoundary({
   onObservation = defaultLogger,
 } = {}) {
   if (typeof handler !== "function") {
-    throw new TypeError(
-      "download retention boundary handler must be a function",
-    );
+    throw new TypeError("download retention boundary handler must be a function");
   }
   return async function queryCandidatePlannerDownloadRetentionBoundary(
     req,

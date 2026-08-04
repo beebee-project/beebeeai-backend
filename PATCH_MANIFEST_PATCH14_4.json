@@ -1,0 +1,151 @@
+{
+  "version": "query_candidate_patch14_4_manifest_v1",
+  "patch": "Controlled Production Merge Adapter",
+  "createdAt": "2026-08-04T11:35:00Z",
+  "fileCount": 20,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH14_4.json",
+      "bytes": 2546,
+      "sha256": "affc7166200313ddedb31add8100a27dfcb01635ecbe251919b692aa09a70bf4"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH14_4_CONTROLLED_PRODUCTION_MERGE_ADAPTER.md",
+      "bytes": 5258,
+      "sha256": "c73405fb7deb7ae78227bb93041c2cfc44339567921061fc81eecfa386490a49"
+    },
+    {
+      "path": "automation/queryCandidatePlannerControlledProductionMergeAdapter.js",
+      "bytes": 14923,
+      "sha256": "0019e27a054aea95bdb1dc435e27e14491f9e3c22dec63875fee7fb38a32b7c8"
+    },
+    {
+      "path": "automation/queryCandidatePlannerControlledProductionMergeAdapter.schema.json",
+      "bytes": 2463,
+      "sha256": "aef19dbdb54551e54ef362b3185cef6f9b0fd52a0cdc3110fc49368867112fcc"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4TestSupport.js",
+      "bytes": 3798,
+      "sha256": "6e95f890eb65dfc586feec0bb4806254ae9336f8e69a63cb559c62c2a734c9f3"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4CandidateMappingSmokeTest.js",
+      "bytes": 1171,
+      "sha256": "c4fb01d529c713629ed15ba2e8f70a1b813c1ecdc839ad499c8bf602d419b53e"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4DefaultOffSmokeTest.js",
+      "bytes": 921,
+      "sha256": "0fb74b1ded61c9b7a79284f5d5be66ce77390392d01fcd7205e1fe89ac0fa70f"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4DeterministicRankingSmokeTest.js",
+      "bytes": 1088,
+      "sha256": "1f5237bf64818035f343af0ec65804a58226357352944aa22c13f3f40ad01fe6"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4DryRunSmokeTest.js",
+      "bytes": 867,
+      "sha256": "c5551792e720650903dfd45d1e007209e0e285bc04bd8e5604433a19bd678354"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4InvalidInputSmokeTest.js",
+      "bytes": 655,
+      "sha256": "678b6c3f8bf50389c971f1bcd9d820fc07a5f2d8ee68152eac1254fcb5b4392b"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4ManifestSmokeTest.js",
+      "bytes": 2096,
+      "sha256": "9cec022c100a0b74812736fc28af23e93859e982f4cc10f6932900b3971a05bb"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4NoMutationSmokeTest.js",
+      "bytes": 1253,
+      "sha256": "8e1fb39730429d5ca06c6900e937204675c3f066a28d0d29d2b4622751e5fb20"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4NoShadowCandidatesSmokeTest.js",
+      "bytes": 810,
+      "sha256": "cbbbf50f8b9d4e1a4dc16b1ab9cc8f6c0820fc97bba2e900a5ebeb30c8938fa9"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4ProductionKillSwitchSmokeTest.js",
+      "bytes": 909,
+      "sha256": "8bb87c7aae065307f6a1f1ccebd14f6b3f2ebf4ff86550510fd78ac3972c195f"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4PromotionGateRequiredSmokeTest.js",
+      "bytes": 948,
+      "sha256": "f91657da429d63bf3c65420f4c522649b2c80e15ac46f9bb29d1b83922ff71cf"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4ReadinessEvidenceSmokeTest.js",
+      "bytes": 845,
+      "sha256": "dc35c74581746fdf6c74c240d175602dd491ad7227c90853b985eebb7a27a9e1"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4ReadyAssignmentGuardrailSmokeTest.js",
+      "bytes": 1068,
+      "sha256": "79230342a6eda57dd41ab490874d5b92b11611bac34baaf283492438d7616191"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4RouteIsolationSmokeTest.js",
+      "bytes": 631,
+      "sha256": "d58ac4ee0d7ef9217981df87a6914f7bcca356ed618e988c7dd09bbf7d198545"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4SchemaSmokeTest.js",
+      "bytes": 939,
+      "sha256": "40a84135ae80060ebd13ec609ce539c37aedd7baec1f68368e8a1c3267a3eb82"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_4SourceIntegritySmokeTest.js",
+      "bytes": 1449,
+      "sha256": "40b252d04b8a66943647d0460ffc097bbd38e57031c46781eb1a12c01547bb51"
+    }
+  ],
+  "changeSet": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0,
+    "featureControlFilesChanged": 0,
+    "predecessorManifestFilesChanged": 0,
+    "undeclaredDriftAllowed": false
+  },
+  "authorization": {
+    "featureControlRequired": true,
+    "readinessEvidenceRequired": true,
+    "promotionGateDecisionRequired": true,
+    "promotionGateDecisionVersion": "query_candidate_planner_controlled_production_promotion_gate_decision_v1",
+    "promotionGateImplemented": false,
+    "defaultAllowed": false,
+    "failClosed": true
+  },
+  "projection": {
+    "topCandidates": true,
+    "recommendedCandidates": true,
+    "analysisRecipeCandidates": true,
+    "businessTemplateCandidates": true,
+    "multiSourceCandidates": true,
+    "categoryCandidates": true,
+    "dashboardCandidates": true,
+    "unknownCandidateFieldsCopied": false,
+    "readyStatusProjected": false
+  },
+  "guardrails": {
+    "defaultEnabled": false,
+    "routeWired": false,
+    "controllerWired": false,
+    "primaryResponseAuthority": true,
+    "primaryPayloadMutated": false,
+    "responsePayloadMutation": false,
+    "responseHeaderMutation": false,
+    "responseStatusMutation": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "sourceCandidateStatusMutation": false,
+    "providerCalls": 0
+  }
+}
