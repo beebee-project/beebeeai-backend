@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_internal_allowlist_canary_result_v1",
+  "title": "Query Candidate Planner Internal Allowlist Canary Result",
+  "type": "object",
+  "required": [
+    "version",
+    "status",
+    "reason",
+    "responseSource",
+    "guardrails"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_internal_allowlist_canary_result_v1"
+    },
+    "status": {
+      "enum": [
+        "PRIMARY_BLOCKED",
+        "CANARY_MERGED",
+        "PRIMARY_FALLBACK"
+      ]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "responseSource": {
+      "enum": ["PRIMARY", "CONTROLLED_PLANNER"]
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "allowlistOnly",
+        "generalUsersBlocked",
+        "rolloutPercent",
+        "primaryFallbackAvailable",
+        "productionReadyAssignment",
+        "productionRouteChanged",
+        "plannerEscalationAllowed",
+        "semanticProfilerOnly",
+        "failClosed"
+      ],
+      "properties": {
+        "allowlistOnly": { "const": true },
+        "generalUsersBlocked": { "const": true },
+        "rolloutPercent": { "const": 0 },
+        "primaryFallbackAvailable": { "const": true },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false },
+        "plannerEscalationAllowed": { "const": false },
+        "semanticProfilerOnly": { "const": true },
+        "failClosed": { "const": true }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

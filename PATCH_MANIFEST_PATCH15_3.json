@@ -1,0 +1,290 @@
+{
+  "version": "query_candidate_patch15_3_manifest_v1",
+  "patch": "Internal Allowlist Canary",
+  "createdAt": "2026-08-05T06:45:00.000Z",
+  "fileCount": 48,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3.json",
+      "bytes": 821,
+      "sha256": "13bcb18ec04c70df504f9c07d4a2ad08af10a2ee5f4ca7cc8aab5641d3ee7247"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_INTERNAL_ALLOWLIST_CANARY.md",
+      "bytes": 8885,
+      "sha256": "d4b5a8f0a9d0fc872f69eb8c9243e162e15830de4fdccb537e3105f2e8d4f3c1"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanarySubject.js",
+      "bytes": 2552,
+      "sha256": "5d81c034d585a179d539aab0dc63a6ed63fdb0107bea94e490a174525b744a0b"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalAllowlistCanaryConfig.js",
+      "bytes": 3969,
+      "sha256": "ea074610dd7eb3ae4dc94c96e60185de20c567a67fcb1b2d7cdfed2e12dba9d5"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryEvidence.js",
+      "bytes": 6251,
+      "sha256": "ff0dd62197ab71defde7803089be13fa1d0a55cfcd5b041a9e3fcbfe1808df46"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalAllowlistCanaryService.js",
+      "bytes": 16738,
+      "sha256": "116bb4de2ac60bfb4e73a364717408a1512363973f441920493f826f69752dd5"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalAllowlistCanaryBoundary.js",
+      "bytes": 8405,
+      "sha256": "8d0ec443a310cef913015b7b3c30117bcca9e53b21abe27f1d0bb3778df41ef1"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalAllowlistCanary.schema.json",
+      "bytes": 1615,
+      "sha256": "61a7be0cfe982ecd131e61b001be0e36ea63ba7d59724174eed0abfa66089383"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryEvidence.schema.json",
+      "bytes": 1121,
+      "sha256": "2a08b1e94b4667bf57cacccd2871b2a5ce316d1a2fc0d20c9c16a631eb57fbba"
+    },
+    {
+      "path": "routes/automationRoutes.js",
+      "bytes": 3143,
+      "sha256": "21301a3c38aa02bb0806d7d1a1ac32f9c0371ef2873e351bee1c7a787ef75df4"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerCanarySubjectHash.js",
+      "bytes": 548,
+      "sha256": "4c5b9cf7dfb93be1f03ad7979c7cafdc85111b76535c5246502623634d8fbc41"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_2ManifestSmokeTest.js",
+      "bytes": 2811,
+      "sha256": "594646171f5d69db56c28f32e0b855e78be65df9783dad941ffc22d44d87a9af"
+    },
+    {
+      "path": "tests/queryCandidatePatch14_3ManifestSmokeTest.js",
+      "bytes": 3076,
+      "sha256": "8de2f46258a0466a29cdf97ed5d2a2bb42b90e46f38b29966d125769266bcb17"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3AllowlistMatchSmokeTest.js",
+      "bytes": 725,
+      "sha256": "5899cf8350fce522daeb79c4b7636a95b79086d05ad4a7851b93c16eea41cf49"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3AudienceAllowlistOnlySmokeTest.js",
+      "bytes": 846,
+      "sha256": "6ae7d4d39e59786842e2907410eef8fed13371e8ff8438b4ba95a6094d4913b6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3BoundaryBlockedPrimarySmokeTest.js",
+      "bytes": 972,
+      "sha256": "8b8597c9ed117b5d6195c9f262330d5a774149b08a2c3a4754acbd1fb332a548"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3BoundaryFailureIsolationSmokeTest.js",
+      "bytes": 925,
+      "sha256": "46b3e039dcefa5028bb832163c00fc42e45b82cb9599209d21dd938937ff1a36"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3BoundaryMergeSmokeTest.js",
+      "bytes": 984,
+      "sha256": "eb418eb58d9812c5b3de572706ab604fba9db6422e4137d76b2e2103b7b2d366"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3CanaryKillSwitchSmokeTest.js",
+      "bytes": 715,
+      "sha256": "7eb5876a96c7269b3eac4a8b6b9ddce743bbbdf8ef2a48c51d28b34150524148"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3DefaultBlockedSmokeTest.js",
+      "bytes": 488,
+      "sha256": "f5b8f16ad6cddf5e11202f4985c8252b75373beac5f1fdae08afe2a3074fe584"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3EvidencePrivacySmokeTest.js",
+      "bytes": 628,
+      "sha256": "44d64b52d16a6f228c655e96c1cefe37a112c8c6bd9d0f523ec7ea3389477655"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ExpiredEvidenceSmokeTest.js",
+      "bytes": 662,
+      "sha256": "41290ffdd74d6d5b5213ab06258f2be5f1e34bb2dddf062fea32abb93cd21852"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3GeneralUserBlockedSmokeTest.js",
+      "bytes": 711,
+      "sha256": "8ed446d0a9136c24cd58cb34381e466c39edba6c616a0c8cc901192b419f14f1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3GlobalKillSwitchSmokeTest.js",
+      "bytes": 692,
+      "sha256": "ff636a631e5689d05f831bbc918f9537e997faecfd124e761246a8834545965a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3InvalidConfigSmokeTest.js",
+      "bytes": 602,
+      "sha256": "3dedea9b93face962c5033d81efd3abf2125c7249729db6750039132f614493f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3LlmPolicyPassThroughSmokeTest.js",
+      "bytes": 793,
+      "sha256": "26191e8c714e9fc8f837552c8b01f674535dfc59fec017ac8e438229c55285f5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ManifestSmokeTest.js",
+      "bytes": 2669,
+      "sha256": "12a0291a797fbd0b1344895ccb214f499b9461b5327b6c0996d89df42ca3e1ba"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3MergeAdapterFailureSmokeTest.js",
+      "bytes": 836,
+      "sha256": "d847bf550b4ddbf4abcc3612fb8fd40d61bf1e4ff60f1a031f41d81821768da8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3MergeSuccessSmokeTest.js",
+      "bytes": 940,
+      "sha256": "45d1d3fc6e04166465d30adb251e674ea982dc257a9bca5efb41ed00ef4a3372"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3NoCandidatesFallbackSmokeTest.js",
+      "bytes": 768,
+      "sha256": "779eb2cd1a68613b4afc55787580248c8e3952948fe23fb2297f6bd466efd75f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3NoMutationSmokeTest.js",
+      "bytes": 720,
+      "sha256": "895197ba7671352395bd616fdd08e5218c5f6d064f834675bdeec6073ebacca3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ObservationPrivacySmokeTest.js",
+      "bytes": 912,
+      "sha256": "1c3d0e652957be2ec4e9707ceb834c7ad12ce077b1885a8707792fd71f1cfe4f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3PlannerEscalationBlockedSmokeTest.js",
+      "bytes": 802,
+      "sha256": "cd23812661f2c1bf092a0f106b2319c96812d3bc6562a4e1e5f9becfb9efd31a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ProductionKillSwitchSmokeTest.js",
+      "bytes": 711,
+      "sha256": "b3fa7b18200c4326fd302caf746e2cdd53d1ef52feff468e03d36db7baf12f46"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ProfilerOnlyPolicySmokeTest.js",
+      "bytes": 719,
+      "sha256": "b72d8bd85824e2ed4a7703a05320e45ac80b47ddad9bf8c383e392c41575950f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ProviderCallLimitSmokeTest.js",
+      "bytes": 788,
+      "sha256": "f9316bd917c1305341fd10cd7aee89dd14becc68e77b60d634a4274ac67636d4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ReadinessEvidenceSmokeTest.js",
+      "bytes": 696,
+      "sha256": "9e1c3bf47657958196d8c10b5c0681a4ff57144c61f3c7e2c977b91d928760cd"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3RouteContractSmokeTest.js",
+      "bytes": 612,
+      "sha256": "82d4e7090c0d0834dd55f34cc061e3e369315ec0b711bf460282ace60b13ea26"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3RuntimeKillSwitchSmokeTest.js",
+      "bytes": 1031,
+      "sha256": "f00071f6e726c1f7f466f814cfcfc6de1c9e62dd5507edd04d43dde4b91a0e28"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3SchemaSmokeTest.js",
+      "bytes": 434,
+      "sha256": "1f0e18f7ee598555443fba56c4886134590a0df1ce4ed50912371f61ef0be3c5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3ShadowFailureFallbackSmokeTest.js",
+      "bytes": 803,
+      "sha256": "64c7fc59409917b14472ca112a93b07369b285d6cb7e1f23dfa15c2ab2fcbeea"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3SourceIntegritySmokeTest.js",
+      "bytes": 1079,
+      "sha256": "e454737ee638bfb20102bb1b489be03387d52370eea8490fd47c9649eedae79c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3SubjectHashCliSmokeTest.js",
+      "bytes": 453,
+      "sha256": "4dc84da78635681558a3c753395317b6b6b0a2ace61b5a91509a9e5d404b7037"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3SubjectPrivacySmokeTest.js",
+      "bytes": 603,
+      "sha256": "3b4682746f20ce600304ee7bbdf69acde6b1e040f9477ce31f24bdeab28ba32b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3SubjectRequiredSmokeTest.js",
+      "bytes": 674,
+      "sha256": "e344d8c5c36a4f70011d309cec24af8f616e936d9ddba44f0d1ca34abb5b0001"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3SyntheticEvidenceBlockedSmokeTest.js",
+      "bytes": 778,
+      "sha256": "f2adcda243060688bb049f64ddc951bd64cc29439bb68bc164e7c76dfcf008b6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3TestSupport.js",
+      "bytes": 6565,
+      "sha256": "27c93abbe90f770c742ed97c870bef2189ff1e582a7fa6e18b116068e39bf1ac"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3TimeoutFallbackSmokeTest.js",
+      "bytes": 814,
+      "sha256": "9271f8967a7bca05fe14609debbc7ced2cf984b9e85c91ce7bf943ded80e27e5"
+    }
+  ],
+  "supersedes": {
+    "patch14_2Files": [
+      "routes/automationRoutes.js",
+      "tests/queryCandidatePatch14_2ManifestSmokeTest.js"
+    ],
+    "patch14_3Files": [
+      "routes/automationRoutes.js",
+      "tests/queryCandidatePatch14_2ManifestSmokeTest.js",
+      "tests/queryCandidatePatch14_3ManifestSmokeTest.js"
+    ]
+  },
+  "activation": {
+    "defaultEnabled": false,
+    "defaultKillSwitch": true,
+    "audienceMode": "ALLOWLIST_ONLY",
+    "rolloutPercent": 0,
+    "deploymentAndActivationSeparated": true
+  },
+  "evidence": {
+    "realShadowTrafficRequired": true,
+    "syntheticEvidenceAccepted": false,
+    "maximumAgeDays": 7,
+    "minimumSampleSize": 30,
+    "approvedActualPricingRequired": true
+  },
+  "llmPolicy": {
+    "mode": "SEMANTIC_PROFILER_ONLY",
+    "plannerEscalationAllowed": false,
+    "maxProviderCalls": 1
+  },
+  "guardrails": {
+    "routeWired": true,
+    "controllerWired": false,
+    "generalUsersBlocked": true,
+    "allowlistOnly": true,
+    "primaryFallback": true,
+    "runtimeKillSwitchImmediate": true,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "userUiChanged": false,
+    "failClosed": true
+  }
+}

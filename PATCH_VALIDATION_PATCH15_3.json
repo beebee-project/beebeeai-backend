@@ -1,0 +1,32 @@
+{
+  "version": "query_candidate_patch15_3_validation_v1",
+  "patch": "Internal Allowlist Canary",
+  "validatedAt": "2026-08-05T06:40:00.000Z",
+  "status": "PASS",
+  "newQa": {
+    "expected": 34,
+    "passed": 34,
+    "failed": 0
+  },
+  "predecessorRegression": {
+    "manifestChecks": 10,
+    "passed": 10,
+    "failed": 0
+  },
+  "contracts": {
+    "defaultBlocked": true,
+    "allowlistOnly": true,
+    "generalUsersBlocked": true,
+    "rolloutPercent": 0,
+    "realShadowEvidenceRequired": true,
+    "syntheticEvidenceRejected": true,
+    "semanticProfilerOnly": true,
+    "plannerEscalationAllowed": false,
+    "maxProviderCalls": 1,
+    "primaryFallback": true,
+    "runtimeKillSwitchImmediate": true,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCallsDuringQa": 0
+  }
+}

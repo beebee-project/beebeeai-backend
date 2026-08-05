@@ -5,9 +5,11 @@ const {
   executeBusinessTemplateObserved,
 } = require("../automation/semanticExecutionRouteBridge");
 const {
-  createQueryCandidatePlannerApiShadowBoundary,
   defaultObservationLogger,
 } = require("../automation/queryCandidatePlannerApiShadowBoundary");
+const {
+  createQueryCandidatePlannerInternalAllowlistCanaryBoundary,
+} = require("../automation/queryCandidatePlannerInternalAllowlistCanaryBoundary");
 const {
   createQueryCandidatePlannerDownloadRetentionBoundary,
 } = require("../automation/queryCandidatePlannerFileLifecycleBoundary");
@@ -34,7 +36,7 @@ function observeQueryCandidatePlannerForInternalPreview(
 }
 
 const getAnalysisCandidatesShadowObserved =
-  createQueryCandidatePlannerApiShadowBoundary({
+  createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
     handler: automationController.getAnalysisCandidates,
     onObservation: observeQueryCandidatePlannerForInternalPreview,
   });

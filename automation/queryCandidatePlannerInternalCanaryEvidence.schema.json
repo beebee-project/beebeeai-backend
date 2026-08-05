@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_internal_canary_evidence_bundle_v1",
+  "title": "Query Candidate Planner Internal Canary Evidence Bundle",
+  "type": "object",
+  "required": [
+    "version",
+    "source",
+    "synthetic",
+    "actualTraffic",
+    "evaluatedAt",
+    "expiresAt",
+    "readiness",
+    "accuracy",
+    "operational",
+    "shadow",
+    "llmPolicy"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_internal_canary_evidence_bundle_v1"
+    },
+    "source": { "const": "REAL_SHADOW_TRAFFIC" },
+    "synthetic": { "const": false },
+    "actualTraffic": { "const": true },
+    "evaluatedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "llmPolicy": {
+      "type": "object",
+      "required": ["mode", "plannerEscalationAllowed"],
+      "properties": {
+        "mode": { "const": "SEMANTIC_PROFILER_ONLY" },
+        "plannerEscalationAllowed": { "const": false }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

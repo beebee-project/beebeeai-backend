@@ -1,0 +1,39 @@
+{
+  "patch": "15.3.1",
+  "name": "Predecessor Integrity Repair",
+  "purpose": "Restore four protected predecessor source files to manifest-canonical bytes after Patch 15.3 installation checks.",
+  "productionBehaviorChanged": false,
+  "providerCalls": 0,
+  "files": [
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_1_PREDECESSOR_INTEGRITY_REPAIR.md",
+      "bytes": 1727,
+      "sha256": "f75f6fa51fe5b6bba9430f359a706b7f5ec799c9ac10d84a78e892a3e9750083"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_1PredecessorIntegrityRepairSmokeTest.js",
+      "bytes": 1548,
+      "sha256": "5f420b07fba294f41e121e50a6f7ccbff2f8c633a25f45d55ad7d2c78794f924"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiUiRollbackQualityGate.js",
+      "bytes": 23875,
+      "sha256": "1826697f646a535a9db5bc6d76bfd699b5869d496478aae109fa41abf6a8580e"
+    },
+    {
+      "path": "automation/queryCandidatePlannerControlledProductionPromotionGate.js",
+      "bytes": 15746,
+      "sha256": "803e745ab95681b24b25ebefe216adcf9710fd89d237a91f768f38e4e59b7ef6"
+    },
+    {
+      "path": "automation/queryCandidatePlannerCostCacheLatencyEvaluator.js",
+      "bytes": 32317,
+      "sha256": "67a0ff4d5ac83103d78c9172aa4cc072c008d195a22e99b3366f8440b9d8658c"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowAccuracyEvaluator.js",
+      "bytes": 33926,
+      "sha256": "0c70432d4ddf838eb4b8d407821d1e44c3e4f89b83564aa554970becb6890f1e"
+    }
+  ]
+}
