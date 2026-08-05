@@ -1,0 +1,762 @@
+{
+  "version": "query_candidate_planner_shadow_accuracy_observation_dataset_v1",
+  "datasetId": "beebeeai_query_candidate_shadow_accuracy_core_v1",
+  "createdAt": "2026-08-05T13:20:00+08:00",
+  "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+  "sourceAccuracyDatasetVersion": "query_candidate_planner_accuracy_evaluation_dataset_v1",
+  "sourceAccuracyDatasetId": "beebeeai_query_candidate_accuracy_core_v1",
+  "dataPolicy": {
+    "evaluationOnly": true,
+    "rawRowsStored": false,
+    "rawFileNamesStored": false,
+    "userIdentityStored": false,
+    "rawPrimaryResponseStored": false,
+    "rawShadowResolutionStored": false,
+    "candidateIdsLimitedToEvaluationLabels": true
+  },
+  "observations": [
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "350bff6d44e2b01eb2047156b88dea9e0c92db94c317443dabd5010d27d8364c",
+      "caseId": "hardcase_two_tables_one_sheet_waste",
+      "requestFingerprintSha256": "3f83453c300ca0dafe97c07fe29bab1a8336873509d868add0c9e4e9eec5245f",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 1180,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "budget_execution_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "budget_variance_analysis",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "budget_category_breakdown",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "FINANCE_BUDGET",
+        "intent": "BUDGET_EXECUTION",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "b16c095746f7cee1db693a828a98af3ba2849f5a9a707e98ab90eae019d30e08",
+      "caseId": "real_world_event_applicant_workshop",
+      "requestFingerprintSha256": "49cda717f4ceb6382529c3cb3490568de5daae0b14d0ccdf1a9897fd83433f1a",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 980,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "event_attendance_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "applicant_status_breakdown",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "participant_roster",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "EVENT_ATTENDANCE",
+        "intent": "APPLICATION_TRACKING",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "e5c402b9855d711ab0d8069acab8610bd24dd82d4e58d8d67bfea47ccf9a2e5a",
+      "caseId": "seed_attendance_conditional",
+      "requestFingerprintSha256": "916708b2e8912950eeb11086703c47be7a0c87aed6f280c47d35089e2f66c2f8",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 720,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 2,
+          "shadow": 2,
+          "shared": 2,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 2,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "attendance_status_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "attendance_rate_analysis",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "EVENT_ATTENDANCE",
+        "intent": "ATTENDANCE_TRACKING",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "8efd97c216411d213847790e066dc42c1763872a7263e75f119cb8fa1caec4f7",
+      "caseId": "seed_sales_ready",
+      "requestFingerprintSha256": "14e6a16c69395e2f763fcd0e722ee5cc3df9616c8a11c4486b8318f0e12f40df",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 1050,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "sales_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "revenue_by_category",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "sales_trend",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "SALES_REVENUE",
+        "intent": "TRANSACTION_ANALYSIS",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "cb759d794b647ba130ed3d63aca3a1b64e7448140b6c13a7167f8a76a9270431",
+      "caseId": "template_course_evaluation_report",
+      "requestFingerprintSha256": "e40d125f8c1ac6f6d1c687f83bcb0a607cdfe9f783bc336c39a197eb1b591dca",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 890,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "course_evaluation_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "question_score_breakdown",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "response_distribution",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "EDUCATION_EVALUATION",
+        "intent": "PERFORMANCE_EVALUATION",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "ed155c4f62900f04eb7f2053a96ca640cae53784b920b9219862d92cfa4a3c70",
+      "caseId": "seed_unstructured_unsupported",
+      "requestFingerprintSha256": "b1c4547411b51c7d62eb444f3327893b9c94abbf518f0d382695723693d2d941",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 410,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 0,
+          "shadow": 0,
+          "shared": 0,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": false,
+          "top3Overlap": 0,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [],
+        "domain": "UNKNOWN",
+        "intent": "UNKNOWN",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": true,
+        "reviewRequired": true
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "c722d37d2505a5262b5e08530369a83dc9e31beb605a73f98af4e9e15a712577",
+      "caseId": "ambiguous_mixed_columns_review",
+      "requestFingerprintSha256": "c1d7046040b9e268a2b44567104640a502e0990b09f6526a8a993d0aae6c0a20",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 640,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 1,
+          "shadow": 1,
+          "shared": 1,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 1,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "generic_data_profile",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "UNKNOWN",
+        "intent": "UNKNOWN",
+        "fallbackApplied": true,
+        "fallbackReason": "LOW_DOMAIN_CONFIDENCE",
+        "unsupportedRejected": false,
+        "reviewRequired": true
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "35f547a0190341dca42c7b0911157c4edaa58158ac714463b8f5b2a6c6a75e66",
+      "caseId": "inventory_stock_movement",
+      "requestFingerprintSha256": "b53baa15da2a641b4dddfc23291ce2521a4f634c7bd8e0c9f9c09eb3436a0ff5",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 940,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "inventory_stock_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "reorder_risk_list",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "stock_movement_trend",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "INVENTORY_OPERATIONS",
+        "intent": "STOCK_MONITORING",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "cc6a7909b313f1214b8744f1bb194e7b53a4cb1a0fdc66a5172e7cee7ed18b34",
+      "caseId": "project_task_tracker",
+      "requestFingerprintSha256": "ecd6dfee84f0d7352c82a4a97776320bb90d142e2a9817b87709345143009ac0",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 870,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "project_status_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "overdue_task_list",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "owner_workload_breakdown",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "PROJECT_OPERATIONS",
+        "intent": "TASK_TRACKING",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    },
+    {
+      "version": "query_candidate_planner_shadow_accuracy_observation_v1",
+      "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+      "observationId": "24cfc0a887f596e926f6f6c87a52efc37fc884c32052b1995c05ab28129b543b",
+      "caseId": "expense_claim_review",
+      "requestFingerprintSha256": "c6c2c0aa46e227a1a16b9957e324f31386e2e7337da5ed21343a194db731e2ad",
+      "status": "COMPLETED",
+      "reason": "SHADOW_COMPLETED",
+      "primaryResponseUnchanged": true,
+      "latencyMs": 1010,
+      "comparison": {
+        "verdict": "MATCH",
+        "counts": {
+          "primary": 3,
+          "shadow": 3,
+          "shared": 3,
+          "primaryOnly": 0,
+          "shadowOnly": 0
+        },
+        "metrics": {
+          "exactOrder": true,
+          "top1Same": true,
+          "top3Overlap": 3,
+          "jaccard": 1,
+          "rankAgreement": 1
+        },
+        "rawIdentifiersIncluded": false
+      },
+      "shadowPrediction": {
+        "candidates": [
+          {
+            "candidateId": "expense_summary",
+            "rank": 1,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "expense_policy_exception",
+            "rank": 2,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          },
+          {
+            "candidateId": "approval_status_breakdown",
+            "rank": 3,
+            "status": "ACCEPTED",
+            "productionEligible": true
+          }
+        ],
+        "domain": "FINANCE_EXPENSE",
+        "intent": "EXPENSE_REVIEW",
+        "fallbackApplied": false,
+        "fallbackReason": "",
+        "unsupportedRejected": false,
+        "reviewRequired": false
+      },
+      "guardrails": {
+        "shadowOnly": true,
+        "primaryResponseAuthority": true,
+        "responsePayloadMutation": false,
+        "responseHeaderMutation": false,
+        "responseStatusMutation": false,
+        "productionCandidateMerge": false,
+        "productionReadyAssignment": false,
+        "productionRouteChanged": false
+      },
+      "privacy": {
+        "rawPrimaryResponseIncluded": false,
+        "rawShadowResolutionIncluded": false,
+        "rawRowsIncluded": false,
+        "sampleValuesIncluded": false,
+        "fileNameIncluded": false,
+        "originalFileNameIncluded": false,
+        "queryTablesKeyIncluded": false,
+        "userIdentityIncluded": false,
+        "tenantIdIncluded": false
+      }
+    }
+  ]
+}

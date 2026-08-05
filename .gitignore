@@ -35,3 +35,4 @@ Thumbs.db
 .patch_backups/
 _patch*/
 query_candidate_patch*.zip
+_restore*/

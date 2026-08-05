@@ -1,0 +1,22 @@
+{
+  "version": "query_candidate_planner_shadow_accuracy_threshold_policy_v1",
+  "policyId": "beebeeai_query_candidate_shadow_accuracy_gate_v1",
+  "minimumObservationCount": 10,
+  "requireAllAccuracyCases": true,
+  "requireAccuracyEvaluationPass": true,
+  "minimumCompletedRate": 1.0,
+  "maximumBlockedRate": 0.0,
+  "maximumFailedSafeRate": 0.0,
+  "maximumTimeoutSafeRate": 0.0,
+  "minimumPrimaryResponseUnchangedRate": 1.0,
+  "minimumComparisonCoverage": 1.0,
+  "minimumPredictionCaptureCoverage": 1.0,
+  "maximumGuardrailViolationCount": 0,
+  "maximumPrivacyViolationCount": 0,
+  "decisionPolicy": {
+    "pass": "EVALUATION_PASS",
+    "block": "EVALUATION_BLOCKED",
+    "failClosed": true,
+    "promotionAuthorized": false
+  }
+}

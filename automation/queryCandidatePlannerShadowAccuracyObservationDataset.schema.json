@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidatePlannerShadowAccuracyObservationDataset.schema.json",
+  "title": "Query Candidate Planner Shadow Accuracy Observation Dataset",
+  "type": "object",
+  "required": [
+    "version",
+    "datasetId",
+    "capturePolicyVersion",
+    "sourceAccuracyDatasetVersion",
+    "sourceAccuracyDatasetId",
+    "dataPolicy",
+    "observations"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_shadow_accuracy_observation_dataset_v1"
+    },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "minLength": 1 },
+    "capturePolicyVersion": {
+      "const": "query_candidate_planner_shadow_accuracy_capture_policy_v1"
+    },
+    "sourceAccuracyDatasetVersion": {
+      "const": "query_candidate_planner_accuracy_evaluation_dataset_v1"
+    },
+    "sourceAccuracyDatasetId": { "type": "string", "minLength": 1 },
+    "dataPolicy": {
+      "type": "object",
+      "required": [
+        "evaluationOnly",
+        "rawRowsStored",
+        "rawFileNamesStored",
+        "userIdentityStored",
+        "rawPrimaryResponseStored",
+        "rawShadowResolutionStored"
+      ]
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "version",
+          "capturePolicyVersion",
+          "observationId",
+          "caseId",
+          "requestFingerprintSha256",
+          "status",
+          "reason",
+          "primaryResponseUnchanged",
+          "latencyMs",
+          "comparison",
+          "shadowPrediction",
+          "guardrails",
+          "privacy"
+        ],
+        "properties": {
+          "version": {
+            "const": "query_candidate_planner_shadow_accuracy_observation_v1"
+          },
+          "capturePolicyVersion": {
+            "const": "query_candidate_planner_shadow_accuracy_capture_policy_v1"
+          },
+          "observationId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "caseId": { "type": "string", "minLength": 1 },
+          "requestFingerprintSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "status": {
+            "enum": [
+              "COMPLETED",
+              "COMPLETED_SAFE",
+              "BLOCKED",
+              "FAILED_SAFE",
+              "TIMEOUT_SAFE"
+            ]
+          },
+          "reason": { "type": "string" },
+          "primaryResponseUnchanged": { "type": "boolean" },
+          "latencyMs": { "type": "number", "minimum": 0 },
+          "comparison": { "type": ["object", "null"] },
+          "shadowPrediction": { "type": ["object", "null"] },
+          "guardrails": { "type": "object" },
+          "privacy": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

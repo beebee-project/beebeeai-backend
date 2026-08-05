@@ -1,0 +1,56 @@
+{
+  "version": "query_candidate_patch15_2_validation_v1",
+  "patch": "Shadow Accuracy Evaluation",
+  "validatedAt": "2026-08-05T13:20:00+08:00",
+  "environment": {
+    "runtime": "Node.js",
+    "providerCalls": 0,
+    "liveShadowTraffic": false,
+    "syntheticBenchmarkOnly": true
+  },
+  "installation": {
+    "rootStructuredZip": true,
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0
+  },
+  "qa": {
+    "newSmokeTests": 36,
+    "expectedPasses": 36,
+    "syntaxChecks": true,
+    "sourceIntegrity": true,
+    "manifestIntegrity": true
+  },
+  "baselineEvaluation": {
+    "decision": "EVALUATION_PASS",
+    "reason": "SHADOW_ACCURACY_THRESHOLDS_PASSED",
+    "observationCount": 10,
+    "completedRate": 1,
+    "comparisonCoverage": 1,
+    "predictionCaptureCoverage": 1,
+    "primaryResponseUnchangedRate": 1,
+    "guardrailViolationCount": 0,
+    "privacyViolationCount": 0,
+    "accuracyDecision": "EVALUATION_PASS",
+    "overallScore": 1,
+    "candidatePrecision": 1,
+    "candidateRecall": 1,
+    "top1Accuracy": 1,
+    "domainAccuracy": 1,
+    "intentAccuracy": 1,
+    "falsePromotionRate": 0,
+    "reportSha256": "7b0b79c19401c28f7a27431073f3668a630a8b88377766b0f99a295cba9df890"
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "productionGateWired": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "railwayEnvironmentChanged": false,
+    "providerCalls": 0
+  },
+  "limitation": "The bundled observation dataset is a synthetic contract baseline and is not live production shadow evidence."
+}

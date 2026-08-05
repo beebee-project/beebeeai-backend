@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidatePlannerShadowAccuracyThresholdPolicy.schema.json",
+  "title": "Query Candidate Planner Shadow Accuracy Threshold Policy",
+  "type": "object",
+  "required": [
+    "version",
+    "policyId",
+    "minimumObservationCount",
+    "requireAllAccuracyCases",
+    "requireAccuracyEvaluationPass",
+    "minimumCompletedRate",
+    "maximumBlockedRate",
+    "maximumFailedSafeRate",
+    "maximumTimeoutSafeRate",
+    "minimumPrimaryResponseUnchangedRate",
+    "minimumComparisonCoverage",
+    "minimumPredictionCaptureCoverage",
+    "maximumGuardrailViolationCount",
+    "maximumPrivacyViolationCount",
+    "decisionPolicy"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_shadow_accuracy_threshold_policy_v1"
+    },
+    "policyId": { "type": "string", "minLength": 1 },
+    "minimumObservationCount": { "type": "integer", "minimum": 1 },
+    "requireAllAccuracyCases": { "type": "boolean" },
+    "requireAccuracyEvaluationPass": { "type": "boolean" },
+    "minimumCompletedRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "maximumBlockedRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "maximumFailedSafeRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "maximumTimeoutSafeRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "minimumPrimaryResponseUnchangedRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "minimumComparisonCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+    "minimumPredictionCaptureCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+    "maximumGuardrailViolationCount": { "type": "integer", "minimum": 0 },
+    "maximumPrivacyViolationCount": { "type": "integer", "minimum": 0 },
+    "decisionPolicy": { "type": "object" }
+  },
+  "additionalProperties": false
+}

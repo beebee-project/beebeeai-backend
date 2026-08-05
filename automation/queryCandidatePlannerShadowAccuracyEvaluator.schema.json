@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "queryCandidatePlannerShadowAccuracyEvaluator.schema.json",
+  "title": "Query Candidate Planner Shadow Accuracy Evaluation Report",
+  "type": "object",
+  "required": [
+    "version",
+    "evaluatorVersion",
+    "observationDatasetVersion",
+    "observationDatasetId",
+    "observationDatasetSha256",
+    "accuracyDatasetVersion",
+    "accuracyDatasetId",
+    "accuracyDatasetSha256",
+    "shadowThresholdPolicyVersion",
+    "shadowThresholdPolicySha256",
+    "accuracyThresholdPolicyVersion",
+    "accuracyThresholdPolicySha256",
+    "decision",
+    "reason",
+    "failClosed",
+    "evaluationOnly",
+    "promotionAuthorized",
+    "observationSummary",
+    "predictionCount",
+    "accuracyReport",
+    "shadowThresholdEvaluation",
+    "invalid",
+    "guardrails"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_shadow_accuracy_evaluation_report_v1"
+    },
+    "evaluatorVersion": {
+      "const": "query_candidate_planner_shadow_accuracy_evaluator_v1"
+    },
+    "observationDatasetVersion": { "type": "string" },
+    "observationDatasetId": { "type": "string" },
+    "observationDatasetSha256": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "accuracyDatasetVersion": { "type": "string" },
+    "accuracyDatasetId": { "type": "string" },
+    "accuracyDatasetSha256": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "shadowThresholdPolicyVersion": { "type": "string" },
+    "shadowThresholdPolicySha256": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "accuracyThresholdPolicyVersion": { "type": "string" },
+    "accuracyThresholdPolicySha256": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "decision": {
+      "enum": ["EVALUATION_PASS", "EVALUATION_BLOCKED"]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "failClosed": { "const": true },
+    "evaluationOnly": { "const": true },
+    "promotionAuthorized": { "const": false },
+    "observationSummary": { "type": ["object", "null"] },
+    "predictionCount": { "type": "integer", "minimum": 0 },
+    "accuracyReport": { "type": ["object", "null"] },
+    "shadowThresholdEvaluation": { "type": ["object", "null"] },
+    "invalid": { "type": "object" },
+    "reportSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "routeWired",
+        "controllerWired",
+        "internalPreviewWired",
+        "productionGateWired",
+        "promotionDecisionProduced",
+        "productionCandidateMergeApplied",
+        "productionReadyAssignment",
+        "productionRouteChanged",
+        "providerCallsExecutedByEvaluator",
+        "rawRowsStored",
+        "rawFileNameStored",
+        "userIdentityStored",
+        "evaluationOnly",
+        "failClosed"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

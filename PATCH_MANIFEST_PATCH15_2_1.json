@@ -1,0 +1,24 @@
+{
+  "patch": "15.2.1",
+  "name": "Predecessor Integrity Repair",
+  "purpose": "Restore canonical protected sources required by Patch 14.4.1, 14.5, and 15.1 manifests.",
+  "productionWiringChanged": false,
+  "providerCalls": 0,
+  "files": [
+    {
+      "path": "automation/queryCandidatePlannerControlledProductionPromotionGate.js",
+      "bytes": 15746,
+      "sha256": "803e745ab95681b24b25ebefe216adcf9710fd89d237a91f768f38e4e59b7ef6"
+    },
+    {
+      "path": "automation/queryCandidatePlannerApiUiRollbackQualityGate.js",
+      "bytes": 23875,
+      "sha256": "1826697f646a535a9db5bc6d76bfd699b5869d496478aae109fa41abf6a8580e"
+    },
+    {
+      "path": "automation/queryCandidatePlannerCostCacheLatencyEvaluator.js",
+      "bytes": 32317,
+      "sha256": "67a0ff4d5ac83103d78c9172aa4cc072c008d195a22e99b3366f8440b9d8658c"
+    }
+  ]
+}

@@ -1,0 +1,300 @@
+{
+  "version": "query_candidate_patch15_2_manifest_v1",
+  "patch": "Shadow Accuracy Evaluation",
+  "createdAt": "2026-08-05T13:20:00+08:00",
+  "fileCount": 45,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_2.json",
+      "bytes": 1690,
+      "sha256": "4ea3f39ed55fb7c35a742e48924a875c9e0399ef32c9bb321be431333d2f4a80"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_2_SHADOW_ACCURACY_EVALUATION.md",
+      "bytes": 8093,
+      "sha256": "bb4dd969d4f950f0456bc6b7f54f2bc7885d0134e2d66fc8030e1c408e8f3f54"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowAccuracyEvaluator.js",
+      "bytes": 33926,
+      "sha256": "0c70432d4ddf838eb4b8d407821d1e44c3e4f89b83564aa554970becb6890f1e"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowAccuracyEvaluator.schema.json",
+      "bytes": 2972,
+      "sha256": "353280c892c673c30e038c42c36197555675c4a6c5e29ab9855ae09b8a255f83"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowAccuracyObservationDataset.schema.json",
+      "bytes": 2937,
+      "sha256": "b8ef161d8562ec109fcf06c58460c1c307193b13e1663f94238f92163e561398"
+    },
+    {
+      "path": "automation/queryCandidatePlannerShadowAccuracyThresholdPolicy.schema.json",
+      "bytes": 1868,
+      "sha256": "4af308e9b1647da19bd5e81fbc83129afa72f567b5e63db58291f972934ca706"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerShadowAccuracyObservationDataset.v1.json",
+      "bytes": 24784,
+      "sha256": "abc66457b4b03450dd13b4667390d10e581dc33f6f981b4233c1627d3548e257"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerShadowAccuracyThresholdPolicy.v1.json",
+      "bytes": 730,
+      "sha256": "5a4042d7923ec11de0c5a1fe4d98d3a779b611b3d1df21daf09c5941de005731"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2AccuracyIntegrationSmokeTest.js",
+      "bytes": 490,
+      "sha256": "689de2314cfcb9f60320123e9be4b51d2a6b87174bf25befbb32e9fdc9fd0098"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2AccuracyRegressionSmokeTest.js",
+      "bytes": 652,
+      "sha256": "59c59bc51835bb0bf104e1b955a934b3f32ce266fb9c87259e74351e20f5e82a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2BlockedRateSmokeTest.js",
+      "bytes": 527,
+      "sha256": "1d3e20d70854f91e87686c3ccf0c2fb1156f97364f6701ab610e6a96e297add2"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2CandidateAccuracySmokeTest.js",
+      "bytes": 420,
+      "sha256": "d2479f582bc41967200a2900be4b58cb3efaf615fe3e4773e5c3a06827379488"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2CaptureAdapterSmokeTest.js",
+      "bytes": 1349,
+      "sha256": "b224c1b60e2d851d5634fa85d3e1c172dcb63bf573e12818ece6239be8b488a0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2CapturePrivacyFailClosedSmokeTest.js",
+      "bytes": 416,
+      "sha256": "1379aa5393c0960e367675bf08b678efffa8111a67a86c03ca423a4fa0d546ca"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ComparisonCoverageSmokeTest.js",
+      "bytes": 346,
+      "sha256": "ad72b54ee43db296d8239f3bdb80d43e600510a372856e7a17237f43a5c3e6c4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2DefaultBlockedSmokeTest.js",
+      "bytes": 372,
+      "sha256": "c96862f0ac69b0bb8a8e1300cb74de315a595a89496d6072364d85edfb2f7a24"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2DeterminismSmokeTest.js",
+      "bytes": 313,
+      "sha256": "6b7fa39c035c6843eb93fe4b949d1502191e571486e654f00de5d0aef756bd4b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2DomainIntentAccuracySmokeTest.js",
+      "bytes": 321,
+      "sha256": "d296f720c05829139fb6c2f7678d4bbd96fac782d34e47263a47d44f37b4d6be"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2DuplicateCaseSmokeTest.js",
+      "bytes": 601,
+      "sha256": "9bee11c3cb2ad9ed10855fe4bbde7e4dbcf4a5e5fe120a1832950c3f24f560c4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2FailedSafeRateSmokeTest.js",
+      "bytes": 538,
+      "sha256": "56c44602809fbbcac2c23296386194517a8aa0b795fff54d842863902d492edb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2FallbackAccuracySmokeTest.js",
+      "bytes": 240,
+      "sha256": "b3877d723fa4f5e2ac496da819c4f912fce5a0cfdc9f526dabf77c0de0ac9499"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2GuardrailViolationSmokeTest.js",
+      "bytes": 595,
+      "sha256": "da3d844bce824829cd46e0ad42ea201f876aa73a8b282802166f6a2fcf296b4c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2InvalidPolicySmokeTest.js",
+      "bytes": 465,
+      "sha256": "50d6a57a8bcc00b5d7ec1dacd1e71f2fc608f49cee2303d4c1c7c3639e5c15e7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2MalformedObservationSmokeTest.js",
+      "bytes": 494,
+      "sha256": "99340d4fdff74e27b4babb8f124cad052e40774b376152f772cf4637e7bd3b19"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ManifestSmokeTest.js",
+      "bytes": 2334,
+      "sha256": "3f9ced47e8a1a32b8cd32fd41c84cd221e8abc43e8ae771bc015e7b4013c78c4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2MissingCaseSmokeTest.js",
+      "bytes": 557,
+      "sha256": "4e837391204821d668d54881986bd4265a066d532cfd419048414fcc00d5edaa"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2MissingComparisonSmokeTest.js",
+      "bytes": 490,
+      "sha256": "25bb9e8a52da09c9995c4a574d8d6c9492a73646c9a72a13b45a0f21dc3d3f2b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2NoMutationSmokeTest.js",
+      "bytes": 542,
+      "sha256": "52216352688cf962dc7f751bdec837dbd262e323d0b65a327fc9bb18a7c36144"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ObservationDatasetContractSmokeTest.js",
+      "bytes": 485,
+      "sha256": "eddb0181dee769e19e77f3842b67432c2dc80ceb46bae39c8ae565da1daeab87"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ObservationDatasetCoverageSmokeTest.js",
+      "bytes": 486,
+      "sha256": "e3619abffe2fd211db19ed627465b50bf68cfe12f79d06c6e0b6455be2b85d36"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ObservationDatasetPrivacySmokeTest.js",
+      "bytes": 510,
+      "sha256": "210a8c4262df28d9b5a8dc845ae122862b0bf610def25606bfd877fabc1492a7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2PerfectEvaluationSmokeTest.js",
+      "bytes": 514,
+      "sha256": "dcfa17514c16e9f8f78c88cc2db9d0137e01f9dc230f834c25efc88784d492a9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2PredictionConversionSmokeTest.js",
+      "bytes": 524,
+      "sha256": "f9e69cd57b2c0fba877418aead5c9acf1ea10327a34c6be9afe1e5259822a00d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2PrimaryResponseUnchangedSmokeTest.js",
+      "bytes": 523,
+      "sha256": "5aec693d79123deff738cc8ca42ec0f823525297572f5eabe492655df68d86ac"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2PrivacyViolationSmokeTest.js",
+      "bytes": 577,
+      "sha256": "1678c3b3593bfb3aaf5df34c0d960c137edc3790c6f5d62f4dd2b7aa937901ed"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ReportPrivacySmokeTest.js",
+      "bytes": 552,
+      "sha256": "81f0fe61485cbecf60b91bb14ae5f10d6e1cd83ccc9e25a280052ef5aa1b01c3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ReviewAccuracySmokeTest.js",
+      "bytes": 253,
+      "sha256": "fdf5b91df69b99e76c9d45668fcf0fe99a4ecf68773bf9391044f766b6e18f28"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2RouteIsolationSmokeTest.js",
+      "bytes": 674,
+      "sha256": "5bee7e22bca52f75b70259744cd8bdb7aad8c8cdaaf3ebba563ee7f0ae002417"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2SchemaSmokeTest.js",
+      "bytes": 935,
+      "sha256": "8d8e7a6670e273aebe382f4da7435c451ddacdf915b69644cfea323bbec43775"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2SourceIntegritySmokeTest.js",
+      "bytes": 1012,
+      "sha256": "a57baca6f164182a3b236161f9fcdef847d3abd8714f75a6ba1aca699c570657"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2TestSupport.js",
+      "bytes": 2127,
+      "sha256": "36a9d37c8b8734e5494f94af07f28f6c3a3d4d791a2b1176aa10aa6ec63bddf0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2ThresholdPolicySmokeTest.js",
+      "bytes": 459,
+      "sha256": "40c8d2a56a32d62eaa5525cb50d54210a01b84790352999a46e79009dd6cfa35"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2TimeoutRateSmokeTest.js",
+      "bytes": 536,
+      "sha256": "b72fee1352216db87586f3fd9d64fc4db50e948cd5374d5ebd906cf7a3c178df"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2UnsupportedAccuracySmokeTest.js",
+      "bytes": 439,
+      "sha256": "6b53417f9d9e9e9a3efc4ac8da01d8d5c02283f1aae3fa84f23312076d2b68e9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_2VerdictDistributionSmokeTest.js",
+      "bytes": 351,
+      "sha256": "50c429584f9abfcb8962a09020dbc57634ba4730b82a9eaaaca03bb6df6527ed"
+    }
+  ],
+  "changeSet": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0,
+    "internalPreviewFilesChanged": 0,
+    "featureControlFilesChanged": 0,
+    "mergeAdapterFilesChanged": 0,
+    "promotionGateFilesChanged": 0,
+    "predecessorManifestFilesChanged": 0,
+    "undeclaredDriftAllowed": false
+  },
+  "evaluation": {
+    "observationDatasetVersion": "query_candidate_planner_shadow_accuracy_observation_dataset_v1",
+    "observationDatasetId": "beebeeai_query_candidate_shadow_accuracy_core_v1",
+    "observationCount": 10,
+    "accuracyDatasetVersion": "query_candidate_planner_accuracy_evaluation_dataset_v1",
+    "accuracyDatasetId": "beebeeai_query_candidate_accuracy_core_v1",
+    "accuracyCaseCount": 10,
+    "shadowThresholdPolicyVersion": "query_candidate_planner_shadow_accuracy_threshold_policy_v1",
+    "evaluatorVersion": "query_candidate_planner_shadow_accuracy_evaluator_v1",
+    "reportVersion": "query_candidate_planner_shadow_accuracy_evaluation_report_v1",
+    "capturePolicyVersion": "query_candidate_planner_shadow_accuracy_capture_policy_v1",
+    "newSmokeTests": 36,
+    "syntheticBenchmarkOnly": true,
+    "liveShadowEvidence": false,
+    "defaultDecision": "EVALUATION_BLOCKED",
+    "failClosed": true
+  },
+  "metrics": {
+    "candidatePrecision": true,
+    "candidateRecall": true,
+    "top1Accuracy": true,
+    "topKRecall": true,
+    "rankingAgreement": true,
+    "domainAccuracy": true,
+    "intentAccuracy": true,
+    "fallbackAccuracy": true,
+    "unsupportedRejectionAccuracy": true,
+    "reviewDecisionAccuracy": true,
+    "falsePromotionRate": true,
+    "completedRate": true,
+    "blockedRate": true,
+    "failedSafeRate": true,
+    "timeoutSafeRate": true,
+    "primaryResponseUnchangedRate": true,
+    "comparisonCoverage": true,
+    "predictionCaptureCoverage": true,
+    "guardrailViolationCount": true,
+    "privacyViolationCount": true
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "routeWired": false,
+    "controllerWired": false,
+    "internalPreviewWired": false,
+    "productionGateWired": false,
+    "promotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCalls": 0,
+    "railwayEnvironmentChanged": false,
+    "rawRowsStored": false,
+    "rawFileNamesStored": false,
+    "userIdentityStored": false
+  }
+}
