@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert"),fs=require("fs"),path=require("path");const root=path.resolve(__dirname,"..");const pricing=JSON.parse(fs.readFileSync(path.join(root,"evaluation/queryCandidatePlannerApprovedActualPricingPolicy.template.json"),"utf8"));assert.notStrictEqual(pricing.mode,"APPROVED_ACTUAL");assert.strictEqual(pricing.guardrails.approvedByOperator,false);console.log("PASS query candidate patch15.3.2 pricing template fail-closed smoke");

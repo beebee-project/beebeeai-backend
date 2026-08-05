@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const pricing={...s.actualPricing(),mode:"DRAFT_NOT_APPROVED"};const r=s.build({approvedActualPricingPolicy:pricing});assert.strictEqual(r.decision,"EVALUATION_BLOCKED");assert.strictEqual(r.reason,"APPROVED_ACTUAL_PRICING_REQUIRED");console.log("PASS query candidate patch15.3.2 approved actual pricing required smoke");

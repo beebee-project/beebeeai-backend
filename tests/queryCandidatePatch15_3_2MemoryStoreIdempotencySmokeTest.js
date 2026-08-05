@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const {createMemoryRealShadowEvidenceStore}=require("../automation/queryCandidatePlannerRealShadowEvidenceStore");(async()=>{const store=createMemoryRealShadowEvidenceStore();const r={recordId:"a",observedAt:"2026-08-05T00:00:00Z"};await store.record(r);await store.record(r);assert.strictEqual((await store.list()).length,1);console.log("PASS query candidate patch15.3.2 evidence store idempotency smoke");})().catch(e=>{throw e;});

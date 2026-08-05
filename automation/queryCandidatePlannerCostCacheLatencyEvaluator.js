@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 
 const EVALUATOR_VERSION =
@@ -8,7 +10,8 @@ const DATASET_VERSION =
   "query_candidate_planner_operational_evaluation_dataset_v1";
 const THRESHOLD_POLICY_VERSION =
   "query_candidate_planner_operational_threshold_policy_v1";
-const PRICING_POLICY_VERSION = "query_candidate_planner_cost_pricing_policy_v1";
+const PRICING_POLICY_VERSION =
+  "query_candidate_planner_cost_pricing_policy_v1";
 
 const DECISIONS = Object.freeze({
   PASS: "EVALUATION_PASS",
@@ -99,11 +102,7 @@ function round(value, digits = 6) {
 }
 
 function safeRate(numerator, denominator) {
-  if (
-    !Number.isFinite(numerator) ||
-    !Number.isFinite(denominator) ||
-    denominator <= 0
-  ) {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) {
     return 0;
   }
   return round(numerator / denominator);
@@ -145,29 +144,16 @@ function validateBoolean(value, path, errors) {
   if (typeof value !== "boolean") errors.push(`${path} must be boolean`);
 }
 
-function validateNonNegativeInteger(
-  value,
-  path,
-  errors,
-  { optional = false } = {},
-) {
+function validateNonNegativeInteger(value, path, errors, { optional = false } = {}) {
   if (optional && value == null) return;
   if (!Number.isInteger(value) || value < 0) {
     errors.push(`${path} must be a non-negative integer`);
   }
 }
 
-function validatePositiveNumber(
-  value,
-  path,
-  errors,
-  { allowZero = true } = {},
-) {
+function validatePositiveNumber(value, path, errors, { allowZero = true } = {}) {
   const valid = Number.isFinite(value) && (allowZero ? value >= 0 : value > 0);
-  if (!valid)
-    errors.push(
-      `${path} must be a finite ${allowZero ? "non-negative" : "positive"} number`,
-    );
+  if (!valid) errors.push(`${path} must be a finite ${allowZero ? "non-negative" : "positive"} number`);
 }
 
 function validateOperationalEvaluationDataset(dataset) {
@@ -199,20 +185,14 @@ function validateOperationalEvaluationDataset(dataset) {
     }
     const executionId = text(execution.executionId);
     if (!executionId) errors.push(`${base}.executionId is required`);
-    if (executionIds.has(executionId))
-      errors.push(`duplicate executionId: ${executionId}`);
+    if (executionIds.has(executionId)) errors.push(`duplicate executionId: ${executionId}`);
     executionIds.add(executionId);
-    if (!text(execution.scenarioId))
-      errors.push(`${base}.scenarioId is required`);
+    if (!text(execution.scenarioId)) errors.push(`${base}.scenarioId is required`);
     if (!EXECUTION_PHASES.includes(execution.phase)) {
-      errors.push(
-        `${base}.phase must be one of ${EXECUTION_PHASES.join(", ")}`,
-      );
+      errors.push(`${base}.phase must be one of ${EXECUTION_PHASES.join(", ")}`);
     }
     if (!EXECUTION_STATUSES.includes(execution.status)) {
-      errors.push(
-        `${base}.status must be one of ${EXECUTION_STATUSES.join(", ")}`,
-      );
+      errors.push(`${base}.status must be one of ${EXECUTION_STATUSES.join(", ")}`);
     }
     validatePositiveNumber(execution.latencyMs, `${base}.latencyMs`, errors);
     validateNonNegativeInteger(
@@ -225,26 +205,12 @@ function validateOperationalEvaluationDataset(dataset) {
     if (!isPlainObject(cache)) {
       errors.push(`${base}.cache is required`);
     } else {
-      validateBoolean(
-        cache.readAttempted,
-        `${base}.cache.readAttempted`,
-        errors,
-      );
+      validateBoolean(cache.readAttempted, `${base}.cache.readAttempted`, errors);
       validateBoolean(cache.hit, `${base}.cache.hit`, errors);
-      validateBoolean(
-        cache.writeAttempted,
-        `${base}.cache.writeAttempted`,
-        errors,
-      );
-      validateBoolean(
-        cache.writeSucceeded,
-        `${base}.cache.writeSucceeded`,
-        errors,
-      );
+      validateBoolean(cache.writeAttempted, `${base}.cache.writeAttempted`, errors);
+      validateBoolean(cache.writeSucceeded, `${base}.cache.writeSucceeded`, errors);
       if (!CACHE_LEVELS.includes(cache.level)) {
-        errors.push(
-          `${base}.cache.level must be one of ${CACHE_LEVELS.join(", ")}`,
-        );
+        errors.push(`${base}.cache.level must be one of ${CACHE_LEVELS.join(", ")}`);
       }
       if (cache.hit === true && !HIT_LEVELS.has(cache.level)) {
         errors.push(`${base}.cache.hit requires L1-L4 level`);
@@ -265,16 +231,8 @@ function validateOperationalEvaluationDataset(dataset) {
       errors.push(`${base}.provider is required`);
     } else {
       validateBoolean(provider.called, `${base}.provider.called`, errors);
-      validateNonNegativeInteger(
-        provider.inputTokens,
-        `${base}.provider.inputTokens`,
-        errors,
-      );
-      validateNonNegativeInteger(
-        provider.outputTokens,
-        `${base}.provider.outputTokens`,
-        errors,
-      );
+      validateNonNegativeInteger(provider.inputTokens, `${base}.provider.inputTokens`, errors);
+      validateNonNegativeInteger(provider.outputTokens, `${base}.provider.outputTokens`, errors);
       validateNonNegativeInteger(
         provider.observedCostMicrousd,
         `${base}.provider.observedCostMicrousd`,
@@ -282,23 +240,14 @@ function validateOperationalEvaluationDataset(dataset) {
         { optional: true },
       );
       if (provider.called === true && !text(provider.modelId)) {
-        errors.push(
-          `${base}.provider.modelId is required when provider is called`,
-        );
+        errors.push(`${base}.provider.modelId is required when provider is called`);
       }
       if (provider.called !== true) {
-        if (
-          (provider.inputTokens || 0) !== 0 ||
-          (provider.outputTokens || 0) !== 0
-        ) {
-          errors.push(
-            `${base}.provider tokens must be zero when provider is not called`,
-          );
+        if ((provider.inputTokens || 0) !== 0 || (provider.outputTokens || 0) !== 0) {
+          errors.push(`${base}.provider tokens must be zero when provider is not called`);
         }
         if ((provider.observedCostMicrousd || 0) !== 0) {
-          errors.push(
-            `${base}.provider cost must be zero when provider is not called`,
-          );
+          errors.push(`${base}.provider cost must be zero when provider is not called`);
         }
       }
       if (cache?.hit === true && provider.called === true) {
@@ -310,25 +259,10 @@ function validateOperationalEvaluationDataset(dataset) {
     if (!isPlainObject(lifecycle)) {
       errors.push(`${base}.lifecycleContext is required`);
     } else {
-      validateBoolean(
-        lifecycle.afterDownload,
-        `${base}.lifecycleContext.afterDownload`,
-        errors,
-      );
-      validateBoolean(
-        lifecycle.afterReupload,
-        `${base}.lifecycleContext.afterReupload`,
-        errors,
-      );
-      validateBoolean(
-        lifecycle.staleCacheReused,
-        `${base}.lifecycleContext.staleCacheReused`,
-        errors,
-      );
-      if (
-        execution.phase === "DOWNLOAD_REUSE" &&
-        lifecycle.afterDownload !== true
-      ) {
+      validateBoolean(lifecycle.afterDownload, `${base}.lifecycleContext.afterDownload`, errors);
+      validateBoolean(lifecycle.afterReupload, `${base}.lifecycleContext.afterReupload`, errors);
+      validateBoolean(lifecycle.staleCacheReused, `${base}.lifecycleContext.staleCacheReused`, errors);
+      if (execution.phase === "DOWNLOAD_REUSE" && lifecycle.afterDownload !== true) {
         errors.push(`${base} DOWNLOAD_REUSE requires afterDownload`);
       }
       if (execution.phase === "REUPLOAD" && lifecycle.afterReupload !== true) {
@@ -346,32 +280,17 @@ function validateOperationalEvaluationDataset(dataset) {
     }
     const eventId = text(event.eventId);
     if (!eventId) errors.push(`${base}.eventId is required`);
-    if (lifecycleIds.has(eventId))
-      errors.push(`duplicate lifecycle eventId: ${eventId}`);
+    if (lifecycleIds.has(eventId)) errors.push(`duplicate lifecycle eventId: ${eventId}`);
     lifecycleIds.add(eventId);
     if (!text(event.scenarioId)) errors.push(`${base}.scenarioId is required`);
     if (!LIFECYCLE_EVENTS.includes(event.event)) {
-      errors.push(
-        `${base}.event must be one of ${LIFECYCLE_EVENTS.join(", ")}`,
-      );
+      errors.push(`${base}.event must be one of ${LIFECYCLE_EVENTS.join(", ")}`);
     }
-    if (!text(event.cacheDisposition))
-      errors.push(`${base}.cacheDisposition is required`);
-    validateBoolean(
-      event.invalidationAttempted,
-      `${base}.invalidationAttempted`,
-      errors,
-    );
-    validateBoolean(
-      event.invalidationSucceeded,
-      `${base}.invalidationSucceeded`,
-      errors,
-    );
+    if (!text(event.cacheDisposition)) errors.push(`${base}.cacheDisposition is required`);
+    validateBoolean(event.invalidationAttempted, `${base}.invalidationAttempted`, errors);
+    validateBoolean(event.invalidationSucceeded, `${base}.invalidationSucceeded`, errors);
     validateBoolean(event.staleCacheReused, `${base}.staleCacheReused`, errors);
-    for (const key of [
-      "priorUploadIdentitySha256",
-      "newUploadIdentitySha256",
-    ]) {
+    for (const key of ["priorUploadIdentitySha256", "newUploadIdentitySha256"]) {
       const value = text(event[key]);
       if (value && !SHA256_RE.test(value)) {
         errors.push(`${base}.${key} must be SHA-256 when present`);
@@ -381,10 +300,7 @@ function validateOperationalEvaluationDataset(dataset) {
       errors.push(`${base} DOWNLOAD must retain cache`);
     }
     if (event.event === "DELETE") {
-      if (
-        event.invalidationAttempted !== true ||
-        event.invalidationSucceeded !== true
-      ) {
+      if (event.invalidationAttempted !== true || event.invalidationSucceeded !== true) {
         errors.push(`${base} DELETE must successfully invalidate cache`);
       }
       if (event.cacheDisposition !== "INVALIDATED") {
@@ -394,8 +310,7 @@ function validateOperationalEvaluationDataset(dataset) {
     if (event.event === "REUPLOAD") {
       const prior = text(event.priorUploadIdentitySha256);
       const next = text(event.newUploadIdentitySha256);
-      if (!prior || !next)
-        errors.push(`${base} REUPLOAD requires prior and new identity hashes`);
+      if (!prior || !next) errors.push(`${base} REUPLOAD requires prior and new identity hashes`);
     }
   }
 
@@ -405,10 +320,7 @@ function validateOperationalEvaluationDataset(dataset) {
 function validatePricingPolicy(policy) {
   const errors = [];
   if (!isPlainObject(policy)) {
-    return freezeDeep({
-      valid: false,
-      errors: ["pricingPolicy must be an object"],
-    });
+    return freezeDeep({ valid: false, errors: ["pricingPolicy must be an object"] });
   }
   if (policy.version !== PRICING_POLICY_VERSION) {
     errors.push(`pricing policy version must be ${PRICING_POLICY_VERSION}`);
@@ -416,10 +328,7 @@ function validatePricingPolicy(policy) {
   if (!text(policy.policyId)) errors.push("pricing policyId is required");
   if (policy.currency !== "USD") errors.push("pricing currency must be USD");
   if (!text(policy.mode)) errors.push("pricing mode is required");
-  if (
-    !isPlainObject(policy.models) ||
-    Object.keys(policy.models).length === 0
-  ) {
+  if (!isPlainObject(policy.models) || Object.keys(policy.models).length === 0) {
     errors.push("pricing models must be a non-empty object");
   }
   for (const [modelId, model] of Object.entries(policy.models || {})) {
@@ -447,10 +356,7 @@ function validatePricingPolicy(policy) {
 function validateThresholdPolicy(policy) {
   const errors = [];
   if (!isPlainObject(policy)) {
-    return freezeDeep({
-      valid: false,
-      errors: ["thresholdPolicy must be an object"],
-    });
+    return freezeDeep({ valid: false, errors: ["thresholdPolicy must be an object"] });
   }
   if (policy.version !== THRESHOLD_POLICY_VERSION) {
     errors.push(`threshold policy version must be ${THRESHOLD_POLICY_VERSION}`);
@@ -460,17 +366,8 @@ function validateThresholdPolicy(policy) {
   if (!isPlainObject(minimum)) {
     errors.push("minimumSampleSize is required");
   } else {
-    for (const key of [
-      "executions",
-      "coldExecutions",
-      "warmExecutions",
-      "lifecycleEvents",
-    ]) {
-      validateNonNegativeInteger(
-        minimum[key],
-        `minimumSampleSize.${key}`,
-        errors,
-      );
+    for (const key of ["executions", "coldExecutions", "warmExecutions", "lifecycleEvents"]) {
+      validateNonNegativeInteger(minimum[key], `minimumSampleSize.${key}`, errors);
     }
   }
   validateNonNegativeInteger(
@@ -515,16 +412,9 @@ function validateThresholdPolicy(policy) {
 function calculateProviderCostMicrousd(execution, pricingPolicy) {
   const provider = execution.provider || {};
   if (provider.called !== true) {
-    return Object.freeze({
-      costMicrousd: 0,
-      source: "NO_PROVIDER_CALL",
-      valid: true,
-    });
+    return Object.freeze({ costMicrousd: 0, source: "NO_PROVIDER_CALL", valid: true });
   }
-  if (
-    Number.isInteger(provider.observedCostMicrousd) &&
-    provider.observedCostMicrousd >= 0
-  ) {
+  if (Number.isInteger(provider.observedCostMicrousd) && provider.observedCostMicrousd >= 0) {
     return Object.freeze({
       costMicrousd: provider.observedCostMicrousd,
       source: "OBSERVED_COST",
@@ -572,13 +462,7 @@ function latencySummary(executions) {
 
 function thresholdResult(metric, operator, actual, threshold) {
   const passed = operator === ">=" ? actual >= threshold : actual <= threshold;
-  return Object.freeze({
-    metric,
-    operator,
-    actual: round(actual),
-    threshold,
-    passed,
-  });
+  return Object.freeze({ metric, operator, actual: round(actual), threshold, passed });
 }
 
 function blockedReport({ dataset, thresholdPolicy, pricingPolicy, errors }) {
@@ -631,12 +515,7 @@ function evaluateCostCacheLatency({
     ...pricingValidation.errors,
   ];
   if (validationErrors.length > 0) {
-    return blockedReport({
-      dataset,
-      thresholdPolicy,
-      pricingPolicy,
-      errors: validationErrors,
-    });
+    return blockedReport({ dataset, thresholdPolicy, pricingPolicy, errors: validationErrors });
   }
 
   const executions = clone(dataset.executions);
@@ -644,37 +523,23 @@ function evaluateCostCacheLatency({
   const costRecords = [];
   for (const execution of executions) {
     const cost = calculateProviderCostMicrousd(execution, pricingPolicy);
-    if (!cost.valid)
-      validationErrors.push(`${execution.executionId}: ${cost.error}`);
+    if (!cost.valid) validationErrors.push(`${execution.executionId}: ${cost.error}`);
     costRecords.push({ executionId: execution.executionId, ...cost });
   }
   if (validationErrors.length > 0) {
-    return blockedReport({
-      dataset,
-      thresholdPolicy,
-      pricingPolicy,
-      errors: validationErrors,
-    });
+    return blockedReport({ dataset, thresholdPolicy, pricingPolicy, errors: validationErrors });
   }
 
   const cold = phaseExecutions(executions, "COLD");
   const warm = phaseExecutions(executions, ["WARM", "DOWNLOAD_REUSE"]);
   const downloadReuse = phaseExecutions(executions, "DOWNLOAD_REUSE");
   const reupload = phaseExecutions(executions, "REUPLOAD");
-  const cacheEligible = executions.filter(
-    (entry) => entry.cache.readAttempted === true,
-  );
+  const cacheEligible = executions.filter((entry) => entry.cache.readAttempted === true);
   const cacheHits = cacheEligible.filter((entry) => entry.cache.hit === true);
   const cacheMisses = cacheEligible.filter((entry) => entry.cache.hit !== true);
-  const providerCalls = executions.filter(
-    (entry) => entry.provider.called === true,
-  );
-  const warmProviderCalls = warm.filter(
-    (entry) => entry.provider.called === true,
-  );
-  const reuploadProviderCalls = reupload.filter(
-    (entry) => entry.provider.called === true,
-  );
+  const providerCalls = executions.filter((entry) => entry.provider.called === true);
+  const warmProviderCalls = warm.filter((entry) => entry.provider.called === true);
+  const reuploadProviderCalls = reupload.filter((entry) => entry.provider.called === true);
   const successes = executions.filter((entry) => entry.status === "SUCCESS");
   const timeouts = executions.filter((entry) => entry.status === "TIMEOUT");
   const errors = executions.filter((entry) => entry.status === "ERROR");
@@ -682,9 +547,7 @@ function evaluateCostCacheLatency({
   const costByExecutionId = new Map(
     costRecords.map((entry) => [entry.executionId, entry]),
   );
-  const costs = executions.map(
-    (entry) => costByExecutionId.get(entry.executionId).costMicrousd,
-  );
+  const costs = executions.map((entry) => costByExecutionId.get(entry.executionId).costMicrousd);
   const providerCosts = providerCalls.map(
     (entry) => costByExecutionId.get(entry.executionId).costMicrousd,
   );
@@ -693,9 +556,7 @@ function evaluateCostCacheLatency({
   );
   const totalCostMicrousd = costs.reduce((sum, value) => sum + value, 0);
   const avoidedCostMicrousd = executions
-    .filter(
-      (entry) => entry.provider.called !== true && entry.cache.hit === true,
-    )
+    .filter((entry) => entry.provider.called !== true && entry.cache.hit === true)
     .reduce((sum, entry) => sum + entry.expectedColdCostMicrousd, 0);
   const totalPotentialCostMicrousd = totalCostMicrousd + avoidedCostMicrousd;
   const averageCostMicrousd = mean(costs);
@@ -716,19 +577,11 @@ function evaluateCostCacheLatency({
     ]),
   );
 
-  const deleteEvents = lifecycleEvents.filter(
-    (event) => event.event === "DELETE",
-  );
-  const downloadEvents = lifecycleEvents.filter(
-    (event) => event.event === "DOWNLOAD",
-  );
-  const reuploadEvents = lifecycleEvents.filter(
-    (event) => event.event === "REUPLOAD",
-  );
+  const deleteEvents = lifecycleEvents.filter((event) => event.event === "DELETE");
+  const downloadEvents = lifecycleEvents.filter((event) => event.event === "DOWNLOAD");
+  const reuploadEvents = lifecycleEvents.filter((event) => event.event === "REUPLOAD");
   const deleteInvalidated = deleteEvents.filter(
-    (event) =>
-      event.invalidationAttempted &&
-      event.invalidationSucceeded &&
+    (event) => event.invalidationAttempted && event.invalidationSucceeded &&
       event.cacheDisposition === "INVALIDATED",
   );
   const downloadRetained = downloadEvents.filter(
@@ -740,9 +593,7 @@ function evaluateCostCacheLatency({
     return prior && next && prior !== next && event.staleCacheReused !== true;
   });
   const staleCacheReuseViolationCount =
-    executions.filter(
-      (entry) => entry.lifecycleContext.staleCacheReused === true,
-    ).length +
+    executions.filter((entry) => entry.lifecycleContext.staleCacheReused === true).length +
     lifecycleEvents.filter((event) => event.staleCacheReused === true).length;
 
   const cacheHitLatency = latencySummary(cacheHits);
@@ -797,16 +648,11 @@ function evaluateCostCacheLatency({
       warmAverageMicrousd: mean(warmCosts),
       p95PerExecutionMicrousd: percentile(costs, 0.95),
       avoidedByCacheMicrousd: avoidedCostMicrousd,
-      cacheCostAvoidanceRate: safeRate(
-        avoidedCostMicrousd,
-        totalPotentialCostMicrousd,
-      ),
+      cacheCostAvoidanceRate: safeRate(avoidedCostMicrousd, totalPotentialCostMicrousd),
       monthlyProjectionExecutions: thresholdPolicy.monthlyProjectionExecutions,
       monthlyProjectedCostMicrousd,
       sourceBreakdown: Object.freeze({
-        observedCostCount: costRecords.filter(
-          (entry) => entry.source === "OBSERVED_COST",
-        ).length,
+        observedCostCount: costRecords.filter((entry) => entry.source === "OBSERVED_COST").length,
         tokenPricingPolicyCount: costRecords.filter(
           (entry) => entry.source === "TOKEN_PRICING_POLICY",
         ).length,
@@ -863,14 +709,8 @@ function evaluateCostCacheLatency({
       downloadEventCount: downloadEvents.length,
       deleteEventCount: deleteEvents.length,
       reuploadEventCount: reuploadEvents.length,
-      downloadRetentionAccuracy: safeRate(
-        downloadRetained.length,
-        downloadEvents.length,
-      ),
-      deleteInvalidationCoverage: safeRate(
-        deleteInvalidated.length,
-        deleteEvents.length,
-      ),
+      downloadRetentionAccuracy: safeRate(downloadRetained.length, downloadEvents.length),
+      deleteInvalidationCoverage: safeRate(deleteInvalidated.length, deleteEvents.length),
       reuploadIdentitySeparationAccuracy: safeRate(
         reuploadSeparated.length,
         reuploadEvents.length,
@@ -881,12 +721,7 @@ function evaluateCostCacheLatency({
 
   const t = thresholdPolicy.thresholds;
   const metricResults = [
-    thresholdResult(
-      "cache.hitRate",
-      ">=",
-      metrics.cache.hitRate,
-      t.cacheHitRateMin,
-    ),
+    thresholdResult("cache.hitRate", ">=", metrics.cache.hitRate, t.cacheHitRateMin),
     thresholdResult(
       "cache.warmHitRate",
       ">=",
@@ -1038,9 +873,7 @@ function evaluateCostCacheLatency({
     metrics,
     thresholdResults,
     failedThresholds: Object.freeze(
-      thresholdResults
-        .filter((entry) => !entry.passed)
-        .map((entry) => entry.metric),
+      thresholdResults.filter((entry) => !entry.passed).map((entry) => entry.metric),
     ),
     privacy: Object.freeze({
       rawRowsIncluded: false,

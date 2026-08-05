@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_real_shadow_case_registry_v1",
+  "title": "Query Candidate Planner Real Shadow Case Registry",
+  "type": "object",
+  "required": ["version", "registryId", "cases"],
+  "properties": {
+    "version": { "const": "query_candidate_planner_real_shadow_case_registry_v1" },
+    "registryId": { "type": "string", "minLength": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["caseId", "scenarioId", "expectedColdCostMicrousd", "modelId"],
+        "properties": {
+          "caseId": { "type": "string", "minLength": 1 },
+          "scenarioId": { "type": "string", "minLength": 1 },
+          "requestFingerprintSha256": { "type": "string", "pattern": "^$|^[a-fA-F0-9]{64}$" },
+          "uploadFingerprintSha256": { "type": "string", "pattern": "^$|^[a-fA-F0-9]{64}$" },
+          "expectedColdCostMicrousd": { "type": "integer", "minimum": 0 },
+          "modelId": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

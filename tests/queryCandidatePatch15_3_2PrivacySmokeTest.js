@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const r=s.build();const json=JSON.stringify(r);for(const token of ["rawRows\":true","fileName\":\"","email\":\"","accountId\":\"","tenantId\":\""])assert(!json.includes(token),`sensitive token found: ${token}`);assert.strictEqual(r.evidenceBundle.shadow.privacyViolationCount,0);console.log("PASS query candidate patch15.3.2 evidence privacy smoke");

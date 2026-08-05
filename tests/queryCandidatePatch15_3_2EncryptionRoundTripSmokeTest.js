@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const {encryptEvidencePayload,decryptEvidencePayload}=require("../automation/queryCandidatePlannerRealShadowEvidenceCrypto");const secret="x".repeat(64);const value={kind:"EXECUTION",candidateId:"sales"};const encrypted=encryptEvidencePayload(value,secret);assert(!encrypted.ciphertext.includes("sales"));assert.deepStrictEqual(decryptEvidencePayload(encrypted,secret),value);console.log("PASS query candidate patch15.3.2 encrypted persistence round-trip smoke");

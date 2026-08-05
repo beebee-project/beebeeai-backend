@@ -1,0 +1,14 @@
+{
+  "version": "query_candidate_planner_real_shadow_case_registry_v1",
+  "registryId": "replace_with_internal_real_shadow_registry_id",
+  "cases": [
+    {
+      "caseId": "replace_with_case_id_from_accuracy_dataset",
+      "scenarioId": "replace_with_stable_internal_scenario_id",
+      "requestFingerprintSha256": "replace_with_64_character_request_fingerprint",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default"
+    }
+  ]
+}

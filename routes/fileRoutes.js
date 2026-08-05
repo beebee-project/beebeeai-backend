@@ -6,6 +6,9 @@ const {
   createQueryCandidatePlannerMutationBoundary,
   createQueryCandidatePlannerDownloadRetentionBoundary,
 } = require("../automation/queryCandidatePlannerFileLifecycleBoundary");
+const {
+  recordQueryCandidatePlannerRealShadowLifecycleObservation,
+} = require("../automation/queryCandidatePlannerRealShadowEvidenceCollector");
 const router = express.Router();
 
 const upload = multer({
@@ -17,20 +20,30 @@ const upload = multer({
 
 router.use(protect);
 
+function collectRealShadowLifecycle(observation, context) {
+  void recordQueryCandidatePlannerRealShadowLifecycleObservation(
+    observation,
+    context,
+  );
+}
+
 const uploadFileCacheObserved =
   createQueryCandidatePlannerMutationBoundary({
     handler: fileController.uploadFile,
     action: "UPLOAD_REPLACEMENT",
+    onObservation: collectRealShadowLifecycle,
   });
 const downloadFileCacheRetained =
   createQueryCandidatePlannerDownloadRetentionBoundary({
     handler: fileController.downloadFile,
     action: "SOURCE_DOWNLOAD",
+    onObservation: collectRealShadowLifecycle,
   });
 const deleteFileCacheObserved =
   createQueryCandidatePlannerMutationBoundary({
     handler: fileController.deleteFile,
     action: "DELETE",
+    onObservation: collectRealShadowLifecycle,
   });
 
 router.route("/").get(fileController.getFiles);

@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert"),fs=require("fs"),path=require("path");const root=path.resolve(__dirname,"..");for(const file of ["automation/queryCandidatePlannerRealShadowEvidenceRecord.schema.json","automation/queryCandidatePlannerRealShadowCaseRegistry.schema.json","automation/queryCandidatePlannerRealShadowEvidenceBundleBuilder.schema.json"]){const value=JSON.parse(fs.readFileSync(path.join(root,file),"utf8"));assert(value.$schema);assert(value.$id);}console.log("PASS query candidate patch15.3.2 schema smoke");

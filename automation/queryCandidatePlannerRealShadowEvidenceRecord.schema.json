@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_real_shadow_evidence_record_v1",
+  "title": "Query Candidate Planner Real Shadow Evidence Record",
+  "type": "object",
+  "required": ["version", "kind", "source", "actualTraffic", "synthetic", "privacy"],
+  "properties": {
+    "version": { "const": "query_candidate_planner_real_shadow_evidence_record_v1" },
+    "kind": { "enum": ["EXECUTION", "LIFECYCLE"] },
+    "source": { "const": "REAL_SHADOW_TRAFFIC" },
+    "actualTraffic": { "const": true },
+    "synthetic": { "const": false },
+    "privacy": {
+      "type": "object",
+      "properties": {
+        "rawRowsIncluded": { "const": false },
+        "fileNameIncluded": { "const": false },
+        "originalFileNameIncluded": { "const": false },
+        "userIdentityIncluded": { "const": false },
+        "tenantIdIncluded": { "const": false }
+      }
+    }
+  },
+  "additionalProperties": true
+}

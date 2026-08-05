@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 const {
   READINESS_DECISION,
@@ -63,14 +65,14 @@ function validDate(value) {
 function validReport(report, expectedVersion) {
   return Boolean(
     isPlainObject(report) &&
-    report.version === expectedVersion &&
-    report.decision === "EVALUATION_PASS" &&
-    report.failClosed === true &&
-    report.evaluationOnly === true &&
-    report.promotionAuthorized === false &&
-    Number.isInteger(report.sampleSize) &&
-    report.sampleSize >= MIN_SAMPLE_SIZE &&
-    SHA256_RE.test(String(report.reportSha256 || "")),
+      report.version === expectedVersion &&
+      report.decision === "EVALUATION_PASS" &&
+      report.failClosed === true &&
+      report.evaluationOnly === true &&
+      report.promotionAuthorized === false &&
+      Number.isInteger(report.sampleSize) &&
+      report.sampleSize >= MIN_SAMPLE_SIZE &&
+      SHA256_RE.test(String(report.reportSha256 || "")),
   );
 }
 
@@ -122,35 +124,26 @@ function validateQueryCandidatePlannerInternalCanaryEvidence(
   }
 
   const readiness = evaluateReadinessGate(evidence?.readiness);
-  if (
-    !readiness.valid ||
-    evidence?.readiness?.decision !== READINESS_DECISION
-  ) {
+  if (!readiness.valid || evidence?.readiness?.decision !== READINESS_DECISION) {
     errors.push("PATCH13_3_READINESS_EVIDENCE_INVALID");
   }
 
-  if (
-    !validReport(
-      evidence?.accuracy,
-      "query_candidate_planner_accuracy_evaluation_report_v1",
-    )
-  ) {
+  if (!validReport(
+    evidence?.accuracy,
+    "query_candidate_planner_accuracy_evaluation_report_v1",
+  )) {
     errors.push("ACCURACY_EVIDENCE_INVALID");
   }
-  if (
-    !validReport(
-      evidence?.operational,
-      "query_candidate_planner_cost_cache_latency_evaluation_report_v1",
-    )
-  ) {
+  if (!validReport(
+    evidence?.operational,
+    "query_candidate_planner_cost_cache_latency_evaluation_report_v1",
+  )) {
     errors.push("OPERATIONAL_EVIDENCE_INVALID");
   }
-  if (
-    !validReport(
-      evidence?.shadow,
-      "query_candidate_planner_shadow_accuracy_evaluation_report_v1",
-    )
-  ) {
+  if (!validReport(
+    evidence?.shadow,
+    "query_candidate_planner_shadow_accuracy_evaluation_report_v1",
+  )) {
     errors.push("SHADOW_EVIDENCE_INVALID");
   }
 
@@ -174,17 +167,15 @@ function validateQueryCandidatePlannerInternalCanaryEvidence(
   }
 
   const forbiddenPaths = findForbiddenPaths(evidence);
-  if (forbiddenPaths.length > 0)
-    errors.push("SENSITIVE_EVIDENCE_FIELD_PRESENT");
+  if (forbiddenPaths.length > 0) errors.push("SENSITIVE_EVIDENCE_FIELD_PRESENT");
 
   const uniqueErrors = Object.freeze([...new Set(errors)]);
   return Object.freeze({
     version: EVIDENCE_VERSION,
     valid: uniqueErrors.length === 0,
-    reason:
-      uniqueErrors.length === 0
-        ? "REAL_SHADOW_EVIDENCE_VALID"
-        : uniqueErrors[0],
+    reason: uniqueErrors.length === 0
+      ? "REAL_SHADOW_EVIDENCE_VALID"
+      : uniqueErrors[0],
     errors: uniqueErrors,
     readiness: readiness.valid ? evidence.readiness : null,
     evidenceSha256: isPlainObject(evidence) ? sha256(evidence) : "",

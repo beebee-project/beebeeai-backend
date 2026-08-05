@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 const {
   DATASET_VERSION: ACCURACY_DATASET_VERSION,
@@ -82,9 +84,7 @@ function freezeDeep(value) {
 }
 
 function text(value, maxLength = 200) {
-  return String(value == null ? "" : value)
-    .trim()
-    .slice(0, maxLength);
+  return String(value == null ? "" : value).trim().slice(0, maxLength);
 }
 
 function number(value, fallback = 0) {
@@ -149,12 +149,9 @@ function normalizeCandidate(candidate = {}, index = 0) {
   const statusText = text(
     candidate.status || candidate.result || candidate.disposition,
   ).toUpperCase();
-  const rejected = [
-    "REJECTED",
-    "BLOCKED",
-    "INELIGIBLE",
-    "UNSUPPORTED",
-  ].includes(statusText);
+  const rejected = ["REJECTED", "BLOCKED", "INELIGIBLE", "UNSUPPORTED"].includes(
+    statusText,
+  );
   return Object.freeze({
     candidateId,
     rank:
@@ -162,7 +159,8 @@ function normalizeCandidate(candidate = {}, index = 0) {
         ? candidate.rank
         : index + 1,
     status: rejected ? "REJECTED" : "ACCEPTED",
-    productionEligible: !rejected && candidate.productionEligible !== false,
+    productionEligible:
+      !rejected && candidate.productionEligible !== false,
   });
 }
 
@@ -195,10 +193,8 @@ function extractCandidates(shadowResolution = {}) {
   return Object.freeze(
     candidates
       .slice()
-      .sort(
-        (left, right) =>
-          left.rank - right.rank ||
-          left.candidateId.localeCompare(right.candidateId),
+      .sort((left, right) =>
+        left.rank - right.rank || left.candidateId.localeCompare(right.candidateId),
       )
       .map((candidate, index) =>
         Object.freeze({ ...candidate, rank: index + 1 }),
@@ -207,31 +203,27 @@ function extractCandidates(shadowResolution = {}) {
 }
 
 function extractDomain(shadowResolution = {}) {
-  return (
-    text(
-      shadowResolution.businessDomainProfile?.primaryDomain ||
-        shadowResolution.semanticProfile?.primaryDomain ||
-        shadowResolution.semanticProfile?.businessDomain ||
-        shadowResolution.primaryDomain ||
-        shadowResolution.domain ||
-        "UNKNOWN",
-      100,
-    ) || "UNKNOWN"
-  );
+  return text(
+    shadowResolution.businessDomainProfile?.primaryDomain ||
+      shadowResolution.semanticProfile?.primaryDomain ||
+      shadowResolution.semanticProfile?.businessDomain ||
+      shadowResolution.primaryDomain ||
+      shadowResolution.domain ||
+      "UNKNOWN",
+    100,
+  ) || "UNKNOWN";
 }
 
 function extractIntent(shadowResolution = {}) {
-  return (
-    text(
-      shadowResolution.businessDomainProfile?.datasetIntent ||
-        shadowResolution.semanticProfile?.datasetIntent ||
-        shadowResolution.semanticProfile?.intent ||
-        shadowResolution.datasetIntent ||
-        shadowResolution.intent ||
-        "UNKNOWN",
-      100,
-    ) || "UNKNOWN"
-  );
+  return text(
+    shadowResolution.businessDomainProfile?.datasetIntent ||
+      shadowResolution.semanticProfile?.datasetIntent ||
+      shadowResolution.semanticProfile?.intent ||
+      shadowResolution.datasetIntent ||
+      shadowResolution.intent ||
+      "UNKNOWN",
+    100,
+  ) || "UNKNOWN";
 }
 
 function extractFallback(shadowResolution = {}) {
@@ -243,7 +235,10 @@ function extractFallback(shadowResolution = {}) {
   return Object.freeze({
     applied:
       shadowResolution.fallbackApplied === true || fallback.applied === true,
-    reason: text(shadowResolution.fallbackReason || fallback.reason, 120),
+    reason: text(
+      shadowResolution.fallbackReason || fallback.reason,
+      120,
+    ),
   });
 }
 
@@ -292,26 +287,38 @@ function sanitizeComparison(comparison = null) {
 function sanitizeGuardrails(guardrails = {}) {
   return Object.freeze({
     shadowOnly: guardrails.shadowOnly !== false,
-    primaryResponseAuthority: guardrails.primaryResponseAuthority !== false,
-    responsePayloadMutation: guardrails.responsePayloadMutation === true,
-    responseHeaderMutation: guardrails.responseHeaderMutation === true,
-    responseStatusMutation: guardrails.responseStatusMutation === true,
-    productionCandidateMerge: guardrails.productionCandidateMerge === true,
-    productionReadyAssignment: guardrails.productionReadyAssignment === true,
-    productionRouteChanged: guardrails.productionRouteChanged === true,
+    primaryResponseAuthority:
+      guardrails.primaryResponseAuthority !== false,
+    responsePayloadMutation:
+      guardrails.responsePayloadMutation === true,
+    responseHeaderMutation:
+      guardrails.responseHeaderMutation === true,
+    responseStatusMutation:
+      guardrails.responseStatusMutation === true,
+    productionCandidateMerge:
+      guardrails.productionCandidateMerge === true,
+    productionReadyAssignment:
+      guardrails.productionReadyAssignment === true,
+    productionRouteChanged:
+      guardrails.productionRouteChanged === true,
   });
 }
 
 function sanitizePrivacy(privacy = {}) {
   return Object.freeze({
-    rawPrimaryResponseIncluded: privacy.rawPrimaryResponseIncluded === true,
-    rawShadowResolutionIncluded: privacy.rawShadowResolutionIncluded === true,
+    rawPrimaryResponseIncluded:
+      privacy.rawPrimaryResponseIncluded === true,
+    rawShadowResolutionIncluded:
+      privacy.rawShadowResolutionIncluded === true,
     rawRowsIncluded: privacy.rawRowsIncluded === true,
     sampleValuesIncluded: privacy.sampleValuesIncluded === true,
     fileNameIncluded: privacy.fileNameIncluded === true,
-    originalFileNameIncluded: privacy.originalFileNameIncluded === true,
-    queryTablesKeyIncluded: privacy.queryTablesKeyIncluded === true,
-    userIdentityIncluded: privacy.userIdentityIncluded === true,
+    originalFileNameIncluded:
+      privacy.originalFileNameIncluded === true,
+    queryTablesKeyIncluded:
+      privacy.queryTablesKeyIncluded === true,
+    userIdentityIncluded:
+      privacy.userIdentityIncluded === true,
     tenantIdIncluded: privacy.tenantIdIncluded === true,
   });
 }
@@ -371,7 +378,10 @@ function buildShadowAccuracyObservation({
     caseId: normalizedCaseId,
     requestFingerprintSha256,
     status,
-    reason: text(apiShadowObservation.reason || shadowResolution.status, 120),
+    reason: text(
+      apiShadowObservation.reason || shadowResolution.status,
+      120,
+    ),
     primaryResponseUnchanged:
       apiShadowObservation.primaryResponseUnchanged !== false,
     latencyMs: Math.max(0, number(apiShadowObservation.latencyMs)),
@@ -382,7 +392,10 @@ function buildShadowAccuracyObservation({
   });
 }
 
-function validateShadowAccuracyObservationDataset(dataset, accuracyDataset) {
+function validateShadowAccuracyObservationDataset(
+  dataset,
+  accuracyDataset,
+) {
   const errors = [];
   if (!isPlainObject(dataset)) {
     return freezeDeep({
@@ -405,14 +418,12 @@ function validateShadowAccuracyObservationDataset(dataset, accuracyDataset) {
     );
   }
   if (
-    text(dataset.sourceAccuracyDatasetId) !== text(accuracyDataset?.datasetId)
+    text(dataset.sourceAccuracyDatasetId) !==
+    text(accuracyDataset?.datasetId)
   ) {
     errors.push("sourceAccuracyDatasetId must match accuracy dataset");
   }
-  if (
-    !Array.isArray(dataset.observations) ||
-    dataset.observations.length === 0
-  ) {
+  if (!Array.isArray(dataset.observations) || dataset.observations.length === 0) {
     errors.push("observations must be a non-empty array");
   }
 
@@ -466,17 +477,12 @@ function validateShadowAccuracyObservationDataset(dataset, accuracyDataset) {
     if (typeof observation.primaryResponseUnchanged !== "boolean") {
       errors.push(`${caseId}: primaryResponseUnchanged boolean is required`);
     }
-    if (
-      !Number.isFinite(Number(observation.latencyMs)) ||
-      Number(observation.latencyMs) < 0
-    ) {
+    if (!Number.isFinite(Number(observation.latencyMs)) || Number(observation.latencyMs) < 0) {
       errors.push(`${caseId}: latencyMs must be non-negative`);
     }
     if (COMPLETED_STATUSES.has(status)) {
       if (!isPlainObject(observation.shadowPrediction)) {
-        errors.push(
-          `${caseId}: completed observation requires shadowPrediction`,
-        );
+        errors.push(`${caseId}: completed observation requires shadowPrediction`);
       } else {
         const prediction = observation.shadowPrediction;
         if (!Array.isArray(prediction.candidates)) {
@@ -499,9 +505,8 @@ function validateShadowAccuracyObservationDataset(dataset, accuracyDataset) {
         }
         const candidateIds = [];
         const ranks = [];
-        for (const [index, candidate] of (Array.isArray(prediction.candidates)
-          ? prediction.candidates
-          : []
+        for (const [index, candidate] of (
+          Array.isArray(prediction.candidates) ? prediction.candidates : []
         ).entries()) {
           const normalized = normalizeCandidate(candidate, index);
           if (!normalized.candidateId) {
@@ -547,10 +552,8 @@ function validateShadowAccuracyThresholdPolicy(policy) {
   if (policy.version !== THRESHOLD_POLICY_VERSION) {
     errors.push(`threshold policy version must be ${THRESHOLD_POLICY_VERSION}`);
   }
-  if (
-    !Number.isInteger(policy.minimumObservationCount) ||
-    policy.minimumObservationCount < 1
-  ) {
+  if (!Number.isInteger(policy.minimumObservationCount) ||
+      policy.minimumObservationCount < 1) {
     errors.push("minimumObservationCount must be a positive integer");
   }
   if (typeof policy.requireAllAccuracyCases !== "boolean") {
@@ -633,7 +636,8 @@ function observationsToPredictions(observations = []) {
           intent: text(prediction.intent) || "UNKNOWN",
           fallbackApplied: prediction.fallbackApplied === true,
           fallbackReason: text(prediction.fallbackReason, 120),
-          unsupportedRejected: prediction.unsupportedRejected === true,
+          unsupportedRejected:
+            prediction.unsupportedRejected === true,
           reviewRequired: prediction.reviewRequired === true,
         });
       }),
@@ -776,7 +780,8 @@ function evaluateShadowThresholds({
     "<=",
     policy.maximumGuardrailViolationCount,
     summary.guardrailViolationCount,
-    summary.guardrailViolationCount <= policy.maximumGuardrailViolationCount,
+    summary.guardrailViolationCount <=
+      policy.maximumGuardrailViolationCount,
   );
   push(
     "privacyViolationCount",
@@ -796,7 +801,9 @@ function evaluateShadowThresholds({
   push(
     "accuracyEvaluationDecision",
     "==",
-    policy.requireAccuracyEvaluationPass ? ACCURACY_DECISIONS.PASS : "ANY",
+    policy.requireAccuracyEvaluationPass
+      ? ACCURACY_DECISIONS.PASS
+      : "ANY",
     accuracyReport?.decision || "",
     policy.requireAccuracyEvaluationPass
       ? accuracyReport?.decision === ACCURACY_DECISIONS.PASS
@@ -894,12 +901,14 @@ function evaluateShadowAccuracy({
   const accuracyDatasetValidation = validateAccuracyEvaluationDataset(
     accuracyDatasetSnapshot,
   );
-  const shadowDatasetValidation = validateShadowAccuracyObservationDataset(
-    shadowDatasetSnapshot,
-    accuracyDatasetSnapshot,
+  const shadowDatasetValidation =
+    validateShadowAccuracyObservationDataset(
+      shadowDatasetSnapshot,
+      accuracyDatasetSnapshot,
+    );
+  const shadowPolicyValidation = validateShadowAccuracyThresholdPolicy(
+    shadowPolicySnapshot,
   );
-  const shadowPolicyValidation =
-    validateShadowAccuracyThresholdPolicy(shadowPolicySnapshot);
 
   if (!accuracyDatasetValidation.valid) {
     return blockedReport({
@@ -981,9 +990,11 @@ function evaluateShadowAccuracy({
     accuracyDatasetId: accuracyDatasetSnapshot.datasetId,
     accuracyDatasetSha256: reportCore.accuracyDatasetSha256,
     shadowThresholdPolicyVersion: shadowPolicySnapshot.version,
-    shadowThresholdPolicySha256: reportCore.shadowThresholdPolicySha256,
+    shadowThresholdPolicySha256:
+      reportCore.shadowThresholdPolicySha256,
     accuracyThresholdPolicyVersion: accuracyPolicySnapshot.version,
-    accuracyThresholdPolicySha256: reportCore.accuracyThresholdPolicySha256,
+    accuracyThresholdPolicySha256:
+      reportCore.accuracyThresholdPolicySha256,
     decision: passed ? DECISIONS.PASS : DECISIONS.BLOCKED,
     reason: passed
       ? "SHADOW_ACCURACY_THRESHOLDS_PASSED"

@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const r=s.build();assert.strictEqual(r.reports.operational.decision,"EVALUATION_PASS");assert.strictEqual(r.reports.operational.sample.executions,50);assert.strictEqual(r.reports.operational.sample.coldExecutions,10);assert.strictEqual(r.reports.operational.sample.warmExecutions,30);assert.strictEqual(r.reports.operational.sample.reuploadExecutions,10);console.log("PASS query candidate patch15.3.2 operational dataset derivation smoke");

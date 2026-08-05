@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const {parseQueryCandidatePlannerRealShadowEvidenceConfig}=require("../automation/queryCandidatePlannerRealShadowEvidenceConfig");const c=parseQueryCandidatePlannerRealShadowEvidenceConfig({});assert.strictEqual(c.enabled,false);assert.strictEqual(c.configurationValid,true);assert.strictEqual(c.failClosed,true);console.log("PASS query candidate patch15.3.2 default disabled smoke");

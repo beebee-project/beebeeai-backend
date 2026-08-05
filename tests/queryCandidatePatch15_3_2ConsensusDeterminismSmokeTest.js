@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const a=s.build({records:s.realRecords()});const b=s.build({records:s.realRecords().slice().reverse()});assert.strictEqual(a.decision,"EVALUATION_PASS");assert.strictEqual(b.decision,"EVALUATION_PASS");assert.strictEqual(a.reports.accuracy.reportSha256,b.reports.accuracy.reportSha256);console.log("PASS query candidate patch15.3.2 consensus determinism smoke");

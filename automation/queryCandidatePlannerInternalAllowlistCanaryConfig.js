@@ -1,3 +1,5 @@
+"use strict";
+
 const CONFIG_VERSION =
   "query_candidate_planner_internal_allowlist_canary_config_v1";
 
@@ -48,11 +50,8 @@ function timeoutValue(env, key, fallback) {
   }
   const raw = String(env[key]).trim();
   const value = Number(raw);
-  const valid =
-    /^\d+$/.test(raw) &&
-    Number.isInteger(value) &&
-    value >= 1000 &&
-    value <= 60000;
+  const valid = /^\d+$/.test(raw) && Number.isInteger(value) &&
+    value >= 1000 && value <= 60000;
   return {
     value: valid ? value : fallback,
     valid,
@@ -73,15 +72,29 @@ function llmModeValue(env, key, fallback) {
   };
 }
 
-function parseQueryCandidatePlannerInternalCanaryConfig(env = process.env) {
-  const enabled = strictBoolean(env, ENV_KEYS.enabled, DEFAULTS.enabled);
+function parseQueryCandidatePlannerInternalCanaryConfig(
+  env = process.env,
+) {
+  const enabled = strictBoolean(
+    env,
+    ENV_KEYS.enabled,
+    DEFAULTS.enabled,
+  );
   const killSwitch = strictBoolean(
     env,
     ENV_KEYS.killSwitch,
     DEFAULTS.killSwitch,
   );
-  const timeoutMs = timeoutValue(env, ENV_KEYS.timeoutMs, DEFAULTS.timeoutMs);
-  const llmMode = llmModeValue(env, ENV_KEYS.llmMode, DEFAULTS.llmMode);
+  const timeoutMs = timeoutValue(
+    env,
+    ENV_KEYS.timeoutMs,
+    DEFAULTS.timeoutMs,
+  );
+  const llmMode = llmModeValue(
+    env,
+    ENV_KEYS.llmMode,
+    DEFAULTS.llmMode,
+  );
   const evidenceJson = Object.prototype.hasOwnProperty.call(
     env || {},
     ENV_KEYS.evidenceJson,

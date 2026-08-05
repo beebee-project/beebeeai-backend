@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const r=s.build();assert.strictEqual(r.decision,"EVALUATION_PASS");assert.strictEqual(r.validation.valid,true);assert.strictEqual(r.evidenceBundle.source,"REAL_SHADOW_TRAFFIC");assert.strictEqual(r.evidenceBundle.synthetic,false);assert.strictEqual(r.evidenceBundle.actualTraffic,true);console.log("PASS query candidate patch15.3.2 real shadow evidence bundle smoke");

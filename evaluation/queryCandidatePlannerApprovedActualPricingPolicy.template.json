@@ -1,0 +1,19 @@
+{
+  "version": "query_candidate_planner_cost_pricing_policy_v1",
+  "policyId": "replace_with_approved_actual_provider_pricing_policy_id",
+  "currency": "USD",
+  "mode": "DRAFT_NOT_APPROVED",
+  "rateUnit": "MICROUSD_PER_MILLION_TOKENS",
+  "models": {
+    "semantic_profiler_default": {
+      "inputMicrousdPerMillionTokens": 0,
+      "outputMicrousdPerMillionTokens": 0
+    }
+  },
+  "guardrails": {
+    "providerInvoice": false,
+    "productionBillingAuthority": false,
+    "approvedByOperator": false,
+    "effectiveAt": ""
+  }
+}

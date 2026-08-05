@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const r=s.build();assert.strictEqual(r.reports.shadow.decision,"EVALUATION_PASS");assert.strictEqual(r.reports.shadow.observationSummary.primaryResponseUnchangedRate,1);assert.strictEqual(r.reports.shadow.observationSummary.privacyViolationCount,0);console.log("PASS query candidate patch15.3.2 shadow accuracy integration smoke");

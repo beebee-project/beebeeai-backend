@@ -17,6 +17,13 @@ const {
   recordQueryCandidatePlannerInternalPreviewObservation,
 } = require("../automation/queryCandidatePlannerInternalPreviewStore");
 const {
+  runQueryCandidatePlannerApiShadowWithRealEvidenceCapture,
+} = require("../automation/queryCandidatePlannerRealShadowCaptureBridge");
+const {
+  recordQueryCandidatePlannerRealShadowObservation,
+  recordQueryCandidatePlannerRealShadowLifecycleObservation,
+} = require("../automation/queryCandidatePlannerRealShadowEvidenceCollector");
+const {
   requireQueryCandidatePlannerInternalPreviewAccess,
 } = require("../automation/queryCandidatePlannerInternalPreviewAccess");
 const {
@@ -33,17 +40,25 @@ function observeQueryCandidatePlannerForInternalPreview(
 ) {
   defaultObservationLogger(observation, context);
   recordQueryCandidatePlannerInternalPreviewObservation(observation);
+  void recordQueryCandidatePlannerRealShadowObservation(observation, context);
 }
 
 const getAnalysisCandidatesShadowObserved =
   createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
     handler: automationController.getAnalysisCandidates,
     onObservation: observeQueryCandidatePlannerForInternalPreview,
+    shadowRunner: runQueryCandidatePlannerApiShadowWithRealEvidenceCapture,
   });
 const downloadGeneratedFileCacheRetained =
   createQueryCandidatePlannerDownloadRetentionBoundary({
     handler: automationController.downloadGeneratedFile,
     action: "GENERATED_DOWNLOAD",
+    onObservation: (observation, context) => {
+      void recordQueryCandidatePlannerRealShadowLifecycleObservation(
+        observation,
+        context,
+      );
+    },
   });
 
 router.post("/query-preview", automationController.previewQueryTables);

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_real_shadow_evidence_bundle_builder_result_v1",
+  "title": "Query Candidate Planner Real Shadow Evidence Bundle Builder Result",
+  "type": "object",
+  "required": ["version", "decision", "reason", "failClosed", "promotionAuthorized"],
+  "properties": {
+    "version": { "const": "query_candidate_planner_real_shadow_evidence_bundle_builder_v1" },
+    "decision": { "enum": ["EVALUATION_PASS", "EVALUATION_BLOCKED"] },
+    "reason": { "type": "string" },
+    "failClosed": { "const": true },
+    "promotionAuthorized": { "const": false },
+    "evidenceSha256": { "type": "string", "pattern": "^$|^[a-fA-F0-9]{64}$" }
+  },
+  "additionalProperties": true
+}

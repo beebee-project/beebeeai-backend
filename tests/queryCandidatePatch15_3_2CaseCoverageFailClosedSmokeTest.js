@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const missing=s.accuracyDataset().cases[0].caseId;const r=s.build({records:s.realRecords().filter(x=>x.caseId!==missing)});assert.strictEqual(r.decision,"EVALUATION_BLOCKED");assert(r.reason.startsWith("INSUFFICIENT_CASE_OBSERVATIONS"));console.log("PASS query candidate patch15.3.2 accuracy case coverage fail-closed smoke");

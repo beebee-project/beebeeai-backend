@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const {validateQueryCandidatePlannerInternalCanaryEvidence}=require("../automation/queryCandidatePlannerInternalCanaryEvidence");const r=s.build();const v=validateQueryCandidatePlannerInternalCanaryEvidence(r.evidenceBundle,{now:()=>Date.parse("2026-08-05T07:30:00Z")});assert.strictEqual(v.valid,true);assert.strictEqual(v.reason,"REAL_SHADOW_EVIDENCE_VALID");console.log("PASS query candidate patch15.3.2 Patch 15.3 evidence validator integration smoke");

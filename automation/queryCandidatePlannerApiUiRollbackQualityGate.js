@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 const {
   createQueryCandidatePlannerFeatureControl,
@@ -50,7 +52,9 @@ function canonicalize(value) {
 
 function sha256(value) {
   const serialized =
-    typeof value === "string" ? value : JSON.stringify(canonicalize(value));
+    typeof value === "string"
+      ? value
+      : JSON.stringify(canonicalize(value));
   return crypto.createHash("sha256").update(serialized).digest("hex");
 }
 
@@ -301,7 +305,8 @@ async function runObservedApiCall({
     primaryBeforeSha256: beforeSha256,
     primaryAfterSha256: afterSha256,
     primaryUnchanged: beforeSha256 === afterSha256,
-    responseMatchesPrimary: sha256(responsePayload) === sha256(primaryPayload),
+    responseMatchesPrimary:
+      sha256(responsePayload) === sha256(primaryPayload),
     observation,
   });
 }
@@ -324,7 +329,7 @@ function evaluateInternalPreview(observation) {
     "/query-execute",
     "/execute-business-template",
     "PRODUCTION_CANDIDATE_MERGE_ENABLED",
-    'method="post"',
+    "method=\"post\"",
     "method='post'",
   ];
   const forbiddenMatches = forbiddenActionFragments.filter((fragment) =>
@@ -414,7 +419,8 @@ function safeObservationDetails(observation = {}) {
   return freeze({
     status: String(observation?.status || ""),
     reason: String(observation?.reason || ""),
-    primaryResponseUnchanged: observation?.primaryResponseUnchanged !== false,
+    primaryResponseUnchanged:
+      observation?.primaryResponseUnchanged !== false,
     providerCallCount: Number(observation?.shadow?.providerCallCount || 0),
     productionCandidateMerge:
       observation?.guardrails?.productionCandidateMerge === true,
@@ -441,13 +447,14 @@ async function runQueryCandidatePlannerApiUiRollbackQualityGate({
   });
   const preview = evaluateInternalPreview(baseline.observation);
 
-  const defaultPromotionDecision = evaluateControlledProductionPromotionGate({
-    env: {},
-    featureControl,
-    readinessGate,
-    subjectSha256,
-    adapterVersion: ADAPTER_VERSION,
-  });
+  const defaultPromotionDecision =
+    evaluateControlledProductionPromotionGate({
+      env: {},
+      featureControl,
+      readinessGate,
+      subjectSha256,
+      adapterVersion: ADAPTER_VERSION,
+    });
   const preRollbackPromotionDecision =
     evaluateControlledProductionPromotionGate({
       env: allowlistPromotionEnvironment(subjectSha256),
@@ -540,185 +547,62 @@ async function runQueryCandidatePlannerApiUiRollbackQualityGate({
   });
 
   const checks = [
-    check(
-      "API_PRIMARY_HTTP_CONTRACT",
-      baseline.statusCode === 200 && baseline.responseKind === "json",
-      {
-        statusCode: baseline.statusCode,
-        responseKind: baseline.responseKind,
-      },
-    ),
-    check(
-      "API_PRIMARY_RESPONSE_UNCHANGED",
-      baseline.primaryUnchanged && baseline.responseMatchesPrimary,
-      {
-        primaryBeforeSha256: baseline.primaryBeforeSha256,
-        primaryAfterSha256: baseline.primaryAfterSha256,
-      },
-    ),
-    check(
-      "SHADOW_OBSERVATION_COMPLETED",
-      ["COMPLETED", "COMPLETED_SAFE"].includes(baseline.observation?.status),
-      safeObservationDetails(baseline.observation),
-    ),
-    check(
-      "SHADOW_COMPARATOR_AVAILABLE",
-      Boolean(baseline.observation?.comparison?.verdict),
-      {
-        verdict: baseline.observation?.comparison?.verdict || "",
-      },
-    ),
-    check(
-      "INTERNAL_PREVIEW_MEMORY_ONLY",
-      preview.entryCount === 1 &&
-        preview.summaryTotal === 1 &&
-        preview.persistence === "MEMORY_ONLY",
-      preview,
-    ),
-    check(
-      "INTERNAL_PREVIEW_READ_ONLY",
-      preview.readOnly &&
-        preview.productionBadgePresent &&
-        preview.forbiddenActionMatches.length === 0,
-      preview,
-    ),
+    check("API_PRIMARY_HTTP_CONTRACT", baseline.statusCode === 200 && baseline.responseKind === "json", {
+      statusCode: baseline.statusCode,
+      responseKind: baseline.responseKind,
+    }),
+    check("API_PRIMARY_RESPONSE_UNCHANGED", baseline.primaryUnchanged && baseline.responseMatchesPrimary, {
+      primaryBeforeSha256: baseline.primaryBeforeSha256,
+      primaryAfterSha256: baseline.primaryAfterSha256,
+    }),
+    check("SHADOW_OBSERVATION_COMPLETED", ["COMPLETED", "COMPLETED_SAFE"].includes(baseline.observation?.status), safeObservationDetails(baseline.observation)),
+    check("SHADOW_COMPARATOR_AVAILABLE", Boolean(baseline.observation?.comparison?.verdict), {
+      verdict: baseline.observation?.comparison?.verdict || "",
+    }),
+    check("INTERNAL_PREVIEW_MEMORY_ONLY", preview.entryCount === 1 && preview.summaryTotal === 1 && preview.persistence === "MEMORY_ONLY", preview),
+    check("INTERNAL_PREVIEW_READ_ONLY", preview.readOnly && preview.productionBadgePresent && preview.forbiddenActionMatches.length === 0, preview),
     check("INTERNAL_PREVIEW_PRIVACY", preview.privacySafe, preview),
-    check(
-      "PROMOTION_GATE_DEFAULT_BLOCKED",
-      defaultPromotionDecision.allowed === false &&
-        defaultPromotionDecision.decision === "BLOCK",
-      {
-        reason: defaultPromotionDecision.reason,
-      },
-    ),
-    check(
-      "CONTROLLED_ALLOWLIST_PATH_READY",
-      preRollbackPromotionDecision.allowed === true &&
-        preRollbackPromotionDecision.decision === "ALLOW",
-      {
-        reason: preRollbackPromotionDecision.reason,
-        audiencePath: preRollbackPromotionDecision.audience?.path || "",
-      },
-    ),
-    check(
-      "MERGE_ADAPTER_DRY_RUN_ONLY",
-      dryRun.status === "DRY_RUN_READY" &&
-        dryRun.applied === false &&
-        dryRun.mergedPayload === null,
-      {
-        status: dryRun.status,
-        reason: dryRun.reason,
-      },
-    ),
-    check(
-      "SHADOW_FAILURE_ISOLATED",
-      shadowFailure.statusCode === 200 &&
-        shadowFailure.responseMatchesPrimary &&
-        shadowFailure.observation?.status === "FAILED_SAFE",
-      safeObservationDetails(shadowFailure.observation),
-    ),
-    check(
-      "SHADOW_TIMEOUT_ISOLATED",
-      shadowTimeout.statusCode === 200 &&
-        shadowTimeout.responseMatchesPrimary &&
-        shadowTimeout.observation?.status === "TIMEOUT_SAFE",
-      safeObservationDetails(shadowTimeout.observation),
-    ),
-    check(
-      "PREVIEW_RECORDER_FAILURE_ISOLATED",
-      previewRecorderFailure.statusCode === 200 &&
-        previewRecorderFailure.responseMatchesPrimary &&
-        previewRecorderFailure.observation?.status === "BOUNDARY_FAILED_SAFE",
-      safeObservationDetails(previewRecorderFailure.observation),
-    ),
-    check(
-      "CACHE_INVALIDATION_FAILURE_ISOLATED",
-      cacheFailure.statusCode === 200 &&
-        cacheFailure.responseSucceeded &&
-        cacheFailure.cacheDisposition === "INVALIDATION_FAILED_SAFE",
-      cacheFailure,
-    ),
-    check(
-      "DOWNLOAD_RETAINS_CACHE",
-      downloadRetention.statusCode === 200 &&
-        downloadRetention.cacheDisposition === "RETAINED",
-      downloadRetention,
-    ),
-    check(
-      "KILL_SWITCH_REVISION_IMMEDIATE",
-      revisionAfterRollback === revisionBeforeRollback + 1,
-      {
-        revisionBeforeRollback,
-        revisionAfterRollback,
-      },
-    ),
-    check(
-      "POST_ROLLBACK_SHADOW_BLOCKED",
-      postRollbackApi.statusCode === 200 &&
-        postRollbackApi.responseMatchesPrimary &&
-        postRollbackApi.observation?.status === "BLOCKED" &&
-        postRollbackApi.observation?.reason === "GLOBAL_KILL_SWITCH_ACTIVE",
-      safeObservationDetails(postRollbackApi.observation),
-    ),
-    check(
-      "POST_ROLLBACK_PROMOTION_BLOCKED",
-      postRollbackPromotionDecision.allowed === false &&
-        postRollbackPromotionDecision.reason === "GLOBAL_KILL_SWITCH_ACTIVE",
-      {
-        reason: postRollbackPromotionDecision.reason,
-      },
-    ),
-    check(
-      "POST_ROLLBACK_MERGE_BLOCKED",
-      postRollbackMerge.status === "BLOCKED" &&
-        postRollbackMerge.applied === false &&
-        postRollbackMerge.mergedPayload === null,
-      {
-        status: postRollbackMerge.status,
-        reason: postRollbackMerge.reason,
-      },
-    ),
-    check(
-      "ROLLBACK_IDEMPOTENT_FAIL_CLOSED",
-      secondRollbackSnapshot.killSwitches.global === true &&
-        secondRollbackSnapshot.runtimeRevision === revisionAfterRollback + 1,
-      {
-        runtimeRevision: secondRollbackSnapshot.runtimeRevision,
-        globalKillSwitch: secondRollbackSnapshot.killSwitches.global,
-      },
-    ),
-    check(
-      "PROVIDER_CALL_COUNT_ZERO",
-      Number(baseline.observation?.shadow?.providerCallCount || 0) === 0 &&
-        Number(shadowFailure.observation?.shadow?.providerCallCount || 0) === 0,
-      {
-        baselineProviderCallCount: Number(
-          baseline.observation?.shadow?.providerCallCount || 0,
-        ),
-        failureProviderCallCount: Number(
-          shadowFailure.observation?.shadow?.providerCallCount || 0,
-        ),
-      },
-    ),
-    check(
-      "PRODUCTION_GUARDRAILS_UNCHANGED",
-      [
-        baseline.observation,
-        shadowFailure.observation,
-        shadowTimeout.observation,
-        postRollbackApi.observation,
-      ].every(
-        (observation) =>
-          observation?.guardrails?.productionCandidateMerge !== true &&
-          observation?.guardrails?.productionReadyAssignment !== true &&
-          observation?.guardrails?.productionRouteChanged !== true,
-      ),
-      {
-        productionCandidateMerge: false,
-        productionReadyAssignment: false,
-        productionRouteChanged: false,
-      },
-    ),
+    check("PROMOTION_GATE_DEFAULT_BLOCKED", defaultPromotionDecision.allowed === false && defaultPromotionDecision.decision === "BLOCK", {
+      reason: defaultPromotionDecision.reason,
+    }),
+    check("CONTROLLED_ALLOWLIST_PATH_READY", preRollbackPromotionDecision.allowed === true && preRollbackPromotionDecision.decision === "ALLOW", {
+      reason: preRollbackPromotionDecision.reason,
+      audiencePath: preRollbackPromotionDecision.audience?.path || "",
+    }),
+    check("MERGE_ADAPTER_DRY_RUN_ONLY", dryRun.status === "DRY_RUN_READY" && dryRun.applied === false && dryRun.mergedPayload === null, {
+      status: dryRun.status,
+      reason: dryRun.reason,
+    }),
+    check("SHADOW_FAILURE_ISOLATED", shadowFailure.statusCode === 200 && shadowFailure.responseMatchesPrimary && shadowFailure.observation?.status === "FAILED_SAFE", safeObservationDetails(shadowFailure.observation)),
+    check("SHADOW_TIMEOUT_ISOLATED", shadowTimeout.statusCode === 200 && shadowTimeout.responseMatchesPrimary && shadowTimeout.observation?.status === "TIMEOUT_SAFE", safeObservationDetails(shadowTimeout.observation)),
+    check("PREVIEW_RECORDER_FAILURE_ISOLATED", previewRecorderFailure.statusCode === 200 && previewRecorderFailure.responseMatchesPrimary && previewRecorderFailure.observation?.status === "BOUNDARY_FAILED_SAFE", safeObservationDetails(previewRecorderFailure.observation)),
+    check("CACHE_INVALIDATION_FAILURE_ISOLATED", cacheFailure.statusCode === 200 && cacheFailure.responseSucceeded && cacheFailure.cacheDisposition === "INVALIDATION_FAILED_SAFE", cacheFailure),
+    check("DOWNLOAD_RETAINS_CACHE", downloadRetention.statusCode === 200 && downloadRetention.cacheDisposition === "RETAINED", downloadRetention),
+    check("KILL_SWITCH_REVISION_IMMEDIATE", revisionAfterRollback === revisionBeforeRollback + 1, {
+      revisionBeforeRollback,
+      revisionAfterRollback,
+    }),
+    check("POST_ROLLBACK_SHADOW_BLOCKED", postRollbackApi.statusCode === 200 && postRollbackApi.responseMatchesPrimary && postRollbackApi.observation?.status === "BLOCKED" && postRollbackApi.observation?.reason === "GLOBAL_KILL_SWITCH_ACTIVE", safeObservationDetails(postRollbackApi.observation)),
+    check("POST_ROLLBACK_PROMOTION_BLOCKED", postRollbackPromotionDecision.allowed === false && postRollbackPromotionDecision.reason === "GLOBAL_KILL_SWITCH_ACTIVE", {
+      reason: postRollbackPromotionDecision.reason,
+    }),
+    check("POST_ROLLBACK_MERGE_BLOCKED", postRollbackMerge.status === "BLOCKED" && postRollbackMerge.applied === false && postRollbackMerge.mergedPayload === null, {
+      status: postRollbackMerge.status,
+      reason: postRollbackMerge.reason,
+    }),
+    check("ROLLBACK_IDEMPOTENT_FAIL_CLOSED", secondRollbackSnapshot.killSwitches.global === true && secondRollbackSnapshot.runtimeRevision === revisionAfterRollback + 1, {
+      runtimeRevision: secondRollbackSnapshot.runtimeRevision,
+      globalKillSwitch: secondRollbackSnapshot.killSwitches.global,
+    }),
+    check("PROVIDER_CALL_COUNT_ZERO", Number(baseline.observation?.shadow?.providerCallCount || 0) === 0 && Number(shadowFailure.observation?.shadow?.providerCallCount || 0) === 0, {
+      baselineProviderCallCount: Number(baseline.observation?.shadow?.providerCallCount || 0),
+      failureProviderCallCount: Number(shadowFailure.observation?.shadow?.providerCallCount || 0),
+    }),
+    check("PRODUCTION_GUARDRAILS_UNCHANGED", [baseline.observation, shadowFailure.observation, shadowTimeout.observation, postRollbackApi.observation].every((observation) => observation?.guardrails?.productionCandidateMerge !== true && observation?.guardrails?.productionReadyAssignment !== true && observation?.guardrails?.productionRouteChanged !== true), {
+      productionCandidateMerge: false,
+      productionReadyAssignment: false,
+      productionRouteChanged: false,
+    }),
   ];
 
   const failedChecks = checks.filter((item) => !item.passed);

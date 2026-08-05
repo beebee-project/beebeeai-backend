@@ -1,4 +1,8 @@
-const { OPERATIONS } = require("./queryCandidatePlannerFeatureControl");
+"use strict";
+
+const {
+  OPERATIONS,
+} = require("./queryCandidatePlannerFeatureControl");
 const {
   getQueryCandidatePlannerFeatureControl,
 } = require("./queryCandidatePlannerFeatureControlRuntime");
@@ -90,9 +94,10 @@ function canaryGuardrails(overrides = {}) {
 
 function parseEvidence(config, evidenceBundle, now) {
   if (evidenceBundle && typeof evidenceBundle === "object") {
-    return validateQueryCandidatePlannerInternalCanaryEvidence(evidenceBundle, {
-      now,
-    });
+    return validateQueryCandidatePlannerInternalCanaryEvidence(
+      evidenceBundle,
+      { now },
+    );
   }
   const parsed = parseEvidenceJson(config.evidenceJson);
   if (parsed.error) {
@@ -106,9 +111,10 @@ function parseEvidence(config, evidenceBundle, now) {
       failClosed: true,
     });
   }
-  return validateQueryCandidatePlannerInternalCanaryEvidence(parsed.value, {
-    now,
-  });
+  return validateQueryCandidatePlannerInternalCanaryEvidence(
+    parsed.value,
+    { now },
+  );
 }
 
 function blockedPreflight({
@@ -227,13 +233,15 @@ function evaluateQueryCandidatePlannerInternalCanaryPreflight({
     });
   }
 
-  const control = featureControl || getQueryCandidatePlannerFeatureControl();
-  const promotionDecision = evaluateControlledProductionPromotionGate({
-    env,
-    featureControl: control,
-    readinessGate: evidence.readiness,
-    subjectSha256: subject.subjectSha256,
-  });
+  const control =
+    featureControl || getQueryCandidatePlannerFeatureControl();
+  const promotionDecision =
+    evaluateControlledProductionPromotionGate({
+      env,
+      featureControl: control,
+      readinessGate: evidence.readiness,
+      subjectSha256: subject.subjectSha256,
+    });
   if (!promotionDecision.allowed) {
     return blockedPreflight({
       reason: promotionDecision.reason,
@@ -288,19 +296,19 @@ function providerCallCount(shadowResolution = {}) {
 function plannerEscalationUsed(shadowResolution = {}) {
   return Boolean(
     shadowResolution?.plannerEscalationUsed === true ||
-    shadowResolution?.plannerResolution?.invocation?.plannerEscalationUsed ===
-      true ||
-    shadowResolution?.policy?.plannerEscalationAllowed === true,
+      shadowResolution?.plannerResolution?.invocation
+        ?.plannerEscalationUsed === true ||
+      shadowResolution?.policy?.plannerEscalationAllowed === true,
   );
 }
 
 function shadowGuardrailViolation(shadowResolution = {}) {
   return Boolean(
     shadowResolution?.policy?.productionCandidateMerge === true ||
-    shadowResolution?.policy?.productionReadyAssignment === true ||
-    shadowResolution?.policy?.productionRouteChanged === true ||
-    providerCallCount(shadowResolution) > 1 ||
-    plannerEscalationUsed(shadowResolution),
+      shadowResolution?.policy?.productionReadyAssignment === true ||
+      shadowResolution?.policy?.productionRouteChanged === true ||
+      providerCallCount(shadowResolution) > 1 ||
+      plannerEscalationUsed(shadowResolution),
   );
 }
 
@@ -324,11 +332,14 @@ function buildObservation({
     evidenceSha256: preflight.evidence.evidenceSha256 || "",
     primaryResponseSha256: primaryResponseContractSha256(primaryPayload),
     responseSource:
-      mergeResult?.applied === true ? "CONTROLLED_PLANNER" : "PRIMARY_FALLBACK",
+      mergeResult?.applied === true
+        ? "CONTROLLED_PLANNER"
+        : "PRIMARY_FALLBACK",
     promotion: Object.freeze({
       allowed: preflight.promotionDecision?.allowed === true,
       reason: preflight.promotionDecision?.reason || preflight.reason,
-      audiencePath: preflight.promotionDecision?.audience?.path || "NONE",
+      audiencePath:
+        preflight.promotionDecision?.audience?.path || "NONE",
       allowlistMatched:
         preflight.promotionDecision?.audience?.allowlistMatched === true,
       rolloutPercent: 0,
@@ -344,7 +355,8 @@ function buildObservation({
       status: String(mergeResult?.status || "NOT_APPLIED"),
       reason: String(mergeResult?.reason || reason),
       applied: mergeResult?.applied === true,
-      primaryPayloadUnchanged: mergeResult?.primaryPayloadUnchanged !== false,
+      primaryPayloadUnchanged:
+        mergeResult?.primaryPayloadUnchanged !== false,
       productionReadyAssignment: false,
       productionRouteChanged: false,
     }),
@@ -406,9 +418,9 @@ async function runQueryCandidatePlannerInternalAllowlistCanary({
   mergeAdapter = controlledProductionMergeAdapter,
   now = Date.now,
 } = {}) {
-  const control = featureControl || getQueryCandidatePlannerFeatureControl();
-  const resolvedPreflight =
-    preflight ||
+  const control =
+    featureControl || getQueryCandidatePlannerFeatureControl();
+  const resolvedPreflight = preflight ||
     evaluateQueryCandidatePlannerInternalCanaryPreflight({
       request,
       env,

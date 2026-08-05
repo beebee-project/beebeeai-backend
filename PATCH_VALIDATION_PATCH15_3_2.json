@@ -1,0 +1,25 @@
+{
+  "version": "query_candidate_patch15_3_2_validation_v1",
+  "patch": "Real Shadow Evidence Collector & Bundle Builder",
+  "assembledAt": "2026-08-05T08:00:00.000Z",
+  "status": "PASS",
+  "newSmokeTests": 29,
+  "newSmokeTestsPassed": 29,
+  "predecessorRegressionStatus": "PASS",
+  "providerCallsDuringAssembly": 0,
+  "productionMergeApplied": false,
+  "productionReadyAssignment": false,
+  "productionRouteChanged": false,
+  "collectorDefaultEnabled": false,
+  "storageEncryption": "AES-256-GCM",
+  "storageTtlDaysDefault": 7,
+  "minimumExecutionSampleSize": 30,
+  "minimumObservationsPerAccuracyCase": 3,
+  "actualPricingRequired": true,
+  "llmPolicy": {
+    "mode": "SEMANTIC_PROFILER_ONLY",
+    "plannerEscalationAllowed": false
+  },
+  "predecessorRegressionTests": 11,
+  "predecessorRegressionTestsPassed": 11
+}

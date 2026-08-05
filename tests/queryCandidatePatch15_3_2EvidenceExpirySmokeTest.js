@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const s=require("./queryCandidatePatch15_3_2TestSupport");const {validateQueryCandidatePlannerInternalCanaryEvidence}=require("../automation/queryCandidatePlannerInternalCanaryEvidence");const r=s.build();const v=validateQueryCandidatePlannerInternalCanaryEvidence(r.evidenceBundle,{now:()=>Date.parse("2026-08-07T07:30:00Z")});assert.strictEqual(v.valid,false);assert(v.errors.includes("EVIDENCE_EXPIRED"));console.log("PASS query candidate patch15.3.2 evidence expiry fail-closed smoke");

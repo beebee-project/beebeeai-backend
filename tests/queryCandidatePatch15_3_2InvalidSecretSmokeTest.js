@@ -1,0 +1,2 @@
+"use strict";
+const assert=require("assert");const {parseQueryCandidatePlannerRealShadowEvidenceConfig}=require("../automation/queryCandidatePlannerRealShadowEvidenceConfig");const c=parseQueryCandidatePlannerRealShadowEvidenceConfig({QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_ENABLED:"1",QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_SECRET:"short"});assert.strictEqual(c.configurationValid,false);assert(c.errors.includes("REAL_SHADOW_EVIDENCE_SECRET_REQUIRED"));console.log("PASS query candidate patch15.3.2 invalid secret fail-closed smoke");
