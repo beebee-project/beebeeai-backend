@@ -1,0 +1,590 @@
+{
+  "version": "query_candidate_planner_accuracy_evaluation_dataset_v1",
+  "datasetId": "beebeeai_query_candidate_accuracy_core_v1",
+  "createdAt": "2026-08-05T12:31:00+08:00",
+  "labelPolicyVersion": "query_candidate_planner_accuracy_label_policy_v1",
+  "dataPolicy": {
+    "labelsOnly": true,
+    "rawRowsStored": false,
+    "rawFileNamesStored": false,
+    "userIdentityStored": false,
+    "sourceReferenceOnly": true
+  },
+  "metricCoverage": [
+    "candidatePrecision",
+    "candidateRecall",
+    "top1Accuracy",
+    "topKRecall",
+    "rankingAgreement",
+    "domainAccuracy",
+    "intentAccuracy",
+    "fallbackAccuracy",
+    "unsupportedRejectionAccuracy",
+    "reviewDecisionAccuracy",
+    "falsePromotionRate"
+  ],
+  "cases": [
+    {
+      "caseId": "hardcase_two_tables_one_sheet_waste",
+      "sourceRef": "fixture:hardcase_two_tables_one_sheet_waste",
+      "scenario": "Two tables on one sheet with budget execution semantics and irrelevant waste rows.",
+      "tags": [
+        "FINANCE",
+        "MULTI_TABLE",
+        "PRIMARY_SELECTION",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.2,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "budget_execution_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "budget_variance_analysis",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "budget_category_breakdown",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "monthly_budget_trend"
+        ],
+        "forbiddenCandidateIds": [
+          "attendance_summary",
+          "sales_pipeline_dashboard"
+        ],
+        "preferredTop1CandidateIds": [
+          "budget_execution_summary",
+          "budget_variance_analysis"
+        ],
+        "domain": {
+          "expected": "FINANCE_BUDGET",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "BUDGET_EXECUTION",
+          "acceptable": [
+            "BUDGET_MONITORING"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "real_world_event_applicant_workshop",
+      "sourceRef": "fixture:real_world_event_applicant_workshop",
+      "scenario": "Workshop applicant and attendance tracking table.",
+      "tags": [
+        "EVENT",
+        "ATTENDANCE",
+        "APPLICATION",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.1,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "event_attendance_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "applicant_status_breakdown",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "participant_roster",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "attendance_rate_analysis"
+        ],
+        "forbiddenCandidateIds": [
+          "sales_summary",
+          "inventory_reorder_report"
+        ],
+        "preferredTop1CandidateIds": [
+          "event_attendance_summary",
+          "applicant_status_breakdown"
+        ],
+        "domain": {
+          "expected": "EVENT_ATTENDANCE",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "APPLICATION_TRACKING",
+          "acceptable": [
+            "ATTENDANCE_TRACKING"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "seed_attendance_conditional",
+      "sourceRef": "fixture:seed_attendance_conditional",
+      "scenario": "Compact attendance status table requiring conditional interpretation.",
+      "tags": [
+        "EVENT",
+        "ATTENDANCE",
+        "SMALL_TABLE",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.0,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "attendance_status_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "attendance_rate_analysis",
+            "idealRank": 2,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "absence_exception_list"
+        ],
+        "forbiddenCandidateIds": [
+          "budget_variance_analysis",
+          "course_evaluation_summary"
+        ],
+        "preferredTop1CandidateIds": [
+          "attendance_status_summary"
+        ],
+        "domain": {
+          "expected": "EVENT_ATTENDANCE",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "ATTENDANCE_TRACKING",
+          "acceptable": []
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "seed_sales_ready",
+      "sourceRef": "fixture:seed_sales_ready",
+      "scenario": "Transaction-level sales table ready for deterministic analysis.",
+      "tags": [
+        "SALES",
+        "TRANSACTION",
+        "TIME_SERIES",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.2,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "sales_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "revenue_by_category",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "sales_trend",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "top_products_analysis"
+        ],
+        "forbiddenCandidateIds": [
+          "attendance_status_summary",
+          "expense_policy_exception"
+        ],
+        "preferredTop1CandidateIds": [
+          "sales_summary"
+        ],
+        "domain": {
+          "expected": "SALES_REVENUE",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "TRANSACTION_ANALYSIS",
+          "acceptable": [
+            "REVENUE_ANALYSIS"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "template_course_evaluation_report",
+      "sourceRef": "fixture:template_course_evaluation_report",
+      "scenario": "Course evaluation responses with numeric scores and comments.",
+      "tags": [
+        "EDUCATION",
+        "EVALUATION",
+        "SURVEY",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.1,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "course_evaluation_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "question_score_breakdown",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "response_distribution",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "comment_theme_summary"
+        ],
+        "forbiddenCandidateIds": [
+          "inventory_stock_summary",
+          "sales_summary"
+        ],
+        "preferredTop1CandidateIds": [
+          "course_evaluation_summary"
+        ],
+        "domain": {
+          "expected": "EDUCATION_EVALUATION",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "PERFORMANCE_EVALUATION",
+          "acceptable": [
+            "SURVEY_ANALYSIS"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "seed_unstructured_unsupported",
+      "sourceRef": "fixture:seed_unstructured_unsupported",
+      "scenario": "Unstructured content without a table-like structure.",
+      "tags": [
+        "UNSTRUCTURED",
+        "UNSUPPORTED",
+        "REJECTION",
+        "REVIEW"
+      ],
+      "caseWeight": 1.3,
+      "labels": {
+        "requiredCandidates": [],
+        "acceptableCandidateIds": [],
+        "forbiddenCandidateIds": [
+          "generic_summary",
+          "sales_summary",
+          "attendance_summary"
+        ],
+        "preferredTop1CandidateIds": [],
+        "domain": {
+          "expected": "UNKNOWN",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "UNKNOWN",
+          "acceptable": []
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": true
+        },
+        "reviewRequired": true
+      }
+    },
+    {
+      "caseId": "ambiguous_mixed_columns_review",
+      "sourceRef": "fixture:ambiguous_mixed_columns_review",
+      "scenario": "Table-like data with ambiguous business semantics requiring generic fallback.",
+      "tags": [
+        "AMBIGUOUS",
+        "FALLBACK",
+        "REVIEW",
+        "SUPPORTED_GENERIC"
+      ],
+      "caseWeight": 1.0,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "generic_data_profile",
+            "idealRank": 1,
+            "relevance": 3
+          }
+        ],
+        "acceptableCandidateIds": [
+          "generic_summary"
+        ],
+        "forbiddenCandidateIds": [
+          "sales_summary",
+          "budget_execution_summary",
+          "attendance_summary"
+        ],
+        "preferredTop1CandidateIds": [
+          "generic_data_profile"
+        ],
+        "domain": {
+          "expected": "UNKNOWN",
+          "acceptable": [
+            "GENERAL_OPERATIONS"
+          ]
+        },
+        "intent": {
+          "expected": "UNKNOWN",
+          "acceptable": [
+            "GENERIC_SUMMARY"
+          ]
+        },
+        "fallback": {
+          "expected": true,
+          "acceptableReasons": [
+            "LOW_DOMAIN_CONFIDENCE",
+            "AMBIGUOUS_BUSINESS_SEMANTICS"
+          ]
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": true
+      }
+    },
+    {
+      "caseId": "inventory_stock_movement",
+      "sourceRef": "fixture:inventory_stock_movement",
+      "scenario": "Inventory movements with current quantity and reorder thresholds.",
+      "tags": [
+        "INVENTORY",
+        "STOCK",
+        "OPERATIONS",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.0,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "inventory_stock_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "reorder_risk_list",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "stock_movement_trend",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "inventory_category_breakdown"
+        ],
+        "forbiddenCandidateIds": [
+          "course_evaluation_summary",
+          "applicant_status_breakdown"
+        ],
+        "preferredTop1CandidateIds": [
+          "inventory_stock_summary",
+          "reorder_risk_list"
+        ],
+        "domain": {
+          "expected": "INVENTORY_OPERATIONS",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "STOCK_MONITORING",
+          "acceptable": [
+            "INVENTORY_ANALYSIS"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "project_task_tracker",
+      "sourceRef": "fixture:project_task_tracker",
+      "scenario": "Project tasks with owners, deadlines, and statuses.",
+      "tags": [
+        "PROJECT",
+        "TASK",
+        "DEADLINE",
+        "SUPPORTED"
+      ],
+      "caseWeight": 0.9,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "project_status_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "overdue_task_list",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "owner_workload_breakdown",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "deadline_timeline"
+        ],
+        "forbiddenCandidateIds": [
+          "sales_trend",
+          "attendance_rate_analysis"
+        ],
+        "preferredTop1CandidateIds": [
+          "project_status_summary"
+        ],
+        "domain": {
+          "expected": "PROJECT_OPERATIONS",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "TASK_TRACKING",
+          "acceptable": [
+            "PROJECT_MONITORING"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    },
+    {
+      "caseId": "expense_claim_review",
+      "sourceRef": "fixture:expense_claim_review",
+      "scenario": "Expense claim records with policy status and approval outcomes.",
+      "tags": [
+        "FINANCE",
+        "EXPENSE",
+        "COMPLIANCE",
+        "SUPPORTED"
+      ],
+      "caseWeight": 1.2,
+      "labels": {
+        "requiredCandidates": [
+          {
+            "candidateId": "expense_summary",
+            "idealRank": 1,
+            "relevance": 3
+          },
+          {
+            "candidateId": "expense_policy_exception",
+            "idealRank": 2,
+            "relevance": 3
+          },
+          {
+            "candidateId": "approval_status_breakdown",
+            "idealRank": 3,
+            "relevance": 2
+          }
+        ],
+        "acceptableCandidateIds": [
+          "expense_category_breakdown"
+        ],
+        "forbiddenCandidateIds": [
+          "inventory_stock_summary",
+          "course_evaluation_summary"
+        ],
+        "preferredTop1CandidateIds": [
+          "expense_summary",
+          "expense_policy_exception"
+        ],
+        "domain": {
+          "expected": "FINANCE_EXPENSE",
+          "acceptable": []
+        },
+        "intent": {
+          "expected": "EXPENSE_REVIEW",
+          "acceptable": [
+            "EXPENSE_ANALYSIS"
+          ]
+        },
+        "fallback": {
+          "expected": false,
+          "acceptableReasons": []
+        },
+        "unsupported": {
+          "expectedRejected": false
+        },
+        "reviewRequired": false
+      }
+    }
+  ]
+}

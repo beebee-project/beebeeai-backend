@@ -1,0 +1,46 @@
+{
+  "version": "query_candidate_patch15_0_validation_v1",
+  "patch": "Accuracy Metric & Evaluation Dataset",
+  "validatedAt": "2026-08-05T12:31:00+08:00",
+  "nodeVersions": ["v22.14.0", "v22.16.0"],
+  "result": "PASS",
+  "newSmokeTests": 24,
+  "passedSmokeTests": 24,
+  "dataset": {
+    "version": "query_candidate_planner_accuracy_evaluation_dataset_v1",
+    "datasetId": "beebeeai_query_candidate_accuracy_core_v1",
+    "caseCount": 10,
+    "labelsOnly": true,
+    "rawRowsStored": false,
+    "rawFileNamesStored": false,
+    "userIdentityStored": false
+  },
+  "metrics": [
+    "candidatePrecision",
+    "candidateRecall",
+    "top1Accuracy",
+    "topKRecall",
+    "rankingAgreement",
+    "domainAccuracy",
+    "intentAccuracy",
+    "fallbackAccuracy",
+    "unsupportedRejectionAccuracy",
+    "reviewDecisionAccuracy",
+    "falsePromotionRate",
+    "overallScore"
+  ],
+  "guardrails": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0,
+    "productionGateWired": false,
+    "promotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCalls": 0,
+    "railwayEnvironmentChanged": false,
+    "failClosed": true
+  }
+}

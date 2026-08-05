@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_accuracy_evaluator.schema.json",
+  "title": "Query Candidate Planner Accuracy Evaluation Report",
+  "type": "object",
+  "required": [
+    "version",
+    "evaluatorVersion",
+    "datasetVersion",
+    "datasetId",
+    "datasetSha256",
+    "thresholdPolicyVersion",
+    "thresholdPolicySha256",
+    "decision",
+    "reason",
+    "failClosed",
+    "evaluationOnly",
+    "promotionAuthorized",
+    "caseCount",
+    "predictionCount",
+    "missingCaseIds",
+    "invalid",
+    "aggregate",
+    "thresholdEvaluation",
+    "cases",
+    "guardrails"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_accuracy_evaluation_report_v1"
+    },
+    "evaluatorVersion": {
+      "const": "query_candidate_planner_accuracy_evaluator_v1"
+    },
+    "datasetVersion": { "type": "string" },
+    "datasetId": { "type": "string" },
+    "datasetSha256": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "thresholdPolicyVersion": { "type": "string" },
+    "thresholdPolicySha256": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "decision": {
+      "enum": ["EVALUATION_PASS", "EVALUATION_BLOCKED"]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "failClosed": { "const": true },
+    "evaluationOnly": { "const": true },
+    "promotionAuthorized": { "const": false },
+    "caseCount": { "type": "integer", "minimum": 0 },
+    "predictionCount": { "type": "integer", "minimum": 0 },
+    "missingCaseIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "invalid": {
+      "type": "object",
+      "required": [
+        "datasetErrors",
+        "thresholdPolicyErrors",
+        "predictionErrors"
+      ],
+      "properties": {
+        "datasetErrors": { "type": "array", "items": { "type": "string" } },
+        "thresholdPolicyErrors": { "type": "array", "items": { "type": "string" } },
+        "predictionErrors": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "aggregate": {
+      "type": ["object", "null"]
+    },
+    "thresholdEvaluation": {
+      "type": ["object", "null"]
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "caseId",
+          "sourceRef",
+          "caseWeight",
+          "predictedCandidateCount",
+          "requiredCandidateCount",
+          "relevantHitCount",
+          "requiredHitCount",
+          "forbiddenHitCount",
+          "metrics",
+          "applicability",
+          "weightedScore",
+          "candidateOrderSha256",
+          "labelsSha256"
+        ]
+      }
+    },
+    "reportSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "routeWired",
+        "controllerWired",
+        "productionGateWired",
+        "promotionDecisionProduced",
+        "productionCandidateMergeApplied",
+        "productionReadyAssignment",
+        "productionRouteChanged",
+        "providerCalls",
+        "rawRowsStored",
+        "rawFileNameStored",
+        "userIdentityStored",
+        "evaluationOnly",
+        "failClosed"
+      ],
+      "properties": {
+        "routeWired": { "const": false },
+        "controllerWired": { "const": false },
+        "productionGateWired": { "const": false },
+        "promotionDecisionProduced": { "const": false },
+        "productionCandidateMergeApplied": { "const": false },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false },
+        "providerCalls": { "const": 0 },
+        "rawRowsStored": { "const": false },
+        "rawFileNameStored": { "const": false },
+        "userIdentityStored": { "const": false },
+        "evaluationOnly": { "const": true },
+        "failClosed": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

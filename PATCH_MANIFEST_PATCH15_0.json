@@ -1,0 +1,221 @@
+{
+  "version": "query_candidate_patch15_0_manifest_v1",
+  "patch": "Accuracy Metric & Evaluation Dataset",
+  "createdAt": "2026-08-05T12:31:00+08:00",
+  "fileCount": 32,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_0.json",
+      "bytes": 1288,
+      "sha256": "e0073cbec6dfb73ae0bf8325ca7a9976a419d5cc146b747d4985a0c716125483"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_0_ACCURACY_METRIC_EVALUATION_DATASET.md",
+      "bytes": 5454,
+      "sha256": "f14dd223aaf0cc9a33ad3436e5bfbc7b00e92b17ee0accdfba83001626aef0bb"
+    },
+    {
+      "path": "automation/queryCandidatePlannerAccuracyEvaluationDataset.schema.json",
+      "bytes": 4966,
+      "sha256": "08446dd3b8a35ee793a124b2e1a7677a428f305ec1da0deb10d92ac82d7f774b"
+    },
+    {
+      "path": "automation/queryCandidatePlannerAccuracyEvaluator.js",
+      "bytes": 26635,
+      "sha256": "2a18e7d1c27952c4f0e65570d0ae9a57df8dbafde7ddb711024c3af2bde9f149"
+    },
+    {
+      "path": "automation/queryCandidatePlannerAccuracyEvaluator.schema.json",
+      "bytes": 4072,
+      "sha256": "c1d059e030e58b356cd20361ee05c4596a9fc28b7a1a465553bf7b710948f966"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      "bytes": 15320,
+      "sha256": "7b471c1b352ffcd44c3f1953f1ad835dc2a35dc3a4e677458ab7f3eb9f83db16"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerAccuracyThresholdPolicy.v1.json",
+      "bytes": 1161,
+      "sha256": "b201b38c08f3640ea8e97d9f7d40ea9ecd8a13c3d697d1454337c297e91b2223"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0AccuracyDatasetConflictSmokeTest.js",
+      "bytes": 538,
+      "sha256": "1dc4379db88eed9e130fe1869b20a001d58fbaecb31244ee4b389e0045cb4c89"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0AccuracyDatasetContractSmokeTest.js",
+      "bytes": 578,
+      "sha256": "07d314b19d8bc6fd7180247f6005f66ab121aa68960630b04b5a33d7a1ea1d1d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0AccuracyDatasetCoverageSmokeTest.js",
+      "bytes": 743,
+      "sha256": "9b2c1e44ae135f91d28db8649fe87e9821b8901782fcf3e84a25a0db5f6feb11"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0AccuracyDatasetPrivacySmokeTest.js",
+      "bytes": 730,
+      "sha256": "a4b2d11069c02001aa1502b4d788a1fb4e1ac3d01c1f680f477ab6716d68600a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0AllowedCandidateSmokeTest.js",
+      "bytes": 695,
+      "sha256": "478f567e5b376514db7feea909bdba675b7a54aba0c7ddffee359400435041ed"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0CandidatePrecisionRecallSmokeTest.js",
+      "bytes": 748,
+      "sha256": "59f54b0a97d90d37a5d91a58d6da72ffe332d1fcd926ed8a7d6e0507d4b24520"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0DeterminismSmokeTest.js",
+      "bytes": 454,
+      "sha256": "d59247fc5d74e37d6a2fb6f7628b2f1e9634df24f49cd6f4be6d431241dcef96"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0DomainIntentSmokeTest.js",
+      "bytes": 568,
+      "sha256": "a68c772b9556c527305f666bd0e43fae4c0105723870d6e69e5f5bd6482f4479"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0FallbackAccuracySmokeTest.js",
+      "bytes": 683,
+      "sha256": "d7471d7ae7a1e91d6a281fecca530cbf1bba4880a4a7b65e849f8a03084a28a5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0ForbiddenCandidateSmokeTest.js",
+      "bytes": 730,
+      "sha256": "6b195dcb0cac1defce50bb873c729e49f99d51f493b5995fba9d457814ccc0ba"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0MalformedPredictionFailClosedSmokeTest.js",
+      "bytes": 595,
+      "sha256": "a99972e411bb9546abf052401d6fd00429835889975eabedecf080ad5c6838f9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0ManifestSmokeTest.js",
+      "bytes": 2327,
+      "sha256": "a42e437c5bb98e6dfeb90cef6b73ec84c357501718e3473c9cf29937deb4b6ae"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0MissingPredictionFailClosedSmokeTest.js",
+      "bytes": 527,
+      "sha256": "e5525948fad5499141ad19ec054aeeb54dc2408a5e0efe443835e5ce898f23ed"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0NoMutationSmokeTest.js",
+      "bytes": 488,
+      "sha256": "ed3d05ecde95f7d52108b4578848e98bd33f5ba002be1b0cfc202234ea9faca2"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0PerfectEvaluationSmokeTest.js",
+      "bytes": 652,
+      "sha256": "98041a699cfc6f0797764efcab6db2747b2ee2932fc67aa67a24bc17506e979d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0ReportPrivacySmokeTest.js",
+      "bytes": 509,
+      "sha256": "810a864692cf82ec1c6ef7e47f87d9dc56bedd733ca64011e8f11691bc5a9928"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0ReviewDecisionSmokeTest.js",
+      "bytes": 492,
+      "sha256": "90015e021af8d5d4302baf05f26de8267cbb249f2466f6983a53b81ad9033fd0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0RouteIsolationSmokeTest.js",
+      "bytes": 615,
+      "sha256": "4de5eb29aa5668e4fc09c86a23ea46cbe280df994e8f99a84ede9031ac541bb4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0SchemaSmokeTest.js",
+      "bytes": 1030,
+      "sha256": "aabf59f28d33f654e90622af9bad56d33e6c1641aa1afa92e3238fab572bb521"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0SourceIntegritySmokeTest.js",
+      "bytes": 1816,
+      "sha256": "69fd619ac9a191f47c886e8e7a007abe0572dd30690ce60864e4a64ef607a852"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0TestSupport.js",
+      "bytes": 2267,
+      "sha256": "0cabb388b2cf8576f31cc4611ed5376e0e26c3d7fd07d3821f275d8bcfd09dc0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0ThresholdPolicySmokeTest.js",
+      "bytes": 735,
+      "sha256": "85863f75feb461f96bcb854eed4578e987ba04c46a0215b5bf553c62bffa6be3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0TopRankMetricsSmokeTest.js",
+      "bytes": 731,
+      "sha256": "91aa5986344169129906699b60269f40594cd44e864dd06ad49c4c2ab2563e43"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0UnsupportedRejectionSmokeTest.js",
+      "bytes": 706,
+      "sha256": "4aeeca7904fac976d7cb52dac1f88c1e4f5323f0a00e442722de34cc3e8555ef"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_0WeightedAggregateSmokeTest.js",
+      "bytes": 645,
+      "sha256": "1a7d6bba3bb595ffee3024b592eaa6d5b630e15e8b85ab56a08ffa5a536c2c87"
+    }
+  ],
+  "changeSet": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0,
+    "featureControlFilesChanged": 0,
+    "mergeAdapterFilesChanged": 0,
+    "promotionGateFilesChanged": 0,
+    "predecessorManifestFilesChanged": 0,
+    "undeclaredDriftAllowed": false
+  },
+  "evaluation": {
+    "datasetVersion": "query_candidate_planner_accuracy_evaluation_dataset_v1",
+    "datasetId": "beebeeai_query_candidate_accuracy_core_v1",
+    "datasetCaseCount": 10,
+    "thresholdPolicyVersion": "query_candidate_planner_accuracy_threshold_policy_v1",
+    "evaluatorVersion": "query_candidate_planner_accuracy_evaluator_v1",
+    "reportVersion": "query_candidate_planner_accuracy_evaluation_report_v1",
+    "newSmokeTests": 24,
+    "defaultDecision": "EVALUATION_BLOCKED",
+    "labelsOnly": true,
+    "rawRowsStored": false,
+    "rawFileNamesStored": false,
+    "userIdentityStored": false,
+    "failClosed": true
+  },
+  "metrics": {
+    "candidatePrecision": true,
+    "candidateRecall": true,
+    "top1Accuracy": true,
+    "topKRecall": true,
+    "rankingAgreement": true,
+    "domainAccuracy": true,
+    "intentAccuracy": true,
+    "fallbackAccuracy": true,
+    "unsupportedRejectionAccuracy": true,
+    "reviewDecisionAccuracy": true,
+    "falsePromotionRate": true,
+    "overallScore": true
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "routeWired": false,
+    "controllerWired": false,
+    "productionGateWired": false,
+    "promotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCalls": 0,
+    "railwayEnvironmentChanged": false,
+    "failClosed": true
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "version": "query_candidate_planner_accuracy_threshold_policy_v1",
+  "policyId": "beebeeai_query_candidate_accuracy_thresholds_core_v1",
+  "topK": 3,
+  "minimumCaseCount": 10,
+  "requireAllCases": true,
+  "metricWeights": {
+    "candidatePrecision": 0.14,
+    "candidateRecall": 0.17,
+    "top1Accuracy": 0.12,
+    "topKRecall": 0.1,
+    "rankingAgreement": 0.1,
+    "domainAccuracy": 0.08,
+    "intentAccuracy": 0.07,
+    "fallbackAccuracy": 0.06,
+    "unsupportedRejectionAccuracy": 0.07,
+    "reviewDecisionAccuracy": 0.04,
+    "falsePromotionSafety": 0.05
+  },
+  "thresholds": {
+    "minimum": {
+      "overallScore": 0.85,
+      "candidatePrecision": 0.85,
+      "candidateRecall": 0.85,
+      "top1Accuracy": 0.8,
+      "topKRecall": 0.85,
+      "rankingAgreement": 0.75,
+      "domainAccuracy": 0.9,
+      "intentAccuracy": 0.9,
+      "fallbackAccuracy": 0.9,
+      "unsupportedRejectionAccuracy": 1.0,
+      "reviewDecisionAccuracy": 0.9
+    },
+    "maximum": {
+      "falsePromotionRate": 0.02
+    }
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "productionGateWired": false,
+    "failClosed": true
+  }
+}

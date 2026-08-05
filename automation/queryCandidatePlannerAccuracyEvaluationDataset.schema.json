@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_accuracy_evaluation_dataset.schema.json",
+  "title": "Query Candidate Planner Accuracy Evaluation Dataset",
+  "type": "object",
+  "required": [
+    "version",
+    "datasetId",
+    "createdAt",
+    "labelPolicyVersion",
+    "dataPolicy",
+    "metricCoverage",
+    "cases"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_accuracy_evaluation_dataset_v1"
+    },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "minLength": 1 },
+    "labelPolicyVersion": {
+      "const": "query_candidate_planner_accuracy_label_policy_v1"
+    },
+    "dataPolicy": {
+      "type": "object",
+      "required": [
+        "labelsOnly",
+        "rawRowsStored",
+        "rawFileNamesStored",
+        "userIdentityStored",
+        "sourceReferenceOnly"
+      ],
+      "properties": {
+        "labelsOnly": { "const": true },
+        "rawRowsStored": { "const": false },
+        "rawFileNamesStored": { "const": false },
+        "userIdentityStored": { "const": false },
+        "sourceReferenceOnly": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "metricCoverage": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 10,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "candidateLabel": {
+      "type": "object",
+      "required": ["candidateId", "idealRank", "relevance"],
+      "properties": {
+        "candidateId": { "type": "string", "minLength": 1 },
+        "idealRank": { "type": "integer", "minimum": 1 },
+        "relevance": { "enum": [1, 2, 3] }
+      },
+      "additionalProperties": false
+    },
+    "semanticLabel": {
+      "type": "object",
+      "required": ["expected", "acceptable"],
+      "properties": {
+        "expected": { "type": "string", "minLength": 1 },
+        "acceptable": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "sourceRef",
+        "scenario",
+        "tags",
+        "caseWeight",
+        "labels"
+      ],
+      "properties": {
+        "caseId": { "type": "string", "minLength": 1 },
+        "sourceRef": { "type": "string", "minLength": 1 },
+        "scenario": { "type": "string", "minLength": 1 },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "caseWeight": { "type": "number", "exclusiveMinimum": 0 },
+        "labels": {
+          "type": "object",
+          "required": [
+            "requiredCandidates",
+            "acceptableCandidateIds",
+            "forbiddenCandidateIds",
+            "preferredTop1CandidateIds",
+            "domain",
+            "intent",
+            "fallback",
+            "unsupported",
+            "reviewRequired"
+          ],
+          "properties": {
+            "requiredCandidates": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/candidateLabel" }
+            },
+            "acceptableCandidateIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "forbiddenCandidateIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "preferredTop1CandidateIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "domain": { "$ref": "#/$defs/semanticLabel" },
+            "intent": { "$ref": "#/$defs/semanticLabel" },
+            "fallback": {
+              "type": "object",
+              "required": ["expected", "acceptableReasons"],
+              "properties": {
+                "expected": { "type": "boolean" },
+                "acceptableReasons": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              },
+              "additionalProperties": false
+            },
+            "unsupported": {
+              "type": "object",
+              "required": ["expectedRejected"],
+              "properties": {
+                "expectedRejected": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            "reviewRequired": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
