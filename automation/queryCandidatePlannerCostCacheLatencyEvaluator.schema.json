@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_cost_cache_latency_evaluation_report_v1",
+  "title": "Query Candidate Planner Cost Cache-Hit Latency Evaluation Report",
+  "type": "object",
+  "required": ["version", "evaluatorVersion", "decision", "failClosed", "dataset", "policies", "privacy", "guardrails"],
+  "properties": {
+    "version": { "const": "query_candidate_planner_cost_cache_latency_evaluation_report_v1" },
+    "evaluatorVersion": { "const": "query_candidate_planner_cost_cache_latency_evaluator_v1" },
+    "decision": { "enum": ["EVALUATION_PASS", "EVALUATION_BLOCKED"] },
+    "failClosed": { "const": true },
+    "validationErrors": { "type": "array", "items": { "type": "string" } },
+    "dataset": { "type": "object" },
+    "policies": { "type": "object" },
+    "sample": { "type": "object" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "cost": { "type": "object" },
+        "cache": { "type": "object" },
+        "provider": { "type": "object" },
+        "latency": { "type": "object" },
+        "reliability": { "type": "object" },
+        "lifecycle": { "type": "object" }
+      }
+    },
+    "thresholdResults": { "type": "array" },
+    "failedThresholds": { "type": "array", "items": { "type": "string" } },
+    "privacy": { "type": "object" },
+    "guardrails": { "type": "object" }
+  }
+}

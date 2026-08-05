@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_api_ui_rollback_quality_gate_report_v1",
+  "title": "BeeBee AI Query Candidate Planner API/UI Rollback Quality Gate Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "qualityGateVersion",
+    "policyVersion",
+    "decision",
+    "passed",
+    "failClosed",
+    "counts",
+    "checks",
+    "failedCheckIds",
+    "rollback",
+    "guardrails",
+    "privacy",
+    "reportSha256"
+  ],
+  "properties": {
+    "version": { "const": "query_candidate_planner_api_ui_rollback_quality_gate_report_v1" },
+    "qualityGateVersion": { "const": "query_candidate_planner_api_ui_rollback_quality_gate_v1" },
+    "policyVersion": { "const": "api_ui_e2e_failure_isolation_immediate_rollback_policy_v1" },
+    "decision": { "enum": ["PASS", "FAIL"] },
+    "passed": { "type": "boolean" },
+    "failClosed": { "const": true },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 1 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "passed", "details"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "passed": { "type": "boolean" },
+          "details": { "type": "object" }
+        }
+      }
+    },
+    "failedCheckIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism",
+        "synchronousDecisionBoundary",
+        "primaryResponseAuthorityRetained",
+        "postRollbackShadowStatus",
+        "postRollbackPromotionReason",
+        "postRollbackMergeStatus"
+      ],
+      "properties": {
+        "mechanism": { "const": "RUNTIME_GLOBAL_KILL_SWITCH" },
+        "synchronousDecisionBoundary": { "const": true },
+        "primaryResponseAuthorityRetained": { "const": true },
+        "postRollbackShadowStatus": { "type": "string" },
+        "postRollbackPromotionReason": { "type": "string" },
+        "postRollbackMergeStatus": { "type": "string" }
+      }
+    },
+    "guardrails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "routeWired",
+        "controllerWired",
+        "generalUserUiChanged",
+        "primaryResponseMutation",
+        "responseHeaderMutation",
+        "responseStatusMutation",
+        "productionCandidateMergeApplied",
+        "productionReadyAssignment",
+        "productionRouteChanged",
+        "providerCalls",
+        "railwayEnvironmentChanged",
+        "failClosed"
+      ],
+      "properties": {
+        "routeWired": { "const": false },
+        "controllerWired": { "const": false },
+        "generalUserUiChanged": { "const": false },
+        "primaryResponseMutation": { "const": false },
+        "responseHeaderMutation": { "const": false },
+        "responseStatusMutation": { "const": false },
+        "productionCandidateMergeApplied": { "const": false },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false },
+        "providerCalls": { "const": 0 },
+        "railwayEnvironmentChanged": { "const": false },
+        "failClosed": { "const": true }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rawRowsIncluded",
+        "fileNameIncluded",
+        "queryTablesKeyIncluded",
+        "tenantIdIncluded",
+        "rawCandidatePayloadIncluded",
+        "rawSubjectIncluded"
+      ],
+      "properties": {
+        "rawRowsIncluded": { "const": false },
+        "fileNameIncluded": { "const": false },
+        "queryTablesKeyIncluded": { "const": false },
+        "tenantIdIncluded": { "const": false },
+        "rawCandidatePayloadIncluded": { "const": false },
+        "rawSubjectIncluded": { "const": false }
+      }
+    },
+    "reportSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "version": "query_candidate_patch15_1_validation_v1",
+  "patch": "Cost, Cache-Hit, Latency Evaluation",
+  "validatedAt": "2026-08-05T12:49:00+08:00",
+  "assembly": {
+    "rootInstallLayout": true,
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0
+  },
+  "qa": {
+    "newSmokeTests": 31,
+    "syntaxChecksPassed": true,
+    "smokeTestsPassed": 31,
+    "smokeTestsFailed": 0,
+    "perfectEvaluationDecision": "EVALUATION_PASS",
+    "failClosedScenariosPassed": true
+  },
+  "dataset": {
+    "executionCount": 25,
+    "lifecycleEventCount": 15,
+    "coldExecutionCount": 5,
+    "warmExecutionCount": 15,
+    "reuploadExecutionCount": 5,
+    "providerCallsExecuted": 0
+  },
+  "baselineMetrics": {
+    "cacheHitRate": 0.6,
+    "warmCacheHitRate": 1,
+    "providerCallRate": 0.4,
+    "warmProviderCallRate": 0,
+    "overallLatencyP50Ms": 88,
+    "overallLatencyP95Ms": 1240,
+    "overallLatencyP99Ms": 1295,
+    "totalCostMicrousd": 2670,
+    "averageCostMicrousd": 106.8,
+    "cacheAvoidedCostMicrousd": 3960,
+    "cacheCostAvoidanceRate": 0.597285,
+    "monthlyProjectedCostMicrousd": 1068000,
+    "timeoutRate": 0,
+    "errorRate": 0,
+    "staleCacheReuseViolationCount": 0
+  },
+  "guardrails": {
+    "syntheticPricingOnly": true,
+    "providerInvoice": false,
+    "requiresLiveRateInjection": true,
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "railwayEnvironmentChanged": false
+  }
+}

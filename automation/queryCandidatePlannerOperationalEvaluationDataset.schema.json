@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_operational_evaluation_dataset_v1",
+  "title": "Query Candidate Planner Operational Evaluation Dataset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "datasetId", "benchmarkMode", "executions", "lifecycleEvents", "guardrails"],
+  "properties": {
+    "version": { "const": "query_candidate_planner_operational_evaluation_dataset_v1" },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "benchmarkMode": { "type": "string", "minLength": 1 },
+    "executions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["executionId", "scenarioId", "phase", "status", "latencyMs", "expectedColdCostMicrousd", "cache", "provider", "lifecycleContext"],
+        "properties": {
+          "executionId": { "type": "string", "minLength": 1 },
+          "scenarioId": { "type": "string", "minLength": 1 },
+          "phase": { "enum": ["COLD", "WARM", "DOWNLOAD_REUSE", "REUPLOAD"] },
+          "status": { "enum": ["SUCCESS", "TIMEOUT", "ERROR", "BLOCKED"] },
+          "latencyMs": { "type": "number", "minimum": 0 },
+          "expectedColdCostMicrousd": { "type": "integer", "minimum": 0 },
+          "cache": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["readAttempted", "hit", "level", "writeAttempted", "writeSucceeded"],
+            "properties": {
+              "readAttempted": { "type": "boolean" },
+              "hit": { "type": "boolean" },
+              "level": { "enum": ["L1", "L2", "L3", "L4", "MISS", "NONE"] },
+              "writeAttempted": { "type": "boolean" },
+              "writeSucceeded": { "type": "boolean" }
+            }
+          },
+          "provider": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["called", "modelId", "inputTokens", "outputTokens"],
+            "properties": {
+              "called": { "type": "boolean" },
+              "modelId": { "type": "string" },
+              "inputTokens": { "type": "integer", "minimum": 0 },
+              "outputTokens": { "type": "integer", "minimum": 0 },
+              "observedCostMicrousd": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "lifecycleContext": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["afterDownload", "afterReupload", "staleCacheReused"],
+            "properties": {
+              "afterDownload": { "type": "boolean" },
+              "afterReupload": { "type": "boolean" },
+              "staleCacheReused": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "lifecycleEvents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["eventId", "scenarioId", "event", "cacheDisposition", "invalidationAttempted", "invalidationSucceeded", "staleCacheReused", "priorUploadIdentitySha256", "newUploadIdentitySha256"],
+        "properties": {
+          "eventId": { "type": "string", "minLength": 1 },
+          "scenarioId": { "type": "string", "minLength": 1 },
+          "event": { "enum": ["DOWNLOAD", "DELETE", "REUPLOAD"] },
+          "cacheDisposition": { "type": "string", "minLength": 1 },
+          "invalidationAttempted": { "type": "boolean" },
+          "invalidationSucceeded": { "type": "boolean" },
+          "staleCacheReused": { "type": "boolean" },
+          "priorUploadIdentitySha256": { "type": "string", "pattern": "^$|^[a-fA-F0-9]{64}$" },
+          "newUploadIdentitySha256": { "type": "string", "pattern": "^$|^[a-fA-F0-9]{64}$" }
+        }
+      }
+    },
+    "guardrails": { "type": "object" }
+  }
+}

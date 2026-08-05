@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_controlled_production_promotion_gate.schema.json",
+  "title": "Query Candidate Planner Controlled Production Promotion Gate Decision",
+  "type": "object",
+  "required": [
+    "version",
+    "gateVersion",
+    "policyVersion",
+    "allowed",
+    "decision",
+    "operation",
+    "reason",
+    "failClosed",
+    "adapterVersion",
+    "configuration",
+    "featureDecision",
+    "audience",
+    "guardrails"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_controlled_production_promotion_gate_decision_v1"
+    },
+    "gateVersion": {
+      "const": "query_candidate_planner_controlled_production_promotion_gate_v1"
+    },
+    "policyVersion": {
+      "const": "query_candidate_planner_controlled_production_promotion_policy_v1"
+    },
+    "allowed": { "type": "boolean" },
+    "decision": { "enum": ["ALLOW", "BLOCK"] },
+    "operation": { "const": "PRODUCTION_CANDIDATE_MERGE" },
+    "reason": { "type": "string", "minLength": 1 },
+    "failClosed": { "const": true },
+    "adapterVersion": {
+      "const": "query_candidate_planner_controlled_production_merge_adapter_v1"
+    },
+    "configuration": {
+      "type": "object",
+      "required": [
+        "valid",
+        "enabled",
+        "audienceMode",
+        "allowlistCount",
+        "rolloutPercent",
+        "invalidEnvironmentKeys"
+      ],
+      "properties": {
+        "valid": { "type": "boolean" },
+        "enabled": { "type": "boolean" },
+        "audienceMode": {
+          "enum": ["BLOCKED", "ALLOWLIST", "ROLLOUT"]
+        },
+        "allowlistCount": { "type": "integer", "minimum": 0 },
+        "rolloutPercent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "invalidEnvironmentKeys": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "featureDecision": { "type": ["object", "null"] },
+    "audience": {
+      "type": "object",
+      "required": [
+        "path",
+        "subjectTagSha256",
+        "allowlistMatched",
+        "rollout"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "subjectTagSha256": {
+          "type": "string",
+          "pattern": "^$|^[a-f0-9]{64}$"
+        },
+        "allowlistMatched": { "type": "boolean" },
+        "rollout": {
+          "type": "object",
+          "required": [
+            "algorithm",
+            "percentage",
+            "basisPoints",
+            "bucket",
+            "selected"
+          ],
+          "properties": {
+            "algorithm": { "const": "SHA256_MOD_10000_V1" },
+            "percentage": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "basisPoints": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "bucket": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "maximum": 9999
+            },
+            "selected": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "guardrails": {
+      "type": "object",
+      "required": [
+        "defaultBlocked",
+        "routeWired",
+        "controllerWired",
+        "primaryResponseAuthority",
+        "responsePayloadMutation",
+        "responseHeaderMutation",
+        "responseStatusMutation",
+        "productionReadyAssignment",
+        "productionRouteChanged",
+        "rawIdentityAccepted",
+        "rawAllowlistExposed",
+        "rolloutSaltExposed",
+        "failClosed"
+      ],
+      "properties": {
+        "defaultBlocked": { "const": true },
+        "routeWired": { "const": false },
+        "controllerWired": { "const": false },
+        "primaryResponseAuthority": { "const": true },
+        "responsePayloadMutation": { "const": false },
+        "responseHeaderMutation": { "const": false },
+        "responseStatusMutation": { "const": false },
+        "productionReadyAssignment": { "const": false },
+        "productionRouteChanged": { "const": false },
+        "rawIdentityAccepted": { "const": false },
+        "rawAllowlistExposed": { "const": false },
+        "rolloutSaltExposed": { "const": false },
+        "failClosed": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "allowed": { "const": true } },
+        "required": ["allowed"]
+      },
+      "then": {
+        "properties": { "decision": { "const": "ALLOW" } }
+      },
+      "else": {
+        "properties": { "decision": { "const": "BLOCK" } }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

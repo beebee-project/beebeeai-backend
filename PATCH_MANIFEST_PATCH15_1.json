@@ -1,0 +1,268 @@
+{
+  "version": "query_candidate_patch15_1_manifest_v1",
+  "patch": "Cost, Cache-Hit, Latency Evaluation",
+  "createdAt": "2026-08-05T12:49:00+08:00",
+  "fileCount": 41,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_1.json",
+      "bytes": 1557,
+      "sha256": "7aba37dbfa1c36d48f48dfe4410d0861437b43b50a9dc189da7ac838e5998f36"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_1_COST_CACHE_LATENCY_EVALUATION.md",
+      "bytes": 7197,
+      "sha256": "363da2fbdfdb72129d000e39e6995a16f04a4fd28c788c1ad6c2489a3934efb0"
+    },
+    {
+      "path": "automation/queryCandidatePlannerCostCacheLatencyEvaluator.js",
+      "bytes": 32317,
+      "sha256": "67a0ff4d5ac83103d78c9172aa4cc072c008d195a22e99b3366f8440b9d8658c"
+    },
+    {
+      "path": "automation/queryCandidatePlannerCostCacheLatencyEvaluator.schema.json",
+      "bytes": 1391,
+      "sha256": "12f08c260b237e4cc88782a21a7ac0ebccd1a9ca2432e468f3f96822100fd512"
+    },
+    {
+      "path": "automation/queryCandidatePlannerOperationalEvaluationDataset.schema.json",
+      "bytes": 3843,
+      "sha256": "4b73ba8ec033ddf6dafee4dfba84c4799688ea41656aed24f4e66540b38745bd"
+    },
+    {
+      "path": "automation/queryCandidatePlannerOperationalPolicy.schema.json",
+      "bytes": 1547,
+      "sha256": "5a7068562c53064d5da5f4dc07364cbf04203c787ff342e71c5dde78923d428b"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerCostPricingPolicy.v1.json",
+      "bytes": 549,
+      "sha256": "b092d9d44dcb11527a651ddea028e82dcdeb491ef28303f005046ea35160d429"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerOperationalEvaluationDataset.v1.json",
+      "bytes": 23846,
+      "sha256": "7a0bbba91a4e0f3de292a6dc5a419a700bffaa48238afd2d7b499375f9d6ae55"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerOperationalThresholdPolicy.v1.json",
+      "bytes": 1227,
+      "sha256": "4f266d07d4c3de049fe83167788d5b1dabd28717450a76c3607f0fbfa3da4e1d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1CacheHitMetricsSmokeTest.js",
+      "bytes": 559,
+      "sha256": "f9ea9c7fd8af128904a37726181252571045ca7661eae89b09456b64b6035c97"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1CacheLevelDistributionSmokeTest.js",
+      "bytes": 453,
+      "sha256": "b3ebc392c9c1b446d76812c9d78e5b41e23db894a7c8531b6b379033999839fb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ColdWarmSegmentationSmokeTest.js",
+      "bytes": 406,
+      "sha256": "68ed98e42188da1e58f930445f7b1854846abc405111d0a2fd78de2c7dbc2100"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1CostAvoidanceSmokeTest.js",
+      "bytes": 635,
+      "sha256": "73a44e3e2e5a72d73e15d3e4cb4b945c2389af4df935b086137675e3c8168a25"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1DeleteInvalidationSmokeTest.js",
+      "bytes": 334,
+      "sha256": "530b464134a7ec6998ffff329b6c0e9588c6735b333afd3e5ceef99a6f979ace"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1DeterminismSmokeTest.js",
+      "bytes": 337,
+      "sha256": "bae8b50071802851d2fbf1e1cfe221edbe534ccdf2347e9514f6774a8b9fb05f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1DownloadRetentionSmokeTest.js",
+      "bytes": 400,
+      "sha256": "ade8f6a9d226c69c3e8301ebee153bf2f906b453c751e0d6f42fd1b54b45f8dc"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1InvalidPricingPolicyFailClosedSmokeTest.js",
+      "bytes": 529,
+      "sha256": "751378d0a76031d1b25f943b54feb11caf8527c2a6662c938270cb0b1e1a2468"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1LatencyPercentileSmokeTest.js",
+      "bytes": 503,
+      "sha256": "1594a994bd1f93d22d81fa4ba4cb5fbeaf72262f72d86522e889573d82805290"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1MalformedObservationFailClosedSmokeTest.js",
+      "bytes": 666,
+      "sha256": "a9877a7b4227e9a725876f9f74f67ae979bf7c052c44be640168418c4bb051ff"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ManifestSmokeTest.js",
+      "bytes": 2356,
+      "sha256": "2d3fb56765bf1dfb351ebb94b1938b42f055288b0d2d7d75e33d72a339bb9a20"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1MissingCostFailClosedSmokeTest.js",
+      "bytes": 546,
+      "sha256": "30008c7daf2b2400078f750a7f795ffa8fc58e17a7c739fdbe05a5fa2be8a25d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1MonthlyProjectionSmokeTest.js",
+      "bytes": 650,
+      "sha256": "3b6e03ab91b4b2b3403abf1aa13b18ba08ba1add145911b22dd1b57b9a846215"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1NoMutationSmokeTest.js",
+      "bytes": 467,
+      "sha256": "15bd69b4477d946abbb9cc1092f5529aceb2c0d4f26239736f660030238d62a2"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ObservedCostPrecedenceSmokeTest.js",
+      "bytes": 564,
+      "sha256": "f7ead9760180172f8fcb214901f2f80714674e2cebed45ea4c7c4cf2bbda69ce"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1OperationalDatasetContractSmokeTest.js",
+      "bytes": 510,
+      "sha256": "1c8348c7b7eb606393015767e2a38d09554375e39e39b92c7bdfd1eac8469ce6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1OperationalDatasetPrivacySmokeTest.js",
+      "bytes": 577,
+      "sha256": "45b13017a0bd7e340390d609edef03bd6605d72c2b4e842c59be28ff5435bb9b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1PerfectEvaluationSmokeTest.js",
+      "bytes": 509,
+      "sha256": "921429ea04bdfd977053b098edbda8fbe5a95492966cff8ee51eb129b8dcac39"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1PricingPolicySmokeTest.js",
+      "bytes": 544,
+      "sha256": "af1b2cbb1cb7b28ffa1850d63691cba9e1cae7de5f523383993a6160272355f2"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ProviderCallRateSmokeTest.js",
+      "bytes": 563,
+      "sha256": "b4334be061781b442deefc7742fb63c193649c7c28261238846eba2b916aeed0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ReliabilitySmokeTest.js",
+      "bytes": 497,
+      "sha256": "bfe7c88f439d1bde5b88a4934684502a13c3681d4b4919e78857d56281c12814"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ReportPrivacySmokeTest.js",
+      "bytes": 667,
+      "sha256": "c49cd9578026604a07a70d985b8bd70ff5938ad74c36c971fb8c60ad2f7f2a56"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ReuploadIsolationSmokeTest.js",
+      "bytes": 487,
+      "sha256": "f16c4a9dfa5b9c317f963592dba7116aa75b9199c7325c21f5e4264d03a88b4f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1RouteIsolationSmokeTest.js",
+      "bytes": 793,
+      "sha256": "fd41eb646f982478da83b1aaba343514182486bb9f657ea371dff037093d2ff8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1SampleSizeFailClosedSmokeTest.js",
+      "bytes": 509,
+      "sha256": "7ad17258d2e2fce36cbbf5c7e5610db09c2937fc1cfe1b34628db51002189817"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1SchemaSmokeTest.js",
+      "bytes": 841,
+      "sha256": "8e6a62fd68ccefe0b3ff8c4489dcd2421e347bccb3d6f28e7f8a64149f76cf3f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1SourceIntegritySmokeTest.js",
+      "bytes": 2095,
+      "sha256": "c6975849ee8d712fc1b33714514d9f1374da5f426fc5f001c50d21936730617c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1StaleCacheFailClosedSmokeTest.js",
+      "bytes": 672,
+      "sha256": "fed6008c85f3e31f1140cc265c2ddd7d63709fe61a4a0fcb916282038db1f411"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1TestSupport.js",
+      "bytes": 1630,
+      "sha256": "53f4c3852e2414bed44288ce5b3ea2f26db91d6eb104bf9dc6eb3031c313e113"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1ThresholdPolicySmokeTest.js",
+      "bytes": 540,
+      "sha256": "beec96e4bef26cae33105e444d183e070161b58cfbe5790b28e972a601eb9741"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1TimeoutErrorRateSmokeTest.js",
+      "bytes": 658,
+      "sha256": "5d3d08326da536dfc6a6fd365b4b6c0eb5196e6398ef5961615705e78eae7897"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_1TokenPricingCalculationSmokeTest.js",
+      "bytes": 595,
+      "sha256": "a9b067f91666ab70c9c50d2c2229eece7833b78cc999aef09b427fb5095ff082"
+    }
+  ],
+  "changeSet": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "controllerFilesChanged": 0,
+    "featureControlFilesChanged": 0,
+    "mergeAdapterFilesChanged": 0,
+    "promotionGateFilesChanged": 0,
+    "predecessorManifestFilesChanged": 0,
+    "undeclaredDriftAllowed": false
+  },
+  "evaluation": {
+    "datasetVersion": "query_candidate_planner_operational_evaluation_dataset_v1",
+    "datasetId": "beebeeai_query_candidate_cost_cache_latency_core_v1",
+    "executionCount": 25,
+    "lifecycleEventCount": 15,
+    "thresholdPolicyVersion": "query_candidate_planner_operational_threshold_policy_v1",
+    "pricingPolicyVersion": "query_candidate_planner_cost_pricing_policy_v1",
+    "pricingMode": "SYNTHETIC_BENCHMARK_ONLY",
+    "evaluatorVersion": "query_candidate_planner_cost_cache_latency_evaluator_v1",
+    "reportVersion": "query_candidate_planner_cost_cache_latency_evaluation_report_v1",
+    "newSmokeTests": 31,
+    "defaultDecision": "EVALUATION_BLOCKED",
+    "failClosed": true
+  },
+  "metrics": {
+    "cost": true,
+    "cacheHit": true,
+    "cacheLevelDistribution": true,
+    "providerCallRate": true,
+    "tokenUsage": true,
+    "latencyP50P95P99": true,
+    "timeoutRate": true,
+    "errorRate": true,
+    "downloadRetention": true,
+    "deleteInvalidation": true,
+    "reuploadIsolation": true,
+    "staleCacheReuseViolation": true,
+    "monthlyCostProjection": true
+  },
+  "guardrails": {
+    "syntheticPricingOnly": true,
+    "providerInvoice": false,
+    "requiresLiveRateInjection": true,
+    "evaluationOnly": true,
+    "routeWired": false,
+    "controllerWired": false,
+    "promotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "providerCalls": 0,
+    "railwayEnvironmentChanged": false,
+    "failClosed": true
+  }
+}

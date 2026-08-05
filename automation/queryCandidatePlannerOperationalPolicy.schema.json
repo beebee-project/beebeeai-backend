@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "query_candidate_planner_operational_policy_v1",
+  "title": "Query Candidate Planner Operational Evaluation Policies",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["version", "policyId", "minimumSampleSize", "monthlyProjectionExecutions", "thresholds"],
+      "properties": {
+        "version": { "const": "query_candidate_planner_operational_threshold_policy_v1" },
+        "policyId": { "type": "string", "minLength": 1 },
+        "minimumSampleSize": { "type": "object" },
+        "monthlyProjectionExecutions": { "type": "integer", "minimum": 0 },
+        "thresholds": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["version", "policyId", "currency", "mode", "models"],
+      "properties": {
+        "version": { "const": "query_candidate_planner_cost_pricing_policy_v1" },
+        "policyId": { "type": "string", "minLength": 1 },
+        "currency": { "const": "USD" },
+        "mode": { "type": "string", "minLength": 1 },
+        "models": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["inputMicrousdPerMillionTokens", "outputMicrousdPerMillionTokens"],
+            "properties": {
+              "inputMicrousdPerMillionTokens": { "type": "integer", "minimum": 0 },
+              "outputMicrousdPerMillionTokens": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
