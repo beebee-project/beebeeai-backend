@@ -1,0 +1,29 @@
+{
+  "version": "query_candidate_patch15_3_2_B_validation_v1",
+  "patch": "Real Shadow 10-Case Registry Finalization",
+  "createdAt": "2026-08-06T13:42:00+08:00",
+  "validationMode": "assembly_against_patch15_3_2_A_and_predecessors",
+  "qa": {
+    "expectedSmokeTests": 12,
+    "passedSmokeTests": 12,
+    "syntaxCheck": "PASS",
+    "sourceIntegrity": "PASS",
+    "manifest": "PASS"
+  },
+  "safety": {
+    "collectorEnabledByPatch": false,
+    "internalCanaryEnabledByPatch": false,
+    "productionMergeEnabledByPatch": false,
+    "productionPromotionAuthorized": false,
+    "rawIdentityIncluded": false,
+    "syntheticFingerprintAllowed": false,
+    "privateOutputsCommitAllowed": false
+  },
+  "runtimeCompletionRequirement": {
+    "actualInternalCases": 10,
+    "requestFingerprintCount": 10,
+    "uploadFingerprintCount": 10,
+    "duplicateFingerprintCount": 0,
+    "registryFinalizationRequired": true
+  }
+}

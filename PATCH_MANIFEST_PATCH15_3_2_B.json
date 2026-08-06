@@ -1,0 +1,122 @@
+{
+  "version": "query_candidate_patch15_3_2_B_manifest_v1",
+  "patch": "Real Shadow 10-Case Registry Finalization",
+  "createdAt": "2026-08-06T13:42:00+08:00",
+  "fileCount": 22,
+  "additiveOnly": true,
+  "routesModified": false,
+  "existingProductionSourcesModified": false,
+  "privateRuntimeOutputsIncluded": false,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_B.json",
+      "bytes": 911,
+      "sha256": "a48a4cec96ca7328ead78893add77db92aaf93478f9c89e9c2ae37eb42fb6b3a"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_B_REAL_SHADOW_REGISTRY_FINALIZATION.md",
+      "bytes": 11399,
+      "sha256": "a044ffd7af5ac832b32429169b16419e087b0a53cdfd030fc0df4c08955901f7"
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowRegistryFinalization.js",
+      "bytes": 16256,
+      "sha256": "6b5489473e09ba0ffbb2208f0d5dc5c639b88d89a45a4f6f60bb005a2cb20568"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerRealShadowFingerprintLedger.template.json",
+      "bytes": 4861,
+      "sha256": "d37c996ffcb5031b08ca6387cb1868aee11415d356c2f5cce6bfd608390b4b1a"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertRealShadowPrivateOutputsUntracked.js",
+      "bytes": 1110,
+      "sha256": "d694899c71b5f7c0dac4f2c86914988bc46b18f5bfb514e13f7e9c8eaf9825f8"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerFinalizeRealShadowCaseRegistry.js",
+      "bytes": 3609,
+      "sha256": "1e335f8bdb7f21b9a0b036939055f76c3c98e78a545904ff93d535a7377362b4"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerRecordRealShadowFingerprint.js",
+      "bytes": 2204,
+      "sha256": "8f4b2085c8dbbc0183c682b42ed74b30b60fa7c50fa03b7d937d491a461fce4a"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerScaffoldRealShadowFingerprintLedger.js",
+      "bytes": 1351,
+      "sha256": "a761c1a031b8be8abe580dbddc18245efaef721bcd39a6a44056c15d193b0f49"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerShowRealShadowRegistryProgress.js",
+      "bytes": 1739,
+      "sha256": "285fa82de00753194eea2d80f976e8b22801d10367855cdf9578f506901d0681"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BCompleteFinalizationSmokeTest.js",
+      "bytes": 861,
+      "sha256": "f7888936685a531380517e46c984b56d3d2438264416c0ecb778d1c2646b888f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BDeterminismSmokeTest.js",
+      "bytes": 628,
+      "sha256": "4fb50f99d77e748867f33af7ce04d00d40ea654313b47eab1561355ea0fd51c8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BDuplicateFingerprintFailClosedSmokeTest.js",
+      "bytes": 1240,
+      "sha256": "50d97395ff75fd158bf408f21b84b1178324440768d90d3b2c385c344741fcd4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BIncompleteFinalizationFailClosedSmokeTest.js",
+      "bytes": 692,
+      "sha256": "ca38c642e85b287a2fefcd3fa415d110e09321035d6e175c501cc665693ec722"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BInvalidFingerprintFailClosedSmokeTest.js",
+      "bytes": 884,
+      "sha256": "a15a3b66578382a094718415aa7de47311fd78a687e6d262953173e186f7e573"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BManifestSmokeTest.js",
+      "bytes": 890,
+      "sha256": "963f983d46961897f43bff126d88b0629ca61dcf9e4712f9cc7f8bfb0f00c96c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BPrivacyFailClosedSmokeTest.js",
+      "bytes": 739,
+      "sha256": "ebd133c31430a81f1cc76aa30f940b8c195d0adde858f5219badcab6f4505159"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BPrivateOutputGuardSmokeTest.js",
+      "bytes": 1106,
+      "sha256": "89fd82fb1d2d46e8c57050e532b4544fc90ff05a214e7f16fd3010e003db8ef8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BRecordSmokeTest.js",
+      "bytes": 1041,
+      "sha256": "cb7b3ff63dccbfb73ff7e7a54043393d1c7a1124a742f963125f1020cf9dc9e0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BScaffoldSmokeTest.js",
+      "bytes": 637,
+      "sha256": "6b56c24836787d8bc5df9737ed678d9276fde20f6a530bfe026b7867d469c2cd"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BSourceIntegritySmokeTest.js",
+      "bytes": 1551,
+      "sha256": "d781db047ca37f46676d738e55b93a53239c0277f804996a601fa9b1048e0e6e"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BTestSupport.js",
+      "bytes": 1423,
+      "sha256": "2558c65a9faf501b0cd60db98c87ed807bf99815ac4280dc1e351d80d5f641a7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_BUnknownCaseFailClosedSmokeTest.js",
+      "bytes": 874,
+      "sha256": "4fd8bb35b45edede1d2bfcd251b73bb01215c104995831e4ad8b1ce1ea7a2e90"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+"use strict";
+const assert = require("assert");
+const { accuracyDataset } = require("./queryCandidatePatch15_3_2_BTestSupport");
+const { buildRealShadowFingerprintLedgerScaffold } = require("../automation/queryCandidatePlannerRealShadowRegistryFinalization");
+const ledger = buildRealShadowFingerprintLedgerScaffold(accuracyDataset());
+assert.strictEqual(ledger.cases.length, 10);
+assert.strictEqual(ledger.actualTrafficOnly, true);
+assert.strictEqual(ledger.syntheticFingerprintForbidden, true);
+assert.strictEqual(ledger.rawIdentityIncluded, false);
+console.log("PASS query candidate patch15.3.2-B fingerprint ledger scaffold smoke");
