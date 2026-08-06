@@ -1,0 +1,99 @@
+{
+  "version": "query_candidate_planner_real_shadow_case_registry_draft_v1",
+  "registryId": "internal_real_shadow_2026_08_v1",
+  "sourceDatasetId": "beebeeai_query_candidate_accuracy_core_v1",
+  "actualTrafficOnly": true,
+  "syntheticFingerprintForbidden": true,
+  "cases": [
+    {
+      "caseId": "hardcase_two_tables_one_sheet_waste",
+      "scenarioId": "hardcase_two_tables_one_sheet_waste_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "real_world_event_applicant_workshop",
+      "scenarioId": "real_world_event_applicant_workshop_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "seed_attendance_conditional",
+      "scenarioId": "seed_attendance_conditional_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "seed_sales_ready",
+      "scenarioId": "seed_sales_ready_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "template_course_evaluation_report",
+      "scenarioId": "template_course_evaluation_report_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "seed_unstructured_unsupported",
+      "scenarioId": "seed_unstructured_unsupported_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "ambiguous_mixed_columns_review",
+      "scenarioId": "ambiguous_mixed_columns_review_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "inventory_stock_movement",
+      "scenarioId": "inventory_stock_movement_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "project_task_tracker",
+      "scenarioId": "project_task_tracker_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    },
+    {
+      "caseId": "expense_claim_review",
+      "scenarioId": "expense_claim_review_internal_01",
+      "requestFingerprintSha256": "",
+      "uploadFingerprintSha256": "",
+      "expectedColdCostMicrousd": 0,
+      "modelId": "semantic_profiler_default",
+      "operatorNote": "fill fingerprints from actual internal preview only"
+    }
+  ]
+}

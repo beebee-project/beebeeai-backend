@@ -1,0 +1,96 @@
+{
+  "version": "query_candidate_patch15_3_2_A_manifest_v1",
+  "patch": "Real Shadow Case Registry & Encryption Secret Preparation",
+  "createdAt": "2026-08-05T15:30:00.000Z",
+  "fileCount": 17,
+  "additiveOnly": true,
+  "routesModified": false,
+  "existingProductionSourcesModified": false,
+  "files": [
+    {
+      "path": "automation/queryCandidatePlannerRealShadowPreparation.js",
+      "bytes": 12709,
+      "sha256": "4fe5fa43e562fe949b8de394e1520f360ce8d15a775732a5819c48c1c9a5efc7"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerRealShadowCaseRegistry.draft.json",
+      "bytes": 3850,
+      "sha256": "99371919f7da5da5620400162075cb8190e4c67ef7d05ed6494ee5b73accf58e"
+    },
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_A.json",
+      "bytes": 852,
+      "sha256": "b25c2001d8527ab9137033d702e2cf1f70bd5498b79abcb107bd06e023d35589"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_A_REAL_SHADOW_PREPARATION.md",
+      "bytes": 10990,
+      "sha256": "838ada558457c7d345fe83a29daecd4eaf4b0772febf2c273cebcd224de2fbba"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerGenerateRealShadowEvidenceSecret.js",
+      "bytes": 580,
+      "sha256": "ded5dad470a142c8a84e06242ddbdafb1cffdfb968d764f23d062935a035a64f"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerPrepareRealShadowCaseRegistry.js",
+      "bytes": 2839,
+      "sha256": "352e4a258bfecf6e60580b7db35190d15849e30c3cac87034e495e16d8f29720"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerScaffoldRealShadowCaseRegistry.js",
+      "bytes": 1285,
+      "sha256": "78152c8f0fb046883ca2aefe144eb29e6bd0c77a47c9dd5772e26c23cab3c055"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyRealShadowPreparation.js",
+      "bytes": 1856,
+      "sha256": "409bdb171e1aae40894e21b69b95bc0b0008f6b6323dd6631abfa41784768411"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_ADuplicateFingerprintFailClosedSmokeTest.js",
+      "bytes": 1027,
+      "sha256": "4a044b6d44d187c6b39ac3aa6442c1a7f489d183370ebfc3c2eefe9c9c60d0c5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_AIncompleteFailClosedSmokeTest.js",
+      "bytes": 790,
+      "sha256": "dd21c59fe87973f59dfe9c09c4066500a4b66163e0ddd80f571c5a9bcd06a323"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_AManifestSmokeTest.js",
+      "bytes": 985,
+      "sha256": "5ea0f1cc17d07463cec380882df34ca1ae6925529a606b711790c40a49fc71a6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_APreparationVerifySmokeTest.js",
+      "bytes": 1474,
+      "sha256": "98e76b133023e8897ab73e3f00f2e2812116f04548c45b00ab5098341bed375d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_ARegistryBuildSmokeTest.js",
+      "bytes": 1285,
+      "sha256": "98b1cdd3bb9bd694900fa94ff6156d034a139e64b06b7262c2c98080816a696a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_AScaffoldSmokeTest.js",
+      "bytes": 852,
+      "sha256": "49becbc62bc3c275c20801d61cbb305d6b2b05456827ee5c29f1a77e0c363d39"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_ASecretGenerationSmokeTest.js",
+      "bytes": 697,
+      "sha256": "8aafbb17ea464fb27202b9b7cac75cd0f0a02fcc87eeb8ce42666d2859253eb6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_ASourceIntegritySmokeTest.js",
+      "bytes": 1365,
+      "sha256": "7fe81c496af281bd2770ac416eda0f093465a405c9910b8b3c238ab47fc29ded"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_AUnsafeProductionFlagFailClosedSmokeTest.js",
+      "bytes": 1494,
+      "sha256": "8fbcdb8033a5be8692ee41fc9edeeaf136d82abf33e2e809805bfe4c602e07bc"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "version": "query_candidate_patch15_3_2_A_validation_v1",
+  "patch": "Real Shadow Case Registry & Encryption Secret Preparation",
+  "status": "PASS",
+  "validatedAt": "2026-08-05T15:30:00.000Z",
+  "checks": {
+    "syntax": 5,
+    "smokeTests": 9,
+    "cliWorkflows": 3,
+    "manifest": 1
+  },
+  "contracts": {
+    "accuracyDatasetCases": 10,
+    "requestFingerprintRequiredPerCase": true,
+    "uploadFingerprintRequiredPerCase": true,
+    "duplicateFingerprintsBlocked": true,
+    "syntheticFingerprintsForbidden": true,
+    "secretEntropyBytes": 48,
+    "secretFormat": "BASE64URL_64"
+  },
+  "productionBehavior": {
+    "collectorEnabledByPatch": false,
+    "internalCanaryEnabledByPatch": false,
+    "productionPromotionAuthorized": false,
+    "routesModified": false,
+    "existingProductionSourcesModified": false,
+    "failClosed": true
+  }
+}
