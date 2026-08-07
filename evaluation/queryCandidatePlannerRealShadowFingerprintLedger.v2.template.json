@@ -1,0 +1,13 @@
+{
+  "version": "query_candidate_planner_real_shadow_fingerprint_ledger_v2",
+  "registryId": "internal_real_shadow_2026_08_v2",
+  "sourceDatasetId": "beebeeai_query_candidate_accuracy_core_v1",
+  "sourceCatalogId": "internal_real_shadow_uploadable_sources_2026_08_v1",
+  "sourceCatalogSha256": "",
+  "legacyCapturesPreserved": false,
+  "actualTrafficOnly": true,
+  "syntheticFingerprintForbidden": true,
+  "sourceArtifactBindingRequired": true,
+  "rawIdentityIncluded": false,
+  "cases": []
+}

@@ -5,14 +5,23 @@ const {
   DRAFT_VERSION,
   buildRealShadowCaseRegistry,
 } = require("./queryCandidatePlannerRealShadowPreparation");
+const {
+  SOURCE_CATALOG_VERSION,
+  SHA256_RE,
+  exactText,
+  sourceCatalogSha256,
+  inspectSourceArtifact,
+  validateUploadableSourceCatalog,
+} = require("./queryCandidatePlannerRealShadowUploadableSourceCatalog");
 
 const FINALIZATION_VERSION =
-  "query_candidate_planner_real_shadow_registry_finalization_v1";
+  "query_candidate_planner_real_shadow_registry_finalization_v2";
 const LEDGER_VERSION =
+  "query_candidate_planner_real_shadow_fingerprint_ledger_v2";
+const LEGACY_LEDGER_VERSION =
   "query_candidate_planner_real_shadow_fingerprint_ledger_v1";
 const ACCURACY_DATASET_VERSION =
   "query_candidate_planner_accuracy_evaluation_dataset_v1";
-const SHA256_RE = /^[a-f0-9]{64}$/i;
 const CAPTURE_SOURCES = Object.freeze([
   "API_SHADOW_OBSERVATION",
   "INTERNAL_PREVIEW",
@@ -50,8 +59,8 @@ const FORBIDDEN_KEYS = new Set([
   "secret",
 ]);
 
-function text(value, maxLength = 240) {
-  return String(value == null ? "" : value).trim().slice(0, maxLength);
+function boundedText(value, maxLength = 240) {
+  return exactText(value).slice(0, maxLength);
 }
 
 function sha256(value) {
@@ -69,9 +78,9 @@ function accuracyCases(accuracyDataset = {}) {
   if (
     accuracyDataset?.version !== ACCURACY_DATASET_VERSION ||
     !Array.isArray(accuracyDataset?.cases) ||
-    accuracyDataset.cases.length === 0
+    accuracyDataset.cases.length !== 10
   ) {
-    const error = new Error("valid Patch 15.0 accuracy dataset is required");
+    const error = new Error("valid ten-case Patch 15.0 accuracy dataset required");
     error.code = "REAL_SHADOW_ACCURACY_DATASET_REQUIRED";
     throw error;
   }
@@ -79,16 +88,20 @@ function accuracyCases(accuracyDataset = {}) {
 }
 
 function canonicalCaseIds(accuracyDataset = {}) {
-  return accuracyCases(accuracyDataset).map((item) => text(item.caseId, 160));
+  return accuracyCases(accuracyDataset).map((item) => boundedText(item.caseId, 160));
 }
 
 function validIsoTimestamp(value, now = Date.now) {
-  const raw = text(value, 80);
+  const raw = exactText(value);
   const parsed = Date.parse(raw);
   if (!raw || !Number.isFinite(parsed)) return false;
   const nowMs = typeof now === "function" ? Number(now()) : Number(now);
-  if (!Number.isFinite(nowMs)) return false;
-  return parsed <= nowMs + 5 * 60 * 1000;
+  return Number.isFinite(nowMs) && parsed <= nowMs + 5 * 60 * 1000;
+}
+
+function exactSha256(value) {
+  const raw = exactText(value).toLowerCase();
+  return SHA256_RE.test(raw) && raw.length === 64 ? raw : "";
 }
 
 function findForbiddenPaths(value, path = "$", output = []) {
@@ -107,16 +120,47 @@ function findForbiddenPaths(value, path = "$", output = []) {
   return output;
 }
 
+function validatedSourceCatalog(accuracyDataset, sourceCatalog, now = Date.now) {
+  const validation = validateUploadableSourceCatalog({
+    accuracyDataset,
+    catalog: sourceCatalog,
+    requireComplete: true,
+    verifyFiles: true,
+    now,
+  });
+  if (!validation.valid || !validation.complete) {
+    const error = new Error(validation.errors.join("; ") || validation.reason);
+    error.code = "REAL_SHADOW_UPLOADABLE_SOURCE_CATALOG_REQUIRED";
+    throw error;
+  }
+  if (sourceCatalog.version !== SOURCE_CATALOG_VERSION) {
+    const error = new Error("finalized source catalog version required");
+    error.code = "REAL_SHADOW_FINALIZED_SOURCE_CATALOG_REQUIRED";
+    throw error;
+  }
+  return sourceCatalog;
+}
+
 function buildRealShadowFingerprintLedgerScaffold(
   accuracyDataset,
-  {
-    registryId = "internal_real_shadow_2026_08_v1",
-  } = {},
+  sourceCatalog,
+  { registryId = "internal_real_shadow_2026_08_v2", now = Date.now } = {},
 ) {
-  const cases = accuracyCases(accuracyDataset).map((item) =>
-    Object.freeze({
-      caseId: text(item.caseId, 160),
-      scenarioId: `${text(item.caseId, 140)}_internal_01`,
+  const verifiedCatalog = validatedSourceCatalog(
+    accuracyDataset,
+    sourceCatalog,
+    now,
+  );
+  const byCaseId = new Map(
+    verifiedCatalog.cases.map((item) => [item.caseId, item]),
+  );
+  const cases = accuracyCases(accuracyDataset).map((item) => {
+    const source = byCaseId.get(item.caseId);
+    return Object.freeze({
+      caseId: boundedText(item.caseId, 160),
+      scenarioId: `${boundedText(item.caseId, 140)}_internal_01`,
+      sourceArtifactSha256: exactSha256(source.sourceArtifactSha256),
+      sourceKind: boundedText(source.sourceKind, 40).toUpperCase(),
       requestFingerprintSha256: "",
       uploadFingerprintSha256: "",
       captureSource: "",
@@ -125,15 +169,19 @@ function buildRealShadowFingerprintLedgerScaffold(
       synthetic: false,
       expectedColdCostMicrousd: 0,
       modelId: "semantic_profiler_default",
-      operatorNote: "record only from an actual internal request",
-    }),
-  );
+      operatorNote: "rerun actual source after B.1 catalog finalization",
+    });
+  });
   return Object.freeze({
     version: LEDGER_VERSION,
-    registryId: text(registryId, 160),
-    sourceDatasetId: text(accuracyDataset.datasetId, 160),
+    registryId: boundedText(registryId, 160),
+    sourceDatasetId: boundedText(accuracyDataset.datasetId, 160),
+    sourceCatalogId: boundedText(verifiedCatalog.catalogId, 160),
+    sourceCatalogSha256: sourceCatalogSha256(verifiedCatalog),
+    legacyCapturesPreserved: false,
     actualTrafficOnly: true,
     syntheticFingerprintForbidden: true,
+    sourceArtifactBindingRequired: true,
     rawIdentityIncluded: false,
     cases: Object.freeze(cases),
   });
@@ -141,59 +189,73 @@ function buildRealShadowFingerprintLedgerScaffold(
 
 function validateRealShadowFingerprintLedger({
   accuracyDataset,
+  sourceCatalog,
   ledger,
   requireComplete = true,
   now = Date.now,
 } = {}) {
   const errors = [];
   let expectedCaseIds = [];
+  let verifiedCatalog = null;
   try {
     expectedCaseIds = canonicalCaseIds(accuracyDataset);
+    verifiedCatalog = validatedSourceCatalog(accuracyDataset, sourceCatalog, now);
   } catch (error) {
-    errors.push(error.code || "REAL_SHADOW_ACCURACY_DATASET_REQUIRED");
+    errors.push(error.code || "REAL_SHADOW_UPLOADABLE_SOURCE_CATALOG_REQUIRED");
   }
 
   if (!ledger || typeof ledger !== "object" || Array.isArray(ledger)) {
     errors.push("FINGERPRINT_LEDGER_OBJECT_REQUIRED");
   }
-  if (ledger?.version !== LEDGER_VERSION) {
+  if (ledger?.version === LEGACY_LEDGER_VERSION) {
+    errors.push("REAL_SHADOW_LEGACY_LEDGER_REJECTED");
+  } else if (ledger?.version !== LEDGER_VERSION) {
     errors.push("FINGERPRINT_LEDGER_VERSION_INVALID");
   }
-  if (!text(ledger?.registryId, 160)) errors.push("registryId required");
-  if (ledger?.actualTrafficOnly !== true) {
-    errors.push("ACTUAL_TRAFFIC_ONLY_REQUIRED");
+  if (!boundedText(ledger?.registryId, 160)) errors.push("registryId required");
+  if (!exactSha256(ledger?.sourceCatalogSha256)) {
+    errors.push("sourceCatalogSha256 required");
   }
+  if (
+    verifiedCatalog &&
+    exactSha256(ledger?.sourceCatalogSha256) !==
+      sourceCatalogSha256(verifiedCatalog)
+  ) {
+    errors.push("REAL_SHADOW_SOURCE_CATALOG_BINDING_MISMATCH");
+  }
+  if (ledger?.legacyCapturesPreserved !== false) {
+    errors.push("LEGACY_CAPTURE_PRESERVATION_FORBIDDEN");
+  }
+  if (ledger?.actualTrafficOnly !== true) errors.push("ACTUAL_TRAFFIC_ONLY_REQUIRED");
   if (ledger?.syntheticFingerprintForbidden !== true) {
     errors.push("SYNTHETIC_FINGERPRINT_FORBIDDEN_REQUIRED");
+  }
+  if (ledger?.sourceArtifactBindingRequired !== true) {
+    errors.push("SOURCE_ARTIFACT_BINDING_REQUIRED");
   }
   if (ledger?.rawIdentityIncluded !== false) {
     errors.push("RAW_IDENTITY_MUST_BE_EXCLUDED");
   }
-
-  const forbiddenPaths = findForbiddenPaths(ledger);
-  forbiddenPaths.forEach((path) => errors.push(`forbidden field: ${path}`));
+  findForbiddenPaths(ledger).forEach((item) => errors.push(`forbidden field: ${item}`));
 
   const cases = Array.isArray(ledger?.cases) ? ledger.cases : [];
-  if (cases.length === 0) errors.push("FINGERPRINT_LEDGER_CASES_REQUIRED");
-
   const byCaseId = new Map();
-  for (const [index, item] of cases.entries()) {
-    const caseId = text(item?.caseId, 160);
-    if (!caseId) {
-      errors.push(`cases[${index}].caseId required`);
-      continue;
-    }
-    if (byCaseId.has(caseId)) errors.push(`duplicate caseId: ${caseId}`);
-    byCaseId.set(caseId, item);
-  }
-
-  for (const caseId of expectedCaseIds) {
+  cases.forEach((item, index) => {
+    const caseId = boundedText(item?.caseId, 160);
+    if (!caseId) errors.push(`cases[${index}].caseId required`);
+    else if (byCaseId.has(caseId)) errors.push(`duplicate caseId: ${caseId}`);
+    else byCaseId.set(caseId, item);
+  });
+  expectedCaseIds.forEach((caseId) => {
     if (!byCaseId.has(caseId)) errors.push(`missing caseId: ${caseId}`);
-  }
+  });
   for (const caseId of byCaseId.keys()) {
     if (!expectedCaseIds.includes(caseId)) errors.push(`unexpected caseId: ${caseId}`);
   }
 
+  const catalogByCaseId = new Map(
+    (verifiedCatalog?.cases || []).map((item) => [item.caseId, item]),
+  );
   const requestFingerprints = new Set();
   const uploadFingerprints = new Set();
   let completedCount = 0;
@@ -201,62 +263,70 @@ function validateRealShadowFingerprintLedger({
   for (const caseId of expectedCaseIds) {
     const item = byCaseId.get(caseId);
     if (!item) continue;
-    const requestFingerprintSha256 = text(
-      item.requestFingerprintSha256,
-      64,
-    ).toLowerCase();
-    const uploadFingerprintSha256 = text(
-      item.uploadFingerprintSha256,
-      64,
-    ).toLowerCase();
-    const captureSource = text(item.captureSource, 80).toUpperCase();
-    const complete =
-      SHA256_RE.test(requestFingerprintSha256) &&
-      SHA256_RE.test(uploadFingerprintSha256) &&
-      CAPTURE_SOURCES.includes(captureSource) &&
-      validIsoTimestamp(item.capturedAt, now) &&
-      item.actualTraffic === true &&
-      item.synthetic === false;
+    const source = catalogByCaseId.get(caseId);
+    const requestRaw = exactText(item.requestFingerprintSha256);
+    const uploadRaw = exactText(item.uploadFingerprintSha256);
+    const requestFingerprintSha256 = exactSha256(requestRaw);
+    const uploadFingerprintSha256 = exactSha256(uploadRaw);
+    const sourceArtifactSha256 = exactSha256(item.sourceArtifactSha256);
+    const captureSource = boundedText(item.captureSource, 80).toUpperCase();
+    const hasCapture = Boolean(requestRaw || uploadRaw || captureSource || exactText(item.capturedAt));
 
-    if (requireComplete || requestFingerprintSha256) {
-      if (!SHA256_RE.test(requestFingerprintSha256)) {
+    if (!sourceArtifactSha256) {
+      errors.push(`${caseId}: sourceArtifactSha256 required`);
+    } else if (
+      source &&
+      sourceArtifactSha256 !== exactSha256(source.sourceArtifactSha256)
+    ) {
+      errors.push(`${caseId}: source artifact binding mismatch`);
+    }
+    if (requestRaw && requestRaw.length !== 64) {
+      errors.push(`${caseId}: request fingerprint must be exactly 64 characters`);
+    }
+    if (uploadRaw && uploadRaw.length !== 64) {
+      errors.push(`${caseId}: upload fingerprint must be exactly 64 characters`);
+    }
+    if (requireComplete || hasCapture) {
+      if (!requestFingerprintSha256) {
         errors.push(`${caseId}: actual request fingerprint required`);
       }
-    }
-    if (requireComplete || uploadFingerprintSha256) {
-      if (!SHA256_RE.test(uploadFingerprintSha256)) {
+      if (!uploadFingerprintSha256) {
         errors.push(`${caseId}: actual upload fingerprint required`);
       }
-    }
-    if (requireComplete || captureSource) {
+      if (requestFingerprintSha256 === uploadFingerprintSha256 && requestFingerprintSha256) {
+        errors.push(`${caseId}: request and upload fingerprints must differ`);
+      }
       if (!CAPTURE_SOURCES.includes(captureSource)) {
         errors.push(`${caseId}: captureSource invalid`);
       }
-    }
-    if (requireComplete || text(item.capturedAt, 80)) {
       if (!validIsoTimestamp(item.capturedAt, now)) {
         errors.push(`${caseId}: capturedAt invalid`);
       }
     }
-    if (item.actualTraffic !== true) {
-      errors.push(`${caseId}: actualTraffic must be true`);
-    }
-    if (item.synthetic !== false) {
-      errors.push(`${caseId}: synthetic must be false`);
-    }
+    if (item.actualTraffic !== true) errors.push(`${caseId}: actualTraffic must be true`);
+    if (item.synthetic !== false) errors.push(`${caseId}: synthetic must be false`);
 
-    if (SHA256_RE.test(requestFingerprintSha256)) {
+    if (requestFingerprintSha256) {
       if (requestFingerprints.has(requestFingerprintSha256)) {
         errors.push(`${caseId}: duplicate request fingerprint`);
       }
       requestFingerprints.add(requestFingerprintSha256);
     }
-    if (SHA256_RE.test(uploadFingerprintSha256)) {
+    if (uploadFingerprintSha256) {
       if (uploadFingerprints.has(uploadFingerprintSha256)) {
         errors.push(`${caseId}: duplicate upload fingerprint`);
       }
       uploadFingerprints.add(uploadFingerprintSha256);
     }
+    const complete =
+      Boolean(sourceArtifactSha256) &&
+      Boolean(requestFingerprintSha256) &&
+      Boolean(uploadFingerprintSha256) &&
+      requestFingerprintSha256 !== uploadFingerprintSha256 &&
+      CAPTURE_SOURCES.includes(captureSource) &&
+      validIsoTimestamp(item.capturedAt, now) &&
+      item.actualTraffic === true &&
+      item.synthetic === false;
     if (complete) completedCount += 1;
   }
 
@@ -277,14 +347,16 @@ function validateRealShadowFingerprintLedger({
     remainingCount: Math.max(0, expectedCaseIds.length - completedCount),
     requestFingerprintCount: requestFingerprints.size,
     uploadFingerprintCount: uploadFingerprints.size,
+    legacyLedgerAccepted: false,
     rawIdentityIncluded: false,
-    syntheticFingerprintAllowed: false,
   });
 }
 
 function upsertRealShadowFingerprintCapture({
   accuracyDataset,
+  sourceCatalog,
   ledger,
+  sourceFilePath,
   caseId,
   requestFingerprintSha256,
   uploadFingerprintSha256,
@@ -292,30 +364,35 @@ function upsertRealShadowFingerprintCapture({
   capturedAt = new Date().toISOString(),
   expectedColdCostMicrousd = 0,
   modelId = "semantic_profiler_default",
-  operatorNote = "",
+  operatorNote = "actual internal request captured",
   now = Date.now,
 } = {}) {
-  const expectedCaseIds = canonicalCaseIds(accuracyDataset);
-  const normalizedCaseId = text(caseId, 160);
-  if (!expectedCaseIds.includes(normalizedCaseId)) {
+  const normalizedCaseId = boundedText(caseId, 160);
+  if (!canonicalCaseIds(accuracyDataset).includes(normalizedCaseId)) {
     const error = new Error(`unknown caseId: ${normalizedCaseId}`);
     error.code = "REAL_SHADOW_CASE_ID_NOT_IN_ACCURACY_DATASET";
     throw error;
   }
-
-  const requestHash = text(requestFingerprintSha256, 64).toLowerCase();
-  const uploadHash = text(uploadFingerprintSha256, 64).toLowerCase();
-  const normalizedSource = text(captureSource, 80).toUpperCase();
-  if (!SHA256_RE.test(requestHash)) {
-    const error = new Error("actual request fingerprint must be 64 hex characters");
+  const requestRaw = exactText(requestFingerprintSha256);
+  const uploadRaw = exactText(uploadFingerprintSha256);
+  if (requestRaw.length !== 64 || !SHA256_RE.test(requestRaw)) {
+    const error = new Error("request fingerprint must be exactly 64 hex characters");
     error.code = "REAL_SHADOW_REQUEST_FINGERPRINT_INVALID";
     throw error;
   }
-  if (!SHA256_RE.test(uploadHash)) {
-    const error = new Error("actual upload fingerprint must be 64 hex characters");
+  if (uploadRaw.length !== 64 || !SHA256_RE.test(uploadRaw)) {
+    const error = new Error("upload fingerprint must be exactly 64 hex characters");
     error.code = "REAL_SHADOW_UPLOAD_FINGERPRINT_INVALID";
     throw error;
   }
+  const requestHash = requestRaw.toLowerCase();
+  const uploadHash = uploadRaw.toLowerCase();
+  if (requestHash === uploadHash) {
+    const error = new Error("request and upload fingerprints must differ");
+    error.code = "REAL_SHADOW_REQUEST_UPLOAD_FINGERPRINT_IDENTICAL";
+    throw error;
+  }
+  const normalizedSource = boundedText(captureSource, 80).toUpperCase();
   if (!CAPTURE_SOURCES.includes(normalizedSource)) {
     const error = new Error("capture source invalid");
     error.code = "REAL_SHADOW_CAPTURE_SOURCE_INVALID";
@@ -335,24 +412,40 @@ function upsertRealShadowFingerprintCapture({
 
   const baseValidation = validateRealShadowFingerprintLedger({
     accuracyDataset,
+    sourceCatalog,
     ledger,
     requireComplete: false,
     now,
   });
   if (!baseValidation.valid) {
     const error = new Error(baseValidation.errors.join("; "));
-    error.code = "REAL_SHADOW_FINGERPRINT_LEDGER_INVALID";
+    error.code = baseValidation.errors.includes("REAL_SHADOW_LEGACY_LEDGER_REJECTED")
+      ? "REAL_SHADOW_LEGACY_LEDGER_REJECTED"
+      : "REAL_SHADOW_FINGERPRINT_LEDGER_INVALID";
+    throw error;
+  }
+
+  const catalogItem = sourceCatalog.cases.find(
+    (item) => item.caseId === normalizedCaseId,
+  );
+  const inspected = inspectSourceArtifact(sourceFilePath);
+  if (
+    !catalogItem ||
+    inspected.sourceArtifactSha256 !== exactSha256(catalogItem.sourceArtifactSha256)
+  ) {
+    const error = new Error("source file does not match the catalog binding");
+    error.code = "REAL_SHADOW_CAPTURE_SOURCE_ARTIFACT_MISMATCH";
     throw error;
   }
 
   for (const item of ledger.cases) {
     if (item.caseId === normalizedCaseId) continue;
-    if (text(item.requestFingerprintSha256, 64).toLowerCase() === requestHash) {
+    if (exactSha256(item.requestFingerprintSha256) === requestHash) {
       const error = new Error("request fingerprint already assigned to another case");
       error.code = "REAL_SHADOW_REQUEST_FINGERPRINT_DUPLICATE";
       throw error;
     }
-    if (text(item.uploadFingerprintSha256, 64).toLowerCase() === uploadHash) {
+    if (exactSha256(item.uploadFingerprintSha256) === uploadHash) {
       const error = new Error("upload fingerprint already assigned to another case");
       error.code = "REAL_SHADOW_UPLOAD_FINGERPRINT_DUPLICATE";
       throw error;
@@ -362,11 +455,8 @@ function upsertRealShadowFingerprintCapture({
   const updatedCases = ledger.cases.map((item) => {
     if (item.caseId !== normalizedCaseId) return Object.freeze({ ...item });
     return Object.freeze({
-      caseId: normalizedCaseId,
-      scenarioId: text(
-        item.scenarioId || `${normalizedCaseId}_internal_01`,
-        160,
-      ),
+      ...item,
+      sourceArtifactSha256: inspected.sourceArtifactSha256,
       requestFingerprintSha256: requestHash,
       uploadFingerprintSha256: uploadHash,
       captureSource: normalizedSource,
@@ -374,22 +464,20 @@ function upsertRealShadowFingerprintCapture({
       actualTraffic: true,
       synthetic: false,
       expectedColdCostMicrousd: cost,
-      modelId: text(modelId || item.modelId || "semantic_profiler_default", 120),
-      operatorNote: text(operatorNote || item.operatorNote, 240),
+      modelId: boundedText(modelId || item.modelId || "semantic_profiler_default", 120),
+      operatorNote: boundedText(operatorNote || item.operatorNote, 240),
     });
   });
-
   const updated = Object.freeze({
+    ...ledger,
     version: LEDGER_VERSION,
-    registryId: text(ledger.registryId, 160),
-    sourceDatasetId: text(ledger.sourceDatasetId, 160),
-    actualTrafficOnly: true,
-    syntheticFingerprintForbidden: true,
-    rawIdentityIncluded: false,
+    sourceCatalogSha256: sourceCatalogSha256(sourceCatalog),
+    legacyCapturesPreserved: false,
     cases: Object.freeze(updatedCases),
   });
   const validation = validateRealShadowFingerprintLedger({
     accuracyDataset,
+    sourceCatalog,
     ledger: updated,
     requireComplete: false,
     now,
@@ -413,11 +501,13 @@ function upsertRealShadowFingerprintCapture({
 
 function finalizeRealShadowCaseRegistry({
   accuracyDataset,
+  sourceCatalog,
   ledger,
   now = Date.now,
 } = {}) {
   const validation = validateRealShadowFingerprintLedger({
     accuracyDataset,
+    sourceCatalog,
     ledger,
     requireComplete: true,
     now,
@@ -438,26 +528,20 @@ function finalizeRealShadowCaseRegistry({
 
   const draft = Object.freeze({
     version: DRAFT_VERSION,
-    registryId: text(ledger.registryId, 160),
-    sourceDatasetId: text(ledger.sourceDatasetId, 160),
+    registryId: boundedText(ledger.registryId, 160),
+    sourceDatasetId: boundedText(ledger.sourceDatasetId, 160),
     actualTrafficOnly: true,
     syntheticFingerprintForbidden: true,
     cases: Object.freeze(
       ledger.cases.map((item) =>
         Object.freeze({
-          caseId: text(item.caseId, 160),
-          scenarioId: text(item.scenarioId, 160),
-          requestFingerprintSha256: text(
-            item.requestFingerprintSha256,
-            64,
-          ).toLowerCase(),
-          uploadFingerprintSha256: text(
-            item.uploadFingerprintSha256,
-            64,
-          ).toLowerCase(),
+          caseId: boundedText(item.caseId, 160),
+          scenarioId: boundedText(item.scenarioId, 160),
+          requestFingerprintSha256: exactSha256(item.requestFingerprintSha256),
+          uploadFingerprintSha256: exactSha256(item.uploadFingerprintSha256),
           expectedColdCostMicrousd: Number(item.expectedColdCostMicrousd) || 0,
-          modelId: text(item.modelId || "semantic_profiler_default", 120),
-          operatorNote: "actual internal request fingerprint verified",
+          modelId: boundedText(item.modelId || "semantic_profiler_default", 120),
+          operatorNote: "actual source-bound internal request verified",
         }),
       ),
     ),
@@ -488,11 +572,12 @@ function finalizeRealShadowCaseRegistry({
     registry: registryResult.registry,
     registrySha256: registryResult.registrySha256,
     ledgerSha256: sha256(JSON.stringify(ledger)),
+    sourceCatalogSha256: sourceCatalogSha256(sourceCatalog),
     caseCount: registryResult.caseCount,
     expectedCaseCount: registryResult.expectedCaseCount,
     requestFingerprintCount: registryResult.requestFingerprintCount,
     uploadFingerprintCount: registryResult.uploadFingerprintCount,
-    source: "REAL_INTERNAL_REQUEST",
+    source: "REAL_UPLOADABLE_SOURCE_BOUND_INTERNAL_REQUEST",
     actualTraffic: true,
     synthetic: false,
     rawIdentityIncluded: false,
@@ -502,10 +587,12 @@ function finalizeRealShadowCaseRegistry({
 module.exports = Object.freeze({
   FINALIZATION_VERSION,
   LEDGER_VERSION,
+  LEGACY_LEDGER_VERSION,
   ACCURACY_DATASET_VERSION,
   SHA256_RE,
   CAPTURE_SOURCES,
   sha256,
+  exactSha256,
   findForbiddenPaths,
   buildRealShadowFingerprintLedgerScaffold,
   validateRealShadowFingerprintLedger,

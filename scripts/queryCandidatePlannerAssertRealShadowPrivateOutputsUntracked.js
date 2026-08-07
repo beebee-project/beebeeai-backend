@@ -4,10 +4,9 @@
 const { execFileSync } = require("child_process");
 
 const patterns = [
-  /queryCandidatePlannerRealShadowFingerprintLedger\.private\.json$/i,
-  /queryCandidatePlannerRealShadowCaseRegistry\.private\.json$/i,
-  /queryCandidatePlannerRealShadowCaseRegistry\.railway\.private\.txt$/i,
-  /queryCandidatePlannerRealShadowCaseRegistry\.summary\.private\.json$/i,
+  /queryCandidatePlannerRealShadowFingerprintLedger.*\.private\.json$/i,
+  /queryCandidatePlannerRealShadowCaseRegistry.*\.private\.(json|txt)$/i,
+  /queryCandidatePlannerRealShadowUploadableSourceCatalog.*\.private\.json$/i,
   /queryCandidatePlannerRealShadowEvidenceSecret\.private\.txt$/i,
 ];
 

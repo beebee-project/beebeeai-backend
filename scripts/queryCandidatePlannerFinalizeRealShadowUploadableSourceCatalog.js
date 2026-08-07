@@ -4,8 +4,8 @@
 const fs = require("fs");
 const path = require("path");
 const {
-  finalizeRealShadowCaseRegistry,
-} = require("../automation/queryCandidatePlannerRealShadowRegistryFinalization");
+  finalizeUploadableSourceCatalog,
+} = require("../automation/queryCandidatePlannerRealShadowUploadableSourceCatalog");
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
@@ -28,19 +28,14 @@ function privateOutput(name, fallback) {
 
 try {
   const root = path.resolve(__dirname, "..");
-  const ledgerPath = required("--ledger");
-  const sourceCatalogPath = required("--source-catalog");
-  const outputPath = privateOutput(
+  const draftPath = required("--catalog");
+  const privateOutputPath = privateOutput(
     "--output",
-    "queryCandidatePlannerRealShadowCaseRegistry.private.json",
-  );
-  const railwayOutputPath = privateOutput(
-    "--railway-output",
-    "queryCandidatePlannerRealShadowCaseRegistry.railway.private.txt",
+    "queryCandidatePlannerRealShadowUploadableSourceCatalog.private.json",
   );
   const summaryOutputPath = privateOutput(
     "--summary-output",
-    "queryCandidatePlannerRealShadowCaseRegistry.summary.private.json",
+    "queryCandidatePlannerRealShadowUploadableSourceCatalog.summary.private.json",
   );
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
@@ -48,43 +43,30 @@ try {
       "utf8",
     ),
   );
-  const sourceCatalog = JSON.parse(fs.readFileSync(sourceCatalogPath, "utf8"));
-  const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
-  const result = finalizeRealShadowCaseRegistry({
-    accuracyDataset,
-    sourceCatalog,
-    ledger,
-  });
+  const catalog = JSON.parse(fs.readFileSync(draftPath, "utf8"));
+  const result = finalizeUploadableSourceCatalog({ accuracyDataset, catalog });
   if (!result.valid) {
     result.errors.forEach((error) => console.error(`BLOCKED ${error}`));
     process.exitCode = 2;
   } else {
-    fs.writeFileSync(outputPath, `${JSON.stringify(result.registry, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
     fs.writeFileSync(
-      railwayOutputPath,
-      `QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_JSON=${JSON.stringify(result.registry)}\n`,
+      privateOutputPath,
+      `${JSON.stringify(result.privateCatalog, null, 2)}\n`,
       { encoding: "utf8", mode: 0o600 },
     );
     fs.writeFileSync(
       summaryOutputPath,
       `${JSON.stringify(
         {
-          version: result.version,
-          decision: "REAL_SHADOW_REGISTRY_FINALIZATION_PASS",
-          registryId: result.registry.registryId,
-          registrySha256: result.registrySha256,
-          ledgerSha256: result.ledgerSha256,
+          version: result.publicCatalog.version,
+          decision: "REAL_SHADOW_UPLOADABLE_SOURCE_CATALOG_PASS",
+          catalogId: result.publicCatalog.catalogId,
           sourceCatalogSha256: result.sourceCatalogSha256,
-          caseCount: result.caseCount,
-          requestFingerprintCount: result.requestFingerprintCount,
-          uploadFingerprintCount: result.uploadFingerprintCount,
-          source: result.source,
-          actualTraffic: true,
+          caseCount: result.completedCount,
+          sourceKinds: [...new Set(result.publicCatalog.cases.map((item) => item.sourceKind))],
           synthetic: false,
-          rawIdentityIncluded: false,
+          rawWorkbookDataIncluded: false,
+          privatePathsIncluded: false,
           collectorEnabledByThisOperation: false,
           internalCanaryEnabledByThisOperation: false,
           productionPromotionAuthorized: false,
@@ -95,13 +77,13 @@ try {
       { encoding: "utf8", mode: 0o600 },
     );
     console.log(
-      `PASS source-bound real shadow registry finalized sha256=${result.registrySha256} cases=${result.caseCount}`,
+      `PASS uploadable source catalog finalized sha256=${result.sourceCatalogSha256} cases=${result.completedCount}`,
     );
-    console.log(`SOURCE_CATALOG_SHA256 ${result.sourceCatalogSha256}`);
+    console.log(`OUTPUT ${privateOutputPath}`);
+    console.log(`SUMMARY ${summaryOutputPath}`);
     console.log("PRIVATE_OUTPUT_DO_NOT_COMMIT true");
+    console.log("LEGACY_LEDGER_ACCEPTED false");
     console.log("COLLECTOR_ENABLED_BY_THIS_OPERATION false");
-    console.log("INTERNAL_CANARY_ENABLED_BY_THIS_OPERATION false");
-    console.log("PRODUCTION_PROMOTION_AUTHORIZED false");
   }
 } catch (error) {
   console.error(`FAIL ${error.code || error.message}`);

@@ -4,6 +4,11 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+const root = path.resolve(__dirname, "..");
+const successor = JSON.parse(
+  fs.readFileSync(path.join(root, "PATCH_MANIFEST_PATCH15_3_2_B_1.json"), "utf8"),
+);
+const successorByPath = new Map(successor.files.map((entry) => [entry.path, entry]));
 const expected = Object.freeze({
   "automation/queryCandidatePlannerRealShadowRegistryFinalization.js":
     "6b5489473e09ba0ffbb2208f0d5dc5c639b88d89a45a4f6f60bb005a2cb20568",
@@ -20,10 +25,14 @@ const expected = Object.freeze({
   "evaluation/queryCandidatePlannerRealShadowFingerprintLedger.template.json":
     "d37c996ffcb5031b08ca6387cb1868aee11415d356c2f5cce6bfd608390b4b1a",
 });
-
-for (const [relative, expectedHash] of Object.entries(expected)) {
-  const content = fs.readFileSync(path.join(__dirname, "..", relative));
+let superseded = 0;
+for (const [relative, originalHash] of Object.entries(expected)) {
+  const content = fs.readFileSync(path.join(root, relative));
   const actual = crypto.createHash("sha256").update(content).digest("hex");
-  assert.strictEqual(actual, expectedHash, `SHA-256 mismatch: ${relative}`);
+  if (actual === originalHash) continue;
+  const replacement = successorByPath.get(relative);
+  assert(replacement, `unexpected Patch 15.3.2-B source drift: ${relative}`);
+  assert.strictEqual(actual, replacement.sha256, `SHA-256 mismatch: ${relative}`);
+  superseded += 1;
 }
-console.log("PASS query candidate patch15.3.2-B source integrity smoke");
+console.log(`PASS query candidate patch15.3.2-B source integrity smoke superseded=${superseded}`);

@@ -1,10 +1,10 @@
 "use strict";
 const assert = require("assert");
-const { accuracyDataset } = require("./queryCandidatePatch15_3_2_BTestSupport");
+const { completeSourceCatalog } = require("./queryCandidatePatch15_3_2_BTestSupport");
 const { buildRealShadowFingerprintLedgerScaffold, validateRealShadowFingerprintLedger } = require("../automation/queryCandidatePlannerRealShadowRegistryFinalization");
-const dataset = accuracyDataset();
-const ledger = { ...buildRealShadowFingerprintLedgerScaffold(dataset), email: "private@example.com" };
-const result = validateRealShadowFingerprintLedger({ accuracyDataset: dataset, ledger, requireComplete: false });
+const support = completeSourceCatalog();
+const ledger = { ...buildRealShadowFingerprintLedgerScaffold(support.dataset, support.catalog), email: "private@example.com" };
+const result = validateRealShadowFingerprintLedger({ accuracyDataset: support.dataset, sourceCatalog: support.catalog, ledger, requireComplete: false });
 assert.strictEqual(result.valid, false);
 assert(result.errors.some((item) => item.includes("forbidden field")));
-console.log("PASS query candidate patch15.3.2-B privacy fail-closed smoke");
+console.log("PASS query candidate patch15.3.2-B privacy fail-closed smoke superseded=B.1");

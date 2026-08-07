@@ -1,0 +1,11 @@
+"use strict";
+const assert = require("assert");
+const { completeSourceCatalog, completeLedger } = require("./queryCandidatePatch15_3_2_B_1TestSupport");
+const source = completeSourceCatalog();
+const serializedPublic = JSON.stringify(source.finalized.publicCatalog).toLowerCase();
+assert(!serializedPublic.includes("sourcepath"));
+assert(!serializedPublic.includes("filename"));
+const ledger = completeLedger().ledger;
+assert.strictEqual(ledger.rawIdentityIncluded, false);
+assert.strictEqual(ledger.legacyCapturesPreserved, false);
+console.log("PASS query candidate patch15.3.2-B.1 privacy smoke");

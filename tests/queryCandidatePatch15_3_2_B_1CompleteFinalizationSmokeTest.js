@@ -1,7 +1,9 @@
 "use strict";
 const assert = require("assert");
-const { completeLedger } = require("./queryCandidatePatch15_3_2_BTestSupport");
-const { finalizeRealShadowCaseRegistry } = require("../automation/queryCandidatePlannerRealShadowRegistryFinalization");
+const {
+  finalizeRealShadowCaseRegistry,
+} = require("../automation/queryCandidatePlannerRealShadowRegistryFinalization");
+const { completeLedger } = require("./queryCandidatePatch15_3_2_B_1TestSupport");
 const support = completeLedger();
 const result = finalizeRealShadowCaseRegistry({
   accuracyDataset: support.dataset,
@@ -11,4 +13,5 @@ const result = finalizeRealShadowCaseRegistry({
 });
 assert.strictEqual(result.valid, true);
 assert.strictEqual(result.caseCount, 10);
-console.log("PASS query candidate patch15.3.2-B complete registry finalization smoke superseded=B.1");
+assert(/^[a-f0-9]{64}$/.test(result.sourceCatalogSha256));
+console.log("PASS query candidate patch15.3.2-B.1 complete finalization smoke");

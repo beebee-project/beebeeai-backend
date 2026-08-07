@@ -1,0 +1,44 @@
+{
+  "version": "query_candidate_patch15_3_2_B_1_validation_v1",
+  "patch": "Real Uploadable Source Catalog Remap and Invalid Ledger Guard",
+  "createdAt": "2026-08-06T17:01:00+08:00",
+  "decision": "PASS",
+  "qa": {
+    "newSmokeTests": 17,
+    "passed": 17,
+    "failed": 0
+  },
+  "verified": [
+    "ten-case source catalog scaffold",
+    "only REAL_ANONYMIZED or PUBLIC_DATASET accepted",
+    "synthetic and generated fixture sources rejected",
+    "duplicate source artifact rejected",
+    "semantic compatibility confirmation required",
+    "incomplete source catalog fail-closed",
+    "complete source catalog finalization",
+    "legacy v1 ledger rejected",
+    "legacy capture automatic preservation forbidden",
+    "fingerprint suffix and overlength rejected",
+    "request and upload fingerprint equality rejected",
+    "source artifact mismatch rejected at capture",
+    "source-bound capture accepted",
+    "ten-case registry finalization",
+    "deterministic finalization",
+    "private path excluded from public projection",
+    "private output staging guard"
+  ],
+  "operationalState": {
+    "realSourceFilesIncluded": false,
+    "collectorEnabled": false,
+    "internalCanaryEnabled": false,
+    "productionMergeEnabled": false,
+    "productionPromotionAuthorized": false
+  },
+  "predecessorQA": {
+    "patch15_3_2_BSmokeTests": 12,
+    "passed": 12,
+    "failed": 0,
+    "manifestSupersededFiles": 18,
+    "sourceIntegritySupersededFiles": 6
+  }
+}
