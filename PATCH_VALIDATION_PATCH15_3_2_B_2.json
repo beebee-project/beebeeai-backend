@@ -1,0 +1,47 @@
+{
+  "version": "query_candidate_patch15_3_2_B_2_validation_v1",
+  "patch": "Real Shadow Evidence Foundation Closeout Gate",
+  "phase": "15.3-A",
+  "createdAt": "2026-08-07T20:17:00+08:00",
+  "decision": "PASS",
+  "qa": {
+    "newSmokeTests": 14,
+    "passed": 14,
+    "failed": 0
+  },
+  "verified": [
+    "Patch 15.0 expectedRejected case contract is required for rejection attestation",
+    "completed or completed-safe observation required",
+    "zero accepted shadow candidates required for expected rejection",
+    "request and upload fingerprints must match the recorded ledger case",
+    "source artifact remains bound through Patch 15.3.2-B.1 catalog",
+    "incomplete ten-case ledger blocks phase closeout",
+    "complete ten-case ledger plus expected rejection attestation passes phase closeout",
+    "deterministic foundation summary and registry finalization",
+    "raw candidate payload excluded",
+    "raw identity excluded",
+    "raw file content excluded",
+    "expected-rejection record CLI",
+    "phase finalization CLI",
+    "phase private output staging guard"
+  ],
+  "predecessorQA": {
+    "patch15_3_2_B_1SmokeTests": 17,
+    "patch15_3_2_B_1Passed": 17,
+    "patch15_3_2_BSmokeTests": 12,
+    "patch15_3_2_BPassed": 12
+  },
+  "operationalState": {
+    "routesModified": false,
+    "productionRuntimeModified": false,
+    "railwayVariablesModified": false,
+    "collectorEnabled": false,
+    "internalCanaryEnabled": false,
+    "productionMergeEnabled": false,
+    "productionPromotionAuthorized": false
+  },
+  "phaseExit": {
+    "readySignal": "READY_FOR_PATCH_15_3_2_C true",
+    "nextPatch": "15.3.2-C — Encryption Secret & Safe Deployment"
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "version": "query_candidate_patch15_3_2_B_2_manifest_v1",
+  "patch": "Real Shadow Evidence Foundation Closeout Gate",
+  "phase": "15.3-A",
+  "createdAt": "2026-08-07T20:17:00+08:00",
+  "fileCount": 21,
+  "additiveOnly": true,
+  "routesModified": false,
+  "productionRuntimeModified": false,
+  "privateRuntimeOutputsIncluded": false,
+  "realSourceFilesIncluded": false,
+  "railwayVariablesModified": false,
+  "dependsOn": [
+    "15.3.2-B",
+    "15.3.2-B.1"
+  ],
+  "purpose": [
+    "explicitly attest expected unsupported rejection evidence",
+    "close source-bound ten-case real shadow foundation",
+    "produce fail-closed readiness signal for Patch 15.3.2-C"
+  ],
+  "operationalState": {
+    "collectorEnabled": false,
+    "internalCanaryEnabled": false,
+    "productionMergeEnabled": false,
+    "productionPromotionAuthorized": false
+  },
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_B_2.json",
+      "bytes": 1673,
+      "sha256": "ac8f3ba7bc1849bf4fcb1157cbb43b789493db1f2d9f41f0811f275d8e84752e"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_B_2_REAL_SHADOW_EVIDENCE_FOUNDATION_CLOSEOUT.md",
+      "bytes": 10570,
+      "sha256": "0e559247d11547b655aa85d690921380b3250183214529ffb4b7acf3d7528acc"
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowEvidenceFoundation.js",
+      "bytes": 16300,
+      "sha256": "34b87a7026f95e1e07ef8b12d93669e0067dd002a5dd720b54665123c90eac87"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerRecordRealShadowExpectedRejection.js",
+      "bytes": 3907,
+      "sha256": "0e35dd89699eab051c419f44800ce67cd91e25f85e9584ff7e749d90a763327b"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerFinalizeRealShadowEvidenceFoundation.js",
+      "bytes": 4817,
+      "sha256": "9d6e9715fb2d28b8612d9620ec3f3a53b119880545e2cd6f334fc8646f9d8a77"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertRealShadowFoundationPrivateOutputsUntracked.js",
+      "bytes": 1210,
+      "sha256": "af79c75ba63daa4a661de6f5f113f58bf2d247a09cdb3cf70f023e089ca190b7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2AcceptedNonzeroFailClosedSmokeTest.js",
+      "bytes": 883,
+      "sha256": "cee0c1d48a4993549fccc2352fdcdf8727ad44e5428407cd4751916aa23f8a63"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2CompleteFoundationGateSmokeTest.js",
+      "bytes": 1151,
+      "sha256": "acf3a8978814da3fd82e38de83ed600ff76d9e73a9e2ad37d12e473a7ee3c591"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2DeterminismSmokeTest.js",
+      "bytes": 846,
+      "sha256": "7da578b9b386dc5642d9be5c13c97412cfd03dde535e9ee177e9a65b25a16e84"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2ExpectedRejectionSmokeTest.js",
+      "bytes": 717,
+      "sha256": "cfd8f6bd4c71edd577be8dd5080ac21bc0190126594bcf2301ab84874acaf7d0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2FinalizeCliSmokeTest.js",
+      "bytes": 2165,
+      "sha256": "af55737aa82e81c98bf382748d3063c16518a94e64329927c1eb495bb5d948eb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2FingerprintMismatchFailClosedSmokeTest.js",
+      "bytes": 864,
+      "sha256": "5c467bb649d59441b31f53e4e1b59c0d34aca094122c88fd9f6bfab9699c4cab"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2IncompleteLedgerGateFailClosedSmokeTest.js",
+      "bytes": 998,
+      "sha256": "95f9183497497151a5956c0886d389d242ebb86d1afa9adc4df33248c98b354f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2ManifestSmokeTest.js",
+      "bytes": 993,
+      "sha256": "0b992cc1816db91bd1517b0bf044122db73f828fcf49f64ca3d44beff0e9daec"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2NonExpectedCaseFailClosedSmokeTest.js",
+      "bytes": 946,
+      "sha256": "484b3e3e88e70fd5bd315c20bc192256c3a4f5dae7782fc9d07b102fe631d005"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2PrivacySmokeTest.js",
+      "bytes": 902,
+      "sha256": "d639a97aeef0dbbad43ba9c8104430273803af9ee53422ebd2d1ca5bf316695d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2PrivateOutputGuardSmokeTest.js",
+      "bytes": 1212,
+      "sha256": "0367b1cb2bff87fa433a2a0b8a766666fb92a6054e17bce96ad9722a2c32e4a8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2RecordCliSmokeTest.js",
+      "bytes": 1980,
+      "sha256": "b09e737c388410024ca7e149ad2eb4f69a9027b1bd8810010d97ba8e079c5cbc"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2SourceIntegritySmokeTest.js",
+      "bytes": 1118,
+      "sha256": "a42ba45b241890f9d5ed1549e1b50195528c70cf22558f622e9f03e6afdb8e76"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2TestSupport.js",
+      "bytes": 1155,
+      "sha256": "e1386961d7e5f7e8a59e5da00d2bdd6358f0248e5eccc1849e547e67e64b7c00"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_B_2UnsafeStatusFailClosedSmokeTest.js",
+      "bytes": 874,
+      "sha256": "c1da905d033cd8e1ab41be37fc34c996bccab2cc1dbec8ffb6801f7ca839e2a3"
+    }
+  ]
+}
