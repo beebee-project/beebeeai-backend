@@ -1,11 +1,7 @@
-"use strict";
-
 const crypto = require("crypto");
 
-const SUBJECT_VERSION =
-  "query_candidate_planner_internal_canary_subject_v1";
-const SUBJECT_HASH_PREFIX =
-  "beebee-query-candidate-internal-canary-subject-v1";
+const SUBJECT_VERSION = "query_candidate_planner_internal_canary_subject_v1";
+const SUBJECT_HASH_PREFIX = "beebee-query-candidate-internal-canary-subject-v1";
 
 function text(value, maxLength = 240) {
   return String(value == null ? "" : value)
@@ -31,9 +27,8 @@ function normalizeIdentityPart(value) {
 }
 
 function deriveQueryCandidatePlannerInternalCanarySubject(request = {}) {
-  const user = request.user && typeof request.user === "object"
-    ? request.user
-    : {};
+  const user =
+    request.user && typeof request.user === "object" ? request.user : {};
   const accountId = firstText(
     user.accountId,
     user.userId,

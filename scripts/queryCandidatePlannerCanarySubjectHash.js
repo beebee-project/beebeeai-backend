@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   hashQueryCandidatePlannerInternalCanarySubject,
 } = require("../automation/queryCandidatePlannerInternalCanarySubject");

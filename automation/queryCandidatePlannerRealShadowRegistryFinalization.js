@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   DRAFT_VERSION,
@@ -80,7 +78,9 @@ function accuracyCases(accuracyDataset = {}) {
     !Array.isArray(accuracyDataset?.cases) ||
     accuracyDataset.cases.length !== 10
   ) {
-    const error = new Error("valid ten-case Patch 15.0 accuracy dataset required");
+    const error = new Error(
+      "valid ten-case Patch 15.0 accuracy dataset required",
+    );
     error.code = "REAL_SHADOW_ACCURACY_DATASET_REQUIRED";
     throw error;
   }
@@ -88,7 +88,9 @@ function accuracyCases(accuracyDataset = {}) {
 }
 
 function canonicalCaseIds(accuracyDataset = {}) {
-  return accuracyCases(accuracyDataset).map((item) => boundedText(item.caseId, 160));
+  return accuracyCases(accuracyDataset).map((item) =>
+    boundedText(item.caseId, 160),
+  );
 }
 
 function validIsoTimestamp(value, now = Date.now) {
@@ -113,14 +115,20 @@ function findForbiddenPaths(value, path = "$", output = []) {
   }
   if (!value || typeof value !== "object") return output;
   for (const [key, item] of Object.entries(value)) {
-    const normalized = String(key).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+    const normalized = String(key)
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
     if (FORBIDDEN_KEYS.has(normalized)) output.push(`${path}.${key}`);
     findForbiddenPaths(item, `${path}.${key}`, output);
   }
   return output;
 }
 
-function validatedSourceCatalog(accuracyDataset, sourceCatalog, now = Date.now) {
+function validatedSourceCatalog(
+  accuracyDataset,
+  sourceCatalog,
+  now = Date.now,
+) {
   const validation = validateUploadableSourceCatalog({
     accuracyDataset,
     catalog: sourceCatalog,
@@ -199,7 +207,11 @@ function validateRealShadowFingerprintLedger({
   let verifiedCatalog = null;
   try {
     expectedCaseIds = canonicalCaseIds(accuracyDataset);
-    verifiedCatalog = validatedSourceCatalog(accuracyDataset, sourceCatalog, now);
+    verifiedCatalog = validatedSourceCatalog(
+      accuracyDataset,
+      sourceCatalog,
+      now,
+    );
   } catch (error) {
     errors.push(error.code || "REAL_SHADOW_UPLOADABLE_SOURCE_CATALOG_REQUIRED");
   }
@@ -226,7 +238,8 @@ function validateRealShadowFingerprintLedger({
   if (ledger?.legacyCapturesPreserved !== false) {
     errors.push("LEGACY_CAPTURE_PRESERVATION_FORBIDDEN");
   }
-  if (ledger?.actualTrafficOnly !== true) errors.push("ACTUAL_TRAFFIC_ONLY_REQUIRED");
+  if (ledger?.actualTrafficOnly !== true)
+    errors.push("ACTUAL_TRAFFIC_ONLY_REQUIRED");
   if (ledger?.syntheticFingerprintForbidden !== true) {
     errors.push("SYNTHETIC_FINGERPRINT_FORBIDDEN_REQUIRED");
   }
@@ -236,7 +249,9 @@ function validateRealShadowFingerprintLedger({
   if (ledger?.rawIdentityIncluded !== false) {
     errors.push("RAW_IDENTITY_MUST_BE_EXCLUDED");
   }
-  findForbiddenPaths(ledger).forEach((item) => errors.push(`forbidden field: ${item}`));
+  findForbiddenPaths(ledger).forEach((item) =>
+    errors.push(`forbidden field: ${item}`),
+  );
 
   const cases = Array.isArray(ledger?.cases) ? ledger.cases : [];
   const byCaseId = new Map();
@@ -250,7 +265,8 @@ function validateRealShadowFingerprintLedger({
     if (!byCaseId.has(caseId)) errors.push(`missing caseId: ${caseId}`);
   });
   for (const caseId of byCaseId.keys()) {
-    if (!expectedCaseIds.includes(caseId)) errors.push(`unexpected caseId: ${caseId}`);
+    if (!expectedCaseIds.includes(caseId))
+      errors.push(`unexpected caseId: ${caseId}`);
   }
 
   const catalogByCaseId = new Map(
@@ -270,7 +286,9 @@ function validateRealShadowFingerprintLedger({
     const uploadFingerprintSha256 = exactSha256(uploadRaw);
     const sourceArtifactSha256 = exactSha256(item.sourceArtifactSha256);
     const captureSource = boundedText(item.captureSource, 80).toUpperCase();
-    const hasCapture = Boolean(requestRaw || uploadRaw || captureSource || exactText(item.capturedAt));
+    const hasCapture = Boolean(
+      requestRaw || uploadRaw || captureSource || exactText(item.capturedAt),
+    );
 
     if (!sourceArtifactSha256) {
       errors.push(`${caseId}: sourceArtifactSha256 required`);
@@ -281,10 +299,14 @@ function validateRealShadowFingerprintLedger({
       errors.push(`${caseId}: source artifact binding mismatch`);
     }
     if (requestRaw && requestRaw.length !== 64) {
-      errors.push(`${caseId}: request fingerprint must be exactly 64 characters`);
+      errors.push(
+        `${caseId}: request fingerprint must be exactly 64 characters`,
+      );
     }
     if (uploadRaw && uploadRaw.length !== 64) {
-      errors.push(`${caseId}: upload fingerprint must be exactly 64 characters`);
+      errors.push(
+        `${caseId}: upload fingerprint must be exactly 64 characters`,
+      );
     }
     if (requireComplete || hasCapture) {
       if (!requestFingerprintSha256) {
@@ -293,7 +315,10 @@ function validateRealShadowFingerprintLedger({
       if (!uploadFingerprintSha256) {
         errors.push(`${caseId}: actual upload fingerprint required`);
       }
-      if (requestFingerprintSha256 === uploadFingerprintSha256 && requestFingerprintSha256) {
+      if (
+        requestFingerprintSha256 === uploadFingerprintSha256 &&
+        requestFingerprintSha256
+      ) {
         errors.push(`${caseId}: request and upload fingerprints must differ`);
       }
       if (!CAPTURE_SOURCES.includes(captureSource)) {
@@ -303,8 +328,10 @@ function validateRealShadowFingerprintLedger({
         errors.push(`${caseId}: capturedAt invalid`);
       }
     }
-    if (item.actualTraffic !== true) errors.push(`${caseId}: actualTraffic must be true`);
-    if (item.synthetic !== false) errors.push(`${caseId}: synthetic must be false`);
+    if (item.actualTraffic !== true)
+      errors.push(`${caseId}: actualTraffic must be true`);
+    if (item.synthetic !== false)
+      errors.push(`${caseId}: synthetic must be false`);
 
     if (requestFingerprintSha256) {
       if (requestFingerprints.has(requestFingerprintSha256)) {
@@ -376,12 +403,16 @@ function upsertRealShadowFingerprintCapture({
   const requestRaw = exactText(requestFingerprintSha256);
   const uploadRaw = exactText(uploadFingerprintSha256);
   if (requestRaw.length !== 64 || !SHA256_RE.test(requestRaw)) {
-    const error = new Error("request fingerprint must be exactly 64 hex characters");
+    const error = new Error(
+      "request fingerprint must be exactly 64 hex characters",
+    );
     error.code = "REAL_SHADOW_REQUEST_FINGERPRINT_INVALID";
     throw error;
   }
   if (uploadRaw.length !== 64 || !SHA256_RE.test(uploadRaw)) {
-    const error = new Error("upload fingerprint must be exactly 64 hex characters");
+    const error = new Error(
+      "upload fingerprint must be exactly 64 hex characters",
+    );
     error.code = "REAL_SHADOW_UPLOAD_FINGERPRINT_INVALID";
     throw error;
   }
@@ -399,13 +430,17 @@ function upsertRealShadowFingerprintCapture({
     throw error;
   }
   if (!validIsoTimestamp(capturedAt, now)) {
-    const error = new Error("capturedAt must be a valid non-future ISO timestamp");
+    const error = new Error(
+      "capturedAt must be a valid non-future ISO timestamp",
+    );
     error.code = "REAL_SHADOW_CAPTURE_TIMESTAMP_INVALID";
     throw error;
   }
   const cost = Number(expectedColdCostMicrousd);
   if (!Number.isInteger(cost) || cost < 0) {
-    const error = new Error("expectedColdCostMicrousd must be a non-negative integer");
+    const error = new Error(
+      "expectedColdCostMicrousd must be a non-negative integer",
+    );
     error.code = "REAL_SHADOW_EXPECTED_COLD_COST_INVALID";
     throw error;
   }
@@ -419,7 +454,9 @@ function upsertRealShadowFingerprintCapture({
   });
   if (!baseValidation.valid) {
     const error = new Error(baseValidation.errors.join("; "));
-    error.code = baseValidation.errors.includes("REAL_SHADOW_LEGACY_LEDGER_REJECTED")
+    error.code = baseValidation.errors.includes(
+      "REAL_SHADOW_LEGACY_LEDGER_REJECTED",
+    )
       ? "REAL_SHADOW_LEGACY_LEDGER_REJECTED"
       : "REAL_SHADOW_FINGERPRINT_LEDGER_INVALID";
     throw error;
@@ -431,7 +468,8 @@ function upsertRealShadowFingerprintCapture({
   const inspected = inspectSourceArtifact(sourceFilePath);
   if (
     !catalogItem ||
-    inspected.sourceArtifactSha256 !== exactSha256(catalogItem.sourceArtifactSha256)
+    inspected.sourceArtifactSha256 !==
+      exactSha256(catalogItem.sourceArtifactSha256)
   ) {
     const error = new Error("source file does not match the catalog binding");
     error.code = "REAL_SHADOW_CAPTURE_SOURCE_ARTIFACT_MISMATCH";
@@ -441,12 +479,16 @@ function upsertRealShadowFingerprintCapture({
   for (const item of ledger.cases) {
     if (item.caseId === normalizedCaseId) continue;
     if (exactSha256(item.requestFingerprintSha256) === requestHash) {
-      const error = new Error("request fingerprint already assigned to another case");
+      const error = new Error(
+        "request fingerprint already assigned to another case",
+      );
       error.code = "REAL_SHADOW_REQUEST_FINGERPRINT_DUPLICATE";
       throw error;
     }
     if (exactSha256(item.uploadFingerprintSha256) === uploadHash) {
-      const error = new Error("upload fingerprint already assigned to another case");
+      const error = new Error(
+        "upload fingerprint already assigned to another case",
+      );
       error.code = "REAL_SHADOW_UPLOAD_FINGERPRINT_DUPLICATE";
       throw error;
     }
@@ -464,7 +506,10 @@ function upsertRealShadowFingerprintCapture({
       actualTraffic: true,
       synthetic: false,
       expectedColdCostMicrousd: cost,
-      modelId: boundedText(modelId || item.modelId || "semantic_profiler_default", 120),
+      modelId: boundedText(
+        modelId || item.modelId || "semantic_profiler_default",
+        120,
+      ),
       operatorNote: boundedText(operatorNote || item.operatorNote, 240),
     });
   });
@@ -540,7 +585,10 @@ function finalizeRealShadowCaseRegistry({
           requestFingerprintSha256: exactSha256(item.requestFingerprintSha256),
           uploadFingerprintSha256: exactSha256(item.uploadFingerprintSha256),
           expectedColdCostMicrousd: Number(item.expectedColdCostMicrousd) || 0,
-          modelId: boundedText(item.modelId || "semantic_profiler_default", 120),
+          modelId: boundedText(
+            item.modelId || "semantic_profiler_default",
+            120,
+          ),
           operatorNote: "actual source-bound internal request verified",
         }),
       ),

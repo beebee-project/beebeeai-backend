@@ -1,9 +1,5 @@
-"use strict";
-
 const crypto = require("crypto");
-const {
-  OPERATIONS,
-} = require("./queryCandidatePlannerFeatureControl");
+const { OPERATIONS } = require("./queryCandidatePlannerFeatureControl");
 const {
   ADAPTER_VERSION,
   PROMOTION_GATE_DECISION_VERSION,
@@ -28,10 +24,8 @@ const AUDIENCE_MODES = Object.freeze({
 const ENV_KEYS = Object.freeze({
   enabled: "QUERY_CANDIDATE_PLANNER_PROMOTION_GATE_ENABLED",
   audienceMode: "QUERY_CANDIDATE_PLANNER_PROMOTION_AUDIENCE_MODE",
-  allowlistSha256:
-    "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256",
-  rolloutPercent:
-    "QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT",
+  allowlistSha256: "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256",
+  rolloutPercent: "QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT",
   rolloutSalt: "QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_SALT",
 });
 
@@ -58,7 +52,9 @@ function sha256(value) {
 }
 
 function normalizeSha256(value) {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
   return SHA256_RE.test(normalized) ? normalized : "";
 }
 
@@ -132,8 +128,7 @@ function parseAllowlist(env, key) {
   return Object.freeze({
     value: Object.freeze(normalized),
     valid: invalidEntries.length === 0,
-    source:
-      invalidEntries.length === 0 ? "ENV" : "INVALID_ENV_FAIL_CLOSED",
+    source: invalidEntries.length === 0 ? "ENV" : "INVALID_ENV_FAIL_CLOSED",
     invalidEntries: Object.freeze(invalidEntries),
   });
 }
@@ -217,9 +212,7 @@ function parsePromotionGateEnvironment(env = process.env) {
     invalidEnvironmentKeys.push(ENV_KEYS.rolloutSalt);
   }
 
-  const uniqueInvalidKeys = Object.freeze([
-    ...new Set(invalidEnvironmentKeys),
-  ]);
+  const uniqueInvalidKeys = Object.freeze([...new Set(invalidEnvironmentKeys)]);
 
   return Object.freeze({
     version: CONFIG_VERSION,
@@ -355,9 +348,7 @@ function evaluateAudience({ config, subjectSha256 }) {
   if (config.audienceMode === AUDIENCE_MODES.ALLOWLIST) {
     return Object.freeze({
       allowed: allowlistMatched,
-      reason: allowlistMatched
-        ? "ALLOWLIST_MATCH"
-        : "SUBJECT_NOT_ALLOWLISTED",
+      reason: allowlistMatched ? "ALLOWLIST_MATCH" : "SUBJECT_NOT_ALLOWLISTED",
       audiencePath: "ALLOWLIST",
       subjectSha256: subject,
       allowlistMatched,

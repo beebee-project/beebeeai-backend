@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   getQueryCandidatePlannerFeatureControl,
 } = require("./queryCandidatePlannerFeatureControlRuntime");
@@ -22,12 +20,9 @@ function defaultCanaryObservationLogger(observation = {}) {
     subjectTagSha256: observation.subjectTagSha256 || "",
     evidenceSha256: observation.evidenceSha256 || "",
     responseSource: observation.responseSource || "PRIMARY",
-    allowlistMatched:
-      observation.promotion?.allowlistMatched === true,
-    providerCallCount:
-      Number(observation.shadow?.providerCallCount || 0),
-    plannerEscalationUsed:
-      observation.shadow?.plannerEscalationUsed === true,
+    allowlistMatched: observation.promotion?.allowlistMatched === true,
+    providerCallCount: Number(observation.shadow?.providerCallCount || 0),
+    plannerEscalationUsed: observation.shadow?.plannerEscalationUsed === true,
     mergeApplied: observation.merge?.applied === true,
     latencyMs: Number(observation.latencyMs || 0),
     productionReadyAssignment: false,
@@ -39,20 +34,18 @@ function defaultCanaryObservationLogger(observation = {}) {
 
 function safeBlockedCanaryObservation(preflight = {}) {
   return Object.freeze({
-    version:
-      "query_candidate_planner_internal_allowlist_canary_observation_v1",
+    version: "query_candidate_planner_internal_allowlist_canary_observation_v1",
     status: "BLOCKED",
     reason: String(preflight.reason || "INTERNAL_CANARY_BLOCKED"),
-    subjectTagSha256:
-      String(preflight.subject?.subjectTagSha256 || ""),
-    evidenceSha256:
-      String(preflight.evidence?.evidenceSha256 || ""),
+    subjectTagSha256: String(preflight.subject?.subjectTagSha256 || ""),
+    evidenceSha256: String(preflight.evidence?.evidenceSha256 || ""),
     responseSource: "PRIMARY",
     promotion: Object.freeze({
       allowed: false,
       reason: String(preflight.reason || "INTERNAL_CANARY_BLOCKED"),
-      audiencePath:
-        String(preflight.promotionDecision?.audience?.path || "NONE"),
+      audiencePath: String(
+        preflight.promotionDecision?.audience?.path || "NONE",
+      ),
       allowlistMatched:
         preflight.promotionDecision?.audience?.allowlistMatched === true,
       rolloutPercent: 0,
@@ -128,14 +121,13 @@ function createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
 
       const control =
         featureControl || getQueryCandidatePlannerFeatureControl();
-      const preflight =
-        evaluateQueryCandidatePlannerInternalCanaryPreflight({
-          request: req,
-          env,
-          featureControl: control,
-          evidenceBundle,
-          now,
-        });
+      const preflight = evaluateQueryCandidatePlannerInternalCanaryPreflight({
+        request: req,
+        env,
+        featureControl: control,
+        evidenceBundle,
+        now,
+      });
 
       res.locals = res.locals || {};
       res.locals.queryCandidatePlannerCanaryPreflight = preflight;
@@ -143,8 +135,7 @@ function createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
       if (!preflight.allowed) {
         const response = originalJson(primaryPayload);
         const canaryObservation = safeBlockedCanaryObservation(preflight);
-        res.locals.queryCandidatePlannerCanaryObservation =
-          canaryObservation;
+        res.locals.queryCandidatePlannerCanaryObservation = canaryObservation;
         if (typeof onCanaryObservation === "function") {
           onCanaryObservation(canaryObservation, { req, res });
         }
@@ -160,8 +151,7 @@ function createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
             }),
           )
           .then((observation) => {
-            res.locals.queryCandidatePlannerShadowObservation =
-              observation;
+            res.locals.queryCandidatePlannerShadowObservation = observation;
             if (typeof onObservation === "function") {
               onObservation(observation, { req, res });
             }

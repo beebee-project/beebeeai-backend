@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,11 +6,15 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 
 function privateEnvPath(value) {
-  const output = path.resolve(value || "queryCandidatePlannerRealShadowEvidenceSecret.private.env");
+  const output = path.resolve(
+    value || "queryCandidatePlannerRealShadowEvidenceSecret.private.env",
+  );
   if (!/\.private\.env$/i.test(path.basename(output))) {
     const error = new Error("secret output must use a .private.env filename");
     error.code = "REAL_SHADOW_SECRET_PRIVATE_OUTPUT_REQUIRED";
@@ -26,7 +27,9 @@ try {
   const output = privateEnvPath(arg("--output"));
   const force = process.argv.includes("--force");
   if (fs.existsSync(output) && !force) {
-    const error = new Error("secret output already exists; explicit --force required for rotation");
+    const error = new Error(
+      "secret output already exists; explicit --force required for rotation",
+    );
     error.code = "REAL_SHADOW_SECRET_OUTPUT_ALREADY_EXISTS";
     throw error;
   }
@@ -38,7 +41,9 @@ try {
     "",
   ].join("\n");
   fs.writeFileSync(output, content, { encoding: "utf8", mode: 0o600 });
-  try { fs.chmodSync(output, 0o600); } catch (_error) {}
+  try {
+    fs.chmodSync(output, 0o600);
+  } catch (_error) {}
   console.log("PASS real shadow evidence secret private file created");
   console.log(`OUTPUT ${output}`);
   console.log(`SECRET_SHA256 ${generated.secretSha256}`);

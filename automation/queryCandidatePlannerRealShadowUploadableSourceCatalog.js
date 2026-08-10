@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -195,12 +193,15 @@ function validateUploadableSourceCatalog({
     if (byCaseId.has(caseId)) errors.push(`duplicate caseId: ${caseId}`);
     byCaseId.set(caseId, item);
   }
-  const expectedIds = expectedCases.map((item) => boundedText(item.caseId, 160));
+  const expectedIds = expectedCases.map((item) =>
+    boundedText(item.caseId, 160),
+  );
   expectedIds.forEach((caseId) => {
     if (!byCaseId.has(caseId)) errors.push(`missing caseId: ${caseId}`);
   });
   for (const caseId of byCaseId.keys()) {
-    if (!expectedIds.includes(caseId)) errors.push(`unexpected caseId: ${caseId}`);
+    if (!expectedIds.includes(caseId))
+      errors.push(`unexpected caseId: ${caseId}`);
   }
 
   const artifactHashes = new Set();
@@ -222,7 +223,9 @@ function validateUploadableSourceCatalog({
     );
     if (requireComplete || hasAnyBinding) {
       if (!ALLOWED_SOURCE_KINDS.includes(sourceKind)) {
-        errors.push(`${caseId}: sourceKind must be REAL_ANONYMIZED or PUBLIC_DATASET`);
+        errors.push(
+          `${caseId}: sourceKind must be REAL_ANONYMIZED or PUBLIC_DATASET`,
+        );
       }
       if (!sourcePath) errors.push(`${caseId}: sourcePath required`);
       if (!SHA256_RE.test(sourceArtifactSha256)) {
@@ -234,7 +237,8 @@ function validateUploadableSourceCatalog({
       if (!ALLOWED_EXTENSIONS.includes(sourceExtension)) {
         errors.push(`${caseId}: sourceExtension invalid`);
       }
-      if (item.uploadable !== true) errors.push(`${caseId}: uploadable must be true`);
+      if (item.uploadable !== true)
+        errors.push(`${caseId}: uploadable must be true`);
       if (item.semanticCompatibilityConfirmed !== true) {
         errors.push(`${caseId}: semantic compatibility confirmation required`);
       }
@@ -250,7 +254,8 @@ function validateUploadableSourceCatalog({
     }
     if (sourcePath) {
       const normalizedPath = path.resolve(sourcePath).toLowerCase();
-      if (sourcePaths.has(normalizedPath)) errors.push(`${caseId}: duplicate source path`);
+      if (sourcePaths.has(normalizedPath))
+        errors.push(`${caseId}: duplicate source path`);
       sourcePaths.add(normalizedPath);
     }
     let fileVerified = !verifyFiles;
@@ -261,7 +266,8 @@ function validateUploadableSourceCatalog({
           inspected.sourceArtifactSha256 === sourceArtifactSha256 &&
           inspected.sourceSizeBytes === sourceSizeBytes &&
           inspected.sourceExtension === sourceExtension;
-        if (!fileVerified) errors.push(`${caseId}: source artifact metadata mismatch`);
+        if (!fileVerified)
+          errors.push(`${caseId}: source artifact metadata mismatch`);
       } catch (error) {
         errors.push(`${caseId}: ${error.code || error.message}`);
       }
@@ -313,7 +319,9 @@ function bindUploadableSource({
 } = {}) {
   const expectedCases = accuracyCases(accuracyDataset);
   const normalizedCaseId = boundedText(caseId, 160);
-  const expected = expectedCases.find((item) => item.caseId === normalizedCaseId);
+  const expected = expectedCases.find(
+    (item) => item.caseId === normalizedCaseId,
+  );
   if (!expected) {
     const error = new Error(`unknown caseId: ${normalizedCaseId}`);
     error.code = "REAL_SHADOW_SOURCE_CASE_ID_UNKNOWN";
@@ -321,7 +329,9 @@ function bindUploadableSource({
   }
   const normalizedKind = boundedText(sourceKind, 40).toUpperCase();
   if (!ALLOWED_SOURCE_KINDS.includes(normalizedKind)) {
-    const error = new Error("only REAL_ANONYMIZED or PUBLIC_DATASET is allowed");
+    const error = new Error(
+      "only REAL_ANONYMIZED or PUBLIC_DATASET is allowed",
+    );
     error.code = "REAL_SHADOW_SOURCE_KIND_INVALID";
     throw error;
   }
@@ -354,7 +364,9 @@ function bindUploadableSource({
       exactText(item.sourceArtifactSha256).toLowerCase() ===
       inspected.sourceArtifactSha256
     ) {
-      const error = new Error("source artifact already assigned to another case");
+      const error = new Error(
+        "source artifact already assigned to another case",
+      );
       error.code = "REAL_SHADOW_SOURCE_ARTIFACT_DUPLICATE";
       throw error;
     }

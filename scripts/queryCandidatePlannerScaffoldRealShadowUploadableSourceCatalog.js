@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,14 +6,19 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 
 try {
   const root = path.resolve(__dirname, "..");
   const dataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -27,7 +29,9 @@ try {
     ),
   );
   if (!/\.private\./i.test(path.basename(output))) {
-    const error = new Error("source catalog output must use a .private. filename");
+    const error = new Error(
+      "source catalog output must use a .private. filename",
+    );
     error.code = "REAL_SHADOW_PRIVATE_OUTPUT_NAME_REQUIRED";
     throw error;
   }
@@ -42,7 +46,9 @@ try {
     encoding: "utf8",
     mode: 0o600,
   });
-  console.log(`PASS uploadable source catalog scaffold cases=${catalog.cases.length}`);
+  console.log(
+    `PASS uploadable source catalog scaffold cases=${catalog.cases.length}`,
+  );
   console.log(`OUTPUT ${output}`);
   console.log("PRIVATE_OUTPUT_DO_NOT_COMMIT true");
   console.log("ACTUAL_SOURCE_FILES_INCLUDED false");

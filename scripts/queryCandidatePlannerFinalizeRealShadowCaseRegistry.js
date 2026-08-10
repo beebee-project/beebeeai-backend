@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,7 +6,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 function required(name) {
   const value = arg(name);
@@ -44,7 +43,10 @@ try {
   );
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -59,10 +61,14 @@ try {
     result.errors.forEach((error) => console.error(`BLOCKED ${error}`));
     process.exitCode = 2;
   } else {
-    fs.writeFileSync(outputPath, `${JSON.stringify(result.registry, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
+    fs.writeFileSync(
+      outputPath,
+      `${JSON.stringify(result.registry, null, 2)}\n`,
+      {
+        encoding: "utf8",
+        mode: 0o600,
+      },
+    );
     fs.writeFileSync(
       railwayOutputPath,
       `QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_JSON=${JSON.stringify(result.registry)}\n`,

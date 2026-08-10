@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,7 +6,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 function required(name) {
   const value = arg(name);
@@ -21,7 +20,10 @@ try {
   const root = path.resolve(__dirname, "..");
   const dataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -29,7 +31,10 @@ try {
     fs.readFileSync(path.resolve(required("--source-catalog")), "utf8"),
   );
   const output = path.resolve(
-    arg("--output", "queryCandidatePlannerRealShadowFingerprintLedger.private.json"),
+    arg(
+      "--output",
+      "queryCandidatePlannerRealShadowFingerprintLedger.private.json",
+    ),
   );
   if (!/\.private\./i.test(path.basename(output))) {
     const error = new Error("ledger output must use a .private. filename");

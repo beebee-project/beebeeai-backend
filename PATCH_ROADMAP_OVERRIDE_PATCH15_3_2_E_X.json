@@ -1,0 +1,35 @@
+{
+  "version": "query_candidate_patch15_3_2_E_X_roadmap_override_v1",
+  "patch": "15.3.2-E-X",
+  "title": "Real Shadow Observation Collection Exclusion & Pre-E Restore",
+  "decision": {
+    "excludedPatch": "15.3.2-E",
+    "status": "EXCLUDED_NA",
+    "deferred": false,
+    "blocked": false,
+    "prerequisiteForSubsequentPatches": false,
+    "reason": "The dedicated Real Shadow Observation Collection path is removed from the active 15.3 roadmap. Evaluation proceeds without Patch E evidence collection."
+  },
+  "activeSequence": [
+    "15.3.2-D Limited Evidence Collector Activation — CLOSED",
+    "15.3.2-E Real Shadow Observation Collection — EXCLUDED / N/A",
+    "15.3.2-F Evaluation Baseline & Operational Assessment — NEXT",
+    "15.3.2-G Evaluation Evidence Bundle & Internal Canary Readiness",
+    "15.3.3 Internal Production Exposure",
+    "15.3.4 Production Promotion Gate + 15.4 Readiness",
+    "15.4 Controlled Production Rollout"
+  ],
+  "evaluationContract": {
+    "patch15_3_2_FDependsOnPatchE": false,
+    "patch15_3_2_GDependsOnPatchE": false,
+    "realProductionTrafficEvidenceMovesTo": "15.3.3 -> 15.3.4",
+    "independentInternalAllowlistReadinessRequiredBefore15_3_3": true
+  },
+  "runtimeStateAfterRestore": {
+    "QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_ENABLED": "0",
+    "QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_KILL_SWITCH": "1",
+    "internalCanary": "OFF",
+    "productionPromotion": "BLOCKED",
+    "production": "OFF"
+  }
+}

@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -12,7 +9,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 function required(name) {
   const value = arg(name);
@@ -45,7 +44,10 @@ try {
   );
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -87,9 +89,14 @@ try {
   });
 
   atomicWrite(ledgerPath, `${JSON.stringify(recorded.ledger, null, 2)}\n`);
-  atomicWrite(attestationPath, `${JSON.stringify(attested.attestation, null, 2)}\n`);
+  atomicWrite(
+    attestationPath,
+    `${JSON.stringify(attested.attestation, null, 2)}\n`,
+  );
 
-  console.log(`PASS recorded expected-rejection case=${recorded.recordedCaseId}`);
+  console.log(
+    `PASS recorded expected-rejection case=${recorded.recordedCaseId}`,
+  );
   console.log(`PROGRESS ${recorded.completedCount}/10`);
   console.log(`REMAINING ${recorded.remainingCount}`);
   console.log(`LEDGER_SHA256 ${recorded.ledgerSha256}`);

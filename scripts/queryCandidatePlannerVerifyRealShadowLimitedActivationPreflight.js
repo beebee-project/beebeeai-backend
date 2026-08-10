@@ -1,12 +1,11 @@
-#!/usr/bin/env node
-"use strict";
-
 const {
   evaluateRealShadowLimitedActivationPreflight,
 } = require("../automation/queryCandidatePlannerRealShadowLimitedActivation");
 
 try {
-  const result = evaluateRealShadowLimitedActivationPreflight({ env: process.env });
+  const result = evaluateRealShadowLimitedActivationPreflight({
+    env: process.env,
+  });
   if (!result.ready) {
     result.errors.forEach((error) => console.error(`BLOCKED ${error}`));
     process.exitCode = 2;

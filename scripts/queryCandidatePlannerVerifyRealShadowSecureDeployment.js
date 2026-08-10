@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -21,7 +18,9 @@ function requiredPath(name) {
 try {
   const foundationSummaryPath = requiredPath("--foundation-summary");
   const registryPath = requiredPath("--registry");
-  const foundationSummary = JSON.parse(fs.readFileSync(foundationSummaryPath, "utf8"));
+  const foundationSummary = JSON.parse(
+    fs.readFileSync(foundationSummaryPath, "utf8"),
+  );
   const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
   const result = evaluateRealShadowSecureDeployment({
     foundationSummary,
@@ -36,7 +35,9 @@ try {
     console.log(`SECRET_SHA256 ${result.secretSha256}`);
     console.log(`REGISTRY_SHA256 ${result.registrySha256}`);
     console.log(`ALLOWLIST_ENTRIES ${result.allowlistEntryCount}`);
-    console.log(`ENCRYPTION_VERSION ${result.encryptionSelfTest.encryptionVersion}`);
+    console.log(
+      `ENCRYPTION_VERSION ${result.encryptionSelfTest.encryptionVersion}`,
+    );
     console.log("ENCRYPTION_ROUND_TRIP true");
     console.log("WRONG_SECRET_REJECTED true");
     console.log("COLLECTOR_ENABLED false");

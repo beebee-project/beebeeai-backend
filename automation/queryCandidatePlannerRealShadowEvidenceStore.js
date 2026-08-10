@@ -1,21 +1,15 @@
-"use strict";
-
 const {
   encryptEvidencePayload,
   decryptEvidencePayload,
 } = require("./queryCandidatePlannerRealShadowEvidenceCrypto");
 
-const STORE_VERSION =
-  "query_candidate_planner_real_shadow_evidence_store_v1";
+const STORE_VERSION = "query_candidate_planner_real_shadow_evidence_store_v1";
 
 function modelProvider() {
   return require("../models/QueryCandidatePlannerRealShadowEvidenceObservation");
 }
 
-function createMongoRealShadowEvidenceStore({
-  model = null,
-  secret,
-} = {}) {
+function createMongoRealShadowEvidenceStore({ model = null, secret } = {}) {
   const EvidenceModel = model || modelProvider();
   async function record(record) {
     const encrypted = encryptEvidencePayload(record.payload, secret);
@@ -61,21 +55,25 @@ function createMongoRealShadowEvidenceStore({
       .sort({ observedAt: 1, recordId: 1 })
       .limit(Math.max(1, Math.min(50000, Number(limit) || 5000)))
       .lean();
-    return Object.freeze(docs.map((doc) => Object.freeze({
-      recordId: doc.recordId,
-      kind: doc.kind,
-      source: doc.source,
-      actualTraffic: doc.actualTraffic === true,
-      synthetic: doc.synthetic === true,
-      observedAt: new Date(doc.observedAt).toISOString(),
-      expiresAt: new Date(doc.expiresAt).toISOString(),
-      subjectTagSha256: doc.subjectTagSha256,
-      requestFingerprintSha256: doc.requestFingerprintSha256 || "",
-      uploadFingerprintSha256: doc.uploadFingerprintSha256 || "",
-      caseId: doc.caseId || "",
-      scenarioId: doc.scenarioId || "",
-      payload: decryptEvidencePayload(doc, secret),
-    })));
+    return Object.freeze(
+      docs.map((doc) =>
+        Object.freeze({
+          recordId: doc.recordId,
+          kind: doc.kind,
+          source: doc.source,
+          actualTraffic: doc.actualTraffic === true,
+          synthetic: doc.synthetic === true,
+          observedAt: new Date(doc.observedAt).toISOString(),
+          expiresAt: new Date(doc.expiresAt).toISOString(),
+          subjectTagSha256: doc.subjectTagSha256,
+          requestFingerprintSha256: doc.requestFingerprintSha256 || "",
+          uploadFingerprintSha256: doc.uploadFingerprintSha256 || "",
+          caseId: doc.caseId || "",
+          scenarioId: doc.scenarioId || "",
+          payload: decryptEvidencePayload(doc, secret),
+        }),
+      ),
+    );
   }
 
   return Object.freeze({ version: STORE_VERSION, record, list });
@@ -90,12 +88,17 @@ function createMemoryRealShadowEvidenceStore() {
       return Object.freeze({ stored: true, recordId: record.recordId });
     },
     async list() {
-      return Object.freeze([...records.values()].sort((a, b) =>
-        String(a.observedAt).localeCompare(String(b.observedAt)) ||
-        String(a.recordId).localeCompare(String(b.recordId)),
-      ));
+      return Object.freeze(
+        [...records.values()].sort(
+          (a, b) =>
+            String(a.observedAt).localeCompare(String(b.observedAt)) ||
+            String(a.recordId).localeCompare(String(b.recordId)),
+        ),
+      );
     },
-    clear() { records.clear(); },
+    clear() {
+      records.clear();
+    },
   });
 }
 

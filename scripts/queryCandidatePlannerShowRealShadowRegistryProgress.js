@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,7 +6,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 
 try {
@@ -20,7 +19,10 @@ try {
   if (!sourceCatalogArg) throw new Error("--source-catalog is required");
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -48,7 +50,9 @@ try {
         /^[a-f0-9]{64}$/i.test(String(item.sourceArtifactSha256 || ""));
       console.log(`${complete ? "READY" : "PENDING"} ${item.caseId}`);
     }
-    console.log(`PROGRESS ${result.completedCount}/${result.expectedCaseCount}`);
+    console.log(
+      `PROGRESS ${result.completedCount}/${result.expectedCaseCount}`,
+    );
     console.log(`REMAINING ${result.remainingCount}`);
     console.log(`COMPLETE ${result.complete}`);
     console.log("LEGACY_LEDGER_ACCEPTED false");

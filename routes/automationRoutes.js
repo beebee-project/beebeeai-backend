@@ -1,4 +1,4 @@
-const router = require("express").Router();
+﻿const router = require("express").Router();
 const { protect } = require("../middleware/authMiddleware");
 const automationController = require("../controllers/automationController");
 const {
@@ -38,16 +38,7 @@ function observeQueryCandidatePlannerForInternalPreview(observation, context) {
   defaultObservationLogger(observation, context);
   recordQueryCandidatePlannerInternalPreviewObservation(observation);
   // void recordQueryCandidatePlannerRealShadowObservation(observation, context);
-  void recordQueryCandidatePlannerRealShadowObservation(
-    observation,
-    context,
-  ).then((result) => {
-    console.log("[real-shadow-evidence]", {
-      kind: "EXECUTION",
-      stored: result?.stored === true,
-      reason: String(result?.reason || "UNKNOWN"),
-    });
-  });
+  void recordQueryCandidatePlannerRealShadowObservation(observation, context);
 }
 
 const getAnalysisCandidatesShadowObserved =
@@ -66,15 +57,9 @@ const downloadGeneratedFileCacheRetained =
       //   context,
       // );
       void recordQueryCandidatePlannerRealShadowLifecycleObservation(
-        observation,
-        context,
-      ).then((result) => {
-        console.log("[real-shadow-evidence]", {
-          kind: "LIFECYCLE",
-          stored: result?.stored === true,
-          reason: String(result?.reason || "UNKNOWN"),
-        });
-      });
+    observation,
+    context,
+  );
     },
   });
 

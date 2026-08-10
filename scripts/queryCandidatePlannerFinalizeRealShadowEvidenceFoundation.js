@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,7 +6,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 function args(name) {
   const values = [];
@@ -42,8 +41,8 @@ try {
   const root = path.resolve(__dirname, "..");
   const ledgerPath = requiredPath("--ledger");
   const sourceCatalogPath = requiredPath("--source-catalog");
-  const attestationPaths = args("--expected-rejection-attestation").map((item) =>
-    path.resolve(item),
+  const attestationPaths = args("--expected-rejection-attestation").map(
+    (item) => path.resolve(item),
   );
   if (attestationPaths.length === 0) {
     throw new Error("--expected-rejection-attestation is required");
@@ -68,7 +67,10 @@ try {
 
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -89,7 +91,10 @@ try {
     result.errors.forEach((error) => console.error(`BLOCKED ${error}`));
     process.exitCode = 2;
   } else {
-    writePrivate(registryOutputPath, `${JSON.stringify(result.registry, null, 2)}\n`);
+    writePrivate(
+      registryOutputPath,
+      `${JSON.stringify(result.registry, null, 2)}\n`,
+    );
     writePrivate(
       railwayOutputPath,
       `QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_JSON=${JSON.stringify(result.registry)}\n`,
@@ -123,8 +128,12 @@ try {
     console.log(`REGISTRY_SHA256 ${result.registrySha256}`);
     console.log(`SOURCE_CATALOG_SHA256 ${result.summary.sourceCatalogSha256}`);
     console.log(`LEDGER_SHA256 ${result.summary.ledgerSha256}`);
-    console.log(`EXPECTED_REJECTION_CASES ${result.summary.expectedRejectionCaseCount}`);
-    console.log(`EXPECTED_REJECTION_EVIDENCE ${result.summary.expectedRejectionEvidenceCount}`);
+    console.log(
+      `EXPECTED_REJECTION_CASES ${result.summary.expectedRejectionCaseCount}`,
+    );
+    console.log(
+      `EXPECTED_REJECTION_EVIDENCE ${result.summary.expectedRejectionEvidenceCount}`,
+    );
     console.log("READY_FOR_PATCH_15_3_2_C true");
     console.log("COLLECTOR_ENABLED_BY_THIS_OPERATION false");
     console.log("INTERNAL_CANARY_ENABLED_BY_THIS_OPERATION false");

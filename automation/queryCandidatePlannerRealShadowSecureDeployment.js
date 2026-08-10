@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   parseAllowlist,
@@ -22,7 +20,9 @@ const SHA256_RE = /^[a-f0-9]{64}$/i;
 const SECRET_FORMAT_RE = /^[A-Za-z0-9_-]{64}$/;
 
 function text(value, maxLength = 500000) {
-  return String(value == null ? "" : value).trim().slice(0, maxLength);
+  return String(value == null ? "" : value)
+    .trim()
+    .slice(0, maxLength);
 }
 
 function sha256(value) {
@@ -75,11 +75,16 @@ function foundationErrors(summary = {}) {
   }
   if (
     !Number.isInteger(summary.expectedRejectionCaseCount) ||
-    summary.expectedRejectionEvidenceCount !== summary.expectedRejectionCaseCount
+    summary.expectedRejectionEvidenceCount !==
+      summary.expectedRejectionCaseCount
   ) {
     errors.push("REAL_SHADOW_FOUNDATION_EXPECTED_REJECTION_INCOMPLETE");
   }
-  for (const field of ["sourceCatalogSha256", "ledgerSha256", "registrySha256"]) {
+  for (const field of [
+    "sourceCatalogSha256",
+    "ledgerSha256",
+    "registrySha256",
+  ]) {
     if (!SHA256_RE.test(text(summary[field], 256))) {
       errors.push(`REAL_SHADOW_FOUNDATION_${field.toUpperCase()}_INVALID`);
     }
@@ -88,7 +93,9 @@ function foundationErrors(summary = {}) {
     errors.push("REAL_SHADOW_FOUNDATION_ACTUAL_TRAFFIC_REQUIRED");
   }
   if (summary.syntheticFingerprintForbidden !== true) {
-    errors.push("REAL_SHADOW_FOUNDATION_SYNTHETIC_FINGERPRINT_MUST_BE_FORBIDDEN");
+    errors.push(
+      "REAL_SHADOW_FOUNDATION_SYNTHETIC_FINGERPRINT_MUST_BE_FORBIDDEN",
+    );
   }
   if (summary.legacyLedgerAccepted !== false) {
     errors.push("REAL_SHADOW_FOUNDATION_LEGACY_LEDGER_MUST_BE_REJECTED");
@@ -108,21 +115,32 @@ function foundationErrors(summary = {}) {
   return errors;
 }
 
-
 function strictRegistryFingerprintErrors(registry = {}) {
   const errors = [];
   const cases = Array.isArray(registry?.cases) ? registry.cases : [];
   for (const [index, item] of cases.entries()) {
-    const requestRaw = String(item?.requestFingerprintSha256 == null ? "" : item.requestFingerprintSha256).trim();
-    const uploadRaw = String(item?.uploadFingerprintSha256 == null ? "" : item.uploadFingerprintSha256).trim();
+    const requestRaw = String(
+      item?.requestFingerprintSha256 == null
+        ? ""
+        : item.requestFingerprintSha256,
+    ).trim();
+    const uploadRaw = String(
+      item?.uploadFingerprintSha256 == null ? "" : item.uploadFingerprintSha256,
+    ).trim();
     if (requestRaw && !SHA256_RE.test(requestRaw)) {
-      errors.push(`REAL_SHADOW_DEPLOYMENT_REGISTRY_REQUEST_FINGERPRINT_INVALID:${index}`);
+      errors.push(
+        `REAL_SHADOW_DEPLOYMENT_REGISTRY_REQUEST_FINGERPRINT_INVALID:${index}`,
+      );
     }
     if (uploadRaw && !SHA256_RE.test(uploadRaw)) {
-      errors.push(`REAL_SHADOW_DEPLOYMENT_REGISTRY_UPLOAD_FINGERPRINT_INVALID:${index}`);
+      errors.push(
+        `REAL_SHADOW_DEPLOYMENT_REGISTRY_UPLOAD_FINGERPRINT_INVALID:${index}`,
+      );
     }
     if (!requestRaw && !uploadRaw) {
-      errors.push(`REAL_SHADOW_DEPLOYMENT_REGISTRY_FINGERPRINT_REQUIRED:${index}`);
+      errors.push(
+        `REAL_SHADOW_DEPLOYMENT_REGISTRY_FINGERPRINT_REQUIRED:${index}`,
+      );
     }
   }
   return errors;
@@ -130,7 +148,10 @@ function strictRegistryFingerprintErrors(registry = {}) {
 
 function runEncryptionSelfTest(secret) {
   if (!SECRET_FORMAT_RE.test(String(secret == null ? "" : secret).trim())) {
-    return Object.freeze({ passed: false, reason: "REAL_SHADOW_EVIDENCE_SECRET_FORMAT_INVALID" });
+    return Object.freeze({
+      passed: false,
+      reason: "REAL_SHADOW_EVIDENCE_SECRET_FORMAT_INVALID",
+    });
   }
   const payload = Object.freeze({
     version: "secure_deployment_self_test_v1",
@@ -140,14 +161,19 @@ function runEncryptionSelfTest(secret) {
   const encrypted = encryptEvidencePayload(payload, secret);
   const decrypted = decryptEvidencePayload(encrypted, secret);
   if (JSON.stringify(decrypted) !== JSON.stringify(payload)) {
-    return Object.freeze({ passed: false, reason: "REAL_SHADOW_ENCRYPTION_ROUND_TRIP_FAILED" });
+    return Object.freeze({
+      passed: false,
+      reason: "REAL_SHADOW_ENCRYPTION_ROUND_TRIP_FAILED",
+    });
   }
   if (encrypted.ciphertext.includes(payload.marker)) {
-    return Object.freeze({ passed: false, reason: "REAL_SHADOW_ENCRYPTION_PLAINTEXT_LEAK" });
+    return Object.freeze({
+      passed: false,
+      reason: "REAL_SHADOW_ENCRYPTION_PLAINTEXT_LEAK",
+    });
   }
-  const wrongSecret = secret[0] === "A"
-    ? `B${secret.slice(1)}`
-    : `A${secret.slice(1)}`;
+  const wrongSecret =
+    secret[0] === "A" ? `B${secret.slice(1)}` : `A${secret.slice(1)}`;
   let wrongSecretRejected = false;
   try {
     decryptEvidencePayload(encrypted, wrongSecret);
@@ -155,7 +181,10 @@ function runEncryptionSelfTest(secret) {
     wrongSecretRejected = true;
   }
   if (!wrongSecretRejected) {
-    return Object.freeze({ passed: false, reason: "REAL_SHADOW_WRONG_SECRET_NOT_REJECTED" });
+    return Object.freeze({
+      passed: false,
+      reason: "REAL_SHADOW_WRONG_SECRET_NOT_REJECTED",
+    });
   }
   return Object.freeze({
     passed: true,
@@ -187,7 +216,9 @@ function evaluateRealShadowSecureDeployment({
     false,
   );
   if (collectorEnabled) {
-    errors.push("REAL_SHADOW_COLLECTOR_MUST_REMAIN_DISABLED_DURING_PATCH_15_3_2_C");
+    errors.push(
+      "REAL_SHADOW_COLLECTOR_MUST_REMAIN_DISABLED_DURING_PATCH_15_3_2_C",
+    );
   }
 
   const allowlist = parseAllowlist(
@@ -201,7 +232,9 @@ function evaluateRealShadowSecureDeployment({
   errors.push(...strictRegistryErrors);
   const parsedRegistry = parseRegistry(JSON.stringify(registry || {}));
   if (!parsedRegistry.valid) {
-    errors.push(`REAL_SHADOW_DEPLOYMENT_REGISTRY_INVALID:${parsedRegistry.reason}`);
+    errors.push(
+      `REAL_SHADOW_DEPLOYMENT_REGISTRY_INVALID:${parsedRegistry.reason}`,
+    );
   }
 
   const runtimeRegistryRaw = text(
@@ -209,20 +242,30 @@ function evaluateRealShadowSecureDeployment({
     500000,
   );
   let runtimeRegistryObject = null;
-  try { runtimeRegistryObject = runtimeRegistryRaw ? JSON.parse(runtimeRegistryRaw) : null; } catch (_error) {}
+  try {
+    runtimeRegistryObject = runtimeRegistryRaw
+      ? JSON.parse(runtimeRegistryRaw)
+      : null;
+  } catch (_error) {}
   errors.push(...strictRegistryFingerprintErrors(runtimeRegistryObject || {}));
   const runtimeRegistry = parseRegistry(runtimeRegistryRaw);
   if (!runtimeRegistry.valid) {
-    errors.push(`REAL_SHADOW_DEPLOYMENT_RUNTIME_REGISTRY_INVALID:${runtimeRegistry.reason}`);
+    errors.push(
+      `REAL_SHADOW_DEPLOYMENT_RUNTIME_REGISTRY_INVALID:${runtimeRegistry.reason}`,
+    );
   }
 
   const registrySha256 = parsedRegistry.valid
     ? sha256(JSON.stringify(registry))
     : "";
-  const runtimeRegistrySha256 = runtimeRegistry.valid && runtimeRegistryObject
-    ? sha256(JSON.stringify(runtimeRegistryObject))
-    : "";
-  const expectedRegistrySha256 = text(foundationSummary?.registrySha256, 256).toLowerCase();
+  const runtimeRegistrySha256 =
+    runtimeRegistry.valid && runtimeRegistryObject
+      ? sha256(JSON.stringify(runtimeRegistryObject))
+      : "";
+  const expectedRegistrySha256 = text(
+    foundationSummary?.registrySha256,
+    256,
+  ).toLowerCase();
   const configuredRegistrySha256 = text(
     env.QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_SHA256,
     256,
@@ -249,14 +292,18 @@ function evaluateRealShadowSecureDeployment({
     SHA256_RE.test(configuredRegistrySha256) &&
     configuredRegistrySha256 !== expectedRegistrySha256
   ) {
-    errors.push("REAL_SHADOW_DEPLOYMENT_CONFIGURED_REGISTRY_HASH_FOUNDATION_MISMATCH");
+    errors.push(
+      "REAL_SHADOW_DEPLOYMENT_CONFIGURED_REGISTRY_HASH_FOUNDATION_MISMATCH",
+    );
   }
   if (
     SHA256_RE.test(configuredRegistrySha256) &&
     runtimeRegistrySha256 &&
     configuredRegistrySha256 !== runtimeRegistrySha256
   ) {
-    errors.push("REAL_SHADOW_DEPLOYMENT_CONFIGURED_REGISTRY_HASH_RUNTIME_MISMATCH");
+    errors.push(
+      "REAL_SHADOW_DEPLOYMENT_CONFIGURED_REGISTRY_HASH_RUNTIME_MISMATCH",
+    );
   }
 
   const productionSafety = verifyProductionSafety(env);
@@ -275,7 +322,9 @@ function evaluateRealShadowSecureDeployment({
       encryptionSelfTest = runEncryptionSelfTest(rawSecret);
       if (!encryptionSelfTest.passed) errors.push(encryptionSelfTest.reason);
     } catch (error) {
-      errors.push(String(error?.code || "REAL_SHADOW_ENCRYPTION_SELF_TEST_FAILED"));
+      errors.push(
+        String(error?.code || "REAL_SHADOW_ENCRYPTION_SELF_TEST_FAILED"),
+      );
     }
   }
 
@@ -295,7 +344,10 @@ function evaluateRealShadowSecureDeployment({
     runtimeRegistrySha256,
     foundationRegistrySha256: expectedRegistrySha256,
     configuredRegistrySha256,
-    registryCaseCount: parsedRegistry.valid && Array.isArray(registry?.cases) ? registry.cases.length : 0,
+    registryCaseCount:
+      parsedRegistry.valid && Array.isArray(registry?.cases)
+        ? registry.cases.length
+        : 0,
     allowlistEntryCount: allowlist.length,
     secretConfigured: Boolean(rawSecret),
     secretFormatValid,
@@ -320,41 +372,59 @@ function evaluateRealShadowSecureRuntime({ env = process.env } = {}) {
   );
   const secretFormatValid = SECRET_FORMAT_RE.test(rawSecret);
   if (!rawSecret) errors.push("REAL_SHADOW_EVIDENCE_SECRET_REQUIRED");
-  if (rawSecret && !secretFormatValid) errors.push("REAL_SHADOW_EVIDENCE_SECRET_FORMAT_INVALID");
+  if (rawSecret && !secretFormatValid)
+    errors.push("REAL_SHADOW_EVIDENCE_SECRET_FORMAT_INVALID");
 
   const collectorEnabled = booleanValue(
     env.QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_ENABLED,
     false,
   );
   if (collectorEnabled) {
-    errors.push("REAL_SHADOW_COLLECTOR_MUST_REMAIN_DISABLED_DURING_PATCH_15_3_2_C");
+    errors.push(
+      "REAL_SHADOW_COLLECTOR_MUST_REMAIN_DISABLED_DURING_PATCH_15_3_2_C",
+    );
   }
 
-  const allowlist = parseAllowlist(env.QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256);
-  if (allowlist.length === 0) errors.push("REAL_SHADOW_DEPLOYMENT_ALLOWLIST_REQUIRED");
+  const allowlist = parseAllowlist(
+    env.QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256,
+  );
+  if (allowlist.length === 0)
+    errors.push("REAL_SHADOW_DEPLOYMENT_ALLOWLIST_REQUIRED");
 
   const runtimeRegistryRaw = text(
     env.QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_JSON,
     500000,
   );
   let runtimeRegistryObject = null;
-  try { runtimeRegistryObject = runtimeRegistryRaw ? JSON.parse(runtimeRegistryRaw) : null; } catch (_error) {}
+  try {
+    runtimeRegistryObject = runtimeRegistryRaw
+      ? JSON.parse(runtimeRegistryRaw)
+      : null;
+  } catch (_error) {}
   errors.push(...strictRegistryFingerprintErrors(runtimeRegistryObject || {}));
   const runtimeRegistry = parseRegistry(runtimeRegistryRaw);
   if (!runtimeRegistry.valid) {
-    errors.push(`REAL_SHADOW_DEPLOYMENT_RUNTIME_REGISTRY_INVALID:${runtimeRegistry.reason}`);
+    errors.push(
+      `REAL_SHADOW_DEPLOYMENT_RUNTIME_REGISTRY_INVALID:${runtimeRegistry.reason}`,
+    );
   }
-  const runtimeRegistrySha256 = runtimeRegistry.valid && runtimeRegistryObject
-    ? sha256(JSON.stringify(runtimeRegistryObject))
-    : "";
+  const runtimeRegistrySha256 =
+    runtimeRegistry.valid && runtimeRegistryObject
+      ? sha256(JSON.stringify(runtimeRegistryObject))
+      : "";
   const configuredRegistrySha256 = text(
     env.QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_SHA256,
     256,
   ).toLowerCase();
   if (!SHA256_RE.test(configuredRegistrySha256)) {
     errors.push("REAL_SHADOW_DEPLOYMENT_REGISTRY_SHA256_REQUIRED");
-  } else if (runtimeRegistrySha256 && configuredRegistrySha256 !== runtimeRegistrySha256) {
-    errors.push("REAL_SHADOW_DEPLOYMENT_CONFIGURED_REGISTRY_HASH_RUNTIME_MISMATCH");
+  } else if (
+    runtimeRegistrySha256 &&
+    configuredRegistrySha256 !== runtimeRegistrySha256
+  ) {
+    errors.push(
+      "REAL_SHADOW_DEPLOYMENT_CONFIGURED_REGISTRY_HASH_RUNTIME_MISMATCH",
+    );
   }
 
   const productionSafety = verifyProductionSafety(env);
@@ -364,7 +434,10 @@ function evaluateRealShadowSecureRuntime({ env = process.env } = {}) {
     }
   }
 
-  let encryptionSelfTest = Object.freeze({ passed: false, reason: "REAL_SHADOW_ENCRYPTION_SELF_TEST_NOT_RUN" });
+  let encryptionSelfTest = Object.freeze({
+    passed: false,
+    reason: "REAL_SHADOW_ENCRYPTION_SELF_TEST_NOT_RUN",
+  });
   if (secretFormatValid) {
     encryptionSelfTest = runEncryptionSelfTest(rawSecret);
     if (!encryptionSelfTest.passed) errors.push(encryptionSelfTest.reason);
@@ -384,9 +457,10 @@ function evaluateRealShadowSecureRuntime({ env = process.env } = {}) {
     errors: uniqueErrors,
     runtimeRegistrySha256,
     configuredRegistrySha256,
-    registryCaseCount: runtimeRegistryObject && Array.isArray(runtimeRegistryObject.cases)
-      ? runtimeRegistryObject.cases.length
-      : 0,
+    registryCaseCount:
+      runtimeRegistryObject && Array.isArray(runtimeRegistryObject.cases)
+        ? runtimeRegistryObject.cases.length
+        : 0,
     allowlistEntryCount: allowlist.length,
     secretConfigured: Boolean(rawSecret),
     secretFormatValid,

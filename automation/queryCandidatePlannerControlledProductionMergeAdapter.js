@@ -1,8 +1,4 @@
-"use strict";
-
-const {
-  OPERATIONS,
-} = require("./queryCandidatePlannerFeatureControl");
+const { OPERATIONS } = require("./queryCandidatePlannerFeatureControl");
 const {
   candidateIdentity,
   extractShadowCandidates,
@@ -58,7 +54,10 @@ function safeSourceTableIds(candidate = {}) {
     ? candidate.sourceTableIds
     : [];
   return Object.freeze(
-    values.map((value) => text(value, 160)).filter(Boolean).slice(0, 20),
+    values
+      .map((value) => text(value, 160))
+      .filter(Boolean)
+      .slice(0, 20),
   );
 }
 
@@ -262,8 +261,7 @@ function buildControlledProductionMergePlan({
     counts: Object.freeze({
       projected: candidates.length,
       analysis: candidateProjection.analysisRecipeCandidates.length,
-      businessTemplate:
-        candidateProjection.businessTemplateCandidates.length,
+      businessTemplate: candidateProjection.businessTemplateCandidates.length,
       multiSource: candidateProjection.multiSourceCandidates.length,
       category: candidateProjection.categoryCandidates.length,
       dashboard: candidateProjection.dashboardCandidates.length,
@@ -284,12 +282,10 @@ function buildControlledProductionMergePlan({
 function evaluatePromotionGateDecision(decision) {
   const checks = Object.freeze({
     objectPresent: isPlainObject(decision),
-    version:
-      decision?.version === PROMOTION_GATE_DECISION_VERSION,
+    version: decision?.version === PROMOTION_GATE_DECISION_VERSION,
     allowed: decision?.allowed === true,
     decision: decision?.decision === "ALLOW",
-    operation:
-      decision?.operation === OPERATIONS.PRODUCTION_CANDIDATE_MERGE,
+    operation: decision?.operation === OPERATIONS.PRODUCTION_CANDIDATE_MERGE,
     failClosed: decision?.failClosed === true,
     adapterVersion: decision?.adapterVersion === ADAPTER_VERSION,
   });
@@ -332,9 +328,7 @@ function evaluateControlledProductionMergeAuthorization({
     });
   }
 
-  const promotionGate = evaluatePromotionGateDecision(
-    promotionGateDecision,
-  );
+  const promotionGate = evaluatePromotionGateDecision(promotionGateDecision);
   if (!promotionGate.valid) {
     return Object.freeze({
       allowed: false,
@@ -378,9 +372,7 @@ function applyMergePlanToCopy(primaryPayload, plan) {
     ...(isPlainObject(mergedPayload.candidateUiPayload)
       ? mergedPayload.candidateUiPayload
       : {}),
-    recommendedCandidates: canonicalClone(
-      projection.recommendedCandidates,
-    ),
+    recommendedCandidates: canonicalClone(projection.recommendedCandidates),
   };
 
   return mergedPayload;

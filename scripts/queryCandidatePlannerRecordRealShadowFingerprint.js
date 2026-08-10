@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,7 +6,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 function required(name) {
   const value = arg(name);
@@ -29,7 +28,10 @@ try {
   const sourceCatalogPath = path.resolve(required("--source-catalog"));
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -47,7 +49,10 @@ try {
     capturedAt: arg("--captured-at", new Date().toISOString()),
     expectedColdCostMicrousd: Number(arg("--expected-cold-cost-microusd", "0")),
     modelId: arg("--model-id", "semantic_profiler_default"),
-    operatorNote: arg("--operator-note", "actual source-bound internal request captured"),
+    operatorNote: arg(
+      "--operator-note",
+      "actual source-bound internal request captured",
+    ),
   });
   atomicWrite(ledgerPath, `${JSON.stringify(result.ledger, null, 2)}\n`);
   console.log(`PASS recorded source-bound case=${result.recordedCaseId}`);

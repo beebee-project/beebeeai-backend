@@ -1,10 +1,7 @@
-"use strict";
-
 const crypto = require("crypto");
 const path = require("path");
 
-const RUNTIME_VERSION =
-  "query_candidate_planner_cache_runtime_v1";
+const RUNTIME_VERSION = "query_candidate_planner_cache_runtime_v1";
 
 let runtimeOverride = null;
 let runtimeInstance = null;
@@ -44,10 +41,16 @@ function disabledRuntime(reason) {
 }
 
 function resolveCacheFactory(moduleValue = {}) {
-  if (typeof moduleValue.createEncryptedHierarchicalCandidatePlannerCache === "function") {
+  if (
+    typeof moduleValue.createEncryptedHierarchicalCandidatePlannerCache ===
+    "function"
+  ) {
     return moduleValue.createEncryptedHierarchicalCandidatePlannerCache;
   }
-  if (typeof moduleValue.createQueryCandidatePlannerHierarchicalEncryptedCache === "function") {
+  if (
+    typeof moduleValue.createQueryCandidatePlannerHierarchicalEncryptedCache ===
+    "function"
+  ) {
     return moduleValue.createQueryCandidatePlannerHierarchicalEncryptedCache;
   }
   if (typeof moduleValue.default === "function") return moduleValue.default;
@@ -57,9 +60,7 @@ function resolveCacheFactory(moduleValue = {}) {
 
 function buildRuntimeFromEnvironment(env = process.env) {
   const rawKey = text(env.QUERY_CANDIDATE_PLANNER_CACHE_KEY);
-  const rawSecret = text(
-    env.QUERY_CANDIDATE_PLANNER_CACHE_SECRET || rawKey,
-  );
+  const rawSecret = text(env.QUERY_CANDIDATE_PLANNER_CACHE_SECRET || rawKey);
   if (!rawKey || !rawSecret) {
     return disabledRuntime("CACHE_RUNTIME_ENV_NOT_CONFIGURED");
   }
@@ -83,7 +84,11 @@ function buildRuntimeFromEnvironment(env = process.env) {
 
   const rootDir = path.resolve(
     text(env.QUERY_CANDIDATE_PLANNER_CACHE_ROOT) ||
-      path.join(process.cwd(), ".local_uploads", "query-candidate-planner-cache"),
+      path.join(
+        process.cwd(),
+        ".local_uploads",
+        "query-candidate-planner-cache",
+      ),
   );
   const keyId =
     text(env.QUERY_CANDIDATE_PLANNER_CACHE_KEY_ID) ||

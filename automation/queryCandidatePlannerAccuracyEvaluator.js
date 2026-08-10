@@ -1,11 +1,7 @@
-"use strict";
-
 const crypto = require("crypto");
 
-const EVALUATOR_VERSION =
-  "query_candidate_planner_accuracy_evaluator_v1";
-const REPORT_VERSION =
-  "query_candidate_planner_accuracy_evaluation_report_v1";
+const EVALUATOR_VERSION = "query_candidate_planner_accuracy_evaluator_v1";
+const REPORT_VERSION = "query_candidate_planner_accuracy_evaluation_report_v1";
 const DATASET_VERSION =
   "query_candidate_planner_accuracy_evaluation_dataset_v1";
 const THRESHOLD_POLICY_VERSION =
@@ -142,7 +138,9 @@ function validateCandidateLabels(labels, caseId, errors) {
     }
     requiredIds.push(candidateId);
     if (!Number.isInteger(candidate.idealRank) || candidate.idealRank < 1) {
-      errors.push(`${caseId}: ${candidateId} idealRank must be positive integer`);
+      errors.push(
+        `${caseId}: ${candidateId} idealRank must be positive integer`,
+      );
     } else if (idealRanks.has(candidate.idealRank)) {
       errors.push(`${caseId}: duplicate idealRank ${candidate.idealRank}`);
     } else {
@@ -157,13 +155,21 @@ function validateCandidateLabels(labels, caseId, errors) {
     errors.push(`${caseId}: duplicate required candidateId`);
   }
   if (acceptable.length !== (labels.acceptableCandidateIds || []).length) {
-    errors.push(`${caseId}: acceptableCandidateIds must be unique non-empty strings`);
+    errors.push(
+      `${caseId}: acceptableCandidateIds must be unique non-empty strings`,
+    );
   }
   if (forbidden.length !== (labels.forbiddenCandidateIds || []).length) {
-    errors.push(`${caseId}: forbiddenCandidateIds must be unique non-empty strings`);
+    errors.push(
+      `${caseId}: forbiddenCandidateIds must be unique non-empty strings`,
+    );
   }
-  if (preferredTop1.length !== (labels.preferredTop1CandidateIds || []).length) {
-    errors.push(`${caseId}: preferredTop1CandidateIds must be unique non-empty strings`);
+  if (
+    preferredTop1.length !== (labels.preferredTop1CandidateIds || []).length
+  ) {
+    errors.push(
+      `${caseId}: preferredTop1CandidateIds must be unique non-empty strings`,
+    );
   }
 
   const requiredSet = new Set(requiredIds);
@@ -171,22 +177,30 @@ function validateCandidateLabels(labels, caseId, errors) {
   const forbiddenSet = new Set(forbidden);
   for (const id of acceptableSet) {
     if (requiredSet.has(id)) {
-      errors.push(`${caseId}: candidate ${id} cannot be required and acceptable`);
+      errors.push(
+        `${caseId}: candidate ${id} cannot be required and acceptable`,
+      );
     }
   }
   for (const id of forbiddenSet) {
     if (requiredSet.has(id) || acceptableSet.has(id)) {
-      errors.push(`${caseId}: forbidden candidate overlaps relevant labels: ${id}`);
+      errors.push(
+        `${caseId}: forbidden candidate overlaps relevant labels: ${id}`,
+      );
     }
   }
   const relevantSet = new Set([...requiredSet, ...acceptableSet]);
   for (const id of preferredTop1) {
     if (!relevantSet.has(id)) {
-      errors.push(`${caseId}: preferred top-1 candidate is not relevant: ${id}`);
+      errors.push(
+        `${caseId}: preferred top-1 candidate is not relevant: ${id}`,
+      );
     }
   }
   if (requiredIds.length > 0 && preferredTop1.length === 0) {
-    errors.push(`${caseId}: preferredTop1CandidateIds required for supported case`);
+    errors.push(
+      `${caseId}: preferredTop1CandidateIds required for supported case`,
+    );
   }
 }
 
@@ -239,13 +253,19 @@ function validateAccuracyEvaluationDataset(dataset) {
     if (!isPlainObject(intent) || !normalizeString(intent.expected)) {
       errors.push(`${caseId}: intent.expected is required`);
     }
-    if (!isPlainObject(item.labels.fallback) ||
-        typeof item.labels.fallback.expected !== "boolean") {
+    if (
+      !isPlainObject(item.labels.fallback) ||
+      typeof item.labels.fallback.expected !== "boolean"
+    ) {
       errors.push(`${caseId}: fallback.expected boolean is required`);
     }
-    if (!isPlainObject(item.labels.unsupported) ||
-        typeof item.labels.unsupported.expectedRejected !== "boolean") {
-      errors.push(`${caseId}: unsupported.expectedRejected boolean is required`);
+    if (
+      !isPlainObject(item.labels.unsupported) ||
+      typeof item.labels.unsupported.expectedRejected !== "boolean"
+    ) {
+      errors.push(
+        `${caseId}: unsupported.expectedRejected boolean is required`,
+      );
     }
     if (typeof item.labels.reviewRequired !== "boolean") {
       errors.push(`${caseId}: reviewRequired boolean is required`);
@@ -269,12 +289,18 @@ function validateAccuracyEvaluationDataset(dataset) {
 function validateThresholdPolicy(policy) {
   const errors = [];
   if (!isPlainObject(policy)) {
-    return freezeDeep({ valid: false, errors: ["threshold policy must be an object"] });
+    return freezeDeep({
+      valid: false,
+      errors: ["threshold policy must be an object"],
+    });
   }
   if (policy.version !== THRESHOLD_POLICY_VERSION) {
     errors.push(`threshold policy version must be ${THRESHOLD_POLICY_VERSION}`);
   }
-  if (!Number.isInteger(policy.minimumCaseCount) || policy.minimumCaseCount < 1) {
+  if (
+    !Number.isInteger(policy.minimumCaseCount) ||
+    policy.minimumCaseCount < 1
+  ) {
     errors.push("minimumCaseCount must be a positive integer");
   }
   if (typeof policy.requireAllCases !== "boolean") {
@@ -290,7 +316,10 @@ function validateThresholdPolicy(policy) {
   if (weights.some((value) => !Number.isFinite(value) || value < 0)) {
     errors.push("metricWeights must be non-negative numbers");
   }
-  if (weights.length > 0 && Math.abs(weights.reduce((a, b) => a + b, 0) - 1) > 1e-9) {
+  if (
+    weights.length > 0 &&
+    Math.abs(weights.reduce((a, b) => a + b, 0) - 1) > 1e-9
+  ) {
     errors.push("metricWeights must sum to 1");
   }
   return freezeDeep({ valid: errors.length === 0, errors });
@@ -298,12 +327,14 @@ function validateThresholdPolicy(policy) {
 
 function normalizePredictionCandidate(candidate, index) {
   const candidateId = normalizeString(candidate?.candidateId);
-  const rank = Number.isInteger(candidate?.rank) && candidate.rank > 0
-    ? candidate.rank
-    : index + 1;
-  const status = candidate?.status === CANDIDATE_STATUSES.REJECTED
-    ? CANDIDATE_STATUSES.REJECTED
-    : CANDIDATE_STATUSES.ACCEPTED;
+  const rank =
+    Number.isInteger(candidate?.rank) && candidate.rank > 0
+      ? candidate.rank
+      : index + 1;
+  const status =
+    candidate?.status === CANDIDATE_STATUSES.REJECTED
+      ? CANDIDATE_STATUSES.REJECTED
+      : CANDIDATE_STATUSES.ACCEPTED;
   return {
     candidateId,
     rank,
@@ -315,7 +346,10 @@ function normalizePredictionCandidate(candidate, index) {
 function validatePredictions(predictions, datasetCaseIds) {
   const errors = [];
   if (!Array.isArray(predictions)) {
-    return freezeDeep({ valid: false, errors: ["predictions must be an array"] });
+    return freezeDeep({
+      valid: false,
+      errors: ["predictions must be an array"],
+    });
   }
   const seenCases = new Set();
   for (const prediction of predictions) {
@@ -328,9 +362,11 @@ function validatePredictions(predictions, datasetCaseIds) {
       errors.push("prediction caseId is required");
       continue;
     }
-    if (seenCases.has(caseId)) errors.push(`duplicate prediction caseId: ${caseId}`);
+    if (seenCases.has(caseId))
+      errors.push(`duplicate prediction caseId: ${caseId}`);
     seenCases.add(caseId);
-    if (!datasetCaseIds.has(caseId)) errors.push(`unknown prediction caseId: ${caseId}`);
+    if (!datasetCaseIds.has(caseId))
+      errors.push(`unknown prediction caseId: ${caseId}`);
     if (!Array.isArray(prediction.candidates)) {
       errors.push(`${caseId}: candidates must be an array`);
       continue;
@@ -352,8 +388,10 @@ function validatePredictions(predictions, datasetCaseIds) {
     if (new Set(ranks).size !== ranks.length) {
       errors.push(`${caseId}: duplicate candidate rank`);
     }
-    if (!normalizeString(prediction.domain)) errors.push(`${caseId}: domain is required`);
-    if (!normalizeString(prediction.intent)) errors.push(`${caseId}: intent is required`);
+    if (!normalizeString(prediction.domain))
+      errors.push(`${caseId}: domain is required`);
+    if (!normalizeString(prediction.intent))
+      errors.push(`${caseId}: intent is required`);
     if (typeof prediction.fallbackApplied !== "boolean") {
       errors.push(`${caseId}: fallbackApplied boolean is required`);
     }
@@ -374,12 +412,17 @@ function validatePredictions(predictions, datasetCaseIds) {
 function promotedCandidates(prediction) {
   return (prediction.candidates || [])
     .map(normalizePredictionCandidate)
-    .filter((candidate) =>
-      candidate.candidateId &&
-      candidate.status !== CANDIDATE_STATUSES.REJECTED &&
-      candidate.productionEligible,
+    .filter(
+      (candidate) =>
+        candidate.candidateId &&
+        candidate.status !== CANDIDATE_STATUSES.REJECTED &&
+        candidate.productionEligible,
     )
-    .sort((left, right) => left.rank - right.rank || left.candidateId.localeCompare(right.candidateId));
+    .sort(
+      (left, right) =>
+        left.rank - right.rank ||
+        left.candidateId.localeCompare(right.candidateId),
+    );
 }
 
 function reciprocalMetric(value) {
@@ -388,14 +431,15 @@ function reciprocalMetric(value) {
 
 function dcg(relevances) {
   return relevances.reduce((sum, relevance, index) => {
-    const gain = (2 ** relevance) - 1;
+    const gain = 2 ** relevance - 1;
     return sum + gain / Math.log2(index + 2);
   }, 0);
 }
 
 function rankingAgreement(labels, candidates) {
-  const required = [...(labels.requiredCandidates || [])]
-    .sort((a, b) => a.idealRank - b.idealRank);
+  const required = [...(labels.requiredCandidates || [])].sort(
+    (a, b) => a.idealRank - b.idealRank,
+  );
   if (required.length <= 1) {
     return { applicable: false, value: 1 };
   }
@@ -409,9 +453,11 @@ function rankingAgreement(labels, candidates) {
       pairCount += 1;
       const leftPosition = positionById.get(required[left].candidateId);
       const rightPosition = positionById.get(required[right].candidateId);
-      if (Number.isInteger(leftPosition) &&
-          Number.isInteger(rightPosition) &&
-          leftPosition < rightPosition) {
+      if (
+        Number.isInteger(leftPosition) &&
+        Number.isInteger(rightPosition) &&
+        leftPosition < rightPosition
+      ) {
         concordant += 1;
       }
     }
@@ -427,8 +473,9 @@ function evaluateCase(item, prediction, policy) {
   const candidates = promotedCandidates(prediction);
   const predictedIds = candidates.map((candidate) => candidate.candidateId);
   const predictedSet = new Set(predictedIds);
-  const required = [...(labels.requiredCandidates || [])]
-    .sort((a, b) => a.idealRank - b.idealRank);
+  const required = [...(labels.requiredCandidates || [])].sort(
+    (a, b) => a.idealRank - b.idealRank,
+  );
   const requiredIds = required.map((candidate) => candidate.candidateId);
   const requiredSet = new Set(requiredIds);
   const acceptableSet = new Set(labels.acceptableCandidateIds || []);
@@ -437,18 +484,32 @@ function evaluateCase(item, prediction, policy) {
 
   const relevantHits = predictedIds.filter((id) => relevantSet.has(id)).length;
   const requiredHits = requiredIds.filter((id) => predictedSet.has(id)).length;
-  const forbiddenHits = predictedIds.filter((id) => forbiddenSet.has(id)).length;
-  const candidatePrecision = candidates.length === 0
-    ? (requiredIds.length === 0 ? 1 : 0)
-    : relevantHits / candidates.length;
-  const candidateRecall = requiredIds.length === 0 ? 1 : requiredHits / requiredIds.length;
+  const forbiddenHits = predictedIds.filter((id) =>
+    forbiddenSet.has(id),
+  ).length;
+  const candidatePrecision =
+    candidates.length === 0
+      ? requiredIds.length === 0
+        ? 1
+        : 0
+      : relevantHits / candidates.length;
+  const candidateRecall =
+    requiredIds.length === 0 ? 1 : requiredHits / requiredIds.length;
   const preferredTop1 = new Set(labels.preferredTop1CandidateIds || []);
   const top1Applicable = preferredTop1.size > 0;
-  const top1Accuracy = top1Applicable && candidates[0]
-    ? (preferredTop1.has(candidates[0].candidateId) ? 1 : 0)
-    : (top1Applicable ? 0 : 1);
-  const topK = Number.isInteger(policy.topK) && policy.topK > 0 ? policy.topK : 3;
-  const topKIds = new Set(candidates.slice(0, topK).map((candidate) => candidate.candidateId));
+  const top1Accuracy =
+    top1Applicable && candidates[0]
+      ? preferredTop1.has(candidates[0].candidateId)
+        ? 1
+        : 0
+      : top1Applicable
+        ? 0
+        : 1;
+  const topK =
+    Number.isInteger(policy.topK) && policy.topK > 0 ? policy.topK : 3;
+  const topKIds = new Set(
+    candidates.slice(0, topK).map((candidate) => candidate.candidateId),
+  );
   const topKApplicable = requiredIds.length > 0;
   const topKRecall = topKApplicable
     ? requiredIds.filter((id) => topKIds.has(id)).length / requiredIds.length
@@ -463,25 +524,38 @@ function evaluateCase(item, prediction, policy) {
     normalizeString(labels.intent.expected),
     ...uniqueStrings(labels.intent.acceptable),
   ]);
-  const domainAccuracy = acceptedDomains.has(normalizeString(prediction.domain)) ? 1 : 0;
-  const intentAccuracy = acceptedIntents.has(normalizeString(prediction.intent)) ? 1 : 0;
+  const domainAccuracy = acceptedDomains.has(normalizeString(prediction.domain))
+    ? 1
+    : 0;
+  const intentAccuracy = acceptedIntents.has(normalizeString(prediction.intent))
+    ? 1
+    : 0;
 
   const fallbackLabel = labels.fallback;
-  let fallbackAccuracy = prediction.fallbackApplied === fallbackLabel.expected ? 1 : 0;
+  let fallbackAccuracy =
+    prediction.fallbackApplied === fallbackLabel.expected ? 1 : 0;
   if (fallbackAccuracy === 1 && fallbackLabel.expected) {
     const acceptableReasons = uniqueStrings(fallbackLabel.acceptableReasons);
-    if (acceptableReasons.length > 0 &&
-        !acceptableReasons.includes(normalizeString(prediction.fallbackReason))) {
+    if (
+      acceptableReasons.length > 0 &&
+      !acceptableReasons.includes(normalizeString(prediction.fallbackReason))
+    ) {
       fallbackAccuracy = 0;
     }
   }
 
   const unsupportedExpected = labels.unsupported.expectedRejected;
   const unsupportedRejectionAccuracy = unsupportedExpected
-    ? (prediction.unsupportedRejected && candidates.length === 0 ? 1 : 0)
-    : (!prediction.unsupportedRejected ? 1 : 0);
-  const reviewDecisionAccuracy = prediction.reviewRequired === labels.reviewRequired ? 1 : 0;
-  const falsePromotionRate = candidates.length === 0 ? 0 : forbiddenHits / candidates.length;
+    ? prediction.unsupportedRejected && candidates.length === 0
+      ? 1
+      : 0
+    : !prediction.unsupportedRejected
+      ? 1
+      : 0;
+  const reviewDecisionAccuracy =
+    prediction.reviewRequired === labels.reviewRequired ? 1 : 0;
+  const falsePromotionRate =
+    candidates.length === 0 ? 0 : forbiddenHits / candidates.length;
   const falsePromotionSafety = 1 - falsePromotionRate;
 
   const metricValues = {
@@ -493,15 +567,19 @@ function evaluateCase(item, prediction, policy) {
     domainAccuracy: reciprocalMetric(domainAccuracy),
     intentAccuracy: reciprocalMetric(intentAccuracy),
     fallbackAccuracy: reciprocalMetric(fallbackAccuracy),
-    unsupportedRejectionAccuracy: reciprocalMetric(unsupportedRejectionAccuracy),
+    unsupportedRejectionAccuracy: reciprocalMetric(
+      unsupportedRejectionAccuracy,
+    ),
     reviewDecisionAccuracy: reciprocalMetric(reviewDecisionAccuracy),
     falsePromotionRate: reciprocalMetric(falsePromotionRate),
     falsePromotionSafety: reciprocalMetric(falsePromotionSafety),
   };
-  const weightedScore = round(Object.entries(policy.metricWeights).reduce(
-    (sum, [metric, weight]) => sum + (metricValues[metric] || 0) * weight,
-    0,
-  ));
+  const weightedScore = round(
+    Object.entries(policy.metricWeights).reduce(
+      (sum, [metric, weight]) => sum + (metricValues[metric] || 0) * weight,
+      0,
+    ),
+  );
 
   return freezeDeep({
     caseId: item.caseId,
@@ -546,16 +624,26 @@ function aggregateCases(caseReports, policy) {
       if (report.applicability[metricName] === false) continue;
       values.push(report.metrics[metricName]);
     }
-    aggregate[metricName] = round(mean(values, metricName === "falsePromotionRate" ? 0 : 1));
+    aggregate[metricName] = round(
+      mean(values, metricName === "falsePromotionRate" ? 0 : 1),
+    );
   }
-  aggregate.overallScore = round(Object.entries(policy.metricWeights).reduce(
-    (sum, [metric, weight]) => sum + (aggregate[metric] || 0) * weight,
-    0,
-  ));
+  aggregate.overallScore = round(
+    Object.entries(policy.metricWeights).reduce(
+      (sum, [metric, weight]) => sum + (aggregate[metric] || 0) * weight,
+      0,
+    ),
+  );
   return freezeDeep(aggregate);
 }
 
-function evaluateThresholds({ aggregate, caseCount, predictionCount, missingCaseIds, policy }) {
+function evaluateThresholds({
+  aggregate,
+  caseCount,
+  predictionCount,
+  missingCaseIds,
+  policy,
+}) {
   const checks = [];
   const pushMin = (metric, threshold) => {
     checks.push({
@@ -575,10 +663,14 @@ function evaluateThresholds({ aggregate, caseCount, predictionCount, missingCase
       passed: aggregate[metric] <= threshold,
     });
   };
-  for (const [metric, threshold] of Object.entries(policy.thresholds.minimum || {})) {
+  for (const [metric, threshold] of Object.entries(
+    policy.thresholds.minimum || {},
+  )) {
     pushMin(metric, threshold);
   }
-  for (const [metric, threshold] of Object.entries(policy.thresholds.maximum || {})) {
+  for (const [metric, threshold] of Object.entries(
+    policy.thresholds.maximum || {},
+  )) {
     pushMax(metric, threshold);
   }
   checks.push({
@@ -598,11 +690,20 @@ function evaluateThresholds({ aggregate, caseCount, predictionCount, missingCase
   return freezeDeep({
     passed: checks.every((check) => check.passed),
     checks,
-    failedMetrics: checks.filter((check) => !check.passed).map((check) => check.metric),
+    failedMetrics: checks
+      .filter((check) => !check.passed)
+      .map((check) => check.metric),
   });
 }
 
-function blockedReport({ dataset, policy, datasetValidation, policyValidation, predictionValidation, reason }) {
+function blockedReport({
+  dataset,
+  policy,
+  datasetValidation,
+  policyValidation,
+  predictionValidation,
+  reason,
+}) {
   return freezeDeep({
     version: REPORT_VERSION,
     evaluatorVersion: EVALUATOR_VERSION,
@@ -649,7 +750,11 @@ function guardrails() {
   });
 }
 
-function evaluateAccuracyDataset({ dataset, predictions, thresholdPolicy } = {}) {
+function evaluateAccuracyDataset({
+  dataset,
+  predictions,
+  thresholdPolicy,
+} = {}) {
   const datasetSnapshot = clone(dataset);
   const predictionSnapshot = clone(predictions);
   const policySnapshot = clone(thresholdPolicy);
@@ -667,8 +772,13 @@ function evaluateAccuracyDataset({ dataset, predictions, thresholdPolicy } = {})
     });
   }
 
-  const datasetCaseIds = new Set(datasetSnapshot.cases.map((item) => item.caseId));
-  const predictionValidation = validatePredictions(predictionSnapshot, datasetCaseIds);
+  const datasetCaseIds = new Set(
+    datasetSnapshot.cases.map((item) => item.caseId),
+  );
+  const predictionValidation = validatePredictions(
+    predictionSnapshot,
+    datasetCaseIds,
+  );
   if (!predictionValidation.valid) {
     return blockedReport({
       dataset: datasetSnapshot,
@@ -680,7 +790,9 @@ function evaluateAccuracyDataset({ dataset, predictions, thresholdPolicy } = {})
     });
   }
 
-  const predictionByCaseId = new Map(predictionSnapshot.map((item) => [item.caseId, item]));
+  const predictionByCaseId = new Map(
+    predictionSnapshot.map((item) => [item.caseId, item]),
+  );
   const missingCaseIds = datasetSnapshot.cases
     .map((item) => item.caseId)
     .filter((caseId) => !predictionByCaseId.has(caseId));
@@ -716,7 +828,9 @@ function evaluateAccuracyDataset({ dataset, predictions, thresholdPolicy } = {})
     thresholdPolicyVersion: policySnapshot.version,
     thresholdPolicySha256: sha256(policySnapshot),
     decision: passed ? DECISIONS.PASS : DECISIONS.BLOCKED,
-    reason: passed ? "ALL_ACCURACY_THRESHOLDS_PASSED" : "ACCURACY_THRESHOLDS_NOT_MET",
+    reason: passed
+      ? "ALL_ACCURACY_THRESHOLDS_PASSED"
+      : "ACCURACY_THRESHOLDS_NOT_MET",
     failClosed: true,
     evaluationOnly: true,
     promotionAuthorized: false,

@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   evaluateRealShadowSecureRuntime,
 } = require("./queryCandidatePlannerRealShadowSecureDeployment");
@@ -11,7 +9,9 @@ const LIMITED_ACTIVATION_VERSION =
   "query_candidate_planner_real_shadow_limited_activation_v1";
 
 function text(value, maxLength = 20000) {
-  return String(value == null ? "" : value).trim().slice(0, maxLength);
+  return String(value == null ? "" : value)
+    .trim()
+    .slice(0, maxLength);
 }
 
 function booleanValue(value, fallback = false) {
@@ -48,7 +48,9 @@ function commonLimitedErrors(env) {
   const config = parseQueryCandidatePlannerRealShadowEvidenceConfig(env);
   if (!config.configurationValid) errors.push(config.reason);
   if (config.allowlist.length !== 1) {
-    errors.push("REAL_SHADOW_LIMITED_ACTIVATION_ALLOWLIST_MUST_HAVE_EXACTLY_ONE_ENTRY");
+    errors.push(
+      "REAL_SHADOW_LIMITED_ACTIVATION_ALLOWLIST_MUST_HAVE_EXACTLY_ONE_ENTRY",
+    );
   }
 
   const registryCases = Array.isArray(config.registry?.registry?.cases)
@@ -71,7 +73,9 @@ function commonLimitedErrors(env) {
     errors.push("REAL_SHADOW_LIMITED_ACTIVATION_TTL_MUST_BE_1_TO_7_DAYS");
   }
   if (maxRecords < 30 || maxRecords > 5000) {
-    errors.push("REAL_SHADOW_LIMITED_ACTIVATION_MAX_RECORDS_MUST_BE_30_TO_5000");
+    errors.push(
+      "REAL_SHADOW_LIMITED_ACTIVATION_MAX_RECORDS_MUST_BE_30_TO_5000",
+    );
   }
 
   return Object.freeze({
@@ -84,7 +88,9 @@ function commonLimitedErrors(env) {
   });
 }
 
-function evaluateRealShadowLimitedActivationPreflight({ env = process.env } = {}) {
+function evaluateRealShadowLimitedActivationPreflight({
+  env = process.env,
+} = {}) {
   const state = commonLimitedErrors(env);
   const errors = [...state.errors];
   const requestedEnabled = booleanValue(
@@ -97,10 +103,14 @@ function evaluateRealShadowLimitedActivationPreflight({ env = process.env } = {}
   );
 
   if (requestedEnabled) {
-    errors.push("REAL_SHADOW_LIMITED_ACTIVATION_PREFLIGHT_REQUIRES_COLLECTOR_DISABLED");
+    errors.push(
+      "REAL_SHADOW_LIMITED_ACTIVATION_PREFLIGHT_REQUIRES_COLLECTOR_DISABLED",
+    );
   }
   if (!killSwitch) {
-    errors.push("REAL_SHADOW_LIMITED_ACTIVATION_PREFLIGHT_REQUIRES_KILL_SWITCH_ACTIVE");
+    errors.push(
+      "REAL_SHADOW_LIMITED_ACTIVATION_PREFLIGHT_REQUIRES_KILL_SWITCH_ACTIVE",
+    );
   }
 
   const uniqueErrors = Object.freeze([...new Set(errors)]);
@@ -130,7 +140,9 @@ function evaluateRealShadowLimitedActivationPreflight({ env = process.env } = {}
   });
 }
 
-function evaluateRealShadowLimitedActivationRuntime({ env = process.env } = {}) {
+function evaluateRealShadowLimitedActivationRuntime({
+  env = process.env,
+} = {}) {
   const state = commonLimitedErrors(env);
   const errors = [...state.errors];
   const requestedEnabled = booleanValue(
@@ -149,7 +161,9 @@ function evaluateRealShadowLimitedActivationRuntime({ env = process.env } = {}) 
     errors.push("REAL_SHADOW_LIMITED_ACTIVATION_KILL_SWITCH_MUST_BE_RELEASED");
   }
   if (!state.config.enabled) {
-    errors.push("REAL_SHADOW_LIMITED_ACTIVATION_COLLECTOR_NOT_EFFECTIVELY_ENABLED");
+    errors.push(
+      "REAL_SHADOW_LIMITED_ACTIVATION_COLLECTOR_NOT_EFFECTIVELY_ENABLED",
+    );
   }
 
   const uniqueErrors = Object.freeze([...new Set(errors)]);

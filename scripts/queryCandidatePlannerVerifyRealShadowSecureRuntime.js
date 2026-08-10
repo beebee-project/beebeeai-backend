@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const {
   evaluateRealShadowSecureRuntime,
 } = require("../automation/queryCandidatePlannerRealShadowSecureDeployment");
@@ -16,7 +13,9 @@ try {
     console.log(`REGISTRY_SHA256 ${result.runtimeRegistrySha256}`);
     console.log(`REGISTRY_CASES ${result.registryCaseCount}`);
     console.log(`ALLOWLIST_ENTRIES ${result.allowlistEntryCount}`);
-    console.log(`ENCRYPTION_VERSION ${result.encryptionSelfTest.encryptionVersion}`);
+    console.log(
+      `ENCRYPTION_VERSION ${result.encryptionSelfTest.encryptionVersion}`,
+    );
     console.log("ENCRYPTION_ROUND_TRIP true");
     console.log("WRONG_SECRET_REJECTED true");
     console.log("COLLECTOR_ENABLED false");

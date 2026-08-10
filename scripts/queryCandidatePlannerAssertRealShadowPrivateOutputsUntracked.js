@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const { execFileSync } = require("child_process");
 
 const patterns = [
@@ -23,7 +20,9 @@ try {
     patterns.some((pattern) => pattern.test(file.replace(/\\/g, "/"))),
   );
   if (violations.length > 0) {
-    violations.forEach((file) => console.error(`BLOCKED staged private file: ${file}`));
+    violations.forEach((file) =>
+      console.error(`BLOCKED staged private file: ${file}`),
+    );
     process.exitCode = 2;
   } else {
     console.log("PASS no real shadow private outputs staged");

@@ -1,0 +1,46 @@
+{
+  "version": "query_candidate_patch15_3_2_E_X_manifest_v1",
+  "patch": "15.3.2-E-X",
+  "phase": "15.3 transition",
+  "title": "Real Shadow Observation Collection Exclusion & Pre-E Restore",
+  "predecessor": "15.3.2-D CLOSED; 15.3.2-E artifacts may be present but collection did not complete",
+  "next": "15.3.2-F Evaluation Baseline & Operational Assessment",
+  "action": "REMOVE_PATCH_E_AND_RESTORE_PRE_E_SOURCE_STATE",
+  "excludedPatch": "15.3.2-E",
+  "excludedPatchStatus": "EXCLUDED_NA",
+  "productionPromotionAuthorized": false,
+  "internalCanaryEnabledByThisPatch": false,
+  "productionEnabledByThisPatch": false,
+  "operations": {
+    "removePatchEAutomation": true,
+    "removePatchEScripts": true,
+    "removePatchETests": true,
+    "removePatchEDocs": true,
+    "removePatchEPrivateWindowFromRepoRoot": true,
+    "removeTemporaryRealShadowDiagnosticLogging": true,
+    "preservePatchDImplementation": true,
+    "preserveSecureEvidenceConfiguration": true,
+    "doNotDeleteExternalPrivateEvidenceBackups": true
+  },
+  "runtimeChangeRequiredOutsideRepository": {
+    "QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_ENABLED": "0",
+    "QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_KILL_SWITCH": "1"
+  },
+  "filesAddedByThisCorrectivePatch": [
+    "PATCH_ROADMAP_OVERRIDE_PATCH15_3_2_E_X.json",
+    "PATCH_MANIFEST_PATCH15_3_2_E_X.json",
+    "PATCH_VALIDATION_PATCH15_3_2_E_X.json",
+    "README_QUERY_CANDIDATE_PATCH15_3_2_E_X_PRE_E_RESTORE.md",
+    "apply_patch15_3_2_E_X_pre_e_restore.ps1",
+    "scripts/queryCandidatePlannerVerifyPatch15_3_2_E_XPreERestore.js",
+    "scripts/queryCandidatePlannerVerifyPatch15_3_2_E_XRuntime.js",
+    "tests/queryCandidatePatch15_3_2_E_XTestSupport.js",
+    "tests/queryCandidatePatch15_3_2_E_XPatchERemovedSmokeTest.js",
+    "tests/queryCandidatePatch15_3_2_E_XPatchDPreservedSmokeTest.js",
+    "tests/queryCandidatePatch15_3_2_E_XDiagnosticLogsRemovedSmokeTest.js",
+    "tests/queryCandidatePatch15_3_2_E_XRoadmapOverrideSmokeTest.js",
+    "tests/queryCandidatePatch15_3_2_E_XPrivateWindowRemovedSmokeTest.js",
+    "tests/queryCandidatePatch15_3_2_E_XSafetyContractSmokeTest.js",
+    "tests/queryCandidatePatch15_3_2_E_XRuntimeVerifierSmokeTest.js"
+  ]
+}

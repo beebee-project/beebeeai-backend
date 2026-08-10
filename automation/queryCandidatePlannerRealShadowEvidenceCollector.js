@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   deriveQueryCandidatePlannerInternalCanarySubject,
@@ -21,12 +19,13 @@ const {
 
 const COLLECTOR_VERSION =
   "query_candidate_planner_real_shadow_evidence_collector_v1";
-const RECORD_VERSION =
-  "query_candidate_planner_real_shadow_evidence_record_v1";
+const RECORD_VERSION = "query_candidate_planner_real_shadow_evidence_record_v1";
 const SHA256_RE = /^[a-f0-9]{64}$/i;
 
 function text(value, maxLength = 160) {
-  return String(value == null ? "" : value).trim().slice(0, maxLength);
+  return String(value == null ? "" : value)
+    .trim()
+    .slice(0, maxLength);
 }
 
 function number(value) {
@@ -47,8 +46,10 @@ function safeSha256(value) {
 }
 
 function subjectAllowed(config, subject) {
-  return subject.complete === true &&
-    config.allowlist.includes(String(subject.subjectSha256).toLowerCase());
+  return (
+    subject.complete === true &&
+    config.allowlist.includes(String(subject.subjectSha256).toLowerCase())
+  );
 }
 
 function nowMs(now) {
@@ -170,7 +171,9 @@ function buildExecutionRecord({
   });
   const forbidden = findForbiddenPaths(payload);
   if (forbidden.length > 0) {
-    const error = new Error(`forbidden evidence payload field: ${forbidden[0]}`);
+    const error = new Error(
+      `forbidden evidence payload field: ${forbidden[0]}`,
+    );
     error.code = "REAL_SHADOW_EVIDENCE_PRIVACY_VIOLATION";
     throw error;
   }
@@ -271,25 +274,32 @@ function runtimeStore(config) {
 async function recordQueryCandidatePlannerRealShadowObservation(
   observation = {},
   context = {},
-  {
-    env = process.env,
-    store = null,
-    capture = null,
-    now = Date.now,
-  } = {},
+  { env = process.env, store = null, capture = null, now = Date.now } = {},
 ) {
   const config = parseQueryCandidatePlannerRealShadowEvidenceConfig(env);
-  if (!config.enabled) return Object.freeze({ stored: false, reason: "COLLECTOR_DISABLED" });
-  if (!config.configurationValid) return Object.freeze({ stored: false, reason: config.reason });
-  if (observation.version !== "query_candidate_planner_api_shadow_observation_v1") {
-    return Object.freeze({ stored: false, reason: "API_SHADOW_OBSERVATION_REQUIRED" });
+  if (!config.enabled)
+    return Object.freeze({ stored: false, reason: "COLLECTOR_DISABLED" });
+  if (!config.configurationValid)
+    return Object.freeze({ stored: false, reason: config.reason });
+  if (
+    observation.version !== "query_candidate_planner_api_shadow_observation_v1"
+  ) {
+    return Object.freeze({
+      stored: false,
+      reason: "API_SHADOW_OBSERVATION_REQUIRED",
+    });
   }
   const request = context.req || {};
   const subject = deriveQueryCandidatePlannerInternalCanarySubject(request);
   if (!subjectAllowed(config, subject)) {
-    return Object.freeze({ stored: false, reason: "COLLECTOR_SUBJECT_NOT_ALLOWLISTED" });
+    return Object.freeze({
+      stored: false,
+      reason: "COLLECTOR_SUBJECT_NOT_ALLOWLISTED",
+    });
   }
-  const requestFingerprintSha256 = safeSha256(observation.requestFingerprintSha256);
+  const requestFingerprintSha256 = safeSha256(
+    observation.requestFingerprintSha256,
+  );
   const uploadFingerprintSha256 = safeSha256(
     observation.cacheLifecycle?.identity?.uploadFingerprintSha256,
   );
@@ -298,12 +308,22 @@ async function recordQueryCandidatePlannerRealShadowObservation(
     uploadFingerprintSha256,
   });
   if (!registryCase) {
-    return Object.freeze({ stored: false, reason: "REAL_SHADOW_CASE_NOT_REGISTERED" });
+    return Object.freeze({
+      stored: false,
+      reason: "REAL_SHADOW_CASE_NOT_REGISTERED",
+    });
   }
-  const captured = capture ||
+  const captured =
+    capture ||
     takeQueryCandidatePlannerRealShadowCapture(requestFingerprintSha256);
-  if (!captured && ["COMPLETED", "COMPLETED_SAFE"].includes(observation.status)) {
-    return Object.freeze({ stored: false, reason: "REAL_SHADOW_RESOLUTION_CAPTURE_REQUIRED" });
+  if (
+    !captured &&
+    ["COMPLETED", "COMPLETED_SAFE"].includes(observation.status)
+  ) {
+    return Object.freeze({
+      stored: false,
+      reason: "REAL_SHADOW_RESOLUTION_CAPTURE_REQUIRED",
+    });
   }
   try {
     const record = buildExecutionRecord({
@@ -330,19 +350,27 @@ async function recordQueryCandidatePlannerRealShadowLifecycleObservation(
   { env = process.env, store = null, now = Date.now } = {},
 ) {
   const config = parseQueryCandidatePlannerRealShadowEvidenceConfig(env);
-  if (!config.enabled) return Object.freeze({ stored: false, reason: "COLLECTOR_DISABLED" });
-  if (!config.configurationValid) return Object.freeze({ stored: false, reason: config.reason });
+  if (!config.enabled)
+    return Object.freeze({ stored: false, reason: "COLLECTOR_DISABLED" });
+  if (!config.configurationValid)
+    return Object.freeze({ stored: false, reason: config.reason });
   const request = context.req || {};
   const subject = deriveQueryCandidatePlannerInternalCanarySubject(request);
   if (!subjectAllowed(config, subject)) {
-    return Object.freeze({ stored: false, reason: "COLLECTOR_SUBJECT_NOT_ALLOWLISTED" });
+    return Object.freeze({
+      stored: false,
+      reason: "COLLECTOR_SUBJECT_NOT_ALLOWLISTED",
+    });
   }
   const uploadFingerprintSha256 = safeSha256(
     observation.identity?.uploadFingerprintSha256,
   );
   const registryCase = resolveRegistryCase(config, { uploadFingerprintSha256 });
   if (!registryCase) {
-    return Object.freeze({ stored: false, reason: "REAL_SHADOW_CASE_NOT_REGISTERED" });
+    return Object.freeze({
+      stored: false,
+      reason: "REAL_SHADOW_CASE_NOT_REGISTERED",
+    });
   }
   try {
     const record = buildLifecycleRecord({

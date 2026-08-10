@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const {
   generateRealShadowEvidenceSecret,
 } = require("../automation/queryCandidatePlannerRealShadowPreparation");

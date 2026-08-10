@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const { execFileSync } = require("child_process");
 
 const forbidden = [
@@ -15,10 +12,15 @@ const forbidden = [
 try {
   const staged = execFileSync("git", ["diff", "--cached", "--name-only"], {
     encoding: "utf8",
-  }).split(/\r?\n/).map((v) => v.trim()).filter(Boolean);
+  })
+    .split(/\r?\n/)
+    .map((v) => v.trim())
+    .filter(Boolean);
   const bad = staged.filter((name) => forbidden.some((re) => re.test(name)));
   if (bad.length) {
-    bad.forEach((name) => console.error(`BLOCKED private staged output ${name}`));
+    bad.forEach((name) =>
+      console.error(`BLOCKED private staged output ${name}`),
+    );
     process.exitCode = 2;
   } else {
     console.log("PASS no limited-activation private outputs staged");

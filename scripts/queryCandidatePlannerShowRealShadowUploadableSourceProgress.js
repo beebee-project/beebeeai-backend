@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 const {
@@ -9,7 +6,9 @@ const {
 
 function arg(name, fallback = "") {
   const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+  return index >= 0 && process.argv[index + 1]
+    ? process.argv[index + 1]
+    : fallback;
 }
 
 try {
@@ -18,7 +17,10 @@ try {
   if (!catalogArg) throw new Error("--catalog is required");
   const accuracyDataset = JSON.parse(
     fs.readFileSync(
-      path.join(root, "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json"),
+      path.join(
+        root,
+        "evaluation/queryCandidatePlannerAccuracyEvaluationDataset.v1.json",
+      ),
       "utf8",
     ),
   );
@@ -41,7 +43,9 @@ try {
         item.semanticCompatibilityConfirmed === true;
       console.log(`${ready ? "READY" : "PENDING"} ${item.caseId}`);
     });
-    console.log(`PROGRESS ${result.completedCount}/${result.expectedCaseCount}`);
+    console.log(
+      `PROGRESS ${result.completedCount}/${result.expectedCaseCount}`,
+    );
     console.log(`REMAINING ${result.remainingCount}`);
     console.log(`COMPLETE ${result.complete}`);
   }

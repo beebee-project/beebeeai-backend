@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   parseRegistry,
@@ -10,14 +8,15 @@ const PREPARATION_VERSION =
   "query_candidate_planner_real_shadow_preparation_v1";
 const DRAFT_VERSION =
   "query_candidate_planner_real_shadow_case_registry_draft_v1";
-const REGISTRY_VERSION =
-  "query_candidate_planner_real_shadow_case_registry_v1";
+const REGISTRY_VERSION = "query_candidate_planner_real_shadow_case_registry_v1";
 const SECRET_BYTES = 48;
 const SHA256_RE = /^[a-f0-9]{64}$/i;
 const BASE64URL_64_RE = /^[A-Za-z0-9_-]{64}$/;
 
 function text(value, maxLength = 240) {
-  return String(value == null ? "" : value).trim().slice(0, maxLength);
+  return String(value == null ? "" : value)
+    .trim()
+    .slice(0, maxLength);
 }
 
 function sha256(value) {
@@ -45,10 +44,14 @@ function accuracyCases(accuracyDataset = {}) {
   return accuracyDataset.cases;
 }
 
-function generateRealShadowEvidenceSecret({ randomBytes = crypto.randomBytes } = {}) {
+function generateRealShadowEvidenceSecret({
+  randomBytes = crypto.randomBytes,
+} = {}) {
   const raw = randomBytes(SECRET_BYTES);
   if (!Buffer.isBuffer(raw) || raw.length !== SECRET_BYTES) {
-    const error = new Error("secret generator must return exactly 48 random bytes");
+    const error = new Error(
+      "secret generator must return exactly 48 random bytes",
+    );
     error.code = "REAL_SHADOW_SECRET_RANDOM_SOURCE_INVALID";
     throw error;
   }
@@ -127,7 +130,8 @@ function buildRealShadowCaseRegistry({
   const extraCaseIds = [...byCaseId.keys()].filter(
     (caseId) => !expectedCaseIds.includes(caseId),
   );
-  for (const caseId of extraCaseIds) errors.push(`unexpected caseId: ${caseId}`);
+  for (const caseId of extraCaseIds)
+    errors.push(`unexpected caseId: ${caseId}`);
 
   const requestFingerprints = new Set();
   const uploadFingerprints = new Set();
@@ -159,10 +163,7 @@ function buildRealShadowCaseRegistry({
     if (requireUploadFingerprint && !SHA256_RE.test(uploadFingerprintSha256)) {
       errors.push(`${caseId}: actual upload fingerprint required`);
     }
-    if (
-      uploadFingerprintSha256 &&
-      !SHA256_RE.test(uploadFingerprintSha256)
-    ) {
+    if (uploadFingerprintSha256 && !SHA256_RE.test(uploadFingerprintSha256)) {
       errors.push(`${caseId}: upload fingerprint invalid`);
     }
     if (
@@ -190,14 +191,12 @@ function buildRealShadowCaseRegistry({
       Object.freeze({
         caseId,
         scenarioId,
-        requestFingerprintSha256:
-          SHA256_RE.test(requestFingerprintSha256)
-            ? requestFingerprintSha256
-            : "",
-        uploadFingerprintSha256:
-          SHA256_RE.test(uploadFingerprintSha256)
-            ? uploadFingerprintSha256
-            : "",
+        requestFingerprintSha256: SHA256_RE.test(requestFingerprintSha256)
+          ? requestFingerprintSha256
+          : "",
+        uploadFingerprintSha256: SHA256_RE.test(uploadFingerprintSha256)
+          ? uploadFingerprintSha256
+          : "",
         expectedColdCostMicrousd:
           Number.isInteger(expectedColdCostMicrousd) &&
           expectedColdCostMicrousd >= 0
@@ -271,9 +270,7 @@ function verifyProductionSafety(env = {}) {
         40,
       ).toUpperCase() === "BLOCKED",
     rolloutZero:
-      Number(
-        env.QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT || 0,
-      ) === 0,
+      Number(env.QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT || 0) === 0,
     productionDisabled: !booleanValue(
       env.QUERY_CANDIDATE_PLANNER_PRODUCTION_ENABLED,
       false,
@@ -323,7 +320,10 @@ function verifyRealShadowPreparation({
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean),
   );
-  if (allowlist.length === 0 || allowlist.some((entry) => !SHA256_RE.test(entry))) {
+  if (
+    allowlist.length === 0 ||
+    allowlist.some((entry) => !SHA256_RE.test(entry))
+  ) {
     errors.push("PROMOTION_ALLOWLIST_SHA256_INVALID");
   }
 
@@ -341,7 +341,8 @@ function verifyRealShadowPreparation({
 
   const safety = verifyProductionSafety(env);
   if (!safety.safe) {
-    for (const failed of safety.failed) errors.push(`unsafe production flag: ${failed}`);
+    for (const failed of safety.failed)
+      errors.push(`unsafe production flag: ${failed}`);
   }
 
   const runtimeEnv = {
@@ -349,12 +350,12 @@ function verifyRealShadowPreparation({
     QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_ENABLED: "1",
     QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_SECRET: normalizedSecret,
     QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256: allowlist.join(","),
-    QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_JSON:
-      registryResult.valid ? JSON.stringify(registryResult.registry) : "",
+    QUERY_CANDIDATE_PLANNER_REAL_SHADOW_CASE_REGISTRY_JSON: registryResult.valid
+      ? JSON.stringify(registryResult.registry)
+      : "",
   };
-  const runtimeConfig = parseQueryCandidatePlannerRealShadowEvidenceConfig(
-    runtimeEnv,
-  );
+  const runtimeConfig =
+    parseQueryCandidatePlannerRealShadowEvidenceConfig(runtimeEnv);
   if (!runtimeConfig.configurationValid) {
     errors.push(`runtime config: ${runtimeConfig.reason}`);
   }
@@ -372,7 +373,8 @@ function verifyRealShadowPreparation({
     secretSha256: BASE64URL_64_RE.test(normalizedSecret)
       ? sha256(normalizedSecret)
       : "",
-    allowlistEntryCount: allowlist.filter((entry) => SHA256_RE.test(entry)).length,
+    allowlistEntryCount: allowlist.filter((entry) => SHA256_RE.test(entry))
+      .length,
     caseCount: registryResult.caseCount,
     productionSafety: safety,
     collectorConfigurationWouldBeValid: runtimeConfig.configurationValid,

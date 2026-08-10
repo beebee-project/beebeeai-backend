@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const {
   exactSha256,
@@ -57,7 +55,9 @@ const FORBIDDEN_KEYS = new Set([
 ]);
 
 function text(value, maxLength = 240) {
-  return String(value == null ? "" : value).trim().slice(0, maxLength);
+  return String(value == null ? "" : value)
+    .trim()
+    .slice(0, maxLength);
 }
 
 function sha256(value) {
@@ -80,7 +80,9 @@ function validIsoTimestamp(value, now = Date.now) {
 }
 
 function expectedRejectedCases(accuracyDataset = {}) {
-  const cases = Array.isArray(accuracyDataset?.cases) ? accuracyDataset.cases : [];
+  const cases = Array.isArray(accuracyDataset?.cases)
+    ? accuracyDataset.cases
+    : [];
   return cases.filter(
     (item) => item?.labels?.unsupported?.expectedRejected === true,
   );
@@ -95,7 +97,9 @@ function findForbiddenPaths(value, path = "$", output = []) {
   }
   if (!value || typeof value !== "object") return output;
   for (const [key, item] of Object.entries(value)) {
-    const normalized = String(key).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+    const normalized = String(key)
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
     if (FORBIDDEN_KEYS.has(normalized)) output.push(`${path}.${key}`);
     findForbiddenPaths(item, `${path}.${key}`, output);
   }
@@ -118,7 +122,9 @@ function buildExpectedRejectionAttestation({
 } = {}) {
   const normalizedCaseId = text(caseId, 160);
   const expectedCases = expectedRejectedCases(accuracyDataset);
-  const expectedCase = expectedCases.find((item) => item.caseId === normalizedCaseId);
+  const expectedCase = expectedCases.find(
+    (item) => item.caseId === normalizedCaseId,
+  );
   if (!expectedCase) {
     const error = new Error("case is not an expected-rejection accuracy case");
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_CASE_REQUIRED";
@@ -163,12 +169,16 @@ function buildExpectedRejectionAttestation({
   const requestHash = exactSha256(requestFingerprintSha256);
   const uploadHash = exactSha256(uploadFingerprintSha256);
   if (!requestHash) {
-    const error = new Error("request fingerprint must be exactly 64 hex characters");
+    const error = new Error(
+      "request fingerprint must be exactly 64 hex characters",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_REQUEST_FINGERPRINT_INVALID";
     throw error;
   }
   if (!uploadHash) {
-    const error = new Error("upload fingerprint must be exactly 64 hex characters");
+    const error = new Error(
+      "upload fingerprint must be exactly 64 hex characters",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_UPLOAD_FINGERPRINT_INVALID";
     throw error;
   }
@@ -181,12 +191,16 @@ function buildExpectedRejectionAttestation({
   const ledgerRequest = exactSha256(ledgerCase.requestFingerprintSha256);
   const ledgerUpload = exactSha256(ledgerCase.uploadFingerprintSha256);
   if (ledgerRequest && ledgerRequest !== requestHash) {
-    const error = new Error("request fingerprint does not match the ledger case");
+    const error = new Error(
+      "request fingerprint does not match the ledger case",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_REQUEST_MISMATCH";
     throw error;
   }
   if (ledgerUpload && ledgerUpload !== uploadHash) {
-    const error = new Error("upload fingerprint does not match the ledger case");
+    const error = new Error(
+      "upload fingerprint does not match the ledger case",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_UPLOAD_MISMATCH";
     throw error;
   }
@@ -197,17 +211,23 @@ function buildExpectedRejectionAttestation({
   const normalizedCaptureSource = text(captureSource, 80).toUpperCase();
 
   if (!COMPLETED_STATUSES.includes(normalizedStatus)) {
-    const error = new Error("expected rejection must finish in a completed safe state");
+    const error = new Error(
+      "expected rejection must finish in a completed safe state",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_STATUS_INVALID";
     throw error;
   }
   if (!normalizedReason) {
-    const error = new Error("expected rejection observation reason is required");
+    const error = new Error(
+      "expected rejection observation reason is required",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_REASON_REQUIRED";
     throw error;
   }
   if (!Number.isInteger(accepted) || accepted !== 0) {
-    const error = new Error("expected rejection must accept zero shadow candidates");
+    const error = new Error(
+      "expected rejection must accept zero shadow candidates",
+    );
     error.code = "REAL_SHADOW_EXPECTED_REJECTION_ACCEPTED_NONZERO";
     throw error;
   }
@@ -271,7 +291,11 @@ function validateExpectedRejectionAttestation({
   now = Date.now,
 } = {}) {
   const errors = [];
-  if (!attestation || typeof attestation !== "object" || Array.isArray(attestation)) {
+  if (
+    !attestation ||
+    typeof attestation !== "object" ||
+    Array.isArray(attestation)
+  ) {
     errors.push("EXPECTED_REJECTION_ATTESTATION_OBJECT_REQUIRED");
   }
   if (attestation?.version !== ATTESTATION_VERSION) {
@@ -283,31 +307,49 @@ function validateExpectedRejectionAttestation({
   );
   if (!expectedCase) errors.push("EXPECTED_REJECTION_CASE_INVALID");
 
-  const ledgerCase = (ledger?.cases || []).find((item) => item.caseId === caseId);
-  const catalogCase = (sourceCatalog?.cases || []).find((item) => item.caseId === caseId);
+  const ledgerCase = (ledger?.cases || []).find(
+    (item) => item.caseId === caseId,
+  );
+  const catalogCase = (sourceCatalog?.cases || []).find(
+    (item) => item.caseId === caseId,
+  );
   const requestHash = exactSha256(attestation?.requestFingerprintSha256);
   const uploadHash = exactSha256(attestation?.uploadFingerprintSha256);
   const sourceHash = exactSha256(attestation?.sourceArtifactSha256);
 
-  if (!requestHash) errors.push("EXPECTED_REJECTION_REQUEST_FINGERPRINT_INVALID");
+  if (!requestHash)
+    errors.push("EXPECTED_REJECTION_REQUEST_FINGERPRINT_INVALID");
   if (!uploadHash) errors.push("EXPECTED_REJECTION_UPLOAD_FINGERPRINT_INVALID");
   if (requestHash && uploadHash && requestHash === uploadHash) {
     errors.push("EXPECTED_REJECTION_FINGERPRINTS_IDENTICAL");
   }
   if (!sourceHash) errors.push("EXPECTED_REJECTION_SOURCE_HASH_INVALID");
-  if (ledgerCase && requestHash !== exactSha256(ledgerCase.requestFingerprintSha256)) {
+  if (
+    ledgerCase &&
+    requestHash !== exactSha256(ledgerCase.requestFingerprintSha256)
+  ) {
     errors.push("EXPECTED_REJECTION_REQUEST_LEDGER_MISMATCH");
   }
-  if (ledgerCase && uploadHash !== exactSha256(ledgerCase.uploadFingerprintSha256)) {
+  if (
+    ledgerCase &&
+    uploadHash !== exactSha256(ledgerCase.uploadFingerprintSha256)
+  ) {
     errors.push("EXPECTED_REJECTION_UPLOAD_LEDGER_MISMATCH");
   }
-  if (catalogCase && sourceHash !== exactSha256(catalogCase.sourceArtifactSha256)) {
+  if (
+    catalogCase &&
+    sourceHash !== exactSha256(catalogCase.sourceArtifactSha256)
+  ) {
     errors.push("EXPECTED_REJECTION_SOURCE_CATALOG_MISMATCH");
   }
   if (attestation?.expectedRejected !== true) {
     errors.push("EXPECTED_REJECTION_FLAG_REQUIRED");
   }
-  if (!COMPLETED_STATUSES.includes(text(attestation?.observationStatus, 60).toUpperCase())) {
+  if (
+    !COMPLETED_STATUSES.includes(
+      text(attestation?.observationStatus, 60).toUpperCase(),
+    )
+  ) {
     errors.push("EXPECTED_REJECTION_STATUS_INVALID");
   }
   if (!text(attestation?.observationReason, 120)) {
@@ -316,7 +358,11 @@ function validateExpectedRejectionAttestation({
   if (Number(attestation?.shadowAccepted) !== 0) {
     errors.push("EXPECTED_REJECTION_ACCEPTED_MUST_BE_ZERO");
   }
-  if (!CAPTURE_SOURCES.includes(text(attestation?.captureSource, 80).toUpperCase())) {
+  if (
+    !CAPTURE_SOURCES.includes(
+      text(attestation?.captureSource, 80).toUpperCase(),
+    )
+  ) {
     errors.push("EXPECTED_REJECTION_CAPTURE_SOURCE_INVALID");
   }
   if (!validIsoTimestamp(attestation?.observedAt, now)) {
@@ -396,13 +442,16 @@ function evaluateRealShadowEvidenceFoundation({
   for (const attestation of attestations) {
     const caseId = text(attestation?.caseId, 160);
     if (!caseId) continue;
-    if (byCaseId.has(caseId)) errors.push(`duplicate expected rejection attestation: ${caseId}`);
+    if (byCaseId.has(caseId))
+      errors.push(`duplicate expected rejection attestation: ${caseId}`);
     byCaseId.set(caseId, attestation);
   }
   for (const expectedCase of expectedCases) {
     const attestation = byCaseId.get(expectedCase.caseId);
     if (!attestation) {
-      errors.push(`missing expected rejection attestation: ${expectedCase.caseId}`);
+      errors.push(
+        `missing expected rejection attestation: ${expectedCase.caseId}`,
+      );
       continue;
     }
     const validation = validateExpectedRejectionAttestation({
@@ -438,12 +487,14 @@ function evaluateRealShadowEvidenceFoundation({
     expectedRejectionEvidenceCount: expectedCases.filter((item) =>
       byCaseId.has(item.caseId),
     ).length,
-    sourceCatalogSha256:
-      catalogValidation.valid ? sourceCatalogSha256(sourceCatalog) : "",
+    sourceCatalogSha256: catalogValidation.valid
+      ? sourceCatalogSha256(sourceCatalog)
+      : "",
     ledgerSha256: ledgerValidation.valid ? sha256(JSON.stringify(ledger)) : "",
     registrySha256: finalization.valid ? finalization.registrySha256 : "",
     actualTrafficOnly: ledger?.actualTrafficOnly === true,
-    syntheticFingerprintForbidden: ledger?.syntheticFingerprintForbidden === true,
+    syntheticFingerprintForbidden:
+      ledger?.syntheticFingerprintForbidden === true,
     legacyLedgerAccepted: false,
     rawIdentityIncluded: false,
     collectorEnabledByThisPhase: false,

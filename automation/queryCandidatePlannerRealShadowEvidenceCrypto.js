@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 
 const ENCRYPTION_VERSION =
@@ -16,7 +14,11 @@ function encryptEvidencePayload(payload, secret) {
     throw error;
   }
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", keyFromSecret(secret), iv);
+  const cipher = crypto.createCipheriv(
+    "aes-256-gcm",
+    keyFromSecret(secret),
+    iv,
+  );
   const ciphertext = Buffer.concat([
     cipher.update(JSON.stringify(payload), "utf8"),
     cipher.final(),

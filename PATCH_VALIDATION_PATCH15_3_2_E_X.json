@@ -1,0 +1,22 @@
+{
+  "version": "query_candidate_patch15_3_2_E_X_validation_v1",
+  "patch": "15.3.2-E-X",
+  "status": "PASS_ISOLATED_HARNESS",
+  "validation": {
+    "rollbackTarget": "post-15.3.2-D / pre-15.3.2-E source state",
+    "patchEAdditiveFilesRemoved": true,
+    "patchDPreserved": true,
+    "temporaryDiagnosticMarkersRemoved": true,
+    "privateCollectionArtifactsRemovedFromRepoRoot": true,
+    "roadmapOverride": "15.3.2-E EXCLUDED_NA; next 15.3.2-F",
+    "productionMutation": false,
+    "internalCanaryActivation": false,
+    "productionPromotionAuthorization": false,
+    "railwayRuntimeChangeRequiresManualDeploy": true
+  },
+  "qa": {
+    "smokeTests": 7,
+    "finalVerifier": true,
+    "runtimeVerifier": true
+  }
+}

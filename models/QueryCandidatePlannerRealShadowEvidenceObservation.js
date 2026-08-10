@@ -1,11 +1,14 @@
-"use strict";
-
 const mongoose = require("mongoose");
 
 const schema = new mongoose.Schema(
   {
     recordId: { type: String, required: true, unique: true, index: true },
-    kind: { type: String, enum: ["EXECUTION", "LIFECYCLE"], required: true, index: true },
+    kind: {
+      type: String,
+      enum: ["EXECUTION", "LIFECYCLE"],
+      required: true,
+      index: true,
+    },
     source: { type: String, enum: ["REAL_SHADOW_TRAFFIC"], required: true },
     actualTraffic: { type: Boolean, required: true },
     synthetic: { type: Boolean, required: true },
@@ -33,7 +36,4 @@ schema.index({ observedAt: 1, kind: 1 });
 
 module.exports =
   mongoose.models.QueryCandidatePlannerRealShadowEvidenceObservation ||
-  mongoose.model(
-    "QueryCandidatePlannerRealShadowEvidenceObservation",
-    schema,
-  );
+  mongoose.model("QueryCandidatePlannerRealShadowEvidenceObservation", schema);

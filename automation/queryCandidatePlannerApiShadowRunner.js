@@ -1,5 +1,3 @@
-"use strict";
-
 const {
   sha256,
   candidateIdentity,
@@ -11,8 +9,7 @@ const {
 
 const RUNNER_VERSION =
   "query_candidate_planner_api_shadow_runner_v2_cache_lifecycle";
-const INPUT_VERSION =
-  "query_candidate_planner_api_shadow_input_v1";
+const INPUT_VERSION = "query_candidate_planner_api_shadow_input_v1";
 
 const FORBIDDEN_KEYS = new Set([
   "rows",
@@ -39,14 +36,8 @@ function number(value, fallback = 0) {
 
 function sanitizeColumn(column = {}, index = 0) {
   return Object.freeze({
-    columnId:
-      text(column.columnId) ||
-      text(column.id) ||
-      `column_${index + 1}`,
-    header:
-      text(column.header) ||
-      text(column.name) ||
-      text(column.label),
+    columnId: text(column.columnId) || text(column.id) || `column_${index + 1}`,
+    header: text(column.header) || text(column.name) || text(column.label),
     type: text(column.type),
     role: text(column.role || column.semanticRole),
     metricFamily: text(column.metricFamily),
@@ -60,10 +51,7 @@ function sanitizeColumn(column = {}, index = 0) {
 function sanitizeTable(table = {}, index = 0) {
   const columns = Array.isArray(table.columns) ? table.columns : [];
   return Object.freeze({
-    tableId:
-      text(table.tableId) ||
-      text(table.id) ||
-      `table_${index + 1}`,
+    tableId: text(table.tableId) || text(table.id) || `table_${index + 1}`,
     sheetOrdinal: number(table.sheetIndex ?? table.sheetOrdinal, index),
     rowCount: number(table.rowCount),
     columnCount: number(table.columnCount, columns.length),
@@ -99,15 +87,12 @@ function sanitizeCandidate(candidate = {}, index = 0) {
     operation: text(candidate.operation || candidate.recipeType),
     tableId: text(candidate.tableId || candidate.sourceTableId),
     sourceTableIds: Object.freeze(
-      (Array.isArray(candidate.sourceTableIds)
-        ? candidate.sourceTableIds
-        : []
-      ).map(text).filter(Boolean),
+      (Array.isArray(candidate.sourceTableIds) ? candidate.sourceTableIds : [])
+        .map(text)
+        .filter(Boolean),
     ),
     status: text(
-      candidate.status ||
-        candidate.feasibilityStatus ||
-        candidate.disposition,
+      candidate.status || candidate.feasibilityStatus || candidate.disposition,
     ),
     rank: number(
       candidate.rank ?? candidate.shadowRank ?? candidate.score?.rank,
@@ -217,22 +202,25 @@ function buildSafeApiShadowContext({ request = {}, primaryPayload = {} } = {}) {
 }
 
 function primaryResponseContractSha256(primaryPayload = {}) {
-  const tableSchemas = (Array.isArray(primaryPayload.normalizedQueryTables)
-    ? primaryPayload.normalizedQueryTables
-    : []
-  ).slice(0, 20).map((table, tableIndex) => ({
-    tableId: text(table.tableId || table.id || `table_${tableIndex + 1}`),
-    rowCount: number(table.rowCount),
-    columnIds: (Array.isArray(table.columns) ? table.columns : [])
-      .slice(0, 120)
-      .map((column, columnIndex) =>
-        text(column.columnId || column.id || `column_${columnIndex + 1}`),
-      ),
-  }));
+  const tableSchemas = (
+    Array.isArray(primaryPayload.normalizedQueryTables)
+      ? primaryPayload.normalizedQueryTables
+      : []
+  )
+    .slice(0, 20)
+    .map((table, tableIndex) => ({
+      tableId: text(table.tableId || table.id || `table_${tableIndex + 1}`),
+      rowCount: number(table.rowCount),
+      columnIds: (Array.isArray(table.columns) ? table.columns : [])
+        .slice(0, 120)
+        .map((column, columnIndex) =>
+          text(column.columnId || column.id || `column_${columnIndex + 1}`),
+        ),
+    }));
   const candidateOrders = candidateArrays(primaryPayload).map((list) =>
-    list.slice(0, 200).map((candidate, index) =>
-      candidateIdentity(candidate, index),
-    ),
+    list
+      .slice(0, 200)
+      .map((candidate, index) => candidateIdentity(candidate, index)),
   );
   return sha256({
     ok: primaryPayload.ok === true,
@@ -287,8 +275,7 @@ function buildShadowCacheRuntimeOptions({
   runtimeProvider = getQueryCandidatePlannerCacheRuntime,
 } = {}) {
   const cacheAllowed =
-    cacheReadDecision?.allowed === true ||
-    cacheWriteDecision?.allowed === true;
+    cacheReadDecision?.allowed === true || cacheWriteDecision?.allowed === true;
   if (!cacheAllowed) {
     return Object.freeze({
       enabled: false,
@@ -298,9 +285,7 @@ function buildShadowCacheRuntimeOptions({
   if (!lifecycleIdentity?.complete) {
     return Object.freeze({
       enabled: false,
-      reason: String(
-        lifecycleIdentity?.reason || "UPLOAD_IDENTITY_INCOMPLETE",
-      ),
+      reason: String(lifecycleIdentity?.reason || "UPLOAD_IDENTITY_INCOMPLETE"),
     });
   }
   const runtime = runtimeProvider();
@@ -316,8 +301,7 @@ function buildShadowCacheRuntimeOptions({
     hierarchicalCache: runtime.hierarchicalCache,
     tenantId: lifecycleIdentity.tenantId,
     cacheSecret: runtime.cacheSecret,
-    uploadFingerprintSha256:
-      lifecycleIdentity.uploadFingerprintSha256,
+    uploadFingerprintSha256: lifecycleIdentity.uploadFingerprintSha256,
     queryJsonSha256: lifecycleIdentity.queryJsonSha256,
   });
 }
@@ -353,8 +337,7 @@ async function runQueryCandidatePlannerApiShadow({
     semanticProfile: safeContext.semanticProfile,
     candidateResolution: safeContext.candidateResolution,
     candidateFamilyResolution: safeContext.candidateFamilyResolution,
-    candidateFeasibilityResolution:
-      safeContext.candidateFeasibilityResolution,
+    candidateFeasibilityResolution: safeContext.candidateFeasibilityResolution,
     rankingResolution: safeContext.rankingResolution,
     sourceCandidateResolution: safeContext.candidateResolution,
     provider,
@@ -368,8 +351,7 @@ async function runQueryCandidatePlannerApiShadow({
           hierarchicalCache: cacheRuntime.hierarchicalCache,
           tenantId: cacheRuntime.tenantId,
           cacheSecret: cacheRuntime.cacheSecret,
-          uploadFingerprintSha256:
-            cacheRuntime.uploadFingerprintSha256,
+          uploadFingerprintSha256: cacheRuntime.uploadFingerprintSha256,
           queryJsonSha256: cacheRuntime.queryJsonSha256,
         }
       : {}),

@@ -1,6 +1,3 @@
-#!/usr/bin/env node
-"use strict";
-
 const childProcess = require("child_process");
 
 const PRIVATE_PATTERNS = Object.freeze([
