@@ -34,13 +34,20 @@ const {
 
 router.use(protect);
 
-function observeQueryCandidatePlannerForInternalPreview(
-  observation,
-  context,
-) {
+function observeQueryCandidatePlannerForInternalPreview(observation, context) {
   defaultObservationLogger(observation, context);
   recordQueryCandidatePlannerInternalPreviewObservation(observation);
-  void recordQueryCandidatePlannerRealShadowObservation(observation, context);
+  // void recordQueryCandidatePlannerRealShadowObservation(observation, context);
+  void recordQueryCandidatePlannerRealShadowObservation(
+    observation,
+    context,
+  ).then((result) => {
+    console.log("[real-shadow-evidence]", {
+      kind: "EXECUTION",
+      stored: result?.stored === true,
+      reason: String(result?.reason || "UNKNOWN"),
+    });
+  });
 }
 
 const getAnalysisCandidatesShadowObserved =
@@ -54,10 +61,20 @@ const downloadGeneratedFileCacheRetained =
     handler: automationController.downloadGeneratedFile,
     action: "GENERATED_DOWNLOAD",
     onObservation: (observation, context) => {
+      // void recordQueryCandidatePlannerRealShadowLifecycleObservation(
+      //   observation,
+      //   context,
+      // );
       void recordQueryCandidatePlannerRealShadowLifecycleObservation(
         observation,
         context,
-      );
+      ).then((result) => {
+        console.log("[real-shadow-evidence]", {
+          kind: "LIFECYCLE",
+          stored: result?.stored === true,
+          reason: String(result?.reason || "UNKNOWN"),
+        });
+      });
     },
   });
 
@@ -81,10 +98,7 @@ router.post(
 );
 router.post("/execute-business-template", executeBusinessTemplateObserved);
 
-router.get(
-  "/internal/query-candidate-shadow-preview",
-  internalPreviewPage,
-);
+router.get("/internal/query-candidate-shadow-preview", internalPreviewPage);
 router.get(
   "/internal/query-candidate-shadow-preview/status",
   requireQueryCandidatePlannerInternalPreviewAccess,
