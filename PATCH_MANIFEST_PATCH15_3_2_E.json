@@ -1,0 +1,44 @@
+{
+  "patch": "15.3.2-E",
+  "phase": "15.3-B",
+  "name": "Real Shadow Observation Collection",
+  "mode": "additive-only",
+  "predecessor": "15.3.2-D",
+  "files": {
+    "automation": [
+      "automation/queryCandidatePlannerRealShadowObservationCollection.js"
+    ],
+    "scripts": [
+      "scripts/queryCandidatePlannerStartRealShadowObservationCollection.js",
+      "scripts/queryCandidatePlannerShowRealShadowObservationCollectionProgress.js",
+      "scripts/queryCandidatePlannerFinalizeRealShadowObservationCollection.js",
+      "scripts/queryCandidatePlannerAssertRealShadowObservationCollectionPrivateOutputsUntracked.js"
+    ],
+    "tests": 20,
+    "docs": [
+      "README_QUERY_CANDIDATE_PATCH15_3_2_E_REAL_SHADOW_OBSERVATION_COLLECTION.md",
+      "PATCH_MANIFEST_PATCH15_3_2_E.json",
+      "PATCH_VALIDATION_PATCH15_3_2_E.json"
+    ]
+  },
+  "collectionContract": {
+    "registryCases": 10,
+    "executionPerCase": 5,
+    "executionTotal": 50,
+    "downloadLifecyclePerCase": 1,
+    "deleteLifecyclePerCase": 1,
+    "lifecycleTotal": 20,
+    "distinctUploadIdentityPerCase": 2,
+    "builderMinimumExecutionTotal": 30,
+    "builderMinimumExecutionPerCase": 3
+  },
+  "guardrails": {
+    "collectorMustAlreadyBeLimitedActive": true,
+    "internalCanaryEnabledByThisPatch": false,
+    "productionPromotionAuthorized": false,
+    "productionRouteChanged": false,
+    "rawRecordsLogged": false,
+    "fingerprintsLogged": false,
+    "privateOutputsMustRemainUntracked": true
+  }
+}
