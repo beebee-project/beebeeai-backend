@@ -1,0 +1,186 @@
+{
+  "version": "query_candidate_patch15_3_2_C_manifest_v1",
+  "patch": "Encryption Secret & Safe Deployment",
+  "phase": "15.3-B",
+  "createdAt": "2026-08-07T21:06:00+08:00",
+  "fileCount": 28,
+  "additiveOnly": true,
+  "routesModified": false,
+  "productionRuntimeModified": false,
+  "collectorActivated": false,
+  "privateRuntimeOutputsIncluded": false,
+  "realSourceFilesIncluded": false,
+  "railwayVariablesModifiedByPatch": false,
+  "dependsOn": [
+    "15.3.2-B.2"
+  ],
+  "purpose": [
+    "generate a dedicated evidence-encryption secret without stdout disclosure",
+    "pin the finalized real-shadow registry to the Phase 15.3-A registry SHA-256",
+    "verify AES-256-GCM round-trip and wrong-secret rejection before collector activation",
+    "fail closed unless production and internal-canary controls remain blocked",
+    "produce a deployed-runtime readiness signal for Patch 15.3.2-D"
+  ],
+  "security": {
+    "secretEntropyBytes": 48,
+    "secretFormat": "BASE64URL_64",
+    "rawSecretLogged": false,
+    "encryption": "AES-256-GCM",
+    "collectorMustRemainDisabled": true,
+    "registryHashPinned": true,
+    "privateOutputGuard": true
+  },
+  "operationalState": {
+    "collectorEnabled": false,
+    "internalCanaryEnabled": false,
+    "productionMergeEnabled": false,
+    "productionPromotionAuthorized": false
+  },
+  "exitGate": {
+    "readyForPatch15_3_2_D": true,
+    "requiresLocalPreflight": true,
+    "requiresDeployedRuntimeVerification": true
+  },
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_C.json",
+      "bytes": 888,
+      "sha256": "04d5059926d5ee1304a983c7b41dcfb238db4d2f60e4af9d5b377bc565016274"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_C_ENCRYPTION_SECRET_SAFE_DEPLOYMENT.md",
+      "bytes": 8986,
+      "sha256": "8e38b8656dc44475031aa7c5e7b92a1d81de4e59562d6f4de165ef18f6f66088"
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowSecureDeployment.js",
+      "bytes": 15079,
+      "sha256": "8f9a9c29089242613a41915a6be73e311db6ad5fc381bd0909a64ccadef1e786"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertRealShadowSecureDeploymentPrivateOutputsUntracked.js",
+      "bytes": 1404,
+      "sha256": "7558a58033b4844089da84d8fef00011e64d0e3af5a6cabbacb328da6a63b3be"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerCreateRealShadowEvidenceSecretPrivate.js",
+      "bytes": 2128,
+      "sha256": "03f0385780f9bd4c7a94ae36b0a9be0bfc04127141e4812e7dc7f5e26aedfbb5"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyRealShadowSecureDeployment.js",
+      "bytes": 1847,
+      "sha256": "e3fa798fa7b48b9b9e93d925980a55d6e59579e8973ef460f339608b2cb90266"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyRealShadowSecureRuntime.js",
+      "bytes": 1240,
+      "sha256": "9cfba90875ee1dd414b583bd1f3ad2c0abde32952c95be820fd4e1051cb7ff45"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CCollectorStillDisabledSmokeTest.js",
+      "bytes": 812,
+      "sha256": "53c8ffed2a3b0b1a7f4c2ba532341babf01a7d2b388ef663fb8f3959676a229a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CCryptoStrictSecretSmokeTest.js",
+      "bytes": 484,
+      "sha256": "1e2a71f1bfad070d0ad38191ae29d1da9a77a379db11cb45b25f1e3604415f19"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CFoundationRequiredSmokeTest.js",
+      "bytes": 711,
+      "sha256": "a3dffe0e5893701c541c4afd2354abe7ca138c1c70646faaf8a2a61a87ab5e67"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CMalformedEnvelopeSmokeTest.js",
+      "bytes": 452,
+      "sha256": "021cbaf8122ea932090abc855c43dbeb01c6437430c8021acc8764bfa6e34e4d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CManifestSmokeTest.js",
+      "bytes": 1449,
+      "sha256": "cce76a559a83efbf47dd375f6837aca866c5175f1c14ae7caf7ccf8231e196b1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CNoPromotionAuthorizationSmokeTest.js",
+      "bytes": 732,
+      "sha256": "beb917823c6c8cf0c09b67f10564d95f0a3a82db3b90e51d1473206b616b2b17"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CPrivateOutputGuardSmokeTest.js",
+      "bytes": 693,
+      "sha256": "0d3fad0d942ef89f5872a2a0869aacf51c19edb822f20b4e78af36fc680e34cf"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CPrivateSecretCliSmokeTest.js",
+      "bytes": 1039,
+      "sha256": "9f1292da968c5b1da9cb4fe7e30ffc7a06531306883bd3b1f3ab2deccdd8aa3f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CRegistryHashMismatchSmokeTest.js",
+      "bytes": 721,
+      "sha256": "5446fc737988f16241c001a037d869e4df4184688eca4f775df031f194175d6d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CRegistryShaRequiredSmokeTest.js",
+      "bytes": 643,
+      "sha256": "9e1dad6ef55b72d46eda6b1b4bef28683a6d785ba23f00dadf357ef0bcf5eda5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CRegistrySuffixFailClosedSmokeTest.js",
+      "bytes": 880,
+      "sha256": "ee177336f9f62e1af08b2e7ce8e2a709c75c9a74046c4f8e3a0816e42991dd3f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CRuntimeRegistryMismatchSmokeTest.js",
+      "bytes": 868,
+      "sha256": "9159d4ab598b17ae487cef4b041eafb8755c9e26fe39945b5652661c2721a892"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CSecretFormatSmokeTest.js",
+      "bytes": 782,
+      "sha256": "e735fba1c71a96d27384b8bafd4bea64755591e0949ec352fb2e6a752057f0ce"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CSecretNoOverwriteSmokeTest.js",
+      "bytes": 846,
+      "sha256": "b335d4d9edbcc8323b8865e4993480092d6ad0fceb40f926d87cbfdb5bf47319"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CSecureDeploymentSmokeTest.js",
+      "bytes": 845,
+      "sha256": "0f5dcd08205784ff3812fb1b7ea249cac97bbaff23fb4e21b488745e643fa2db"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CSecureRuntimeSmokeTest.js",
+      "bytes": 675,
+      "sha256": "0b0e32b96eae3e525246ed03820dab02bb24a1b879aa6f67a942b81f41d05d63"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CSourceIntegritySmokeTest.js",
+      "bytes": 1255,
+      "sha256": "2cb54bd02fc2fc229e3d7fbfeac155277c6a1b6b6e606c32cedc273aa33bd0fa"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CTestSupport.js",
+      "bytes": 1454,
+      "sha256": "de6153ec7ab870197b4660ef4c6dd40dd4bd0c937c329fbbf143a5bfa3eca2cb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CUnsafeProductionFlagSmokeTest.js",
+      "bytes": 832,
+      "sha256": "7fbd8555d942b1a581c24444c20427f6b64008157880aa64b7ba4790d858b20f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CVerifyCliSmokeTest.js",
+      "bytes": 1273,
+      "sha256": "28c6d44ee1f849a2804d597c0c3d0760c51c1305a5148ddad4af198abba7b5b6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_CVerifyRuntimeCliSmokeTest.js",
+      "bytes": 820,
+      "sha256": "20c3c941181edd8e85040379ca7225831cd4f60150d93c44e0fbe63894a41c74"
+    }
+  ]
+}

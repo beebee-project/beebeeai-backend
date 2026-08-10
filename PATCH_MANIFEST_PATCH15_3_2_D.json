@@ -1,0 +1,149 @@
+{
+  "version": "query_candidate_patch15_3_2_D_manifest_v1",
+  "patch": "15.3.2-D",
+  "phase": "15.3-B",
+  "title": "Limited Evidence Collector Activation",
+  "prerequisite": "15.3.2-C secure runtime verification PASS and READY_FOR_PATCH_15_3_2_D=true",
+  "next": "15.3.2-E Real Shadow Observation Collection",
+  "productionPromotionAuthorized": false,
+  "internalCanaryEnabledByThisPatch": false,
+  "collectorActivationLimitedToAllowlistedRegisteredTraffic": true,
+  "rollbackKillSwitch": "QUERY_CANDIDATE_PLANNER_REAL_SHADOW_EVIDENCE_KILL_SWITCH",
+  "files": [
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_D_LIMITED_EVIDENCE_COLLECTOR_ACTIVATION.md",
+      "sha256": "b105521dd43d792920be7922f409458960ad421e3b19aff2a00dd042878f9ac9",
+      "sizeBytes": 4051
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowEvidenceConfig.js",
+      "sha256": "9648fbcee6b11ebb2622565ae99d24dbbbdf05d9191bc803bafd074aad89c6a8",
+      "sizeBytes": 7115
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowLimitedActivation.js",
+      "sha256": "5b3aacf2ff77c081b8ed19a038f3107f8657db4090bf795471e99dc0ecec13de",
+      "sizeBytes": 6030
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertRealShadowLimitedActivationPrivateOutputsUntracked.js",
+      "sha256": "22f34b05ade84f0db627d09c1dde01f49a89a2c01e7233f120708cc87732bca6",
+      "sizeBytes": 1099
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyRealShadowLimitedActivationPreflight.js",
+      "sha256": "f48806920f2ddfdf306d48954366ec2bc642f7972406bada9ed54f0a9b87ac6d",
+      "sizeBytes": 1080
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyRealShadowLimitedActivationRuntime.js",
+      "sha256": "f72b755b3fcc6f1caa667629f15bcb07459694819a9ce5cd8ca3e680c47a3aa7",
+      "sizeBytes": 1072
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DAllowlistScopeSmokeTest.js",
+      "sha256": "0e92bbefa41b98a8f905d296f18578a6d05418513abc8a5fb240c36741fcfb53",
+      "sizeBytes": 674
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DCliSmokeTest.js",
+      "sha256": "0aa4fc34d560d0a057f41ddc769822c276528fdd8c95eeebae7579a326f0033e",
+      "sizeBytes": 499
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DCollectorOffPreflightSmokeTest.js",
+      "sha256": "f1c02a615925515cf9698d6bd8d14c744ffb9a24fc30a5ccfad856b1ed93e7fa",
+      "sizeBytes": 597
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DConfigBackwardCompatibilitySmokeTest.js",
+      "sha256": "d2e42d269ed9a337177b188f65a442375674c994b33288d68f7e6fe6e3220237",
+      "sizeBytes": 593
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DInternalCanaryStillOffSmokeTest.js",
+      "sha256": "07bd6623f430e62888fe3d7b82a2e8c99b7b0a7b5b8260f7c2e759835c892716",
+      "sizeBytes": 555
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DKillSwitchSmokeTest.js",
+      "sha256": "b87fc5636ff2947ea2c6e53d666e0f796215fbb8ad73043ec089db19a77e1afe",
+      "sizeBytes": 572
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DManifestSmokeTest.js",
+      "sha256": "279dca634e18f4738c843c00f1842ef490490f562e0fe8f416ee38dc937073b1",
+      "sizeBytes": 690
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DMaxRecordsScopeSmokeTest.js",
+      "sha256": "ec00a0c9087b91bd32e3970b97e44471e5ac6011e0c8d83fa0f0f520018c9dd6",
+      "sizeBytes": 650
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DNoPromotionAuthorizationSmokeTest.js",
+      "sha256": "e30c39c2e3c957a9cfa8b0e07c2c2267853c395cc6e20729b34308a053399a63",
+      "sizeBytes": 589
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DPreflightSmokeTest.js",
+      "sha256": "64fca7ded4da611cab19fe8fe9876e99907f75b65850186c11b38594bda97814",
+      "sizeBytes": 530
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DPrivateOutputGuardSmokeTest.js",
+      "sha256": "ab6bd4d1b1ee5c344da7521d4adf9ef5f18c7a6c11edc9e9b88b5b0282272b75",
+      "sizeBytes": 531
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DProductionSafetySmokeTest.js",
+      "sha256": "d51997a7a5e15b0e2f1b80b3dec17a9e0d5421c7b0f16e23985ce066203a899d",
+      "sizeBytes": 605
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DRegistryHashRequiredSmokeTest.js",
+      "sha256": "b6d20e02a1e62b1536e090d1610f13ee539169cb37b02816c78932ef6d37a741",
+      "sizeBytes": 564
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DRegistryScopeSmokeTest.js",
+      "sha256": "0b2a03344d67c2bfb008fecee614f1ef7986e998baca3c85e2d98c78743368aa",
+      "sizeBytes": 844
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DRuntimeRejectsKillSwitchSmokeTest.js",
+      "sha256": "8aa7d4df117038be60e92845af69a5642c0ce7e37577bbc5601a4564b68d24b2",
+      "sizeBytes": 582
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DRuntimeRequiresEnabledSmokeTest.js",
+      "sha256": "177967060d1227572969fcd8dc87b6ea313ca24a73d5d10cc14e778ad4064699",
+      "sizeBytes": 584
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DRuntimeSmokeTest.js",
+      "sha256": "bbbe0c409909082d5af5a5585f70bd1ca82626cbe465e3bb06b43cfbcc0825e5",
+      "sizeBytes": 529
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DSecretRequiredSmokeTest.js",
+      "sha256": "401b1ef85ec8ef85f170e9ab3a8c000b1f5f4788fa19b05634563022c8978fe9",
+      "sizeBytes": 552
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DSourceContractSmokeTest.js",
+      "sha256": "afdcf5be4e6d40e7d890e0b539d506b7bd794c4280bf40d8025e064adce564c9",
+      "sizeBytes": 511
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DTTLScopeSmokeTest.js",
+      "sha256": "5437dee83d53c06dcf8e683acbc5ee4deff931c72453789737062545a9d1d7c4",
+      "sizeBytes": 629
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_DTestSupport.js",
+      "sha256": "172f05609ce6eec9c449bc8baad3557b9da5b3635121098cc94bf9ed7a2a23b5",
+      "sizeBytes": 1553
+    }
+  ]
+}

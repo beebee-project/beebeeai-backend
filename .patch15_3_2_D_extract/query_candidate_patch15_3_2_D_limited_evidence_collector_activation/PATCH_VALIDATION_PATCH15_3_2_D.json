@@ -1,0 +1,25 @@
+{
+  "version": "query_candidate_patch15_3_2_D_validation_v1",
+  "patch": "15.3.2-D",
+  "phase": "15.3-B",
+  "status": "PASS",
+  "qa": {
+    "patchD": {
+      "passed": 20,
+      "total": 20
+    },
+    "syntaxChecks": "PASS",
+    "isolatedPredecessorRegression": "NOT_FULLY_RUN_MISSING_FULL_REPOSITORY_DEPENDENCIES"
+  },
+  "safety": {
+    "collectorPreflightRequiresDisabled": true,
+    "collectorKillSwitchAdded": true,
+    "limitedAllowlistExactlyOne": true,
+    "registryCaseCountRequired": 10,
+    "ttlMaxDays": 7,
+    "maxRecordsCap": 5000,
+    "internalCanaryEnabled": false,
+    "productionPromotionAuthorized": false
+  },
+  "note": "Run predecessor regression suites again in the real BeeBeeAI repository after applying this overlay."
+}

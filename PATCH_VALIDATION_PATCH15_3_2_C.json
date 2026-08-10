@@ -1,0 +1,32 @@
+{
+  "version": "query_candidate_patch15_3_2_C_validation_v1",
+  "patch": "15.3.2-C",
+  "phase": "15.3-B",
+  "decision": "PASS",
+  "scope": "Encryption Secret & Safe Deployment",
+  "additiveOnly": true,
+  "routesModified": false,
+  "collectorActivated": false,
+  "internalCanaryActivated": false,
+  "productionPromotionAuthorized": false,
+  "security": {
+    "secretEntropyBytes": 48,
+    "secretFormat": "BASE64URL_64",
+    "rawSecretLogged": false,
+    "encryption": "AES-256-GCM",
+    "wrongSecretRejected": true,
+    "registryHashPinned": true,
+    "privateOutputGuard": true
+  },
+  "gates": {
+    "phase15_3_AFoundationRequired": true,
+    "collectorMustRemainDisabled": true,
+    "internalAllowlistRequired": true,
+    "productionSafetyRequired": true,
+    "readyForPatch15_3_2_D": true
+  },
+  "qa": {
+    "patchSmokeTests": 20,
+    "predecessor15_3_2FamilyRegression": "PASS"
+  }
+}
