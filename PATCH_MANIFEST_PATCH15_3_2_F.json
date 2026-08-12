@@ -1,0 +1,148 @@
+{
+  "version": "query_candidate_patch15_3_2_F_manifest_v1",
+  "patch": "15.3.2-F",
+  "phase": "15.3-C",
+  "name": "Evaluation Baseline & Operational Performance Evaluation",
+  "mode": "additive-only",
+  "predecessor": "15.3.2-E",
+  "fileCount": 23,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F.json",
+      "bytes": 943,
+      "sha256": "ed180a333be6c88fff733d4c96afb6ef8a25aab6f8bad86a6c13d11546ff33c7"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_EVALUATION_BASELINE_OPERATIONAL_PERFORMANCE.md",
+      "bytes": 11519,
+      "sha256": "f5030f710bebefe8c14f967c074964ab86f17ae9910fb85c031b057aed9e1b8a"
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowEvaluationBaseline.js",
+      "bytes": 16301,
+      "sha256": "e64cac5b4158351caa236981269f15b68e20c106596dadaf52de73dc7067d040"
+    },
+    {
+      "path": "automation/queryCandidatePlannerRealShadowEvaluationBaseline.schema.json",
+      "bytes": 841,
+      "sha256": "4d3a2c83511e3ff79e4cda4f34df5a0b7aef74408f797e938d805a4e3388e974"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerRealShadowEvaluationBaselinePolicy.v1.json",
+      "bytes": 722,
+      "sha256": "f3cbf1771d671023f53afa058db4e6b040da7d9c0c28903823c616870a912ff1"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertRealShadowEvaluationPrivateOutputsUntracked.js",
+      "bytes": 1101,
+      "sha256": "a474c3305daa3463538f93a7a01e9ffa6fad736355a0aa88ab2fb86f45bb1e39"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerBuildRealShadowEvaluationBaseline.js",
+      "bytes": 1966,
+      "sha256": "b68a6816767553edb84accad9888bcc403c3103a386ef53799eeaeeba3ca548d"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerPrepareApprovedActualPricingPolicy.js",
+      "bytes": 2907,
+      "sha256": "517c1d3c4ca3609a363bf8515a250f78a55a4f313f5771a7a6876311ff990159"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyRealShadowEvaluationPreflight.js",
+      "bytes": 2671,
+      "sha256": "2ba58992ee4219a62fe19dc217a6627104a249a98bbca251a95da55bc2ee4cda"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FActualPricingShapeSmokeTest.js",
+      "bytes": 414,
+      "sha256": "06060021ed257a53553dc2d76d5638eec44229544e209c275c16104b9ab2f491"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FBaselinePassSmokeTest.js",
+      "bytes": 501,
+      "sha256": "698ef2d5ce283ac14892d2f36b4a662e59e99383d061ac791955e43653e81c49"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FCollectionIncompleteFailClosedSmokeTest.js",
+      "bytes": 528,
+      "sha256": "7564f733c96a14d4388527e4fa45cfb6e03b5853b3109a129ab598fbd56aef57"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FDeterminismSmokeTest.js",
+      "bytes": 522,
+      "sha256": "c7782a06457c1512e77de486bcd22656c1de42a705871a33f774110f5ea7c1cb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FExistingEvaluatorIsolationSmokeTest.js",
+      "bytes": 531,
+      "sha256": "414f8db4250ea96c29c1e9643df599a921866ae632839be234687c580f7284bb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FGuardrailPrivacyFailClosedSmokeTest.js",
+      "bytes": 443,
+      "sha256": "a4908d2b825af3ce720fa9a505d4d0cffdaceabe413a7606d9b7f28fdf9af191"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FManifestSmokeTest.js",
+      "bytes": 739,
+      "sha256": "78f08830435497cf7261d8e92e8291bce0c23f4eefb245ce6eeffeea8c57e277"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FNoPromotionAuthorizationSmokeTest.js",
+      "bytes": 714,
+      "sha256": "dc5bc56dc953a6b902fa995623a09282227aebd22337a105f151d48b0f7b5acf"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FOperationalBlockedFailClosedSmokeTest.js",
+      "bytes": 717,
+      "sha256": "b2c4be4ae2f86e975514d37695cdf1dd18d5c294be2003b9ece65095e82023a0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FPolicySmokeTest.js",
+      "bytes": 491,
+      "sha256": "0c143420a4190f253e93f671198fd464bfbc747881e7bf5e279c5afb01a217b7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FPricingFailClosedSmokeTest.js",
+      "bytes": 453,
+      "sha256": "4d98f52948fd184d81b142d3e0f4492c1977dad3cfe58ccb25423f4b816ac520"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FSchemaSmokeTest.js",
+      "bytes": 433,
+      "sha256": "87b9a21c9736611fcccd7dd30ad44d10ea0bd92cbe12bc0bff54f0ebcb057bb5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FSourceIntegritySmokeTest.js",
+      "bytes": 831,
+      "sha256": "d3bd60c535fc205f5e97157552dc75a0c5e854c97f3a171b7efe3ad1bb4f1a97"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_FTestSupport.js",
+      "bytes": 2545,
+      "sha256": "918481cb6948c069cc0d33ab8cc44f19fb079fc82b789fce6e2d62f4deae3953"
+    }
+  ],
+  "changeSet": {
+    "additiveOnly": true,
+    "existingProductionSourcesModified": false,
+    "routesModified": false,
+    "controllersModified": false,
+    "featureControlModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "shadowAccuracyEvaluatorModified": false,
+    "promotionGateModified": false,
+    "collectorRuntimeModified": false,
+    "railwayEnvironmentChangedByPatch": false
+  },
+  "evaluationContract": {
+    "minimumExecutionCount": 50,
+    "minimumLifecycleCount": 20,
+    "minimumCaseCount": 10,
+    "pricingMode": "APPROVED_ACTUAL",
+    "operationalDecision": "EVALUATION_PASS",
+    "baselineDecision": "EVALUATION_BASELINE_PASS",
+    "evaluationOnly": true,
+    "promotionAuthorized": false
+  }
+}

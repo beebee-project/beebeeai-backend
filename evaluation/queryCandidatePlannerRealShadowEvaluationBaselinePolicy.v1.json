@@ -1,0 +1,21 @@
+{
+  "version": "query_candidate_planner_real_shadow_evaluation_baseline_policy_v1",
+  "policyId": "beebeeai_real_shadow_evaluation_baseline_2026_08_v1",
+  "minimumExecutionCount": 50,
+  "minimumLifecycleCount": 20,
+  "minimumCaseCount": 10,
+  "requireCollectionProtocolComplete": true,
+  "requireApprovedActualPricing": true,
+  "requireOperationalEvaluationPass": true,
+  "requireEvaluationOnly": true,
+  "requirePromotionBlocked": true,
+  "maximumPrivacyViolationCount": 0,
+  "maximumGuardrailViolationCount": 0,
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "version": "query_candidate_patch15_3_2_F_validation_v1",
+  "patch": "15.3.2-F",
+  "name": "Evaluation Baseline & Operational Performance Evaluation",
+  "phase": "15.3-C",
+  "validation": {
+    "syntax": "PASS",
+    "newSmokeTests": {
+      "passed": 13,
+      "total": 13
+    },
+    "additiveOnly": true,
+    "existingEvaluatorModified": false,
+    "routeMutation": false,
+    "collectorActivationMutation": false,
+    "internalCanaryActivation": false,
+    "productionPromotionAuthorization": false,
+    "actualPricingHardcoded": false,
+    "pricingRequiresOperatorApproval": true,
+    "minimumExecutionCount": 50,
+    "minimumLifecycleCount": 20,
+    "minimumCaseCount": 10,
+    "baselineDecision": "EVALUATION_BASELINE_PASS",
+    "failClosed": true
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "providerCallsExecutedByBaselineBuilder": 0,
+    "privateOutputsMustRemainUntracked": true
+  }
+}

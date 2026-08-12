@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Query Candidate Planner Real Shadow Evaluation Baseline",
+  "type": "object",
+  "required": [
+    "version",
+    "decision",
+    "failClosed",
+    "evaluationOnly",
+    "promotionAuthorized",
+    "source",
+    "coverage",
+    "pricing",
+    "operational",
+    "guardrails",
+    "baselineSha256"
+  ],
+  "properties": {
+    "version": {
+      "const": "query_candidate_planner_real_shadow_evaluation_baseline_v1"
+    },
+    "decision": {
+      "const": "EVALUATION_BASELINE_PASS"
+    },
+    "failClosed": {
+      "const": true
+    },
+    "evaluationOnly": {
+      "const": true
+    },
+    "promotionAuthorized": {
+      "const": false
+    },
+    "baselineSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": true
+}

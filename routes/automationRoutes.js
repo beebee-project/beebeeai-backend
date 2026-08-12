@@ -38,7 +38,16 @@ function observeQueryCandidatePlannerForInternalPreview(observation, context) {
   defaultObservationLogger(observation, context);
   recordQueryCandidatePlannerInternalPreviewObservation(observation);
   // void recordQueryCandidatePlannerRealShadowObservation(observation, context);
-  void recordQueryCandidatePlannerRealShadowObservation(observation, context);
+  void recordQueryCandidatePlannerRealShadowObservation(
+    observation,
+    context,
+  ).then((result) => {
+    console.log("[real-shadow-evidence]", {
+      kind: "EXECUTION",
+      stored: result?.stored === true,
+      reason: String(result?.reason || "UNKNOWN"),
+    });
+  });
 }
 
 const getAnalysisCandidatesShadowObserved =
@@ -57,9 +66,15 @@ const downloadGeneratedFileCacheRetained =
       //   context,
       // );
       void recordQueryCandidatePlannerRealShadowLifecycleObservation(
-    observation,
-    context,
-  );
+        observation,
+        context,
+      ).then((result) => {
+        console.log("[real-shadow-evidence]", {
+          kind: "LIFECYCLE",
+          stored: result?.stored === true,
+          reason: String(result?.reason || "UNKNOWN"),
+        });
+      });
     },
   });
 
