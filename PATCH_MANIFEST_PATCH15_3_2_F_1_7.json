@@ -1,0 +1,102 @@
+{
+  "patch": "15.3.2-F.1.7",
+  "scope": "CANARY_SUBJECT_ROTATION_PREPARATION_AND_APPROVAL_REBINDING_READINESS",
+  "baseline": {
+    "f14CandidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "f10ThroughF14EvaluationBaselinePreserved": true
+  },
+  "guardrails": {
+    "rawIdentityTracked": false,
+    "environmentModified": false,
+    "railwayModified": false,
+    "routeModified": false,
+    "providerCallsExecutedByPatch": 0,
+    "actualOperationalTelemetry": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false
+  },
+  "nextGate": {
+    "f15ReceiptReissueRequired": true,
+    "f16ApprovalBindingReverificationRequired": true,
+    "f161CompositionReverificationRequired": true,
+    "providerFreeRuntimePreflightE2ERequired": true
+  },
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_7.json",
+      "bytes": 657,
+      "sha256": "67C3C87D8D60AB5A5D10DF75ED4809876503E7B17FAEA9018E294BBD9010F357"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_7_CANARY_SUBJECT_ROTATION.md",
+      "bytes": 1764,
+      "sha256": "03485125E8264422B6AFEB20BEFF714B908FABD7953F71E343096C06F0B11452"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanarySubjectRotation.js",
+      "bytes": 4749,
+      "sha256": "5CF9C3C8166FA95BBE7A19CBCC56B63400802AF14CBE1D1DAFBB10527259CD64"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerPrepareInternalCanarySubjectRotation.js",
+      "bytes": 2448,
+      "sha256": "21A3DE1E4539EB4642BB4AE8C83B8AE7182541AB732A4EC05E894C44AF4DA93A"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanarySubjectRotation.js",
+      "bytes": 3211,
+      "sha256": "5E9A37065500AE75FD2C18E7A8DE4F57D44CD14FC2FBC00656498F25BDB36293"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7CandidateBindingSmokeTest.js",
+      "bytes": 722,
+      "sha256": "FEA192AF25FD8AA96B45C07BED9C3A701906B4A6F9D6DCA0D89C2AC11F790E96"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7InvalidAllowlistSmokeTest.js",
+      "bytes": 573,
+      "sha256": "BA516BB976DDB0900852B89B27C1CA2ACF4EB611F6239FB3D3EC413A03F027AE"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7ManifestSmokeTest.js",
+      "bytes": 853,
+      "sha256": "E3048673BE32523CBC5A89810EDD23861EE4C9BAAA8613EBF618607DFBD48D4B"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7NoMutationSmokeTest.js",
+      "bytes": 914,
+      "sha256": "651242BCD66B10EBBF6BFB9FBD255EECA311FFCFE057A36D419B2135A697140F"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7PrivacyBoundarySmokeTest.js",
+      "bytes": 702,
+      "sha256": "2244A5ED74EBB1A95DEFC63D3CC381930D09BD24D14B91C595B9839662C8C635"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7RotationContractSmokeTest.js",
+      "bytes": 898,
+      "sha256": "17395B219904663379640AF77C79C8152A29337021AED27AA6D71CB67CF977BD"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7SameSubjectBlockedSmokeTest.js",
+      "bytes": 627,
+      "sha256": "1256C6F6A794BB43FD873E907D5F1584BC64D2289FF08679B381BDACF17FEAF5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7ScriptContractSmokeTest.js",
+      "bytes": 944,
+      "sha256": "19160736F140578231DB67B53C87973D184B0204EC577F2AA877D03388CC6D99"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7SourceIntegritySmokeTest.js",
+      "bytes": 820,
+      "sha256": "4FF7ACCB944F010CDB33CF9BA59C6A121A9496BD2BD5B21C0900CA6C8F65AAE7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_7TestSupport.js",
+      "bytes": 344,
+      "sha256": "39059B4A08A633F2CD122F565FC1655CA380AA6FD062A73D45273D8E3F53DF91"
+    }
+  ],
+  "fileCount": 15
+}

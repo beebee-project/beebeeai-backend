@@ -1,0 +1,16 @@
+{
+  "patch": "15.3.2-F.1.7",
+  "decision": "READY_FOR_LOCAL_SUBJECT_ROTATION_PREPARATION",
+  "f14CandidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+  "f10ThroughF14EvaluationBaselinePreserved": true,
+  "f15ReceiptReissueRequiredAfterRotation": true,
+  "f16ApprovalBindingReverificationRequired": true,
+  "f161CompositionReverificationRequired": true,
+  "providerFreeRuntimePreflightE2ERequired": true,
+  "actualOperationalTelemetry": false,
+  "railwayModified": false,
+  "routeModified": false,
+  "providerCallsExecutedByPatch": 0,
+  "percentageRolloutAuthorized": false,
+  "productionPromotionAuthorized": false
+}

@@ -1,0 +1,38 @@
+{
+  "version": "query_candidate_planner_internal_canary_subject_rotation_v1",
+  "valid": true,
+  "decision": "READY_FOR_LOCAL_APPROVAL_REBINDING",
+  "reason": "F_1_7_CANARY_SUBJECT_ROTATION_PREPARED",
+  "failClosed": true,
+  "currentAllowlistSha256": "8B7B8D908F28047E0C662BD29A2155ED7450D84265F104D54CA74CB3CD8431FD",
+  "proposedAllowlistSha256": "35D88A2074548BB9A6DB6BD3415CEE3CD2024BE9896AE6EC23260DB9B859AB95",
+  "subject": {
+    "complete": true,
+    "subjectSha256": "35D88A2074548BB9A6DB6BD3415CEE3CD2024BE9896AE6EC23260DB9B859AB95",
+    "source": "ACCOUNT_ID",
+    "rawIdentityIncluded": false
+  },
+  "immutableBindings": {
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "priorAllowlistSha256": "8B7B8D908F28047E0C662BD29A2155ED7450D84265F104D54CA74CB3CD8431FD",
+    "proposedAllowlistSha256": "35D88A2074548BB9A6DB6BD3415CEE3CD2024BE9896AE6EC23260DB9B859AB95"
+  },
+  "approvalRebinding": {
+    "f14CandidatePreserved": true,
+    "f15ReceiptReissueRequired": true,
+    "f16ApprovalBindingReverificationRequired": true,
+    "f161CompositionReverificationRequired": true,
+    "runtimePreflightE2ERequired": true
+  },
+  "guardrails": {
+    "localProcessOnlyUntilExplicitPromotionStep": true,
+    "rawIdentityIncluded": false,
+    "environmentModified": false,
+    "railwayModified": false,
+    "routeModified": false,
+    "providerCallsExecutedByRotation": 0,
+    "actualOperationalTelemetry": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false
+  }
+}
