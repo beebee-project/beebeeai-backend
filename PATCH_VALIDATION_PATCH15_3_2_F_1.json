@@ -1,0 +1,20 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_validation_v1",
+  "patch": "15.3.2-F.1",
+  "name": "E-X Compatibility & Canonical Evaluation Input",
+  "validation": {
+    "syntax": "PASS",
+    "smoke": {
+      "passed": 16,
+      "total": 16
+    },
+    "additiveOnly": true,
+    "existingEvaluatorModified": false,
+    "routesModified": false,
+    "providerCallsByPatch": 0,
+    "patchESummaryRequired": false,
+    "actualOperationalTelemetry": false,
+    "promotionAuthorized": false,
+    "thresholdAutoRelaxation": false
+  }
+}

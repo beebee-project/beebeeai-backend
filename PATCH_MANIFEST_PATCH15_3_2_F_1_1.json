@@ -1,0 +1,97 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_1_manifest_v1",
+  "patch": "15.3.2-F.1.1",
+  "phase": "15.3-C",
+  "name": "Historical Patch 13.3 Readiness Evidence Recovery",
+  "mode": "additive-only",
+  "predecessor": "15.3.2-F.1",
+  "fileCount": 14,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_1.json",
+      "bytes": 585,
+      "sha256": "9402c7a776c49fd84d68d11ca5c0a7f99e290543c1167e5e0e12237bb4766219"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_1_HISTORICAL_READINESS_RECOVERY.md",
+      "bytes": 5047,
+      "sha256": "fc4b9dd1fef8aa9f971a6b6edc923059305f5d405eed391eade4d108416237cd"
+    },
+    {
+      "path": "automation/queryCandidatePlannerHistoricalReadinessEvidenceRecovery.js",
+      "bytes": 8207,
+      "sha256": "3c26136f0fbdf7b3e485640fc76e92a35e2b84d7e14b1e82caea56d0dab67ac2"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerHistoricalReadinessEvidenceRecoveryPolicy.v1.json",
+      "bytes": 1071,
+      "sha256": "b8b9ed90aec814ba69792263f941c16578b0fd66729dcc9f8e3a25e97aeb4c84"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertHistoricalReadinessPrivateOutputUntracked.js",
+      "bytes": 853,
+      "sha256": "6f53a3f2eb509a6ba8ef0e7f24eaf70b3e48a74b7c8c6a374ba3366ccdbe8e53"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerRestoreHistoricalReadinessEvidence.js",
+      "bytes": 1980,
+      "sha256": "fe449e0c9226cdefa7b0933c46f4e28f0702addd81fcbd96e18400b5ddb7f6e0"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyHistoricalReadinessF1Compatibility.js",
+      "bytes": 2138,
+      "sha256": "81a295532af2034a0ec56d2413ed62aa3dd6cce17f4c523bceeaceafe7631abf"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1DeterminismSmokeTest.js",
+      "bytes": 438,
+      "sha256": "037cace36143e95d281e659e2ef409dc5d4a64e67ec7f839c989c2c02eb62cad"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1FailClosedSmokeTest.js",
+      "bytes": 483,
+      "sha256": "414e319a841f3e57e0fe78e582bd4b0f8b7aa445734132abefa371790a4c46f3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1HistoricalFactsSmokeTest.js",
+      "bytes": 786,
+      "sha256": "886c55a405980d0fa4656f401f29c255f8ac9f7989fa19d4154fe8709667c919"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1ManifestSmokeTest.js",
+      "bytes": 539,
+      "sha256": "734bf21c28f5e34743717fc2a22d6f2254274e1f7a5158c11b657e2f72d6df69"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1NoPromotionSmokeTest.js",
+      "bytes": 587,
+      "sha256": "7a59736d44620ebf01e6bc520a78042c0d2442d345ff193c75d944c052f8b7c8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1RecoverySmokeTest.js",
+      "bytes": 610,
+      "sha256": "53ae413102e2c0f9544f72b74fbe61e844c93ac3520999eae0bb4db383751753"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_1SanitizationSmokeTest.js",
+      "bytes": 632,
+      "sha256": "abd5575af675c34a73d50560cfd61cbe009fb3609207804624fb0551d788e177"
+    }
+  ],
+  "changeSet": {
+    "additiveOnly": true,
+    "existingProductionSourcesModified": false,
+    "routesModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "canonicalEvaluationInputModified": false,
+    "collectorRuntimeModified": false,
+    "promotionGateModified": false
+  },
+  "recoveryContract": {
+    "historicalEvidenceOnly": true,
+    "providerCallsExecutedByRecovery": 0,
+    "currentOperationalTelemetry": false,
+    "productionPromotionAuthorized": false,
+    "privateOutputDoNotCommit": true
+  }
+}

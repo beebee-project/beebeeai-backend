@@ -1,0 +1,24 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_3_validation_v1",
+  "patch": "15.3.2-F.1.3",
+  "name": "Actual Pricing Absolute Cost Threshold Recalibration",
+  "validation": {
+    "syntax": "PASS",
+    "additiveOnly": true,
+    "sourceThresholdPolicyModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "providerCallsByPatch": 0,
+    "productionPromotionAuthorized": false,
+    "headroomRate": 0.2,
+    "roundingIncrementMicrousd": 100,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "averageCostMicrousdMax": 2600,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMinPreserved": 0.59,
+    "expectedEvaluationDecision": "EVALUATION_PASS",
+    "smoke": {
+      "passed": 13,
+      "total": 13
+    }
+  }
+}

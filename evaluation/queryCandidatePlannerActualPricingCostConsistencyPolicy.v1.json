@@ -1,0 +1,37 @@
+{
+  "version": "query_candidate_planner_actual_pricing_cost_consistency_policy_v1",
+  "policyId": "beebeeai_patch15_3_2_f_1_2_actual_pricing_cost_consistency_v1",
+  "method": "SCENARIO_COLD_TOKEN_COST_REPRICED_WITH_APPROVED_ACTUAL_POLICY",
+  "sourceRequirements": {
+    "patchF1CanonicalInput": true,
+    "approvedActualPricing": true,
+    "oneColdExecutionPerScenario": true,
+    "coldProviderTokenCounts": true
+  },
+  "changes": {
+    "expectedColdCostMicrousdRepriced": true,
+    "originalThresholdPolicyModified": false,
+    "costCacheLatencyEvaluatorModified": false
+  },
+  "expectedCanonicalDatasetFacts": {
+    "scenarioCount": 5,
+    "executionCount": 25,
+    "cacheHitCount": 15,
+    "providerCallCount": 10
+  },
+  "expectedApprovedTerraResult": {
+    "providerCostMicrousd": 48900,
+    "avoidedByCacheMicrousd": 72600,
+    "cacheCostAvoidanceRate": 0.597531,
+    "cacheCostAvoidanceThreshold": 0.59,
+    "cacheCostAvoidanceExpectedPass": true,
+    "absoluteCostThresholdFailureCountExpected": 3
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "actualOperationalTelemetry": false,
+    "providerCallsExecutedByPatch": 0,
+    "promotionAuthorized": false,
+    "thresholdAutoRelaxation": false
+  }
+}

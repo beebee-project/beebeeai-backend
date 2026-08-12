@@ -1,0 +1,51 @@
+{
+  "version": "query_candidate_planner_actual_pricing_absolute_cost_threshold_recalibration_policy_v1",
+  "policyId": "beebeeai_patch15_3_2_f_1_3_absolute_cost_recalibration_v1",
+  "methodology": {
+    "basis": "MAX_OBSERVED_PROVIDER_COST_PLUS_HEADROOM",
+    "headroomRate": 0.2,
+    "roundingIncrementMicrousd": 100,
+    "providerCallCeiling": "ceil_to_100(max_provider_call_cost * 1.20)",
+    "averageExecutionCeiling": "ceil_to_100(provider_call_ceiling * preserved_provider_call_rate_max)",
+    "monthlyCeiling": "average_execution_ceiling * preserved_monthly_projection_executions"
+  },
+  "expectedDistribution": {
+    "providerCallSamples": 10,
+    "costsMicrousd": [
+      4400,
+      4500,
+      4620,
+      4720,
+      4840,
+      4940,
+      5060,
+      5160,
+      5280,
+      5380
+    ],
+    "averageMicrousd": 4890,
+    "p95Microusd": 5380,
+    "maxMicrousd": 5380
+  },
+  "derivedThresholds": {
+    "providerCallAverageCostMicrousdMax": 6500,
+    "averageCostMicrousdMax": 2600,
+    "monthlyProjectedCostMicrousdMax": 26000000
+  },
+  "preserved": {
+    "providerCallRateMax": 0.4,
+    "monthlyProjectionExecutions": 10000,
+    "cacheCostAvoidanceRateMin": 0.59,
+    "warmAverageCostMicrousdMax": 0,
+    "allNonCostThresholds": true
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "sourceThresholdPolicyModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "providerCallsExecutedByPatch": 0,
+    "productionPromotionAuthorized": false,
+    "productionMergeAuthorized": false,
+    "thresholdAutoRelaxation": false
+  }
+}

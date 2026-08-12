@@ -1,0 +1,22 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_2_validation_v1",
+  "patch": "15.3.2-F.1.2",
+  "name": "Actual Pricing Cache-Avoidance Cost Consistency",
+  "validation": {
+    "syntax": "PASS",
+    "smoke": {
+      "passed": 12,
+      "total": 12
+    },
+    "additiveOnly": true,
+    "thresholdPolicyModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "providerCallsByPatch": 0,
+    "productionPromotionAuthorized": false,
+    "expectedProviderCostMicrousd": 48900,
+    "expectedAvoidedByCacheMicrousd": 72600,
+    "expectedCacheCostAvoidanceRate": 0.597531,
+    "expectedCacheCostAvoidancePass": true,
+    "expectedRemainingAbsoluteCostFailures": 3
+  }
+}

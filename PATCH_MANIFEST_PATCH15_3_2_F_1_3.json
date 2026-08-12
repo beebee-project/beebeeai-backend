@@ -1,0 +1,133 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_3_manifest_v1",
+  "patch": "15.3.2-F.1.3",
+  "phase": "15.3-C",
+  "name": "Actual Pricing Absolute Cost Threshold Recalibration",
+  "mode": "additive-only",
+  "predecessor": "15.3.2-F.1.2",
+  "fileCount": 20,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_3.json",
+      "bytes": 754,
+      "sha256": "abe2e5ccab3873bb7ee2ee954bd3c7664b5deb3e4830fdbc14d032e3f09a16b3"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_3_ACTUAL_PRICING_ABSOLUTE_COST_THRESHOLD_RECALIBRATION.md",
+      "bytes": 1924,
+      "sha256": "4351d3f1f00790c51e5698423dca71bc7728bf48af03d084a3cbe0505623d93d"
+    },
+    {
+      "path": "automation/queryCandidatePlannerActualPricingAbsoluteCostThresholdRecalibration.js",
+      "bytes": 11704,
+      "sha256": "6c2b3d2df84c35a63cbfb159856ccdb88de8fe93b29c878f607e93d606c2829b"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerActualPricingAbsoluteCostThresholdRecalibrationPolicy.v1.json",
+      "bytes": 1555,
+      "sha256": "7dec259fea3d2429d7a8ec424c18a6e7c60e3461c2cad58770fe0df3d3cf9a35"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertActualPricingAbsoluteCostPrivateOutputsUntracked.js",
+      "bytes": 961,
+      "sha256": "a31be9ab0dc04fe7dc405bd48ece568b7b27a90ca98396574a4511bcd51b45b1"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerPrepareActualPricingAbsoluteCostThresholdPolicy.js",
+      "bytes": 2800,
+      "sha256": "d74007ca425ad4229f294b5636b5b33b714099b6f04ba8c7f24b74af464e8a73"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerRunActualPricingAbsoluteCostThresholdReevaluation.js",
+      "bytes": 4895,
+      "sha256": "a28e29bae3e3264089a1676d9e88a1b1b4efda2b13e90ec9a48f6e1aebf2eec4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3AssessmentPassSmokeTest.js",
+      "bytes": 1074,
+      "sha256": "88378437aa82befe0874b4a2a66441f79557298bd8739ac8e7d50d1abde1ca40"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3DeterminismSmokeTest.js",
+      "bytes": 582,
+      "sha256": "3268a99d0f6a52d11f1f9e19cf5afcb6da54cbd0ff1a9a16108fe31b4caff625"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3DistributionSmokeTest.js",
+      "bytes": 613,
+      "sha256": "5db2b85cede6fbf9509681a6f603f9f01987104632c0ea070cfc0d245c4c9c2c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3HeadroomGuardrailSmokeTest.js",
+      "bytes": 472,
+      "sha256": "8eea3625a71cf68e59fd1d11c894b6d4e087814b0f28676eade6c39df4e5fc65"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3HeadroomSmokeTest.js",
+      "bytes": 644,
+      "sha256": "143a94ee0a1e24b9c8bc1d02babaeb16280d725404a4abe71a58e805fbd7df35"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3ManifestSmokeTest.js",
+      "bytes": 535,
+      "sha256": "87e5447988a5c76b9165bbd31e68e3d357c8afcf1db1c1ba29ff23778da6392c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3NoMutationSmokeTest.js",
+      "bytes": 519,
+      "sha256": "9fb312c0379a49f9c9296efbc0485e70843697d54fecd1598cbc1c7bdc556cb7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3NoPromotionSmokeTest.js",
+      "bytes": 504,
+      "sha256": "13f13c73c74e4fe0b60d6954479b8b324dc6ee96aff00f4638dc0f842d032aa2"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3PolicySmokeTest.js",
+      "bytes": 582,
+      "sha256": "4557960eb726ec12017252d798725f28193e966e87ebadc2f10ae42be139c688"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3PreservationSmokeTest.js",
+      "bytes": 760,
+      "sha256": "77aa7c78142ecb15d25346b5a50ed5aff5a4831bc4d1efe1ac4c1f53dffd7302"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3ProviderSampleFailClosedSmokeTest.js",
+      "bytes": 588,
+      "sha256": "7296be0390305a61f61eecda201d3a0937774037cc72b83c6067c1c030990a2f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3TestSupport.js",
+      "bytes": 2917,
+      "sha256": "06a3252d49df4c1a8f534ad744b8cd99b49e5e8b7f2e044f683b5a96f6b8c932"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_3ThresholdScopeSmokeTest.js",
+      "bytes": 688,
+      "sha256": "53cf9e8498d29857709158f3df7a490c7aa7ca450ddc668826620a61ba460bc7"
+    }
+  ],
+  "changeSet": {
+    "additiveOnly": true,
+    "existingProductionSourcesModified": false,
+    "sourceThresholdPolicyModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "routesModified": false,
+    "collectorRuntimeModified": false,
+    "promotionGateModified": false
+  },
+  "contract": {
+    "providerCallCostMaxMicrousd": 5380,
+    "headroomRate": 0.2,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "providerCallRateMaxPreserved": 0.4,
+    "averageCostMicrousdMax": 2600,
+    "monthlyProjectionExecutionsPreserved": 10000,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMinPreserved": 0.59,
+    "changedThresholdCount": 3,
+    "providerCallsExecutedByPatch": 0,
+    "productionPromotionAuthorized": false
+  }
+}

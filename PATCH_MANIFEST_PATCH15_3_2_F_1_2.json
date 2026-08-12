@@ -1,0 +1,119 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_2_manifest_v1",
+  "patch": "15.3.2-F.1.2",
+  "phase": "15.3-C",
+  "name": "Actual Pricing Cache-Avoidance Cost Consistency",
+  "mode": "additive-only",
+  "predecessor": "15.3.2-F.1.1",
+  "fileCount": 18,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_2.json",
+      "bytes": 674,
+      "sha256": "47f41fba97adfa859675d7f6b551d33c7adf2e707ef0b07150c1a88a22789ef0"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_2_ACTUAL_PRICING_COST_CONSISTENCY.md",
+      "bytes": 5780,
+      "sha256": "95e2224c2689b9d88fac50ee8bc8d00ca8404dcd8e6ee5137e2c62238466aab7"
+    },
+    {
+      "path": "automation/queryCandidatePlannerActualPricingCacheAvoidanceConsistency.js",
+      "bytes": 12067,
+      "sha256": "6435a8902ba080857eb17634db99db6dd15544e2a1342ae877c7c2e5994db02b"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerActualPricingCostConsistencyPolicy.v1.json",
+      "bytes": 1213,
+      "sha256": "dfe38009fbdb38c8ead4c61799ae930de2232222f3fb45245096b9b1002d198e"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerPrepareActualPricingConsistentEvaluationInput.js",
+      "bytes": 2076,
+      "sha256": "ce6d770ba7506e09bc899e6824bffc1b9a40a6a344b569c65434846d838994be"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerRunActualPricingCostConsistencyReevaluation.js",
+      "bytes": 3752,
+      "sha256": "58b38f52c61a63c0187067911ca4e4ac4d7e24104db74ab845512dcd23eb6c27"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2AssessmentSmokeTest.js",
+      "bytes": 1157,
+      "sha256": "3f40eca2736da16f9d26878343c0027b1b1d104cd2d3345ce13cedc783dcd0ab"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2AvoidedCostSmokeTest.js",
+      "bytes": 691,
+      "sha256": "f94f97ed8c22ed77bbf173eab159ecc732c0aab4f03c49d6f6b9e852a3e5621e"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2CacheHitRepricingSmokeTest.js",
+      "bytes": 687,
+      "sha256": "5b2b933fb1eaca936f894808dabbb2a5db480d5c803c12a8ef00ad7024dc618b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2DeterminismSmokeTest.js",
+      "bytes": 597,
+      "sha256": "e4d67568aa664ba844e32369ce0929c609da6b938a56044980a8b4ab888e1aaa"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2ManifestSmokeTest.js",
+      "bytes": 526,
+      "sha256": "d5ad46e405c42f9578f88588410fd27ad19247d391f39c14fa7afd54ce3716fc"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2MissingColdFailClosedSmokeTest.js",
+      "bytes": 719,
+      "sha256": "bdfa690a7ad8d0c80bb7eff632999283fd7d0df7aeadba26fb1e39d17f4f06c6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2NoMutationSmokeTest.js",
+      "bytes": 564,
+      "sha256": "cd838c85ebda5e202e6dd4de14e30072068f308e920b747db9a53366d2c491d1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2NoPromotionSmokeTest.js",
+      "bytes": 623,
+      "sha256": "fe97a78b531b1e85bd384867544b155bde7e68aebc9eafbb5673bbdf114b737b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2PolicySmokeTest.js",
+      "bytes": 578,
+      "sha256": "24676e0c0de73322088b3d8476decb2dd445e3c9713a2766e020d07b0af518e2"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2ProviderCostSmokeTest.js",
+      "bytes": 499,
+      "sha256": "95fa367c0411d1f28f04b1bb53691a457da1448eacc983002a358f211e769b37"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2TestSupport.js",
+      "bytes": 2914,
+      "sha256": "501b3d5335df394e34758c7785eb1bc322a2132da57eb4fe276d29e5cb00f3dc"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_2ThresholdPreservationSmokeTest.js",
+      "bytes": 354,
+      "sha256": "b06762e22a75ea434d7d37d070671a11bda4e28111c9d8aa7383be8428e5edc4"
+    }
+  ],
+  "changeSet": {
+    "additiveOnly": true,
+    "existingProductionSourcesModified": false,
+    "costCacheLatencyEvaluatorModified": false,
+    "thresholdPolicyModified": false,
+    "routesModified": false,
+    "collectorRuntimeModified": false,
+    "promotionGateModified": false
+  },
+  "expectedReevaluation": {
+    "providerCostMicrousd": 48900,
+    "avoidedByCacheMicrousd": 72600,
+    "cacheCostAvoidanceRate": 0.597531,
+    "cacheCostAvoidanceThreshold": 0.59,
+    "cacheCostAvoidancePassed": true,
+    "absoluteCostFailureCount": 3,
+    "nonCostFailureCount": 0
+  }
+}

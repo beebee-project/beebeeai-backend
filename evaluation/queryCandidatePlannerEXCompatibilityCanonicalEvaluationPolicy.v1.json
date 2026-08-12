@@ -1,0 +1,26 @@
+{
+  "version": "query_candidate_planner_e_x_compatibility_canonical_evaluation_policy_v1",
+  "policyId": "beebeeai_patch15_3_2_f_1_e_x_compatibility_v1",
+  "methodologyMode": "CANONICAL_BENCHMARK_WITH_APPROVED_ACTUAL_PRICING",
+  "sourceRequirements": {
+    "patch15_1CanonicalDataset": true,
+    "approvedActualPricing": true,
+    "patch13_3LiveProviderCacheParity": true,
+    "patchECollectionSummary": false
+  },
+  "interpretation": {
+    "actualPricing": true,
+    "actualLiveProviderParityEvidence": true,
+    "actualOperationalTelemetry": false,
+    "currentProductionTrafficMeasurement": false,
+    "canonicalLatencyAndLifecycleBenchmark": true
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "canaryPromotionEvidence": false,
+    "productionPromotionEvidence": false,
+    "collectorActivation": false,
+    "providerCallsExecutedByPatch": 0
+  }
+}
