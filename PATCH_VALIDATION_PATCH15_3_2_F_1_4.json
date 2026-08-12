@@ -1,0 +1,25 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_4_validation_v1",
+  "patch": "15.3.2-F.1.4",
+  "name": "Internal Canary Evidence Candidate Bundle",
+  "validation": {
+    "syntax": "PASS",
+    "additiveOnly": true,
+    "gateModified": false,
+    "environmentModified": false,
+    "routesModified": false,
+    "featureFlagsModified": false,
+    "killSwitchModified": false,
+    "allowlistModified": false,
+    "providerCallsByPatch": 0,
+    "internalCanaryReviewEligible": true,
+    "internalCanaryAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "expectedReviewDecision": "ELIGIBLE_FOR_INTERNAL_ALLOWLIST_CANARY_REVIEW",
+    "smoke": {
+      "passed": 14,
+      "total": 14
+    }
+  }
+}

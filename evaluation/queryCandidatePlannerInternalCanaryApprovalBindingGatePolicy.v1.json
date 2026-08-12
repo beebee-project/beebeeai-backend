@@ -1,0 +1,66 @@
+{
+  "version": "query_candidate_planner_internal_canary_approval_binding_gate_policy_v1",
+  "policyId": "beebeeai_patch15_3_2_f_1_6_internal_allowlist_canary_gate_integration_v1",
+  "scope": "INTERNAL_ALLOWLIST_CANARY_ONLY",
+  "requiredBindings": {
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "approvalReceiptPayloadSha256EnvironmentVariable": "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_BUNDLE_SHA256",
+    "approvalReceiptJsonEnvironmentVariable": "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_RECEIPT_JSON",
+    "allowlistEnvironmentVariable": "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256",
+    "requestSubjectMustEqualApprovedAllowlistSha": true
+  },
+  "runtimeRequirements": {
+    "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_KILL_SWITCH": "0",
+    "QUERY_CANDIDATE_PLANNER_KILL_SWITCH": "0",
+    "QUERY_CANDIDATE_PLANNER_FEATURE_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_SHADOW_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_PROVIDER_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_PROVIDER_KILL_SWITCH": "0",
+    "QUERY_CANDIDATE_PLANNER_PRODUCTION_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_PRODUCTION_CANDIDATE_MERGE_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_PRODUCTION_READY_ASSIGNMENT_ENABLED": "0",
+    "QUERY_CANDIDATE_PLANNER_PRODUCTION_ROUTE_ENABLED": "0",
+    "QUERY_CANDIDATE_PLANNER_PRODUCTION_KILL_SWITCH": "0",
+    "QUERY_CANDIDATE_PLANNER_PROMOTION_GATE_ENABLED": "1",
+    "QUERY_CANDIDATE_PLANNER_PROMOTION_AUDIENCE_MODE": "ALLOWLIST",
+    "QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT": "0",
+    "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_LLM_MODE": "SEMANTIC_PROFILER_ONLY"
+  },
+  "featureControlOperationsRequired": [
+    "SHADOW_EXECUTION",
+    "PROVIDER_CALL",
+    "PRODUCTION_CANDIDATE_MERGE"
+  ],
+  "evidenceSemantics": {
+    "actualOperationalTelemetry": false,
+    "historicalLiveProviderParityEvidence": true,
+    "canaryEvidenceCollectionRequired": true,
+    "mustNotClaimRealCanaryTelemetryBeforeCanary": true
+  },
+  "authorizationBoundary": {
+    "internalCanaryManualApprovalGranted": true,
+    "runtimeGateBindingAppliedAfterIntegration": true,
+    "runtimeCanaryMayBeAuthorizedForApprovedAllowlistOnly": true,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionReadyAssignmentAuthorized": false,
+    "productionRouteChangeAuthorized": false
+  },
+  "failClosedOn": [
+    "missing or invalid receipt JSON",
+    "candidate payload SHA drift",
+    "receipt payload SHA mismatch",
+    "allowlist SHA mismatch",
+    "request subject mismatch",
+    "invalid boolean environment value",
+    "internal/global/provider/production kill switch",
+    "feature/shadow/provider/production/merge/promotion gate disabled",
+    "audience mode other than ALLOWLIST",
+    "rollout percent other than 0",
+    "LLM mode other than SEMANTIC_PROFILER_ONLY",
+    "Feature Control blocking SHADOW_EXECUTION",
+    "Feature Control blocking PROVIDER_CALL",
+    "Feature Control blocking PRODUCTION_CANDIDATE_MERGE"
+  ]
+}

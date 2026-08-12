@@ -1,0 +1,21 @@
+{
+  "version": "query_candidate_planner_actual_pricing_absolute_cost_threshold_recalibration_assessment_v1",
+  "decision": "ACTUAL_PRICING_ABSOLUTE_COST_RECALIBRATION_PASS",
+  "operationalDecision": "EVALUATION_PASS",
+  "failedCheckCount": 0,
+  "absoluteCostPassCount": 3,
+  "absoluteCostFailureCount": 0,
+  "cacheCostAvoidancePassed": true,
+  "cacheCostAvoidanceActual": 0.597531,
+  "cacheCostAvoidanceThreshold": 0.59,
+  "thresholds": {
+    "averageCostMicrousdMax": 2600,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMin": 0.59
+  },
+  "sourceThresholdPolicyModified": false,
+  "evaluatorModified": false,
+  "providerCallsExecutedByAssessment": 0,
+  "productionPromotionAuthorized": false
+}

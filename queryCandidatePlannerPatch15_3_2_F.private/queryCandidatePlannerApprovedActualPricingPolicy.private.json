@@ -1,0 +1,19 @@
+{
+  "version": "query_candidate_planner_cost_pricing_policy_v1",
+  "policyId": "openai_gpt_5_6_terra_standard_2026_07_30_v1",
+  "currency": "USD",
+  "mode": "APPROVED_ACTUAL",
+  "rateUnit": "MICROUSD_PER_MILLION_TOKENS",
+  "models": {
+    "semantic_profiler_default": {
+      "inputMicrousdPerMillionTokens": 2000000,
+      "outputMicrousdPerMillionTokens": 12000000
+    }
+  },
+  "guardrails": {
+    "providerInvoice": false,
+    "productionBillingAuthority": false,
+    "approvedByOperator": true,
+    "effectiveAt": "2026-07-30T00:00:00.000Z"
+  }
+}

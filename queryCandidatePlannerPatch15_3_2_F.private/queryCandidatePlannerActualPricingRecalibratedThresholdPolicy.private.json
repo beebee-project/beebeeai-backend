@@ -1,0 +1,39 @@
+{
+  "version": "query_candidate_planner_operational_threshold_policy_v1",
+  "policyId": "beebeeai_query_candidate_operational_thresholds_v1",
+  "minimumSampleSize": {
+    "executions": 25,
+    "coldExecutions": 5,
+    "warmExecutions": 15,
+    "lifecycleEvents": 15
+  },
+  "monthlyProjectionExecutions": 10000,
+  "thresholds": {
+    "cacheHitRateMin": 0.6,
+    "warmCacheHitRateMin": 1,
+    "downloadReuseCacheHitRateMin": 1,
+    "providerCallRateMax": 0.4,
+    "warmProviderCallRateMax": 0,
+    "reuploadProviderCallRateMin": 1,
+    "p95LatencyMsMax": 1400,
+    "p99LatencyMsMax": 1500,
+    "warmP95LatencyMsMax": 120,
+    "cacheHitP95LatencyMsMax": 120,
+    "timeoutRateMax": 0,
+    "errorRateMax": 0,
+    "averageCostMicrousdMax": 2600,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "warmAverageCostMicrousdMax": 0,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMin": 0.59,
+    "deleteInvalidationCoverageMin": 1,
+    "downloadRetentionAccuracyMin": 1,
+    "reuploadIdentitySeparationAccuracyMin": 1,
+    "staleCacheReuseViolationCountMax": 0
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "productionMergeAuthorized": false
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "version": "query_candidate_planner_live_cache_parity_readiness_evidence_v1",
+  "origin": {
+    "status": "SHADOW_COMPLETED",
+    "invocationStatus": "CALLED",
+    "providerCallCount": 1,
+    "cacheHit": false,
+    "model": "gpt-5.6-terra"
+  },
+  "replay": {
+    "status": "SHADOW_COMPLETED",
+    "invocationStatus": "CACHE_HIT",
+    "providerCallCount": 0,
+    "cacheHit": true,
+    "model": "gpt-5.6-terra",
+    "cache": {
+      "plannerResolution": {
+        "source": "L3_SEMANTIC"
+      },
+      "reentry": {
+        "source": "L4_REENTRY"
+      }
+    }
+  },
+  "parityAudit": {
+    "valid": true,
+    "observedProviderCallCount": 1,
+    "persistentFiles": {
+      "encryptedFileCount": 3,
+      "plaintextFileCount": 0,
+      "encryptedOnly": true
+    },
+    "auditSha256": "9f231f6354d70a92b0461b930bf876fc0c723bc5c62eac8f26092ac28a54b5b2",
+    "replayAuditSha256": "77380cab79603663ec5cbed085c02e96af3274b0c84ae78343272078b9e77d66",
+    "originFingerprintSha256": "00c30b508086432a71ae8827b177f1c9ee4f09d18f5f8941121a963d2eb24ff0",
+    "replayFingerprintSha256": "00c30b508086432a71ae8827b177f1c9ee4f09d18f5f8941121a963d2eb24ff0"
+  },
+  "readinessGate": {
+    "eligible": true,
+    "decision": "ELIGIBLE_FOR_CONTROLLED_PRODUCTION_PROMOTION_REVIEW",
+    "guardrails": {
+      "shadowOnlyEvidence": true,
+      "productionPromotionAllowed": false,
+      "productionRouteAutoWired": false,
+      "productionCandidateMergeAllowed": false,
+      "productionReadyAssignmentAllowed": false,
+      "manualPromotionReviewRequired": true,
+      "failClosed": true
+    },
+    "gateSha256": "12fe722248ff2403a334ffbe735f97eec7cc52de7099a118c4144fd16d3e7823"
+  },
+  "recovery": {
+    "version": "query_candidate_planner_historical_live_cache_parity_readiness_capsule_v1",
+    "source": "ARCHIVED_PATCH_13_3_VERIFIED_READINESS_EVIDENCE",
+    "purpose": "PATCH_15_3_2_F_1_E_X_COMPATIBILITY_EVALUATION_INPUT",
+    "historicalEvidenceOnly": true,
+    "liveProviderCallExecutedByRecovery": false,
+    "providerCallsExecutedByRecovery": 0,
+    "actualHistoricalLiveProviderEvidence": true,
+    "currentOperationalTelemetry": false,
+    "responseIdIncluded": false,
+    "tokenUsageValuesIncluded": false,
+    "rawRowsIncluded": false,
+    "sampleValuesIncluded": false,
+    "originalSourceVersion": "query_candidate_planner_live_cache_parity_readiness_evidence_v1",
+    "originalParityAuditSha256": "9f231f6354d70a92b0461b930bf876fc0c723bc5c62eac8f26092ac28a54b5b2",
+    "originalReadinessGateSha256": "12fe722248ff2403a334ffbe735f97eec7cc52de7099a118c4144fd16d3e7823",
+    "originalReplayAuditSha256": "77380cab79603663ec5cbed085c02e96af3274b0c84ae78343272078b9e77d66",
+    "productionPromotionAuthorized": false,
+    "productionRouteChanged": false,
+    "privateOutputDoNotCommit": true
+  },
+  "recoveryCapsuleSha256": "30e7f165a9bad2d2a05a91efa257abd2bf24ef0d47dc089d3f314c689edd0d11"
+}

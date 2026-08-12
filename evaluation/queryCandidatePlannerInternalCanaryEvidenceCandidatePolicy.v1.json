@@ -1,0 +1,55 @@
+{
+  "version": "query_candidate_planner_internal_canary_evidence_candidate_policy_v1",
+  "policyId": "beebeeai_patch15_3_2_f_1_4_internal_canary_evidence_candidate_v1",
+  "scope": "INTERNAL_ALLOWLIST_CANARY_ONLY",
+  "eligibilityDecision": "ELIGIBLE_FOR_INTERNAL_ALLOWLIST_CANARY_REVIEW",
+  "requirements": {
+    "operationalDecision": "EVALUATION_PASS",
+    "assessmentDecision": "ACTUAL_PRICING_ABSOLUTE_COST_RECALIBRATION_PASS",
+    "failedCheckCount": 0,
+    "absoluteCostFailureCount": 0,
+    "cacheCostAvoidancePassed": true,
+    "evaluatorWorktreeEqualsHead": true,
+    "evaluatorSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+    "finalBaselineSha256": "0c59e08cead5a81d84abd4159aedd34d21666898d6d637c58aed7616ab62730f",
+    "approvedActualPricing": true,
+    "historicalLiveProviderParityEvidence": true,
+    "actualOperationalTelemetry": false
+  },
+  "thresholdContract": {
+    "averageCostMicrousdMax": 2600,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMin": 0.59,
+    "providerCallRateMax": 0.4,
+    "warmAverageCostMicrousdMax": 0
+  },
+  "authorizationBoundary": {
+    "manualOperatorApprovalRequired": true,
+    "immutableApprovalBundleHashBindingRequired": true,
+    "immutableAllowlistHashBindingRequired": true,
+    "internalCanaryReviewEligible": true,
+    "internalCanaryAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionMergeAuthorized": false
+  },
+  "patchBoundary": {
+    "gateModified": false,
+    "environmentModified": false,
+    "routesModified": false,
+    "featureFlagsModified": false,
+    "killSwitchModified": false,
+    "allowlistModified": false,
+    "providerCallsExecutedByPatch": 0
+  },
+  "sanitization": {
+    "responseIdsIncluded": false,
+    "rawExecutionsIncluded": false,
+    "rawRowsIncluded": false,
+    "tokenUsageRowsIncluded": false,
+    "immutableAccountIdsIncluded": false,
+    "allowlistSubjectsIncluded": false,
+    "environmentValuesIncluded": false
+  }
+}

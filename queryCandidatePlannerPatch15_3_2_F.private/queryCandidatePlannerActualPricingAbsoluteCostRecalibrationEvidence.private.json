@@ -1,0 +1,53 @@
+{
+  "version": "query_candidate_planner_actual_pricing_absolute_cost_threshold_recalibration_v1",
+  "sourceThresholdPolicySha256": "6167dfbce0e3498efcea0890d2442a167d2e23f903783e9d2905d89a6beeedf7",
+  "pricingPolicySha256": "6e7e6100e44f250fa31ac180bf7af7400aba635ca2c1fe7d0946feb08be4eb52",
+  "datasetSha256": "9f9d09a0cd19b05b13800cebb00869bacb46e49068c63ac775c38a69aebc6f1d",
+  "methodology": "MAX_OBSERVED_PROVIDER_COST_PLUS_20_PERCENT_HEADROOM_WITH_PRESERVED_CALL_RATE",
+  "headroomRate": 0.2,
+  "roundingIncrementMicrousd": 100,
+  "providerCostDistribution": {
+    "sampleCount": 10,
+    "costsMicrousd": [
+      4400,
+      4500,
+      4620,
+      4720,
+      4840,
+      4940,
+      5060,
+      5160,
+      5280,
+      5380
+    ],
+    "minMicrousd": 4400,
+    "averageMicrousd": 4890,
+    "p50Microusd": 4840,
+    "p95Microusd": 5380,
+    "maxMicrousd": 5380,
+    "totalMicrousd": 48900
+  },
+  "rawProviderCeilingMicrousd": 6456,
+  "derivedThresholds": {
+    "providerCallAverageCostMicrousdMax": 6500,
+    "averageCostMicrousdMax": 2600,
+    "monthlyProjectedCostMicrousdMax": 26000000
+  },
+  "preservedContracts": {
+    "providerCallRateMax": 0.4,
+    "monthlyProjectionExecutions": 10000,
+    "cacheCostAvoidanceRateMin": 0.59,
+    "warmAverageCostMicrousdMax": 0
+  },
+  "changedThresholds": [
+    "averageCostMicrousdMax",
+    "providerCallAverageCostMicrousdMax",
+    "monthlyProjectedCostMicrousdMax"
+  ],
+  "sourceThresholdPolicyModified": false,
+  "evaluatorModified": false,
+  "providerCallsExecutedByRecalibration": 0,
+  "actualOperationalTelemetry": false,
+  "productionPromotionAuthorized": false,
+  "privateOutputDoNotCommit": true
+}

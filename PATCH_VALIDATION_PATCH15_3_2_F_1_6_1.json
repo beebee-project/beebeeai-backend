@@ -1,0 +1,29 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_6_1_validation_v1",
+  "patch": "15.3.2-F.1.6.1",
+  "name": "Existing Canary Preflight Composition Repair",
+  "validation": {
+    "repairPurpose": "replace unsafe early-return integration with AND composition",
+    "expectedServiceSha256BeforeApply": "089E260D90625E068769F3D3538FAC198B4EAB3CEC4D864EF8CA9A747123E561",
+    "expectedGateSha256": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+    "approvalBindingIsAdditionalPrerequisite": true,
+    "approvalBlockFailClosed": true,
+    "approvalAllowContinuesLegacyPreflight": true,
+    "legacyConfigReachable": true,
+    "legacyKillSwitchReachable": true,
+    "legacyEvidenceReachable": true,
+    "legacyPromotionGateReachable": true,
+    "legacyFeatureControlReachable": true,
+    "legacyFinalAllowReachable": true,
+    "obsoleteEarlyReturnForbidden": true,
+    "routeModified": false,
+    "environmentModified": false,
+    "providerCallsByPatch": 0,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "smoke": {
+      "passed": 17,
+      "total": 17
+    }
+  }
+}

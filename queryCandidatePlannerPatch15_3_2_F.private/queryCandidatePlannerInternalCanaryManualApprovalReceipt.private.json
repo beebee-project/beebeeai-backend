@@ -1,0 +1,74 @@
+{
+  "version": "query_candidate_planner_internal_canary_manual_approval_receipt_v1",
+  "scope": "INTERNAL_ALLOWLIST_CANARY_ONLY",
+  "sourcePatch": "15.3.2-F.1.5",
+  "decision": "INTERNAL_ALLOWLIST_CANARY_MANUAL_APPROVAL_GRANTED",
+  "manualApproval": {
+    "approvedByOperator": true,
+    "evidenceBundleReviewed": true,
+    "allowlistHashReviewed": true,
+    "explicitApprovalFlagRequired": true,
+    "approvalIsRuntimeActivation": false
+  },
+  "immutableBindings": {
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "candidateBundleFileSha256": "ED5A92C1F5809E6BF48A20C30046418F5F90152B87027DFFAD95E71DB77A534A",
+    "allowlistSha256": "8B7B8D908F28047E0C662BD29A2155ED7450D84265F104D54CA74CB3CD8431FD",
+    "allowlistEnvironmentVariableName": "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256"
+  },
+  "evidenceSnapshot": {
+    "operationalDecision": "EVALUATION_PASS",
+    "assessmentDecision": "ACTUAL_PRICING_ABSOLUTE_COST_RECALIBRATION_PASS",
+    "failedCheckCount": 0,
+    "absoluteCostFailureCount": 0,
+    "cacheCostAvoidancePassed": true,
+    "cacheCostAvoidanceActual": 0.597531,
+    "cacheCostAvoidanceThreshold": 0.59,
+    "evaluatorSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+    "evaluatorWorktreeEqualsHead": true,
+    "finalBaselineSha256": "0c59e08cead5a81d84abd4159aedd34d21666898d6d637c58aed7616ab62730f",
+    "actualOperationalTelemetry": false
+  },
+  "thresholdContract": {
+    "averageCostMicrousdMax": 2600,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMin": 0.59,
+    "providerCallRateMax": 0.4,
+    "warmAverageCostMicrousdMax": 0
+  },
+  "authorizationBoundary": {
+    "internalCanaryApprovalGranted": true,
+    "runtimeGateBindingApplied": false,
+    "runtimeCanaryAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionMergeAuthorized": false
+  },
+  "nextGateRequirements": {
+    "candidatePayloadSha256MustMatch": true,
+    "approvalReceiptPayloadSha256MustMatch": true,
+    "allowlistSha256MustMatch": true,
+    "killSwitchMustPermit": true,
+    "featureFlagMustPermit": true,
+    "runtimeGateIntegrationRequired": true
+  },
+  "guardrails": {
+    "noGateMutation": true,
+    "noEnvironmentMutation": true,
+    "noRouteMutation": true,
+    "noFeatureFlagMutation": true,
+    "noKillSwitchMutation": true,
+    "noAllowlistMutation": true,
+    "providerCallsExecutedByReceiptBuilder": 0,
+    "privateOutputDoNotCommit": true
+  },
+  "sanitization": {
+    "immutableAccountIdsIncluded": false,
+    "allowlistSubjectsIncluded": false,
+    "environmentValuesIncluded": false,
+    "rawEvaluationRowsIncluded": false,
+    "rawTokenUsageIncluded": false
+  },
+  "approvalReceiptPayloadSha256": "0FEAB7DA3C1141726B25674BC9A0657643CAF3C11780CEBED129A7CD7B0E5ECD"
+}

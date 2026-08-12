@@ -1,0 +1,49 @@
+{
+  "version": "query_candidate_planner_actual_pricing_cost_consistency_reevaluation_assessment_v1",
+  "decision": "CACHE_AVOIDANCE_PRICING_CONSISTENCY_PASS_ABSOLUTE_COST_RECALIBRATION_REQUIRED",
+  "operationalDecision": "EVALUATION_BLOCKED",
+  "targetCostResults": {
+    "cost.averagePerExecutionMicrousd": {
+      "metric": "cost.averagePerExecutionMicrousd",
+      "operator": "<=",
+      "actual": 1956,
+      "threshold": 130,
+      "passed": false
+    },
+    "cost.averagePerProviderCallMicrousd": {
+      "metric": "cost.averagePerProviderCallMicrousd",
+      "operator": "<=",
+      "actual": 4890,
+      "threshold": 325,
+      "passed": false
+    },
+    "cost.monthlyProjectedCostMicrousd": {
+      "metric": "cost.monthlyProjectedCostMicrousd",
+      "operator": "<=",
+      "actual": 19560000,
+      "threshold": 1300000,
+      "passed": false
+    },
+    "cost.cacheCostAvoidanceRate": {
+      "metric": "cost.cacheCostAvoidanceRate",
+      "operator": ">=",
+      "actual": 0.597531,
+      "threshold": 0.59,
+      "passed": true
+    }
+  },
+  "absoluteCostFailureCount": 3,
+  "absoluteCostFailures": [
+    "cost.averagePerExecutionMicrousd",
+    "cost.averagePerProviderCallMicrousd",
+    "cost.monthlyProjectedCostMicrousd"
+  ],
+  "cacheCostAvoidancePassed": true,
+  "cacheCostAvoidanceActual": 0.597531,
+  "cacheCostAvoidanceThreshold": 0.59,
+  "nonCostFailureCount": 0,
+  "thresholdPolicyModified": false,
+  "evaluatorModified": false,
+  "providerCallsExecutedByAssessment": 0,
+  "productionPromotionAuthorized": false
+}

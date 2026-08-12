@@ -1,0 +1,27 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_5_validation_v1",
+  "patch": "15.3.2-F.1.5",
+  "name": "Manual Approval Receipt & Immutable Evidence/Allowlist Hash Binding",
+  "validation": {
+    "syntax": "PASS",
+    "additiveOnly": true,
+    "candidateModuleDependency": "self-contained contract validation",
+    "gateModified": false,
+    "environmentModified": false,
+    "routesModified": false,
+    "featureFlagsModified": false,
+    "killSwitchModified": false,
+    "allowlistModified": false,
+    "providerCallsByPatch": 0,
+    "internalCanaryApprovalGranted": true,
+    "runtimeGateBindingApplied": false,
+    "runtimeCanaryAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "expectedCandidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "smoke": {
+      "passed": 15,
+      "total": 15
+    }
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "version": "query_candidate_planner_internal_canary_evidence_candidate_v1",
+  "scope": "INTERNAL_ALLOWLIST_CANARY_ONLY",
+  "sourcePatch": "15.3.2-F.1.4",
+  "purpose": "SANITIZED_EVIDENCE_FOR_MANUAL_INTERNAL_ALLOWLIST_CANARY_REVIEW",
+  "evaluation": {
+    "operationalDecision": "EVALUATION_PASS",
+    "assessmentDecision": "ACTUAL_PRICING_ABSOLUTE_COST_RECALIBRATION_PASS",
+    "failedCheckCount": 0,
+    "absoluteCostPassCount": 3,
+    "absoluteCostFailureCount": 0,
+    "cacheCostAvoidancePassed": true,
+    "cacheCostAvoidanceActual": 0.597531,
+    "cacheCostAvoidanceThreshold": 0.59
+  },
+  "thresholds": {
+    "averageCostMicrousdMax": 2600,
+    "providerCallAverageCostMicrousdMax": 6500,
+    "monthlyProjectedCostMicrousdMax": 26000000,
+    "cacheCostAvoidanceRateMin": 0.59,
+    "providerCallRateMax": 0.4,
+    "warmAverageCostMicrousdMax": 0
+  },
+  "pricing": {
+    "mode": "APPROVED_ACTUAL",
+    "rateUnit": "MICROUSD_PER_MILLION_TOKENS",
+    "modelKey": "semantic_profiler_default",
+    "inputMicrousdPerMillionTokens": 2000000,
+    "outputMicrousdPerMillionTokens": 12000000,
+    "approvedByOperator": true,
+    "productionBillingAuthority": false
+  },
+  "costConsistency": {
+    "providerCostMicrousd": 48900,
+    "avoidedByCacheMicrousd": 72600,
+    "cacheCostAvoidanceRate": 0.597531,
+    "providerCostSampleCount": 10,
+    "providerCostAverageMicrousd": 4890,
+    "providerCostP95Microusd": 5380,
+    "providerCostMaxMicrousd": 5380,
+    "headroomRate": 0.2,
+    "rawProviderCeilingMicrousd": 6456
+  },
+  "liveParity": {
+    "historicalLiveProviderEvidence": true,
+    "originProviderCallCount": 1,
+    "replayProviderCallCount": 0,
+    "plannerResolutionSource": "L3_SEMANTIC",
+    "reentrySource": "L4_REENTRY",
+    "parityValid": true,
+    "readinessEligible": true,
+    "encryptedPersistentFileCount": 3,
+    "plaintextPersistentFileCount": 0,
+    "currentOperationalTelemetry": false
+  },
+  "integrity": {
+    "evaluator": {
+      "filename": "queryCandidatePlannerCostCacheLatencyEvaluator.js",
+      "worktreeSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+      "headSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+      "worktreeEqualsHead": true
+    },
+    "finalBaselineSha256": "0c59e08cead5a81d84abd4159aedd34d21666898d6d637c58aed7616ab62730f",
+    "inputFiles": {
+      "pricingPolicy": {
+        "filename": "queryCandidatePlannerApprovedActualPricingPolicy.private.json",
+        "sha256": "0E81028C30E535CB7F047CD4F05FB3FD96D5345636F9E0ED055DD4A6E765FA0D"
+      },
+      "historicalReadiness": {
+        "filename": "queryCandidatePlannerPatch13_3HistoricalReadinessEvidence.private.json",
+        "sha256": "33B70E7B4278CBC7E6F66D10CC6AA0F8FA7219A46E553EAD70612494E654F7D5"
+      },
+      "actualPricingConsistentInput": {
+        "filename": "queryCandidatePlannerActualPricingConsistentEvaluationInput.private.json",
+        "sha256": "AF073163401F92C3D0A2ABD0E12B74551A22515EE883C1D2D3C4DB9893284135"
+      },
+      "sourceThresholdPolicy": {
+        "filename": "queryCandidatePlannerOperationalThresholdPolicy.v1.json",
+        "sha256": "4F266D07D4C3DE049FE83167788D5B1DABD28717450A76C3607F0FBFA3DA4E1D"
+      },
+      "recalibratedThresholdPolicy": {
+        "filename": "queryCandidatePlannerActualPricingRecalibratedThresholdPolicy.private.json",
+        "sha256": "235D1C869D78ADFF2CBB0539F67048455C6B6BF50A85C56C078169C98C1805D8"
+      },
+      "recalibrationEvidence": {
+        "filename": "queryCandidatePlannerActualPricingAbsoluteCostRecalibrationEvidence.private.json",
+        "sha256": "FC96052817153DFE598ECB4463104AB31F0AFD1D9B74E43D33A70B02C1B22AEE"
+      },
+      "operationalReport": {
+        "filename": "queryCandidatePlannerActualPricingRecalibratedOperationalReport.private.json",
+        "sha256": "048501B8CFE6552EC3089823EE2A7C87FD2E601756A2255BCCEFADA4BB509D6D"
+      },
+      "assessment": {
+        "filename": "queryCandidatePlannerActualPricingAbsoluteCostAssessment.private.json",
+        "sha256": "646B2836AAECED3C3E80E9654CE15894F145B6E666B262F2A968756773A8FB32"
+      },
+      "finalBaseline": {
+        "filename": "queryCandidatePlannerActualPricingRecalibratedEvaluationBaseline.private.json",
+        "sha256": "58EE5E4E5CBCEA9A74F23A5EB120AF7011B1906F4926E311F51EA11F94065B68"
+      }
+    }
+  },
+  "eligibility": {
+    "decision": "ELIGIBLE_FOR_INTERNAL_ALLOWLIST_CANARY_REVIEW",
+    "internalCanaryReviewEligible": true,
+    "manualOperatorApprovalRequired": true,
+    "immutableApprovalBundleHashBindingRequired": true,
+    "immutableAllowlistHashBindingRequired": true,
+    "internalCanaryAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionMergeAuthorized": false
+  },
+  "methodology": {
+    "actualPricing": true,
+    "actualHistoricalLiveProviderParityEvidence": true,
+    "actualOperationalTelemetry": false,
+    "canonicalBenchmarkEvidence": true,
+    "internalCanaryEvidence": false,
+    "productionPromotionEvidence": false
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "noGateMutation": true,
+    "noEnvironmentMutation": true,
+    "noRouteMutation": true,
+    "noFeatureFlagMutation": true,
+    "noKillSwitchMutation": true,
+    "noAllowlistMutation": true,
+    "providerCallsExecutedByBundleBuilder": 0,
+    "privateOutputDoNotCommit": true
+  },
+  "sanitization": {
+    "responseIdsIncluded": false,
+    "rawExecutionsIncluded": false,
+    "rawRowsIncluded": false,
+    "tokenUsageRowsIncluded": false,
+    "immutableAccountIdsIncluded": false,
+    "allowlistSubjectsIncluded": false,
+    "environmentValuesIncluded": false
+  },
+  "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA"
+}

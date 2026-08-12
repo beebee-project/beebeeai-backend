@@ -1,0 +1,388 @@
+{
+  "version": "query_candidate_planner_e_x_compatibility_evaluation_baseline_v1",
+  "decision": "CANONICAL_EVALUATION_BASELINE_COST_RECALIBRATION_REQUIRED",
+  "methodology": {
+    "mode": "CANONICAL_BENCHMARK_WITH_APPROVED_ACTUAL_PRICING",
+    "actualPricing": true,
+    "actualLiveProviderParityEvidence": true,
+    "actualOperationalTelemetry": false,
+    "currentProductionTrafficMeasurement": false,
+    "canonicalLatencyAndLifecycleBenchmark": true,
+    "patchECollectionSummaryRequired": false,
+    "patchECollectionSummaryUsed": false,
+    "patchEXCompatibility": true
+  },
+  "evaluator": {
+    "version": "query_candidate_planner_cost_cache_latency_evaluator_v1",
+    "worktreeSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+    "headSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+    "worktreeEqualsHead": true,
+    "providerCallsExecutedByEvaluator": 0
+  },
+  "operationalEvaluation": {
+    "reportDecision": "EVALUATION_BLOCKED",
+    "reportSha256": "bc1271b376f81dc3ca3d49bafa633eba1b0db8b3c5d0fc03569f946daf5f86c8",
+    "failedCheckCount": 4,
+    "costFailureCount": 4,
+    "nonCostFailureCount": 0,
+    "costThresholdRecalibrationRequired": true,
+    "report": {
+      "version": "query_candidate_planner_cost_cache_latency_evaluation_report_v1",
+      "evaluatorVersion": "query_candidate_planner_cost_cache_latency_evaluator_v1",
+      "decision": "EVALUATION_BLOCKED",
+      "failClosed": true,
+      "validationErrors": [],
+      "dataset": {
+        "datasetId": "beebeeai_query_candidate_cost_cache_latency_core_v1",
+        "datasetSha256": "330b92c9d5c5bdce109c3c8a8fcc2942be8be17ffc1bf4824c98f33ec873f9ba",
+        "benchmarkMode": "CANONICAL_BENCHMARK_WITH_APPROVED_ACTUAL_PRICING",
+        "executionCount": 25,
+        "lifecycleEventCount": 15
+      },
+      "policies": {
+        "thresholdPolicyId": "beebeeai_query_candidate_operational_thresholds_v1",
+        "thresholdPolicySha256": "6167dfbce0e3498efcea0890d2442a167d2e23f903783e9d2905d89a6beeedf7",
+        "pricingPolicyId": "openai_gpt_5_6_terra_standard_2026_07_30_v1",
+        "pricingPolicySha256": "6e7e6100e44f250fa31ac180bf7af7400aba635ca2c1fe7d0946feb08be4eb52",
+        "pricingMode": "APPROVED_ACTUAL",
+        "currency": "USD"
+      },
+      "sample": {
+        "executions": 25,
+        "successfulExecutions": 25,
+        "coldExecutions": 5,
+        "warmExecutions": 15,
+        "downloadReuseExecutions": 5,
+        "reuploadExecutions": 5,
+        "lifecycleEvents": 15
+      },
+      "metrics": {
+        "cost": {
+          "currency": "USD",
+          "totalMicrousd": 48900,
+          "averagePerExecutionMicrousd": 1956,
+          "averagePerProviderCallMicrousd": 4890,
+          "warmAverageMicrousd": 0,
+          "p95PerExecutionMicrousd": 5280,
+          "avoidedByCacheMicrousd": 3960,
+          "cacheCostAvoidanceRate": 0.074915,
+          "monthlyProjectionExecutions": 10000,
+          "monthlyProjectedCostMicrousd": 19560000,
+          "sourceBreakdown": {
+            "observedCostCount": 0,
+            "tokenPricingPolicyCount": 10,
+            "noProviderCallCount": 15
+          }
+        },
+        "cache": {
+          "eligibleReadCount": 25,
+          "hitCount": 15,
+          "missCount": 10,
+          "hitRate": 0.6,
+          "warmHitRate": 1,
+          "downloadReuseHitRate": 1,
+          "levelCounts": {
+            "L1": 2,
+            "L2": 1,
+            "L3": 4,
+            "L4": 8
+          },
+          "levelRates": {
+            "L1": 0.133333,
+            "L2": 0.066667,
+            "L3": 0.266667,
+            "L4": 0.533333
+          }
+        },
+        "provider": {
+          "callCount": 10,
+          "callRate": 0.4,
+          "warmCallRate": 0,
+          "reuploadCallRate": 1,
+          "inputTokens": 11100,
+          "outputTokens": 2225
+        },
+        "latency": {
+          "overall": {
+            "sampleCount": 25,
+            "averageMs": 492.2,
+            "p50Ms": 88,
+            "p95Ms": 1240,
+            "p99Ms": 1295,
+            "maxMs": 1295
+          },
+          "cold": {
+            "sampleCount": 5,
+            "averageMs": 1060,
+            "p50Ms": 1060,
+            "p95Ms": 1180,
+            "p99Ms": 1180,
+            "maxMs": 1180
+          },
+          "warm": {
+            "sampleCount": 15,
+            "averageMs": 72,
+            "p50Ms": 72,
+            "p95Ms": 94,
+            "p99Ms": 94,
+            "maxMs": 94
+          },
+          "cacheHit": {
+            "sampleCount": 15,
+            "averageMs": 72,
+            "p50Ms": 72,
+            "p95Ms": 94,
+            "p99Ms": 94,
+            "maxMs": 94
+          },
+          "reupload": {
+            "sampleCount": 5,
+            "averageMs": 1185,
+            "p50Ms": 1185,
+            "p95Ms": 1295,
+            "p99Ms": 1295,
+            "maxMs": 1295
+          }
+        },
+        "reliability": {
+          "successRate": 1,
+          "timeoutCount": 0,
+          "timeoutRate": 0,
+          "errorCount": 0,
+          "errorRate": 0
+        },
+        "lifecycle": {
+          "downloadEventCount": 5,
+          "deleteEventCount": 5,
+          "reuploadEventCount": 5,
+          "downloadRetentionAccuracy": 1,
+          "deleteInvalidationCoverage": 1,
+          "reuploadIdentitySeparationAccuracy": 1,
+          "staleCacheReuseViolationCount": 0
+        }
+      },
+      "thresholdResults": [
+        {
+          "metric": "sample.executions",
+          "operator": ">=",
+          "actual": 25,
+          "threshold": 25,
+          "passed": true
+        },
+        {
+          "metric": "sample.coldExecutions",
+          "operator": ">=",
+          "actual": 5,
+          "threshold": 5,
+          "passed": true
+        },
+        {
+          "metric": "sample.warmExecutions",
+          "operator": ">=",
+          "actual": 15,
+          "threshold": 15,
+          "passed": true
+        },
+        {
+          "metric": "sample.lifecycleEvents",
+          "operator": ">=",
+          "actual": 15,
+          "threshold": 15,
+          "passed": true
+        },
+        {
+          "metric": "cache.hitRate",
+          "operator": ">=",
+          "actual": 0.6,
+          "threshold": 0.6,
+          "passed": true
+        },
+        {
+          "metric": "cache.warmHitRate",
+          "operator": ">=",
+          "actual": 1,
+          "threshold": 1,
+          "passed": true
+        },
+        {
+          "metric": "cache.downloadReuseHitRate",
+          "operator": ">=",
+          "actual": 1,
+          "threshold": 1,
+          "passed": true
+        },
+        {
+          "metric": "provider.callRate",
+          "operator": "<=",
+          "actual": 0.4,
+          "threshold": 0.4,
+          "passed": true
+        },
+        {
+          "metric": "provider.warmCallRate",
+          "operator": "<=",
+          "actual": 0,
+          "threshold": 0,
+          "passed": true
+        },
+        {
+          "metric": "provider.reuploadCallRate",
+          "operator": ">=",
+          "actual": 1,
+          "threshold": 1,
+          "passed": true
+        },
+        {
+          "metric": "latency.overall.p95Ms",
+          "operator": "<=",
+          "actual": 1240,
+          "threshold": 1400,
+          "passed": true
+        },
+        {
+          "metric": "latency.overall.p99Ms",
+          "operator": "<=",
+          "actual": 1295,
+          "threshold": 1500,
+          "passed": true
+        },
+        {
+          "metric": "latency.warm.p95Ms",
+          "operator": "<=",
+          "actual": 94,
+          "threshold": 120,
+          "passed": true
+        },
+        {
+          "metric": "latency.cacheHit.p95Ms",
+          "operator": "<=",
+          "actual": 94,
+          "threshold": 120,
+          "passed": true
+        },
+        {
+          "metric": "reliability.timeoutRate",
+          "operator": "<=",
+          "actual": 0,
+          "threshold": 0,
+          "passed": true
+        },
+        {
+          "metric": "reliability.errorRate",
+          "operator": "<=",
+          "actual": 0,
+          "threshold": 0,
+          "passed": true
+        },
+        {
+          "metric": "cost.averagePerExecutionMicrousd",
+          "operator": "<=",
+          "actual": 1956,
+          "threshold": 130,
+          "passed": false
+        },
+        {
+          "metric": "cost.averagePerProviderCallMicrousd",
+          "operator": "<=",
+          "actual": 4890,
+          "threshold": 325,
+          "passed": false
+        },
+        {
+          "metric": "cost.warmAverageMicrousd",
+          "operator": "<=",
+          "actual": 0,
+          "threshold": 0,
+          "passed": true
+        },
+        {
+          "metric": "cost.monthlyProjectedCostMicrousd",
+          "operator": "<=",
+          "actual": 19560000,
+          "threshold": 1300000,
+          "passed": false
+        },
+        {
+          "metric": "cost.cacheCostAvoidanceRate",
+          "operator": ">=",
+          "actual": 0.074915,
+          "threshold": 0.59,
+          "passed": false
+        },
+        {
+          "metric": "lifecycle.deleteInvalidationCoverage",
+          "operator": ">=",
+          "actual": 1,
+          "threshold": 1,
+          "passed": true
+        },
+        {
+          "metric": "lifecycle.downloadRetentionAccuracy",
+          "operator": ">=",
+          "actual": 1,
+          "threshold": 1,
+          "passed": true
+        },
+        {
+          "metric": "lifecycle.reuploadIdentitySeparationAccuracy",
+          "operator": ">=",
+          "actual": 1,
+          "threshold": 1,
+          "passed": true
+        },
+        {
+          "metric": "lifecycle.staleCacheReuseViolationCount",
+          "operator": "<=",
+          "actual": 0,
+          "threshold": 0,
+          "passed": true
+        }
+      ],
+      "failedThresholds": [
+        "cost.averagePerExecutionMicrousd",
+        "cost.averagePerProviderCallMicrousd",
+        "cost.monthlyProjectedCostMicrousd",
+        "cost.cacheCostAvoidanceRate"
+      ],
+      "privacy": {
+        "rawRowsIncluded": false,
+        "rawFileNamesIncluded": false,
+        "userIdentityIncluded": false,
+        "storageKeysIncluded": false,
+        "cacheSecretsIncluded": false
+      },
+      "guardrails": {
+        "evaluationOnly": true,
+        "routeWired": false,
+        "controllerWired": false,
+        "providerCallsExecutedByEvaluator": 0,
+        "pricingPolicyIsInvoice": false,
+        "promotionAuthorized": false,
+        "productionCandidateMergeApplied": false,
+        "productionReadyAssignment": false,
+        "railwayEnvironmentChanged": false
+      }
+    }
+  },
+  "source": {
+    "canonicalInputSha256": "74a873717a9fcfcbbff8eed79baa4c6852c4ea51895db43f3275fd97e37e9902",
+    "sourceDatasetSha256": "8815689402df6e321960a9dbbb00ed2960d23aafb5215994dfb6ddabf8897be7",
+    "pricingPolicySha256": "6e7e6100e44f250fa31ac180bf7af7400aba635ca2c1fe7d0946feb08be4eb52",
+    "liveParityReadinessSha256": "9a059dbaba21bd11af3d23ebc285f60ecca8ecc7e544b51e8130643ab56d2c2b",
+    "thresholdPolicySha256": "6167dfbce0e3498efcea0890d2442a167d2e23f903783e9d2905d89a6beeedf7"
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "promotionAuthorized": false,
+    "canaryPromotionEvidence": false,
+    "productionPromotionEvidence": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "collectorEnabledByThisOperation": false,
+    "internalCanaryEnabledByThisOperation": false,
+    "providerCallsExecutedByThisOperation": 0,
+    "privateOutputDoNotCommit": true
+  },
+  "baselineSha256": "b3cc0651ffc3d2f98257e37254adf2823cf680785e3dca6d8548f2e4caa838bb"
+}

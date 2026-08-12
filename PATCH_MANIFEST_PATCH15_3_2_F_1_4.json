@@ -1,0 +1,138 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_4_manifest_v1",
+  "patch": "15.3.2-F.1.4",
+  "phase": "15.3-C",
+  "name": "Internal Canary Evidence Candidate Bundle",
+  "mode": "additive-only",
+  "predecessor": "15.3.2-F.1.3",
+  "fileCount": 21,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_4.json",
+      "bytes": 746,
+      "sha256": "d9b71e13cfb6026658a8a7d6126ead9042498cea4a4a29ec361959b5bea3aca9"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_4_INTERNAL_CANARY_EVIDENCE_CANDIDATE_BUNDLE.md",
+      "bytes": 2618,
+      "sha256": "ff819fe023e66eb9f8c860b59cf9f751293a748b82e833203b0b4be57221bb69"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryEvidenceCandidate.js",
+      "bytes": 23406,
+      "sha256": "9fe6041e11250a1c401d887e52f271ef96daae28399edcc901fa4fa35de0ae71"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerInternalCanaryEvidenceCandidatePolicy.v1.json",
+      "bytes": 2087,
+      "sha256": "65ec3b745deca331a4efc57251e8b086b0708c51eab09816d7cf70abf96dc0e2"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertInternalCanaryEvidenceCandidatePrivateOutputUntracked.js",
+      "bytes": 868,
+      "sha256": "19776d15b86f4996e50f648afa1e0655e3f20763f27da3a3f018367e5c311d24"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerBuildInternalCanaryEvidenceCandidate.js",
+      "bytes": 2959,
+      "sha256": "37fed918bfff57c2779f1cb300e27d40584075db6659fe12f6979673fb596797"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanaryEvidenceCandidate.js",
+      "bytes": 1627,
+      "sha256": "26219eb7ba1d3cae01b33abbe6f7202b628b44fa41794b0e9c2c6cfb2f6f29f1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4DeterminismSmokeTest.js",
+      "bytes": 417,
+      "sha256": "af15bee6fd69f1f56875f123c6d6d009ca95451e63c8f04280caf55e340f6995"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4EligibilityBoundarySmokeTest.js",
+      "bytes": 557,
+      "sha256": "d41e838c13982c570769dd94e25d9cbae721c7cd8fb039a3048d604e048800fb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4ExpectedHashesSmokeTest.js",
+      "bytes": 687,
+      "sha256": "b9e70abdddeaae5f70d75110c44eebb270dac8c6ee57581c16991ce0e56c7fa6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4ManifestSmokeTest.js",
+      "bytes": 525,
+      "sha256": "42e663c52e2c5d6e729e0e003b77f36bd3dd011bfc5599dc7e4c06c589babbdb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4NoPromotionSmokeTest.js",
+      "bytes": 637,
+      "sha256": "f941f36b074580a019af45e8d5a7ac941a544ca9cc2bda6560205e0393699f84"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4NoRuntimeMutationSmokeTest.js",
+      "bytes": 490,
+      "sha256": "a4d8f132bbd20d42903f1d7bb332e116c723aa32167d5067da2301fcc62b2e38"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4PolicySmokeTest.js",
+      "bytes": 569,
+      "sha256": "a1a8c6bdde73d9c12a24038be905ce88379396956c696a5afeb8b1b76256a8f3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4PrivateOutputGuardContractSmokeTest.js",
+      "bytes": 400,
+      "sha256": "efbff25930c30c4d2164f1efb779bd4a89fd33400b9f99962dbb151727dce729"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4SanitizationSmokeTest.js",
+      "bytes": 367,
+      "sha256": "c52d8d9f47dd566269c97a8a52bc883927d8499757839e0b5e63e6fbe47d7d4b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4TelemetryBoundarySmokeTest.js",
+      "bytes": 516,
+      "sha256": "644718afffb57d4465c5aeadea29bd4d28ea0ace731a42216eab9054ecfeda80"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4TestSupport.js",
+      "bytes": 3968,
+      "sha256": "cfa402328a2c03ee1fa7e918512d549c3b765bf4477c2d79989a2cc43863f75d"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4ThresholdContractSmokeTest.js",
+      "bytes": 480,
+      "sha256": "dcd23509513e7f98b7172f147ea2225dfef9269f6df4eb032b21385e8eccc1a9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4VerifyFailClosedSmokeTest.js",
+      "bytes": 516,
+      "sha256": "4564b0795a54d9f704a5cbcc762bedcec3f8c0f59bd09450761ee708ebe77a9f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_4VerifyPassSmokeTest.js",
+      "bytes": 430,
+      "sha256": "9880f9f9819b791fee95f9eb0c962494718c718a841b49e5b491d388698bccb8"
+    }
+  ],
+  "changeSet": {
+    "additiveOnly": true,
+    "existingProductionSourcesModified": false,
+    "gateModified": false,
+    "environmentModified": false,
+    "routesModified": false,
+    "featureFlagsModified": false,
+    "killSwitchModified": false,
+    "allowlistModified": false,
+    "promotionGateModified": false
+  },
+  "candidateContract": {
+    "scope": "INTERNAL_ALLOWLIST_CANARY_ONLY",
+    "reviewDecision": "ELIGIBLE_FOR_INTERNAL_ALLOWLIST_CANARY_REVIEW",
+    "manualOperatorApprovalRequired": true,
+    "internalCanaryReviewEligible": true,
+    "internalCanaryAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "providerCallsExecutedByPatch": 0,
+    "privateOutputDoNotCommit": true
+  }
+}

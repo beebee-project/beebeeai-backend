@@ -1,0 +1,31 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_6_validation_v1",
+  "patch": "15.3.2-F.1.6",
+  "name": "Internal Allowlist Canary Gate Integration",
+  "validation": {
+    "archiveInstallMode": "additive until explicit integration script",
+    "serviceIntegrationRequired": true,
+    "serviceFilesModifiedByApplyScript": [
+      "automation/queryCandidatePlannerInternalAllowlistCanaryService.js"
+    ],
+    "routeModified": false,
+    "controllerModified": false,
+    "environmentModifiedByPatch": false,
+    "providerCallsByPatch": 0,
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "approvalReceiptBindingRequired": true,
+    "allowlistBindingRequired": true,
+    "runtimeFeatureControlRequired": true,
+    "actualOperationalTelemetry": false,
+    "canaryEvidenceCollectionRequired": true,
+    "runtimeCanaryMayBeAuthorizedForApprovedAllowlistOnly": true,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionReadyAssignmentAuthorized": false,
+    "productionRouteChangeAuthorized": false,
+    "smoke": {
+      "passed": 20,
+      "total": 20
+    }
+  }
+}

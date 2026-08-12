@@ -1,0 +1,143 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_6_1_manifest_v1",
+  "patch": "15.3.2-F.1.6.1",
+  "phase": "15.3-C",
+  "name": "Existing Canary Preflight Composition Repair",
+  "predecessor": "15.3.2-F.1.6",
+  "applyMode": "additive archive plus exact-SHA guarded service integration",
+  "targetService": "automation/queryCandidatePlannerInternalAllowlistCanaryService.js",
+  "expectedServiceSha256BeforeApply": "089E260D90625E068769F3D3538FAC198B4EAB3CEC4D864EF8CA9A747123E561",
+  "expectedApprovalBindingGateSha256": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+  "compositionContract": {
+    "approvalBindingRole": "ADDITIONAL_PREREQUISITE",
+    "approvalBlockReturn": true,
+    "approvalAllowEarlyReturn": false,
+    "legacyPreflightMustContinue": true,
+    "legacyPromotionGateMustRemainReachable": true
+  },
+  "authorizationBoundary": {
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionReadyAssignmentAuthorized": false,
+    "productionRouteChangeAuthorized": false
+  },
+  "providerCallsExecutedByPatch": 0,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_6_1.json",
+      "bytes": 1122,
+      "sha256": "8614053d527c69902981a585df6a9f2323c38c5e2155d2c8ead71d6eee871c93"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_6_1_EXISTING_CANARY_PREFLIGHT_COMPOSITION_REPAIR.md",
+      "bytes": 2403,
+      "sha256": "98a56cac5cffb56dc416f4fefc6e7d56752c86afc3a3f239aea4a8437f052013"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerInternalCanaryPreflightCompositionRepairPolicy.v1.json",
+      "bytes": 1684,
+      "sha256": "7d09181d98b6047b53c3976aff144e62ded46ccf13c3d45c802f5ee39d048474"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerApplyInternalCanaryPreflightCompositionRepair.js",
+      "bytes": 10604,
+      "sha256": "69e2e1c6152a151d9ad4087ec25edbf795ca27e1be46b7863454260517721a1d"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertObsoleteF16EarlyReturnAbsent.js",
+      "bytes": 853,
+      "sha256": "476a1b32c8d2df9441949791310a24b32a051012c13fad661e6b1c443426cd9b"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanaryPreflightCompositionRepair.js",
+      "bytes": 3202,
+      "sha256": "09b70889d9cc9f82d7af87b359d936061588238a5ccd897f90b4088d6c97bf05"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1AnchorFailClosedSmokeTest.js",
+      "bytes": 318,
+      "sha256": "7afe88d13b59634852cdeabb226c68b2d4e6540a5d5a4f740984a0c725b7157e"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1ApprovalAllowContinuesSmokeTest.js",
+      "bytes": 684,
+      "sha256": "287b012a0c20dda50a263f5e03865c4e966818aa4222e5ea09cb709c2f992145"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1ApprovalBlockSmokeTest.js",
+      "bytes": 610,
+      "sha256": "f76f744a691069dbfd049c4418efc8a1ecce75f8b23dfaab5e629d7c02f6a2be"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1BackupContractSmokeTest.js",
+      "bytes": 369,
+      "sha256": "05d02286c11d2c9053f637f5005d00f3f2dd066f70f615071e643a13fea1e517"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1CompositionSourceSmokeTest.js",
+      "bytes": 571,
+      "sha256": "755d6bb4446e6d42fc68f4188719c78d34f0b80f137b67f6c021f6160319c4ad"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1DuplicateBlockedSmokeTest.js",
+      "bytes": 461,
+      "sha256": "0f49fdfeeab3ff4c3e7249b5c1f2aa04d1cf03f12a5407bc26af68e8bc5d4ad9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1ExpectedHashesSmokeTest.js",
+      "bytes": 448,
+      "sha256": "47f775b5ad86f57296cb5d5f1eb124ce1736b8791854d0f8374ce14976a6af42"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1LegacyConfigReachableSmokeTest.js",
+      "bytes": 655,
+      "sha256": "900f81523ca5a775c714637793c1625de35e40ed1b6fc2b4818fe772e9d18126"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1LegacyEvidenceReachableSmokeTest.js",
+      "bytes": 497,
+      "sha256": "49938970ed392562516fb902d23c55588f3bd810b31751fc41acba33e8cb8f34"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1LegacyPromotionReachableSmokeTest.js",
+      "bytes": 677,
+      "sha256": "f64daca0b02b06ac11060b48e712abe3cae87067d4892ed3b44b78eac8de7abb"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1ManifestSmokeTest.js",
+      "bytes": 547,
+      "sha256": "a6401fb77f405ac89caf9ded6bc04341a011011dbb6d353a974b3e75d8654b74"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1NoRolloutSmokeTest.js",
+      "bytes": 560,
+      "sha256": "62164a65524710d98d1cfc37db94156692282285ccc490c52781a0fad2b20c63"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1NoRuntimeMutationSmokeTest.js",
+      "bytes": 489,
+      "sha256": "21ecbce338c74022280c03242ba59e69b9248fc8fda81add99d6920bc7b78034"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1ObsoleteEarlyReturnBlockedSmokeTest.js",
+      "bytes": 476,
+      "sha256": "004ff9158aa166ef744f14182c9b7862e60f9a3ef1d9dc3446611be2c377292a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1PolicySmokeTest.js",
+      "bytes": 543,
+      "sha256": "c5890060d448c60ca82dd261ca1a3a2de33f1972841dd7b14a0be27afe34b247"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1TestSupport.js",
+      "bytes": 3318,
+      "sha256": "a5829f06cb65b065fa33dd9ad66cab1041a94c59ba25728f97f10764e3841efa"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6_1VerifierContractSmokeTest.js",
+      "bytes": 461,
+      "sha256": "b7f958d195799e22eb651f274bfc6ecd6ef442f8074bb5d79135054025ffadce"
+    }
+  ],
+  "fileCount": 23
+}

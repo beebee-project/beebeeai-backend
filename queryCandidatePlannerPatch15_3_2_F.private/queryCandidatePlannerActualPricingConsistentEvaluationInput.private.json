@@ -1,0 +1,929 @@
+{
+  "version": "query_candidate_planner_e_x_compatibility_canonical_evaluation_input_v1",
+  "benchmarkMode": "CANONICAL_BENCHMARK_WITH_APPROVED_ACTUAL_PRICING",
+  "dataset": {
+    "version": "query_candidate_planner_operational_evaluation_dataset_v1",
+    "datasetId": "beebeeai_query_candidate_cost_cache_latency_core_v1",
+    "benchmarkMode": "CANONICAL_BENCHMARK_WITH_APPROVED_ACTUAL_PRICING_AND_COST_CONSISTENCY",
+    "executions": [
+      {
+        "executionId": "scenario_01_cold",
+        "scenarioId": "scenario_01",
+        "phase": "COLD",
+        "status": "SUCCESS",
+        "latencyMs": 940,
+        "expectedColdCostMicrousd": 4400,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1000,
+          "outputTokens": 200
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_01_warm_1",
+        "scenarioId": "scenario_01",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 46,
+        "expectedColdCostMicrousd": 4400,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L1",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_01_warm_2",
+        "scenarioId": "scenario_01",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 56,
+        "expectedColdCostMicrousd": 4400,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L3",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_01_download_reuse",
+        "scenarioId": "scenario_01",
+        "phase": "DOWNLOAD_REUSE",
+        "status": "SUCCESS",
+        "latencyMs": 70,
+        "expectedColdCostMicrousd": 4400,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": true,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_01_reupload",
+        "scenarioId": "scenario_01",
+        "phase": "REUPLOAD",
+        "status": "SUCCESS",
+        "latencyMs": 1075,
+        "expectedColdCostMicrousd": 4400,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1020,
+          "outputTokens": 205
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": true,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_02_cold",
+        "scenarioId": "scenario_02",
+        "phase": "COLD",
+        "status": "SUCCESS",
+        "latencyMs": 1000,
+        "expectedColdCostMicrousd": 4620,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1050,
+          "outputTokens": 210
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_02_warm_1",
+        "scenarioId": "scenario_02",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 54,
+        "expectedColdCostMicrousd": 4620,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L2",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_02_warm_2",
+        "scenarioId": "scenario_02",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 64,
+        "expectedColdCostMicrousd": 4620,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_02_download_reuse",
+        "scenarioId": "scenario_02",
+        "phase": "DOWNLOAD_REUSE",
+        "status": "SUCCESS",
+        "latencyMs": 76,
+        "expectedColdCostMicrousd": 4620,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": true,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_02_reupload",
+        "scenarioId": "scenario_02",
+        "phase": "REUPLOAD",
+        "status": "SUCCESS",
+        "latencyMs": 1130,
+        "expectedColdCostMicrousd": 4620,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1070,
+          "outputTokens": 215
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": true,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_03_cold",
+        "scenarioId": "scenario_03",
+        "phase": "COLD",
+        "status": "SUCCESS",
+        "latencyMs": 1060,
+        "expectedColdCostMicrousd": 4840,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1100,
+          "outputTokens": 220
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_03_warm_1",
+        "scenarioId": "scenario_03",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 62,
+        "expectedColdCostMicrousd": 4840,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L3",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_03_warm_2",
+        "scenarioId": "scenario_03",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 72,
+        "expectedColdCostMicrousd": 4840,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L3",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_03_download_reuse",
+        "scenarioId": "scenario_03",
+        "phase": "DOWNLOAD_REUSE",
+        "status": "SUCCESS",
+        "latencyMs": 82,
+        "expectedColdCostMicrousd": 4840,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": true,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_03_reupload",
+        "scenarioId": "scenario_03",
+        "phase": "REUPLOAD",
+        "status": "SUCCESS",
+        "latencyMs": 1185,
+        "expectedColdCostMicrousd": 4840,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1120,
+          "outputTokens": 225
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": true,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_04_cold",
+        "scenarioId": "scenario_04",
+        "phase": "COLD",
+        "status": "SUCCESS",
+        "latencyMs": 1120,
+        "expectedColdCostMicrousd": 5060,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1150,
+          "outputTokens": 230
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_04_warm_1",
+        "scenarioId": "scenario_04",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 70,
+        "expectedColdCostMicrousd": 5060,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_04_warm_2",
+        "scenarioId": "scenario_04",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 80,
+        "expectedColdCostMicrousd": 5060,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_04_download_reuse",
+        "scenarioId": "scenario_04",
+        "phase": "DOWNLOAD_REUSE",
+        "status": "SUCCESS",
+        "latencyMs": 88,
+        "expectedColdCostMicrousd": 5060,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": true,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_04_reupload",
+        "scenarioId": "scenario_04",
+        "phase": "REUPLOAD",
+        "status": "SUCCESS",
+        "latencyMs": 1240,
+        "expectedColdCostMicrousd": 5060,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1170,
+          "outputTokens": 235
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": true,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_05_cold",
+        "scenarioId": "scenario_05",
+        "phase": "COLD",
+        "status": "SUCCESS",
+        "latencyMs": 1180,
+        "expectedColdCostMicrousd": 5280,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1200,
+          "outputTokens": 240
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_05_warm_1",
+        "scenarioId": "scenario_05",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 78,
+        "expectedColdCostMicrousd": 5280,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L1",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_05_warm_2",
+        "scenarioId": "scenario_05",
+        "phase": "WARM",
+        "status": "SUCCESS",
+        "latencyMs": 88,
+        "expectedColdCostMicrousd": 5280,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L3",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_05_download_reuse",
+        "scenarioId": "scenario_05",
+        "phase": "DOWNLOAD_REUSE",
+        "status": "SUCCESS",
+        "latencyMs": 94,
+        "expectedColdCostMicrousd": 5280,
+        "cache": {
+          "readAttempted": true,
+          "hit": true,
+          "level": "L4",
+          "writeAttempted": false,
+          "writeSucceeded": false
+        },
+        "provider": {
+          "called": false,
+          "modelId": "",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "observedCostMicrousd": 0
+        },
+        "lifecycleContext": {
+          "afterDownload": true,
+          "afterReupload": false,
+          "staleCacheReused": false
+        }
+      },
+      {
+        "executionId": "scenario_05_reupload",
+        "scenarioId": "scenario_05",
+        "phase": "REUPLOAD",
+        "status": "SUCCESS",
+        "latencyMs": 1295,
+        "expectedColdCostMicrousd": 5280,
+        "cache": {
+          "readAttempted": true,
+          "hit": false,
+          "level": "MISS",
+          "writeAttempted": true,
+          "writeSucceeded": true
+        },
+        "provider": {
+          "called": true,
+          "modelId": "semantic_profiler_default",
+          "inputTokens": 1220,
+          "outputTokens": 245
+        },
+        "lifecycleContext": {
+          "afterDownload": false,
+          "afterReupload": true,
+          "staleCacheReused": false
+        }
+      }
+    ],
+    "lifecycleEvents": [
+      {
+        "eventId": "scenario_01_download_event",
+        "scenarioId": "scenario_01",
+        "event": "DOWNLOAD",
+        "cacheDisposition": "RETAINED",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "55ee3f3b395d5e5d0f81477637cde04f4ec34c021f4451dff448a16d58fb70e9",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_01_delete_event",
+        "scenarioId": "scenario_01",
+        "event": "DELETE",
+        "cacheDisposition": "INVALIDATED",
+        "invalidationAttempted": true,
+        "invalidationSucceeded": true,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "55ee3f3b395d5e5d0f81477637cde04f4ec34c021f4451dff448a16d58fb70e9",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_01_reupload_event",
+        "scenarioId": "scenario_01",
+        "event": "REUPLOAD",
+        "cacheDisposition": "NEW_IDENTITY",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "55ee3f3b395d5e5d0f81477637cde04f4ec34c021f4451dff448a16d58fb70e9",
+        "newUploadIdentitySha256": "ad39b5ad8b022250808b71942b4e71668f493cdeb461800b4ef45019ce43974a"
+      },
+      {
+        "eventId": "scenario_02_download_event",
+        "scenarioId": "scenario_02",
+        "event": "DOWNLOAD",
+        "cacheDisposition": "RETAINED",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "059b592f9a40b03c4f2ea1e8f07283c9f6377ba8c0e19fc60fd68343dfa0f8dc",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_02_delete_event",
+        "scenarioId": "scenario_02",
+        "event": "DELETE",
+        "cacheDisposition": "INVALIDATED",
+        "invalidationAttempted": true,
+        "invalidationSucceeded": true,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "059b592f9a40b03c4f2ea1e8f07283c9f6377ba8c0e19fc60fd68343dfa0f8dc",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_02_reupload_event",
+        "scenarioId": "scenario_02",
+        "event": "REUPLOAD",
+        "cacheDisposition": "NEW_IDENTITY",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "059b592f9a40b03c4f2ea1e8f07283c9f6377ba8c0e19fc60fd68343dfa0f8dc",
+        "newUploadIdentitySha256": "0c1adf228561ef3077ccac79c086895e8a0b7a8a530b14bc0e362c3f3846a648"
+      },
+      {
+        "eventId": "scenario_03_download_event",
+        "scenarioId": "scenario_03",
+        "event": "DOWNLOAD",
+        "cacheDisposition": "RETAINED",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "6c42056d0aaacf8b9bd077412fd709e56ba8d5623fd8706bc467d24ae0589338",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_03_delete_event",
+        "scenarioId": "scenario_03",
+        "event": "DELETE",
+        "cacheDisposition": "INVALIDATED",
+        "invalidationAttempted": true,
+        "invalidationSucceeded": true,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "6c42056d0aaacf8b9bd077412fd709e56ba8d5623fd8706bc467d24ae0589338",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_03_reupload_event",
+        "scenarioId": "scenario_03",
+        "event": "REUPLOAD",
+        "cacheDisposition": "NEW_IDENTITY",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "6c42056d0aaacf8b9bd077412fd709e56ba8d5623fd8706bc467d24ae0589338",
+        "newUploadIdentitySha256": "4d3e0bf9001877b35ca1d509b9b80355b404d4f391c3bb6e282ca452ed336367"
+      },
+      {
+        "eventId": "scenario_04_download_event",
+        "scenarioId": "scenario_04",
+        "event": "DOWNLOAD",
+        "cacheDisposition": "RETAINED",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "77b2f597159eee8c79671630b186295bc1089c37e3b2926888b8c9a570f7587b",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_04_delete_event",
+        "scenarioId": "scenario_04",
+        "event": "DELETE",
+        "cacheDisposition": "INVALIDATED",
+        "invalidationAttempted": true,
+        "invalidationSucceeded": true,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "77b2f597159eee8c79671630b186295bc1089c37e3b2926888b8c9a570f7587b",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_04_reupload_event",
+        "scenarioId": "scenario_04",
+        "event": "REUPLOAD",
+        "cacheDisposition": "NEW_IDENTITY",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "77b2f597159eee8c79671630b186295bc1089c37e3b2926888b8c9a570f7587b",
+        "newUploadIdentitySha256": "42956b029917dbf805abab6892c0c3be0b382d43e8d23d451e9041392b460b8a"
+      },
+      {
+        "eventId": "scenario_05_download_event",
+        "scenarioId": "scenario_05",
+        "event": "DOWNLOAD",
+        "cacheDisposition": "RETAINED",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "4113dc56458a44c1649af90bce2c038c42818c7efb2d1e6fbf9f2ca744297f77",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_05_delete_event",
+        "scenarioId": "scenario_05",
+        "event": "DELETE",
+        "cacheDisposition": "INVALIDATED",
+        "invalidationAttempted": true,
+        "invalidationSucceeded": true,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "4113dc56458a44c1649af90bce2c038c42818c7efb2d1e6fbf9f2ca744297f77",
+        "newUploadIdentitySha256": ""
+      },
+      {
+        "eventId": "scenario_05_reupload_event",
+        "scenarioId": "scenario_05",
+        "event": "REUPLOAD",
+        "cacheDisposition": "NEW_IDENTITY",
+        "invalidationAttempted": false,
+        "invalidationSucceeded": false,
+        "staleCacheReused": false,
+        "priorUploadIdentitySha256": "4113dc56458a44c1649af90bce2c038c42818c7efb2d1e6fbf9f2ca744297f77",
+        "newUploadIdentitySha256": "fae446a2d9225c9b6186b5d43e5e4f7909116e9d4209aba107869046db4b38a2"
+      }
+    ],
+    "guardrails": {
+      "rawRowsStored": false,
+      "rawFileNamesStored": false,
+      "userIdentityStored": false,
+      "storageKeysStored": false,
+      "providerCallsExecuted": 0,
+      "productionTraffic": false
+    },
+    "compatibility": {
+      "version": "query_candidate_planner_e_x_compatibility_canonical_evaluation_input_v1",
+      "predecessorMode": "PATCH_E_X_EXCLUDED_NO_COLLECTION_SUMMARY",
+      "sourceDatasetMode": "SYNTHETIC_DETERMINISTIC_NO_PROVIDER_CALLS",
+      "pricingMode": "APPROVED_ACTUAL",
+      "actualPricingAppliedByEvaluator": true,
+      "observedSyntheticCostRemovedFromProviderRows": true,
+      "strippedObservedCostCount": 5,
+      "providerCalledExecutionCount": 10,
+      "actualLiveProviderParityEvidence": true,
+      "actualOperationalTelemetry": false,
+      "currentProductionTrafficMeasurement": false,
+      "canaryPromotionEvidence": false,
+      "productionPromotionEvidence": false,
+      "collectorRequired": false,
+      "providerCallsExecutedByPreparation": 0,
+      "sourceDatasetSha256": "8815689402df6e321960a9dbbb00ed2960d23aafb5215994dfb6ddabf8897be7",
+      "pricingPolicySha256": "6e7e6100e44f250fa31ac180bf7af7400aba635ca2c1fe7d0946feb08be4eb52",
+      "liveParityReadinessSha256": "9a059dbaba21bd11af3d23ebc285f60ecca8ecc7e544b51e8130643ab56d2c2b",
+      "liveParity": {
+        "originProviderCalls": 1,
+        "replayProviderCalls": 0,
+        "plannerCacheSource": "L3_SEMANTIC",
+        "reentryCacheSource": "L4_REENTRY",
+        "parityValid": true,
+        "encryptedPersistentFileCount": 3,
+        "plaintextPersistentFileCount": 0,
+        "readinessEligible": true,
+        "readinessDecision": "ELIGIBLE_FOR_CONTROLLED_PRODUCTION_PROMOTION_REVIEW"
+      },
+      "actualPricingCacheAvoidanceConsistency": {
+        "version": "query_candidate_planner_actual_pricing_cache_avoidance_consistency_v1",
+        "method": "SCENARIO_COLD_TOKEN_COST_REPRICED_WITH_APPROVED_ACTUAL_POLICY",
+        "sourceCanonicalInputSha256": "74a873717a9fcfcbbff8eed79baa4c6852c4ea51895db43f3275fd97e37e9902",
+        "pricingPolicySha256": "6e7e6100e44f250fa31ac180bf7af7400aba635ca2c1fe7d0946feb08be4eb52",
+        "scenarioCount": 5,
+        "repricedExecutionCount": 25,
+        "repricedCacheHitCount": 15,
+        "providerCallCount": 10,
+        "providerCostMicrousd": 48900,
+        "avoidedByCacheMicrousd": 72600,
+        "cacheCostAvoidanceRate": 0.597531,
+        "originalThresholdPolicyModified": false,
+        "evaluatorModified": false,
+        "providerCallsExecutedByConsistencyPreparation": 0,
+        "actualOperationalTelemetry": false,
+        "productionPromotionAuthorized": false
+      }
+    }
+  },
+  "source": {
+    "sourceDatasetSha256": "8815689402df6e321960a9dbbb00ed2960d23aafb5215994dfb6ddabf8897be7",
+    "pricingPolicySha256": "6e7e6100e44f250fa31ac180bf7af7400aba635ca2c1fe7d0946feb08be4eb52",
+    "liveParityReadinessSha256": "9a059dbaba21bd11af3d23ebc285f60ecca8ecc7e544b51e8130643ab56d2c2b",
+    "preConsistencyCanonicalInputSha256": "74a873717a9fcfcbbff8eed79baa4c6852c4ea51895db43f3275fd97e37e9902"
+  },
+  "guardrails": {
+    "evaluationOnly": true,
+    "actualOperationalTelemetry": false,
+    "productionPromotionAuthorized": false,
+    "productionCandidateMergeApplied": false,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "collectorEnabledByThisOperation": false,
+    "internalCanaryEnabledByThisOperation": false,
+    "providerCallsExecutedByThisOperation": 0
+  },
+  "costConsistency": {
+    "version": "query_candidate_planner_actual_pricing_cache_avoidance_consistency_v1",
+    "scenarioCount": 5,
+    "repricedExecutionCount": 25,
+    "repricedCacheHitCount": 15,
+    "providerCallCount": 10,
+    "providerCostMicrousd": 48900,
+    "avoidedByCacheMicrousd": 72600,
+    "cacheCostAvoidanceRate": 0.597531,
+    "thresholdPolicyModified": false,
+    "evaluatorModified": false
+  }
+}

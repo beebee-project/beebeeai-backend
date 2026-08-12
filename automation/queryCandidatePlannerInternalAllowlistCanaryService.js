@@ -1,3 +1,6 @@
+const {
+  evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate,
+} = require("./queryCandidatePlannerInternalCanaryApprovalBindingGate");
 const { OPERATIONS } = require("./queryCandidatePlannerFeatureControl");
 const {
   getQueryCandidatePlannerFeatureControl,
@@ -160,6 +163,23 @@ function evaluateQueryCandidatePlannerInternalCanaryPreflight({
   const resolvedConfig =
     config || parseQueryCandidatePlannerInternalCanaryConfig(env);
   const subject = deriveQueryCandidatePlannerInternalCanarySubject(request);
+
+  // PATCH 15.3.2-F.1.6.1 APPROVAL BINDING COMPOSITION
+  const approvalBindingGate =
+    evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
+      env,
+      featureControl,
+      subject,
+    });
+
+  // Approval is an additional prerequisite only.
+  // BLOCK returns immediately; ALLOW must continue through every
+  // existing Patch 15.3 preflight check below.
+  if (!approvalBindingGate.allowed) {
+    return approvalBindingGate.preflight;
+  }
+
+  // PATCH 15.3.2-F.1.6.1 LEGACY PREFLIGHT CONTINUES
   const evidence = parseEvidence(resolvedConfig, evidenceBundle, now);
 
   if (!resolvedConfig.configurationValid) {

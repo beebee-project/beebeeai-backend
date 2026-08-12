@@ -1,0 +1,41 @@
+{
+  "version": "query_candidate_planner_internal_canary_preflight_composition_repair_policy_v1",
+  "policyId": "beebeeai_patch15_3_2_f_1_6_1_existing_canary_preflight_composition_repair_v1",
+  "scope": "INTERNAL_ALLOWLIST_CANARY_ONLY",
+  "predecessor": "15.3.2-F.1.6",
+  "expectedPreIntegrationServiceSha256": "089E260D90625E068769F3D3538FAC198B4EAB3CEC4D864EF8CA9A747123E561",
+  "expectedApprovalBindingGateSha256": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+  "composition": {
+    "approvalBindingRole": "ADDITIONAL_PREREQUISITE",
+    "approvalBlock": "RETURN_BLOCKED_PREFLIGHT",
+    "approvalAllow": "CONTINUE_EXISTING_PATCH15_3_PREFLIGHT",
+    "legacyPreflightReplacementForbidden": true,
+    "legacyEarlyReturnOnApprovalAllowForbidden": true
+  },
+  "legacyChecksThatMustRemainReachable": [
+    "internal canary configuration validity",
+    "internal canary enabled",
+    "internal canary kill switch",
+    "semantic profiler only",
+    "immutable subject completeness",
+    "legacy canary evidence validity",
+    "allowlist-only audience",
+    "rollout percent zero",
+    "existing controlled production promotion gate",
+    "existing feature control",
+    "final ALLOWLIST_PREFLIGHT_ALLOWED"
+  ],
+  "authorizationBoundary": {
+    "internalAllowlistCanaryRuntimeMayBeAuthorizedOnlyWhenBothGatesAllow": true,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionReadyAssignmentAuthorized": false,
+    "productionRouteChangeAuthorized": false
+  },
+  "patchBoundary": {
+    "routeModified": false,
+    "controllerModified": false,
+    "environmentModified": false,
+    "providerCallsExecutedByPatch": 0
+  }
+}

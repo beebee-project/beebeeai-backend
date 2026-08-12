@@ -1,0 +1,172 @@
+{
+  "version": "query_candidate_patch15_3_2_F_1_6_manifest_v1",
+  "patch": "15.3.2-F.1.6",
+  "phase": "15.3-C",
+  "name": "Internal Allowlist Canary Gate Integration",
+  "predecessor": "15.3.2-F.1.5",
+  "install": {
+    "archiveExtraction": "additive",
+    "integrationScriptRequired": true,
+    "runtimeServiceModifiedByIntegration": "automation/queryCandidatePlannerInternalAllowlistCanaryService.js",
+    "routeModified": false
+  },
+  "runtimeBinding": {
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "approvalBundleEnv": "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_BUNDLE_SHA256",
+    "approvalReceiptJsonEnv": "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_RECEIPT_JSON",
+    "allowlistEnv": "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256"
+  },
+  "authorizationBoundary": {
+    "internalAllowlistCanaryRuntimeBinding": true,
+    "actualOperationalTelemetry": false,
+    "canaryEvidenceCollectionRequired": true,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionReadyAssignmentAuthorized": false,
+    "productionRouteChangeAuthorized": false
+  },
+  "providerCallsExecutedByPatch": 0,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_F_1_6.json",
+      "bytes": 1159,
+      "sha256": "1551e0922f0e50cd5a8e897fd8261099eaed2c34a803c9bfd3dc34f07e313359"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_F_1_6_INTERNAL_ALLOWLIST_CANARY_GATE_INTEGRATION.md",
+      "bytes": 3412,
+      "sha256": "7da59895c4735e8f9cb7abb03703c60614749cc4815aecd02619ac0984162f9d"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryApprovalBindingGate.js",
+      "bytes": 22127,
+      "sha256": "ed43cfaf798fe904edb0308ee82efdb5a17d599ec44416072de152f625e436e7"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerInternalCanaryApprovalBindingGatePolicy.v1.json",
+      "bytes": 3095,
+      "sha256": "8912b0b5c2291e0741f44b4ddf525fff47acc0393ab3a191678d93a32d910755"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerApplyInternalCanaryApprovalBindingGateIntegration.js",
+      "bytes": 3982,
+      "sha256": "866515a9c3a21cd5e73759cd7efc9b233acf700b80e6ae87234bde17d2acf48b"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerRenderInternalCanaryApprovalBindingEnvironment.js",
+      "bytes": 1307,
+      "sha256": "446c489fa28949fe9b88114c680be968989c0d55a8a23f4daff02e93b723bc3c"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanaryApprovalBinding.js",
+      "bytes": 3427,
+      "sha256": "dda0d34c049a7cba962247b3c80af4072b89cf1a16365abefee42b7796bcbf4f"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanaryApprovalBindingGateIntegration.js",
+      "bytes": 1492,
+      "sha256": "13a6f590eac380398f52445e19c5b301e32266f454d5e7bca6e4e5262f167943"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6AllowSmokeTest.js",
+      "bytes": 790,
+      "sha256": "8cbb172876d8f5ecf08c83ab6ad9291c47c43ef5a544e1d161e5a62e2b736c17"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6AllowlistMismatchSmokeTest.js",
+      "bytes": 654,
+      "sha256": "1d003c983adc3b741229d59fb27917f28faf18278fd462c69b1f1cb72c4ef159"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6ApprovalBundleMismatchSmokeTest.js",
+      "bytes": 651,
+      "sha256": "4fd5609cd469fa9d80876508a1d6472ca49e481beb7068e102fd76639b921e7a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6DefaultBlockedSmokeTest.js",
+      "bytes": 537,
+      "sha256": "d155a9fc8b39422d96ebe210827c7538fb52d968b2dfc42111f9c7201675e3e7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6FeatureControlBlockSmokeTest.js",
+      "bytes": 723,
+      "sha256": "056dc3f22c6fd19a0782edc8f6bfe24372c5088b9eefd35a04dba2c65461e0e4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6GeneralUserBlockedSmokeTest.js",
+      "bytes": 604,
+      "sha256": "ad28aeed000b70284a5771c6ed9569207e9c1883c328dee462078eb07455aa11"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6GlobalKillSwitchSmokeTest.js",
+      "bytes": 619,
+      "sha256": "3550d469a40a855d53e62d37d3cab1028f3fb5f41f25461dcd4da1fbeb8308e1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6IntegrationScriptContractSmokeTest.js",
+      "bytes": 512,
+      "sha256": "46a524ecd27b1f4255aa36fbf4c675b1ed1635e0d4878afee30713db73ea1479"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6IntegrationSyntheticSmokeTest.js",
+      "bytes": 1203,
+      "sha256": "05db2b9acd2bfb9fc0e2aeffab34160beafe25e7b8050fd386141f6f1c62494b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6InternalKillSwitchSmokeTest.js",
+      "bytes": 629,
+      "sha256": "0affda9a252ca1170922c53597aa636bdea9ed3b2443a68ceb206e6b2a96ba3b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6ManifestSmokeTest.js",
+      "bytes": 510,
+      "sha256": "0fc60d2aa24b91ef0b9182ee8d6eac471b647e5ae14484a7ebf23cc1ec9bd81a"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6PolicySmokeTest.js",
+      "bytes": 513,
+      "sha256": "f910d88646bffa345376d473e415ca6a35dd0afb4d3ed25f732bee7d1bcf5b79"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6ProductionKillSwitchSmokeTest.js",
+      "bytes": 627,
+      "sha256": "6338172ada826d50e4deed8a3557ca774e558ef50635b0f09acfe95a1de82b3c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6ProfilerOnlySmokeTest.js",
+      "bytes": 639,
+      "sha256": "46b90e17680e4da75541bcfd2179931bbdf6da12d76f4ec9037392395f4a2950"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6PromotionDecisionContractSmokeTest.js",
+      "bytes": 918,
+      "sha256": "bc87deee35cb98a835a19ee90f961aae05a3ca206cf028ca035c9af3246fa8e7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6ReadyRouteForbiddenSmokeTest.js",
+      "bytes": 641,
+      "sha256": "18ac62a7625e890a7abd4f65058ff7c938c26d388ff7ab73934a61836d77a1bf"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6ReceiptTamperSmokeTest.js",
+      "bytes": 650,
+      "sha256": "b386a88a47b864ff757f99c2417629768f38397b1cf2b2294bab61bd9fd33928"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6RolloutBlockedSmokeTest.js",
+      "bytes": 634,
+      "sha256": "fffdeb4444d1f38e5b8b305b520973e4d6ef0fe4bc1e7183d511514210067c8f"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6TelemetryBoundarySmokeTest.js",
+      "bytes": 753,
+      "sha256": "974ab42e22f66f384d82f9643e20291cc909c9d0f5fe48858018340f91dcd99c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_F_1_6TestSupport.js",
+      "bytes": 4381,
+      "sha256": "69a77f9de6fc547a668549b1822dd64b1c959f47f096421f789294c817d24745"
+    }
+  ],
+  "fileCount": 28
+}
