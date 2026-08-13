@@ -1,3 +1,5 @@
+"use strict";
+
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -5,7 +7,8 @@ const crypto = require("crypto");
 const TARGET =
   "automation/queryCandidatePlannerInternalAllowlistCanaryService.js";
 
-const REQUIRE_MARKER = "// PATCH 15.3.2-F.1.6 APPROVAL BINDING GATE REQUIRE";
+const REQUIRE_MARKER =
+  "// PATCH 15.3.2-F.1.6 APPROVAL BINDING GATE REQUIRE";
 
 const INTEGRATION_MARKER =
   "// PATCH 15.3.2-F.1.6 APPROVAL BINDING GATE INTEGRATION";
@@ -29,7 +32,10 @@ function main() {
   let source = fs.readFileSync(target, "utf8");
   const beforeSha = sha256(Buffer.from(source, "utf8"));
 
-  if (source.includes(REQUIRE_MARKER) && source.includes(INTEGRATION_MARKER)) {
+  if (
+    source.includes(REQUIRE_MARKER) &&
+    source.includes(INTEGRATION_MARKER)
+  ) {
     console.log("PASS Patch 15.3.2-F.1.6 integration already applied");
     console.log(`SERVICE_SHA256 ${beforeSha}`);
     console.log("IDEMPOTENT true");
@@ -50,8 +56,8 @@ function main() {
 
   const requireBlock = [
     REQUIRE_MARKER,
-    "const {",
-    "  evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate,",
+    'const {',
+    '  evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate,',
     '} = require("./queryCandidatePlannerInternalCanaryApprovalBindingGate");',
     "",
   ].join("\n");
@@ -88,7 +94,9 @@ function main() {
   const backupRoot = path.join(repoRoot, ".patch_backups");
   fs.mkdirSync(backupRoot, { recursive: true });
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
 
   const backupDir = path.join(
     backupRoot,
@@ -96,7 +104,10 @@ function main() {
   );
   fs.mkdirSync(backupDir, { recursive: true });
 
-  const backupFile = path.join(backupDir, path.basename(target));
+  const backupFile = path.join(
+    backupDir,
+    path.basename(target),
+  );
   fs.copyFileSync(target, backupFile);
 
   fs.writeFileSync(target, source, "utf8");

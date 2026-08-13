@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -63,9 +65,7 @@ function sha256File(file) {
 }
 
 function normalizeSha256(value) {
-  const normalized = String(value || "")
-    .trim()
-    .toUpperCase();
+  const normalized = String(value || "").trim().toUpperCase();
   return /^[A-F0-9]{64}$/.test(normalized) && !/^0{64}$/.test(normalized)
     ? normalized
     : "";
@@ -86,43 +86,27 @@ function readJson(file) {
 }
 
 function validateCandidate(candidate, candidateFile) {
-  assert(
-    candidate?.candidatePayloadSha256 === EXPECTED.candidatePayloadSha256,
-    "G_CANDIDATE_PAYLOAD_SHA_MISMATCH",
-  );
-  assert(
-    sha256File(candidateFile) === EXPECTED.candidateFileSha256,
-    "G_CANDIDATE_FILE_SHA_MISMATCH",
-  );
-  assert(
-    candidate?.evaluation?.operationalDecision === "EVALUATION_PASS",
-    "G_OPERATIONAL_EVALUATION_NOT_PASS",
-  );
+  assert(candidate?.candidatePayloadSha256 === EXPECTED.candidatePayloadSha256,
+    "G_CANDIDATE_PAYLOAD_SHA_MISMATCH");
+  assert(sha256File(candidateFile) === EXPECTED.candidateFileSha256,
+    "G_CANDIDATE_FILE_SHA_MISMATCH");
+  assert(candidate?.evaluation?.operationalDecision === "EVALUATION_PASS",
+    "G_OPERATIONAL_EVALUATION_NOT_PASS");
   assert(
     candidate?.evaluation?.assessmentDecision ===
       "ACTUAL_PRICING_ABSOLUTE_COST_RECALIBRATION_PASS",
     "G_ASSESSMENT_NOT_PASS",
   );
-  assert(
-    Number(candidate?.evaluation?.failedCheckCount) === 0,
-    "G_FAILED_CHECK_COUNT_NONZERO",
-  );
-  assert(
-    Number(candidate?.evaluation?.absoluteCostFailureCount) === 0,
-    "G_ABSOLUTE_COST_FAILURE_COUNT_NONZERO",
-  );
-  assert(
-    candidate?.evaluation?.cacheCostAvoidancePassed === true,
-    "G_CACHE_COST_AVOIDANCE_NOT_PASS",
-  );
-  assert(
-    candidate?.methodology?.actualOperationalTelemetry === false,
-    "G_UNEXPECTED_OPERATIONAL_TELEMETRY_CLAIM",
-  );
-  assert(
-    candidate?.integrity?.evaluator?.worktreeEqualsHead === true,
-    "G_EVALUATOR_WORKTREE_DRIFT",
-  );
+  assert(Number(candidate?.evaluation?.failedCheckCount) === 0,
+    "G_FAILED_CHECK_COUNT_NONZERO");
+  assert(Number(candidate?.evaluation?.absoluteCostFailureCount) === 0,
+    "G_ABSOLUTE_COST_FAILURE_COUNT_NONZERO");
+  assert(candidate?.evaluation?.cacheCostAvoidancePassed === true,
+    "G_CACHE_COST_AVOIDANCE_NOT_PASS");
+  assert(candidate?.methodology?.actualOperationalTelemetry === false,
+    "G_UNEXPECTED_OPERATIONAL_TELEMETRY_CLAIM");
+  assert(candidate?.integrity?.evaluator?.worktreeEqualsHead === true,
+    "G_EVALUATOR_WORKTREE_DRIFT");
   assert(
     normalizeSha256(candidate?.integrity?.evaluator?.worktreeSha256) ===
       EXPECTED.evaluatorSha256,
@@ -136,44 +120,31 @@ function validateCandidate(candidate, candidateFile) {
 }
 
 function validateRotation(rotation, rotationFile) {
-  assert(
-    sha256File(rotationFile) === EXPECTED.rotationPlanFileSha256,
-    "G_ROTATION_PLAN_FILE_SHA_MISMATCH",
-  );
-  assert(
-    rotation?.decision === "READY_FOR_LOCAL_APPROVAL_REBINDING",
-    "G_ROTATION_DECISION_INVALID",
-  );
+  assert(sha256File(rotationFile) === EXPECTED.rotationPlanFileSha256,
+    "G_ROTATION_PLAN_FILE_SHA_MISMATCH");
+  assert(rotation?.decision === "READY_FOR_LOCAL_APPROVAL_REBINDING",
+    "G_ROTATION_DECISION_INVALID");
   assert(rotation?.valid === true, "G_ROTATION_NOT_VALID");
   assert(
-    normalizeSha256(rotation?.proposedAllowlistSha256) ===
-      EXPECTED.allowlistSha256,
+    normalizeSha256(rotation?.proposedAllowlistSha256) === EXPECTED.allowlistSha256,
     "G_ROTATED_ALLOWLIST_SHA_MISMATCH",
   );
-  assert(
-    rotation?.approvalRebinding?.f14CandidatePreserved === true,
-    "G_F14_CANDIDATE_NOT_PRESERVED",
-  );
-  assert(
-    rotation?.guardrails?.actualOperationalTelemetry === false,
-    "G_ROTATION_TELEMETRY_BOUNDARY_INVALID",
-  );
+  assert(rotation?.approvalRebinding?.f14CandidatePreserved === true,
+    "G_F14_CANDIDATE_NOT_PRESERVED");
+  assert(rotation?.guardrails?.actualOperationalTelemetry === false,
+    "G_ROTATION_TELEMETRY_BOUNDARY_INVALID");
 }
 
 function validateReceipt(receipt, receiptFile) {
-  assert(
-    sha256File(receiptFile) === EXPECTED.approvalReceiptFileSha256,
-    "G_RECEIPT_FILE_SHA_MISMATCH",
-  );
+  assert(sha256File(receiptFile) === EXPECTED.approvalReceiptFileSha256,
+    "G_RECEIPT_FILE_SHA_MISMATCH");
   assert(
     normalizeSha256(receipt?.approvalReceiptPayloadSha256) ===
       EXPECTED.approvalReceiptPayloadSha256,
     "G_RECEIPT_PAYLOAD_SHA_MISMATCH",
   );
-  assert(
-    receipt?.decision === "INTERNAL_ALLOWLIST_CANARY_MANUAL_APPROVAL_GRANTED",
-    "G_RECEIPT_DECISION_INVALID",
-  );
+  assert(receipt?.decision === "INTERNAL_ALLOWLIST_CANARY_MANUAL_APPROVAL_GRANTED",
+    "G_RECEIPT_DECISION_INVALID");
   assert(
     normalizeSha256(receipt?.immutableBindings?.candidatePayloadSha256) ===
       EXPECTED.candidatePayloadSha256,
@@ -184,26 +155,16 @@ function validateReceipt(receipt, receiptFile) {
       EXPECTED.allowlistSha256,
     "G_RECEIPT_ALLOWLIST_BINDING_MISMATCH",
   );
-  assert(
-    receipt?.manualApproval?.approvedByOperator === true,
-    "G_MANUAL_APPROVAL_MISSING",
-  );
-  assert(
-    receipt?.manualApproval?.approvalIsRuntimeActivation === false,
-    "G_MANUAL_APPROVAL_RUNTIME_BOUNDARY_INVALID",
-  );
-  assert(
-    receipt?.authorizationBoundary?.runtimeCanaryAuthorized === false,
-    "G_RECEIPT_RUNTIME_ALREADY_AUTHORIZED",
-  );
-  assert(
-    receipt?.authorizationBoundary?.percentageRolloutAuthorized === false,
-    "G_RECEIPT_ROLLOUT_ALREADY_AUTHORIZED",
-  );
-  assert(
-    receipt?.authorizationBoundary?.productionPromotionAuthorized === false,
-    "G_RECEIPT_PROMOTION_ALREADY_AUTHORIZED",
-  );
+  assert(receipt?.manualApproval?.approvedByOperator === true,
+    "G_MANUAL_APPROVAL_MISSING");
+  assert(receipt?.manualApproval?.approvalIsRuntimeActivation === false,
+    "G_MANUAL_APPROVAL_RUNTIME_BOUNDARY_INVALID");
+  assert(receipt?.authorizationBoundary?.runtimeCanaryAuthorized === false,
+    "G_RECEIPT_RUNTIME_ALREADY_AUTHORIZED");
+  assert(receipt?.authorizationBoundary?.percentageRolloutAuthorized === false,
+    "G_RECEIPT_ROLLOUT_ALREADY_AUTHORIZED");
+  assert(receipt?.authorizationBoundary?.productionPromotionAuthorized === false,
+    "G_RECEIPT_PROMOTION_ALREADY_AUTHORIZED");
 }
 
 function buildFinalEvaluationEvidenceBundle({
@@ -220,14 +181,8 @@ function buildFinalEvaluationEvidenceBundle({
     approvalBindingGateFile,
     composedServiceFile,
   })) {
-    assert(
-      typeof file === "string" && file.trim(),
-      `G_${name.toUpperCase()}_REQUIRED`,
-    );
-    assert(
-      fs.existsSync(path.resolve(file)),
-      `G_${name.toUpperCase()}_MISSING`,
-    );
+    assert(typeof file === "string" && file.trim(), `G_${name.toUpperCase()}_REQUIRED`);
+    assert(fs.existsSync(path.resolve(file)), `G_${name.toUpperCase()}_MISSING`);
   }
 
   const candidate = readJson(candidateFile);
@@ -269,11 +224,8 @@ function buildFinalEvaluationEvidenceBundle({
       operationalDecision: candidate.evaluation.operationalDecision,
       assessmentDecision: candidate.evaluation.assessmentDecision,
       failedCheckCount: Number(candidate.evaluation.failedCheckCount),
-      absoluteCostFailureCount: Number(
-        candidate.evaluation.absoluteCostFailureCount,
-      ),
-      cacheCostAvoidancePassed:
-        candidate.evaluation.cacheCostAvoidancePassed === true,
+      absoluteCostFailureCount: Number(candidate.evaluation.absoluteCostFailureCount),
+      cacheCostAvoidancePassed: candidate.evaluation.cacheCostAvoidancePassed === true,
       actualOperationalTelemetry: false,
     },
     readiness: {
@@ -348,87 +300,46 @@ function verifyFinalEvaluationEvidenceBundle(bundle = {}) {
     assert(observed === expected, `G_BUNDLE_BINDING_MISMATCH_${key}`);
   }
 
-  assert(
-    bundle?.evaluationSnapshot?.operationalDecision === "EVALUATION_PASS",
-    "G_BUNDLE_OPERATIONAL_DECISION_INVALID",
-  );
-  assert(
-    bundle?.evaluationSnapshot?.failedCheckCount === 0,
-    "G_BUNDLE_FAILED_CHECK_COUNT_NONZERO",
-  );
-  assert(
-    bundle?.evaluationSnapshot?.actualOperationalTelemetry === false,
-    "G_BUNDLE_TELEMETRY_CLAIM_INVALID",
-  );
+  assert(bundle?.evaluationSnapshot?.operationalDecision === "EVALUATION_PASS",
+    "G_BUNDLE_OPERATIONAL_DECISION_INVALID");
+  assert(bundle?.evaluationSnapshot?.failedCheckCount === 0,
+    "G_BUNDLE_FAILED_CHECK_COUNT_NONZERO");
+  assert(bundle?.evaluationSnapshot?.actualOperationalTelemetry === false,
+    "G_BUNDLE_TELEMETRY_CLAIM_INVALID");
 
-  assert(
-    bundle?.readiness?.eligible === true,
-    "G_BUNDLE_READINESS_NOT_ELIGIBLE",
-  );
-  assert(
-    bundle?.readiness?.bootstrapOnly === true,
-    "G_BUNDLE_BOOTSTRAP_ONLY_REQUIRED",
-  );
-  assert(
-    bundle?.readiness?.internalAllowlistOnly === true,
-    "G_BUNDLE_ALLOWLIST_ONLY_REQUIRED",
-  );
-  assert(
-    Number(bundle?.readiness?.rolloutPercent) === 0,
-    "G_BUNDLE_ROLLOUT_PERCENT_MUST_BE_ZERO",
-  );
-  assert(
-    bundle?.readiness?.actualTrafficEvidenceRequiredFor15_3_4 === true,
-    "G_BUNDLE_ACTUAL_TRAFFIC_NEXT_GATE_REQUIRED",
-  );
+  assert(bundle?.readiness?.eligible === true, "G_BUNDLE_READINESS_NOT_ELIGIBLE");
+  assert(bundle?.readiness?.bootstrapOnly === true, "G_BUNDLE_BOOTSTRAP_ONLY_REQUIRED");
+  assert(bundle?.readiness?.internalAllowlistOnly === true,
+    "G_BUNDLE_ALLOWLIST_ONLY_REQUIRED");
+  assert(Number(bundle?.readiness?.rolloutPercent) === 0,
+    "G_BUNDLE_ROLLOUT_PERCENT_MUST_BE_ZERO");
+  assert(bundle?.readiness?.actualTrafficEvidenceRequiredFor15_3_4 === true,
+    "G_BUNDLE_ACTUAL_TRAFFIC_NEXT_GATE_REQUIRED");
 
-  assert(
-    bundle?.legacy15_3EvidenceContract?.satisfiedByThisBundle === false,
-    "G_BUNDLE_MUST_NOT_CLAIM_LEGACY_EVIDENCE_SATISFACTION",
-  );
-  assert(
-    bundle?.legacy15_3EvidenceContract?.substitutionForbidden === true,
-    "G_BUNDLE_LEGACY_EVIDENCE_SUBSTITUTION_MUST_BE_FORBIDDEN",
-  );
+  assert(bundle?.legacy15_3EvidenceContract?.satisfiedByThisBundle === false,
+    "G_BUNDLE_MUST_NOT_CLAIM_LEGACY_EVIDENCE_SATISFACTION");
+  assert(bundle?.legacy15_3EvidenceContract?.substitutionForbidden === true,
+    "G_BUNDLE_LEGACY_EVIDENCE_SUBSTITUTION_MUST_BE_FORBIDDEN");
 
-  assert(
-    bundle?.authorizationBoundary?.runtimeAutoActivationAuthorized === false,
-    "G_BUNDLE_RUNTIME_AUTO_ACTIVATION_FORBIDDEN",
-  );
-  assert(
-    bundle?.authorizationBoundary?.actualInternalUserExposureAuthorized ===
-      false,
-    "G_BUNDLE_ACTUAL_EXPOSURE_NOT_AUTHORIZED_IN_G",
-  );
-  assert(
-    bundle?.authorizationBoundary?.percentageRolloutAuthorized === false,
-    "G_BUNDLE_PERCENTAGE_ROLLOUT_FORBIDDEN",
-  );
-  assert(
-    bundle?.authorizationBoundary?.productionPromotionAuthorized === false,
-    "G_BUNDLE_PRODUCTION_PROMOTION_FORBIDDEN",
-  );
+  assert(bundle?.authorizationBoundary?.runtimeAutoActivationAuthorized === false,
+    "G_BUNDLE_RUNTIME_AUTO_ACTIVATION_FORBIDDEN");
+  assert(bundle?.authorizationBoundary?.actualInternalUserExposureAuthorized === false,
+    "G_BUNDLE_ACTUAL_EXPOSURE_NOT_AUTHORIZED_IN_G");
+  assert(bundle?.authorizationBoundary?.percentageRolloutAuthorized === false,
+    "G_BUNDLE_PERCENTAGE_ROLLOUT_FORBIDDEN");
+  assert(bundle?.authorizationBoundary?.productionPromotionAuthorized === false,
+    "G_BUNDLE_PRODUCTION_PROMOTION_FORBIDDEN");
 
-  assert(
-    bundle?.guardrails?.providerCallsExecutedByBundleBuilder === 0,
-    "G_BUNDLE_PROVIDER_CALLS_NONZERO",
-  );
-  assert(
-    bundle?.guardrails?.actualOperationalTelemetry === false,
-    "G_BUNDLE_ACTUAL_TELEMETRY_FORBIDDEN",
-  );
-  assert(
-    bundle?.guardrails?.railwayModified === false,
-    "G_BUNDLE_RAILWAY_MUTATION_FORBIDDEN",
-  );
-  assert(
-    bundle?.guardrails?.environmentModified === false,
-    "G_BUNDLE_ENV_MUTATION_FORBIDDEN",
-  );
-  assert(
-    bundle?.guardrails?.routeModified === false,
-    "G_BUNDLE_ROUTE_MUTATION_FORBIDDEN",
-  );
+  assert(bundle?.guardrails?.providerCallsExecutedByBundleBuilder === 0,
+    "G_BUNDLE_PROVIDER_CALLS_NONZERO");
+  assert(bundle?.guardrails?.actualOperationalTelemetry === false,
+    "G_BUNDLE_ACTUAL_TELEMETRY_FORBIDDEN");
+  assert(bundle?.guardrails?.railwayModified === false,
+    "G_BUNDLE_RAILWAY_MUTATION_FORBIDDEN");
+  assert(bundle?.guardrails?.environmentModified === false,
+    "G_BUNDLE_ENV_MUTATION_FORBIDDEN");
+  assert(bundle?.guardrails?.routeModified === false,
+    "G_BUNDLE_ROUTE_MUTATION_FORBIDDEN");
 
   const copy = JSON.parse(JSON.stringify(bundle));
   const observed = normalizeSha256(copy.bundlePayloadSha256);
@@ -444,10 +355,7 @@ function verifyFinalEvaluationEvidenceBundle(bundle = {}) {
     '"rawRows"',
     '"providerRawResponse"',
   ]) {
-    assert(
-      !serialized.includes(forbidden),
-      "G_BUNDLE_PRIVACY_BOUNDARY_INVALID",
-    );
+    assert(!serialized.includes(forbidden), "G_BUNDLE_PRIVACY_BOUNDARY_INVALID");
   }
   return true;
 }
