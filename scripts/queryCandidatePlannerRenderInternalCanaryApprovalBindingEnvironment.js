@@ -1,3 +1,5 @@
+"use strict";
+
 const fs = require("fs");
 const path = require("path");
 
@@ -17,7 +19,9 @@ function main() {
   if (!fs.existsSync(target)) throw new Error("Receipt file missing");
 
   const receipt = JSON.parse(fs.readFileSync(target, "utf8"));
-  const payloadSha = String(receipt.approvalReceiptPayloadSha256 || "").trim();
+  const payloadSha = String(
+    receipt.approvalReceiptPayloadSha256 || "",
+  ).trim();
 
   if (!/^[A-Fa-f0-9]{64}$/.test(payloadSha)) {
     throw new Error("Receipt payload SHA invalid");

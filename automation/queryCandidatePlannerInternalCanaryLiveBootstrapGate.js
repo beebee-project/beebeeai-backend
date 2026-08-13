@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -24,7 +26,8 @@ const EXPECTED_G_MODULE_SHA256 =
 
 const ENV = Object.freeze({
   enabled: "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_BOOTSTRAP_ENABLED",
-  killSwitch: "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_BOOTSTRAP_KILL_SWITCH",
+  killSwitch:
+    "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_BOOTSTRAP_KILL_SWITCH",
   bundleJson:
     "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_BOOTSTRAP_READINESS_JSON",
   bundleSha256:
@@ -32,9 +35,7 @@ const ENV = Object.freeze({
 });
 
 function normalizeSha256(value) {
-  const normalized = String(value || "")
-    .trim()
-    .toUpperCase();
+  const normalized = String(value || "").trim().toUpperCase();
   return /^[A-F0-9]{64}$/.test(normalized) && !/^0{64}$/.test(normalized)
     ? normalized
     : "";
@@ -49,9 +50,7 @@ function sha256File(file) {
 }
 
 function parseStrictBoolean(value) {
-  const raw = String(value == null ? "" : value)
-    .trim()
-    .toLowerCase();
+  const raw = String(value == null ? "" : value).trim().toLowerCase();
   if (raw === "1" || raw === "true") return { valid: true, value: true };
   if (raw === "0" || raw === "false") return { valid: true, value: false };
   return { valid: false, value: false };
@@ -153,9 +152,7 @@ function parseAndVerifyGBundle(env = {}) {
   } catch (error) {
     return {
       valid: false,
-      reason: String(
-        error?.code || error?.message || "BOOTSTRAP_G_BUNDLE_INVALID",
-      ),
+      reason: String(error?.code || error?.message || "BOOTSTRAP_G_BUNDLE_INVALID"),
     };
   }
 
@@ -186,8 +183,7 @@ function parseAndVerifyGBundle(env = {}) {
     bundle.legacy15_3EvidenceContract?.substitutionForbidden !== true ||
     bundle.readiness?.actualTrafficEvidenceRequiredFor15_3_4 !== true ||
     bundle.authorizationBoundary?.runtimeAutoActivationAuthorized !== false ||
-    bundle.authorizationBoundary?.actualInternalUserExposureAuthorized !==
-      false ||
+    bundle.authorizationBoundary?.actualInternalUserExposureAuthorized !== false ||
     bundle.authorizationBoundary?.percentageRolloutAuthorized !== false ||
     bundle.authorizationBoundary?.productionPromotionAuthorized !== false
   ) {
@@ -314,7 +310,8 @@ function evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapGate({
       source: "PATCH_15_3_2_G_BOOTSTRAP_READINESS",
       gBundlePayloadSha256: EXPECTED_G_BUNDLE_PAYLOAD_SHA256,
       allowlistSha256: EXPECTED_ALLOWLIST_SHA256,
-      approvalReceiptPayloadSha256: EXPECTED_APPROVAL_RECEIPT_PAYLOAD_SHA256,
+      approvalReceiptPayloadSha256:
+        EXPECTED_APPROVAL_RECEIPT_PAYLOAD_SHA256,
       legacyEvidenceSubstitutionForbidden: true,
       actualTrafficEvidenceRequiredFor15_3_4: true,
     }),

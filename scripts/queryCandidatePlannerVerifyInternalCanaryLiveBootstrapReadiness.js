@@ -1,3 +1,5 @@
+"use strict";
+
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -35,9 +37,7 @@ function sha256File(file) {
 }
 
 function normalizeSha256(value) {
-  const normalized = String(value || "")
-    .trim()
-    .toUpperCase();
+  const normalized = String(value || "").trim().toUpperCase();
   if (!/^[A-F0-9]{64}$/.test(normalized)) throw new Error("SHA256_INVALID");
   return normalized;
 }
@@ -73,7 +73,8 @@ function main() {
 
     QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_ENABLED: "true",
     QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_KILL_SWITCH: "false",
-    QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_LLM_MODE: "SEMANTIC_PROFILER_ONLY",
+    QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_LLM_MODE:
+      "SEMANTIC_PROFILER_ONLY",
 
     QUERY_CANDIDATE_PLANNER_KILL_SWITCH: "false",
     QUERY_CANDIDATE_PLANNER_FEATURE_ENABLED: "true",
@@ -108,12 +109,13 @@ function main() {
     },
   };
 
-  const result = evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapGate({
-    env,
-    featureControl,
-    subject: { complete: true, subjectSha256 },
-    legacyPreflight,
-  });
+  const result =
+    evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapGate({
+      env,
+      featureControl,
+      subject: { complete: true, subjectSha256 },
+      legacyPreflight,
+    });
 
   console.log(
     "PASS Patch 15.3.3-A local live-bootstrap readiness verification executed",
@@ -130,7 +132,9 @@ function main() {
   );
   console.log(`ALLOWLIST_SHA256 ${allowlistSha256}`);
   console.log(`SUBJECT_ALLOWLIST_MATCH ${subjectSha256 === allowlistSha256}`);
-  console.log(`LEGACY_EVIDENCE_VALID ${result.legacyEvidence?.valid === true}`);
+  console.log(
+    `LEGACY_EVIDENCE_VALID ${result.legacyEvidence?.valid === true}`,
+  );
   console.log(
     `LEGACY_EVIDENCE_SUBSTITUTED ${result.legacyEvidence?.substituted === true}`,
   );

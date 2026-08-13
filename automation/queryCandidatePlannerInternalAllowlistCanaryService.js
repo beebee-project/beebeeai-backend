@@ -1,3 +1,4 @@
+// PATCH 15.3.2-F.1.6.1 APPROVAL BINDING COMPOSITION REQUIRE
 const {
   evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate,
 } = require("./queryCandidatePlannerInternalCanaryApprovalBindingGate");

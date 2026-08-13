@@ -1,3 +1,5 @@
+"use strict";
+
 const fs = require("fs");
 const path = require("path");
 
@@ -28,8 +30,9 @@ function main() {
   }
 
   const requireCount =
-    text.split("evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate")
-      .length - 1;
+    text.split(
+      "evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate",
+    ).length - 1;
 
   if (requireCount < 2) {
     throw new Error("F.1.6 gate require/invocation incomplete");
