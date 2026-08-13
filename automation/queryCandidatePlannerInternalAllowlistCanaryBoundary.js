@@ -8,6 +8,13 @@ const {
   evaluateQueryCandidatePlannerInternalCanaryPreflight,
   runQueryCandidatePlannerInternalAllowlistCanary,
 } = require("./queryCandidatePlannerInternalAllowlistCanaryService");
+const {
+  parseQueryCandidatePlannerInternalCanaryLiveBootstrapRuntimeMode,
+  evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapRuntime,
+  runQueryCandidatePlannerInternalCanaryLiveBootstrap,
+  defaultQueryCandidatePlannerLiveBootstrapObservationLogger,
+  safeRuntimeObservation,
+} = require("./queryCandidatePlannerInternalCanaryLiveBootstrapRuntime");
 
 const BOUNDARY_VERSION =
   "query_candidate_planner_internal_allowlist_canary_boundary_v1";
@@ -94,12 +101,20 @@ function createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
   featureControl = null,
   env = process.env,
   evidenceBundle = null,
+  preflightEvaluator = evaluateQueryCandidatePlannerInternalCanaryPreflight,
   canaryRunner = runQueryCandidatePlannerInternalAllowlistCanary,
   shadowObserve = observeQueryCandidatePlannerApiShadow,
   shadowRunner,
   comparator,
   onObservation = null,
   onCanaryObservation = defaultCanaryObservationLogger,
+  bootstrapModeParser =
+    parseQueryCandidatePlannerInternalCanaryLiveBootstrapRuntimeMode,
+  bootstrapAuthorize =
+    evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapRuntime,
+  bootstrapRunner = runQueryCandidatePlannerInternalCanaryLiveBootstrap,
+  onLiveBootstrapObservation =
+    defaultQueryCandidatePlannerLiveBootstrapObservationLogger,
   now = Date.now,
 } = {}) {
   if (typeof handler !== "function") {
@@ -121,7 +136,7 @@ function createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
 
       const control =
         featureControl || getQueryCandidatePlannerFeatureControl();
-      const preflight = evaluateQueryCandidatePlannerInternalCanaryPreflight({
+      const preflight = preflightEvaluator({
         request: req,
         env,
         featureControl: control,
@@ -131,6 +146,97 @@ function createQueryCandidatePlannerInternalAllowlistCanaryBoundary({
 
       res.locals = res.locals || {};
       res.locals.queryCandidatePlannerCanaryPreflight = preflight;
+
+      const bootstrapMode = bootstrapModeParser(env);
+      res.locals.queryCandidatePlannerLiveBootstrapMode = bootstrapMode;
+
+      if (bootstrapMode?.active === true) {
+        const authorization = bootstrapAuthorize({
+          request: req,
+          env,
+          featureControl: control,
+          legacyPreflight: preflight,
+          mode: bootstrapMode,
+        });
+
+        res.locals.queryCandidatePlannerLiveBootstrapAuthorization =
+          authorization;
+
+        // Patch 15.3.3-B live bootstrap never owns the HTTP response.
+        // The Primary payload is returned immediately and unchanged.
+        const response = originalJson(primaryPayload);
+
+        if (
+          authorization?.allowed !== true ||
+          authorization?.runtimeExecutionEligible !== true
+        ) {
+          const observation = safeRuntimeObservation({
+            status: "LIVE_BOOTSTRAP_BLOCKED",
+            reason:
+              authorization?.reason || "LIVE_BOOTSTRAP_RUNTIME_BLOCKED",
+            authorization,
+            providerCalls: 0,
+          });
+          res.locals.queryCandidatePlannerLiveBootstrapObservation =
+            observation;
+          if (typeof onLiveBootstrapObservation === "function") {
+            onLiveBootstrapObservation(observation, { req, res });
+          }
+          return response;
+        }
+
+        const bootstrapTask = Promise.resolve()
+          .then(() =>
+            bootstrapRunner({
+              request: req,
+              primaryPayload,
+              env,
+              featureControl: control,
+              legacyPreflight: preflight,
+              authorization,
+              now,
+            }),
+          )
+          .then((result) => {
+            const observation =
+              result?.observation ||
+              safeRuntimeObservation({
+                status: "LIVE_BOOTSTRAP_FALLBACK_SAFE",
+                reason: "LIVE_BOOTSTRAP_RUNTIME_RESULT_INVALID",
+                authorization,
+                providerCalls: 0,
+              });
+
+            res.locals.queryCandidatePlannerLiveBootstrapResult = result;
+            res.locals.queryCandidatePlannerLiveBootstrapObservation =
+              observation;
+
+            if (typeof onLiveBootstrapObservation === "function") {
+              onLiveBootstrapObservation(observation, { req, res });
+            }
+
+            return result;
+          })
+          .catch((error) => {
+            const observation = safeRuntimeObservation({
+              status: "LIVE_BOOTSTRAP_FALLBACK_SAFE",
+              reason: String(
+                error?.code || "LIVE_BOOTSTRAP_BOUNDARY_FAILED_SAFE",
+              ),
+              authorization,
+              providerCalls: 0,
+            });
+            res.locals.queryCandidatePlannerLiveBootstrapObservation =
+              observation;
+            if (typeof onLiveBootstrapObservation === "function") {
+              onLiveBootstrapObservation(observation, { req, res });
+            }
+            return null;
+          });
+
+        res.locals.queryCandidatePlannerLiveBootstrapTask = bootstrapTask;
+        return response;
+      }
 
       if (!preflight.allowed) {
         const response = originalJson(primaryPayload);

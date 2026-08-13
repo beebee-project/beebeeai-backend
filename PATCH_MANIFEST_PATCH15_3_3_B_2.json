@@ -1,0 +1,147 @@
+{
+  "version": "query_candidate_patch15_3_3_B_2_manifest_v1",
+  "patch": "15.3.3-B-2",
+  "title": "Single-Subject Live Bootstrap Runtime Wiring",
+  "createdAt": "2026-08-13T10:15:00Z",
+  "packageFileCount": 20,
+  "protectedFileCount": 17,
+  "protectedFiles": [
+    {
+      "path": "automation/queryCandidatePlannerInternalAllowlistCanaryBoundary.js",
+      "bytes": 12192,
+      "sha256": "DF36E4B02A91544D6FE82BCC53394ED345019E3058C5DC52F85DF1E8CDC788D0"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryLiveBootstrapRuntime.js",
+      "bytes": 19444,
+      "sha256": "F52737193BCCA38C8534BB12698D96E2B162381E62AA7170B82AB0E01C19519A"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerInternalCanaryLiveBootstrapRuntimePolicy.v1.json",
+      "bytes": 1304,
+      "sha256": "06BBEBB01A80661A804AD7D1EFEAECA01C23C468002BF4D17AF815FF7EBAA4DF"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanaryLiveBootstrapRuntimeWiring.js",
+      "bytes": 3305,
+      "sha256": "C178F544A86DC6CC831C5D3B56A06E6ACB5649101B032EC9D583BD215B28F766"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2AuthorizationSmokeTest.js",
+      "bytes": 1217,
+      "sha256": "426EB31D094E99587B96D7167A350D5350FE6C4F0293BCFF4CE4881BD90CDACE"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2BoundaryAllowSmokeTest.js",
+      "bytes": 2015,
+      "sha256": "7C7AFCD2B0BFE9A18EA887E3FE91B080F4F5D76E5197544308EF731603F8A777"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2BoundaryBlockedNoShadowSmokeTest.js",
+      "bytes": 1791,
+      "sha256": "158A34609AC1099009A08AEA997E9D9753C7D4CF13E3A203FB7D54C818014026"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2DefaultInactiveSmokeTest.js",
+      "bytes": 828,
+      "sha256": "F3A9102F4BC0DA98B3D1DF1E271A8F003E1790AFF4AA8E2BBDC9D8AC302F77D1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2DefaultLegacyParitySmokeTest.js",
+      "bytes": 1383,
+      "sha256": "4DE248327377B2CE413DED7AB83E517E79E972C7797CD01DB8F27CCB626A4C61"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2InvalidEnabledFailClosedSmokeTest.js",
+      "bytes": 992,
+      "sha256": "31A739DDEB20FB9CD4807315BE7F5896C40B2CD927FED64939B443A04F60B7AA"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2LegacyAllowedSuppressedDuringBootstrapSmokeTest.js",
+      "bytes": 1577,
+      "sha256": "8762E983149D8E19CB0884626166F099444DD6A307D7CE09465A9C9BD47DEBF0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2ManifestSmokeTest.js",
+      "bytes": 1158,
+      "sha256": "122392C251A6FD1260ECCA151D1F35908FF78E28934BD31F096EB11A73D3B8A8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2NoLegacyCollectorCouplingSmokeTest.js",
+      "bytes": 1321,
+      "sha256": "D7D1A430F0ACA68ADAB9145EEB6C4EA37AE975BFD55D22FED58CF38EA7DDFCE8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2ObserveOnlyNoMergeSmokeTest.js",
+      "bytes": 2251,
+      "sha256": "404996502D9A41048D16F1A4FF5423C0D10C651B0BA2929E686B00BA534913F1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2ProtectedPredecessorsSmokeTest.js",
+      "bytes": 1447,
+      "sha256": "B0953DF61B176143911E18133CAE26874A60CADAB0DABAF18FCF3BE3FAB475A9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2SourceIntegritySmokeTest.js",
+      "bytes": 1016,
+      "sha256": "2E0D2671D5077640CD09DE9470546BA8D0CB359DDD83DE0CFFFC6314B96CD135"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_2TestSupport.js",
+      "bytes": 4939,
+      "sha256": "F3A7452F4C38A051F44F28CD0A787EABC4A36785144A1CDB84339FEEC032AC12"
+    }
+  ],
+  "predecessor": {
+    "branch": "main",
+    "head": "d4e3588b70a44f71880f6353230f6b05211357e5",
+    "workingTreeCleanRequired": true,
+    "exactFiles": {
+      "automation/queryCandidatePlannerInternalAllowlistCanaryBoundary.js": "8C47FDB9AB55489EE7CAA05DC17ED40ED706CD63BF1367A0D2A532522596589F",
+      "automation/queryCandidatePlannerInternalAllowlistCanaryService.js": "1A61F219ADF49BD863B84C5B8C4DB02158E901E7EDA864AC551656A4A7E75C8F",
+      "automation/queryCandidatePlannerInternalCanaryApprovalBindingGate.js": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+      "automation/queryCandidatePlannerFinalEvaluationEvidenceBundle.js": "439F29AC82D866EEADA3EDFBD8615892904ACD507E4F8D4D5161431E0449440A",
+      "automation/queryCandidatePlannerInternalCanaryLiveBootstrapGate.js": "4585B4549B0F756274F47FBB9089E56A07D21C6EFE3C1929214E856B068B5498",
+      "scripts/queryCandidatePlannerVerifyInternalCanaryLiveBootstrapReadiness.js": "92B2085B188F3AEFAFC0D84008E3CF8542E0F9CB504F67B53505740719747C8C",
+      "routes/automationRoutes.js": "2D5390681F3A4306EBE1BE6166FBE9CC875A71C5A94CCDAABE824511EBC4B626"
+    }
+  },
+  "changes": {
+    "modified": [
+      "automation/queryCandidatePlannerInternalAllowlistCanaryBoundary.js"
+    ],
+    "added": [
+      "automation/queryCandidatePlannerInternalCanaryLiveBootstrapRuntime.js",
+      "evaluation/queryCandidatePlannerInternalCanaryLiveBootstrapRuntimePolicy.v1.json",
+      "scripts/queryCandidatePlannerVerifyInternalCanaryLiveBootstrapRuntimeWiring.js"
+    ],
+    "routeFilesModified": [],
+    "legacyCanaryServiceModified": false
+  },
+  "activation": {
+    "defaultRuntimeActive": false,
+    "explicitBootstrapEnableRequired": true,
+    "railwayModifiedByPatch": false,
+    "providerCallsByPatch": 0,
+    "actualInternalUserExposureByPatch": false,
+    "actualOperationalTelemetryByPatch": false,
+    "gitPushRequiredForLocalVerification": false
+  },
+  "guardrails": {
+    "singleApprovedSubjectOnly": true,
+    "bootstrapKillSwitchRequired": true,
+    "primaryResponseAuthority": true,
+    "bootstrapObserveOnly": true,
+    "bootstrapProductionMergeAuthorized": false,
+    "legacyEvidenceSubstitutionForbidden": true,
+    "legacyRealShadowCollectorCouplingForbidden": true,
+    "semanticProfilerOnly": true,
+    "maxProviderCallsPerBootstrapRequest": 1,
+    "productionReadyAssignment": false,
+    "productionRouteChanged": false,
+    "percentageRolloutAuthorized": false,
+    "routeModified": false,
+    "failClosed": true
+  },
+  "next": "15.3.3-B-3 Railway fail-closed activation preparation"
+}

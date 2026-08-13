@@ -1,0 +1,34 @@
+{
+  "version": "query_candidate_patch15_3_3_B_2_validation_v1",
+  "patch": "15.3.3-B-2",
+  "generatedFromCapture": {
+    "captureSha256": "3C5DDBE8EAFE22C3E21CBC57B7F7EA8007057FCAFE533F9B39D0B5A010830EDD",
+    "captureBytes": 126299,
+    "captureHead": "d4e3588b70a44f71880f6353230f6b05211357e5"
+  },
+  "packageBuildValidation": {
+    "newRuntimeSyntaxChecked": true,
+    "modifiedBoundarySyntaxChecked": true,
+    "userRepositorySmokeExecutionRequired": true,
+    "userRepositorySmokeResultsClaimed": false
+  },
+  "expectedSmokeTests": [
+    "tests/queryCandidatePatch15_3_3_B_2AuthorizationSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2BoundaryAllowSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2BoundaryBlockedNoShadowSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2DefaultInactiveSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2DefaultLegacyParitySmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2InvalidEnabledFailClosedSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2LegacyAllowedSuppressedDuringBootstrapSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2ManifestSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2NoLegacyCollectorCouplingSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2ObserveOnlyNoMergeSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2ProtectedPredecessorsSmokeTest.js",
+    "tests/queryCandidatePatch15_3_3_B_2SourceIntegritySmokeTest.js"
+  ],
+  "expectedSmokeCount": 12,
+  "providerCallsDuringPackageBuild": 0,
+  "railwayModifiedDuringPackageBuild": false,
+  "actualInternalUserExposureDuringPackageBuild": false,
+  "actualOperationalTelemetryDuringPackageBuild": false
+}
