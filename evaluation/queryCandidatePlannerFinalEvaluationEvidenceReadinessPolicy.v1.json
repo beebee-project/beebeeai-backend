@@ -1,0 +1,30 @@
+{
+  "version": "query_candidate_planner_final_evaluation_evidence_readiness_policy_v1",
+  "policyId": "beebeeai_query_candidate_patch15_3_2_g_readiness_v1",
+  "decision": "READY_FOR_15_3_3_INTERNAL_ALLOWLIST_CANARY_BOOTSTRAP",
+  "requirements": {
+    "finalEvaluationPass": true,
+    "failedCheckCountMax": 0,
+    "candidatePayloadImmutable": true,
+    "rotatedAllowlistImmutable": true,
+    "manualApprovalReceiptBound": true,
+    "approvalBindingGateExactSourceRequired": true,
+    "composedServiceExactSourceRequired": true,
+    "internalAllowlistOnly": true,
+    "rolloutPercent": 0,
+    "legacyRealShadowEvidenceMayBeSubstituted": false,
+    "actualTrafficEvidenceRequiredFor15_3_4": true
+  },
+  "guardrails": {
+    "bootstrapOnly": true,
+    "runtimeAutoActivationAuthorized": false,
+    "actualInternalUserExposureAuthorized": false,
+    "providerCallsExecutedByG": 0,
+    "actualOperationalTelemetry": false,
+    "railwayMutation": false,
+    "environmentMutation": false,
+    "routeMutation": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false
+  }
+}

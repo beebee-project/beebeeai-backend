@@ -1,0 +1,136 @@
+{
+  "patch": "15.3.2-G",
+  "scope": "FINAL_EVALUATION_EVIDENCE_BUNDLE_AND_INTERNAL_CANARY_BOOTSTRAP_READINESS",
+  "baseline": {
+    "finalBaselineSha256": "0C59E08CEAD5A81D84ABD4159AEDD34D21666898D6D637C58AED7616AB62730F",
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "candidateFileSha256": "ED5A92C1F5809E6BF48A20C30046418F5F90152B87027DFFAD95E71DB77A534A",
+    "rotationPlanFileSha256": "E2B77CE84DA908130E4C35779A9243E9A66598F70B943B496E8470CCA496C17A",
+    "rotatedAllowlistSha256": "35D88A2074548BB9A6DB6BD3415CEE3CD2024BE9896AE6EC23260DB9B859AB95",
+    "approvalReceiptPayloadSha256": "4F5BA14C79CCB0ADD5DED476335729E59546A244A301FDF12897B14A7A09EF81",
+    "approvalReceiptFileSha256": "3367FC2ECEE9FE21D943C26221701FFA04697E75344D0462FC222E7CF3767FE6",
+    "approvalBindingGateSha256": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+    "composedServiceSha256": "1A61F219ADF49BD863B84C5B8C4DB02158E901E7EDA864AC551656A4A7E75C8F"
+  },
+  "decision": "READY_FOR_15_3_3_INTERNAL_ALLOWLIST_CANARY_BOOTSTRAP",
+  "contract": {
+    "bootstrapOnly": true,
+    "legacy15_3RealShadowEvidenceSatisfied": false,
+    "legacyEvidenceSubstitutionForbidden": true,
+    "actualTrafficEvidenceRequiredFor15_3_4": true
+  },
+  "guardrails": {
+    "runtimeAutoActivationAuthorized": false,
+    "actualInternalUserExposureAuthorized": false,
+    "providerCallsExecutedByPatch": 0,
+    "actualOperationalTelemetry": false,
+    "railwayModified": false,
+    "environmentModified": false,
+    "routeModified": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false
+  },
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_2_G.json",
+      "bytes": 452,
+      "sha256": "4AB1A5A868430D57DFF9D80900B20E2F0689CD4EEE5AE1170CB7DA8F5894E641"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_2_G_FINAL_EVALUATION_EVIDENCE_READINESS.md",
+      "bytes": 1754,
+      "sha256": "A75278259BF7BD94B1A97D41CF596F41AD659487A19189DE130E46DB1D347B3A"
+    },
+    {
+      "path": "automation/queryCandidatePlannerFinalEvaluationEvidenceBundle.js",
+      "bytes": 13846,
+      "sha256": "439F29AC82D866EEADA3EDFBD8615892904ACD507E4F8D4D5161431E0449440A"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerFinalEvaluationEvidenceReadinessPolicy.v1.json",
+      "bytes": 1100,
+      "sha256": "43862B302060DE233CE4A3AEFD0BAD6BDAB3A67C6B97288C1415102B363ADFCC"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerAssertFinalEvaluationEvidenceBundlePrivateOutputUntracked.js",
+      "bytes": 809,
+      "sha256": "0C5A9239AFA05F0BC523C62DA64BE20B1BE3610D1C6DDE2193D6461C3AD266E7"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerBuildFinalEvaluationEvidenceBundle.js",
+      "bytes": 2567,
+      "sha256": "C95015DBE275C4F68516F215E3989441A1B52CD9E1E9389D96F5F37B03F199AA"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyFinalEvaluationEvidenceBundle.js",
+      "bytes": 1729,
+      "sha256": "66A98C33E8113A99B58DDE88D4F5A994B23D3F5AFCC8E882A278CADB54578CA4"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GDecisionBoundarySmokeTest.js",
+      "bytes": 395,
+      "sha256": "03B567DBE01ACC020B387AE63C246D8A71A46F3497CC45D938F0D4BB699B755B"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GExpectedBindingsSmokeTest.js",
+      "bytes": 706,
+      "sha256": "C3875D1522F50D7C3F6B24CEC83B752F914E6220F7E7C763F4229D77D9083F04"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GGuardrailSmokeTest.js",
+      "bytes": 558,
+      "sha256": "0CFBEDC23433DB8324463C3D0827B82A43727DE5481ABAD1E60389C851ADE34D"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GManifestSmokeTest.js",
+      "bytes": 561,
+      "sha256": "E22D6C3E9D19616AF34BF924F74AC67724AE2FF8992A59E29F753BC0271753A7"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GNextStepSmokeTest.js",
+      "bytes": 420,
+      "sha256": "01454D8B60186C7DE9BC76DE8C93B18BD864569150212210240763C0BD7F6835"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GNoLegacyEvidenceSubstitutionSmokeTest.js",
+      "bytes": 476,
+      "sha256": "BBC511C9C3A5F0F4EC1B9098C89FBB1A719DDCB7E76F6BA61FA5E4259419345F"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GNoRuntimeMutationSmokeTest.js",
+      "bytes": 638,
+      "sha256": "DD6867C11B7A9BF89E994F43F5A0B044576EDE6DC024E80242CB9B72A9721290"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GPolicySmokeTest.js",
+      "bytes": 535,
+      "sha256": "0563428CA2BFA8D10DA50CC88BA44ACD73B2593DB90FA2E6549749045E8322E3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GPrivacyBoundarySmokeTest.js",
+      "bytes": 553,
+      "sha256": "0B3E331C63CC7A66B28DF605D0A8EAB2F8E93BC5EC09CB719223C003C5935CC9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GReadmeSmokeTest.js",
+      "bytes": 365,
+      "sha256": "29FB2E1820B57E4B497A1D036FDC0DA4B4F1287AEFA4B1A2C593733DC503ABD0"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GScriptContractSmokeTest.js",
+      "bytes": 553,
+      "sha256": "E4D38A47643334B8EDEB3FC909519163F103C97C555D8D7A08A4ACC43054EFFD"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GSourceIntegritySmokeTest.js",
+      "bytes": 659,
+      "sha256": "3BE8172B48E664C34C4C10E30FF466382D9580A1B365BB8EE590EA43F1581424"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_2_GTestSupport.js",
+      "bytes": 335,
+      "sha256": "9BBA09C3EB6EF26717AE71FE73AD51094759A0EA5DEE1979FA9098236B09A89B"
+    }
+  ],
+  "fileCount": 20
+}

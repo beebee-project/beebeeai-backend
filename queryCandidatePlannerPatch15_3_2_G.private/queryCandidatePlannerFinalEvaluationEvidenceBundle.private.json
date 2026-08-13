@@ -1,0 +1,83 @@
+{
+  "version": "query_candidate_planner_final_evaluation_evidence_bundle_v1",
+  "scope": "INTERNAL_ALLOWLIST_CANARY_BOOTSTRAP_READINESS_ONLY",
+  "sourcePatch": "15.3.2-G",
+  "decision": "READY_FOR_15_3_3_INTERNAL_ALLOWLIST_CANARY_BOOTSTRAP",
+  "failClosed": true,
+  "immutableBindings": {
+    "finalBaselineSha256": "0C59E08CEAD5A81D84ABD4159AEDD34D21666898D6D637C58AED7616AB62730F",
+    "evaluatorSha256": "2461A48972A8F771E6D49911D70079009E62148658C17EEF986CA3E01972208D",
+    "candidatePayloadSha256": "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA",
+    "candidateFileSha256": "ED5A92C1F5809E6BF48A20C30046418F5F90152B87027DFFAD95E71DB77A534A",
+    "rotationPlanFileSha256": "E2B77CE84DA908130E4C35779A9243E9A66598F70B943B496E8470CCA496C17A",
+    "allowlistSha256": "35D88A2074548BB9A6DB6BD3415CEE3CD2024BE9896AE6EC23260DB9B859AB95",
+    "approvalReceiptPayloadSha256": "4F5BA14C79CCB0ADD5DED476335729E59546A244A301FDF12897B14A7A09EF81",
+    "approvalReceiptFileSha256": "3367FC2ECEE9FE21D943C26221701FFA04697E75344D0462FC222E7CF3767FE6",
+    "approvalBindingGateSha256": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+    "composedServiceSha256": "1A61F219ADF49BD863B84C5B8C4DB02158E901E7EDA864AC551656A4A7E75C8F"
+  },
+  "evaluationSnapshot": {
+    "operationalDecision": "EVALUATION_PASS",
+    "assessmentDecision": "ACTUAL_PRICING_ABSOLUTE_COST_RECALIBRATION_PASS",
+    "failedCheckCount": 0,
+    "absoluteCostFailureCount": 0,
+    "cacheCostAvoidancePassed": true,
+    "actualOperationalTelemetry": false
+  },
+  "readiness": {
+    "eligible": true,
+    "decision": "READY_FOR_15_3_3_INTERNAL_ALLOWLIST_CANARY_BOOTSTRAP",
+    "bootstrapOnly": true,
+    "internalAllowlistOnly": true,
+    "rolloutPercent": 0,
+    "manualApprovalBound": true,
+    "currentCodeBaselineVerified": true,
+    "actualTrafficEvidenceRequiredFor15_3_4": true,
+    "guardrails": {
+      "failClosed": true,
+      "productionRouteAutoWired": false,
+      "productionCandidateMergeAutoAuthorized": false,
+      "productionReadyAssignmentAllowed": false,
+      "percentageRolloutAuthorized": false,
+      "productionPromotionAuthorized": false
+    }
+  },
+  "legacy15_3EvidenceContract": {
+    "version": "query_candidate_planner_internal_canary_evidence_bundle_v1",
+    "realShadowTrafficRequired": true,
+    "actualTrafficRequired": true,
+    "syntheticForbidden": true,
+    "satisfiedByThisBundle": false,
+    "substitutionForbidden": true,
+    "reason": "G_IS_PRE_CANARY_BOOTSTRAP_READINESS_NOT_REAL_SHADOW_TRAFFIC"
+  },
+  "authorizationBoundary": {
+    "internalCanaryBootstrapReadinessEstablished": true,
+    "runtimeAutoActivationAuthorized": false,
+    "actualInternalUserExposureAuthorized": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false,
+    "productionMergeAutoAuthorized": false
+  },
+  "nextStep": {
+    "patch": "15.3.3",
+    "action": "INTERNAL_USER_ACTUAL_OPERATIONAL_EXPOSURE",
+    "requiresExplicitRuntimeBootstrapIntegration": true,
+    "requiresActualOperationalTelemetryCollection": true,
+    "requiresKillSwitchAndPrimaryFallback": true,
+    "requiresAllowlistOnly": true,
+    "requiresRolloutPercentZero": true
+  },
+  "guardrails": {
+    "rawIdentityIncluded": false,
+    "rawRowsIncluded": false,
+    "providerCallsExecutedByBundleBuilder": 0,
+    "actualOperationalTelemetry": false,
+    "railwayModified": false,
+    "environmentModified": false,
+    "routeModified": false,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false
+  },
+  "bundlePayloadSha256": "918F5760F4869581842B7A778AD647E3D88775FDEB58677F80CADC3639C3928B"
+}
