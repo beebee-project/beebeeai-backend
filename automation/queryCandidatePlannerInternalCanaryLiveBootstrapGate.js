@@ -10,6 +10,11 @@ const {
 const {
   verifyFinalEvaluationEvidenceBundle,
 } = require("./queryCandidatePlannerFinalEvaluationEvidenceBundle");
+const {
+  BRIDGE_VERSION: READINESS_BRIDGE_VERSION,
+  EXPECTED_READINESS_FILE_SHA256,
+  resolveReadinessAwareApprovalFeatureControl,
+} = require("./queryCandidatePlannerInternalCanaryBootstrapReadinessBridge");
 
 const GATE_VERSION =
   "query_candidate_planner_internal_canary_live_bootstrap_gate_v1";
@@ -23,6 +28,8 @@ const EXPECTED_F16_GATE_SHA256 =
   "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7";
 const EXPECTED_G_MODULE_SHA256 =
   "439F29AC82D866EEADA3EDFBD8615892904ACD507E4F8D4D5161431E0449440A";
+const EXPECTED_READINESS_BRIDGE_SHA256 =
+  "97C8F0CE5742873B16D05411B645C60B68B85625B308186E88AD3442CF5D58E4";
 
 const ENV = Object.freeze({
   enabled: "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_BOOTSTRAP_ENABLED",
@@ -115,8 +122,16 @@ function verifyProtectedDependencies() {
     __dirname,
     "queryCandidatePlannerFinalEvaluationEvidenceBundle.js",
   );
+  const readinessBridge = path.join(
+    __dirname,
+    "queryCandidatePlannerInternalCanaryBootstrapReadinessBridge.js",
+  );
 
-  if (!fs.existsSync(f16Gate) || !fs.existsSync(gModule)) {
+  if (
+    !fs.existsSync(f16Gate) ||
+    !fs.existsSync(gModule) ||
+    !fs.existsSync(readinessBridge)
+  ) {
     return { valid: false, reason: "BOOTSTRAP_PROTECTED_DEPENDENCY_MISSING" };
   }
 
@@ -125,6 +140,9 @@ function verifyProtectedDependencies() {
   }
   if (sha256File(gModule) !== EXPECTED_G_MODULE_SHA256) {
     return { valid: false, reason: "BOOTSTRAP_G_MODULE_SHA_DRIFT" };
+  }
+  if (sha256File(readinessBridge) !== EXPECTED_READINESS_BRIDGE_SHA256) {
+    return { valid: false, reason: "BOOTSTRAP_READINESS_BRIDGE_SHA_DRIFT" };
   }
   return { valid: true, reason: "OK" };
 }
@@ -257,10 +275,25 @@ function evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapGate({
     return blocked(g.reason, { subject, legacyPreflight });
   }
 
+  // Patch 15.3.3-B-4-F-A.2: F.1.6 intentionally remains byte-identical.
+  // Bridge only its PRODUCTION_CANDIDATE_MERGE Feature Control evaluation
+  // to the exact sanitized Patch 13.3 readiness snapshot. No legacy evidence
+  // is substituted and the live bootstrap runtime remains observe-only/no-merge.
+  const readinessBridge =
+    resolveReadinessAwareApprovalFeatureControl({ featureControl });
+  if (!readinessBridge.valid) {
+    return blocked(
+      `BOOTSTRAP_APPROVAL_READINESS_BRIDGE_BLOCKED_${String(
+        readinessBridge.reason || "UNKNOWN",
+      )}`,
+      { subject, legacyPreflight },
+    );
+  }
+
   const approval =
     evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
       env,
-      featureControl,
+      featureControl: readinessBridge.featureControl,
       subject: safe,
     });
 
@@ -314,6 +347,8 @@ function evaluateQueryCandidatePlannerInternalCanaryLiveBootstrapGate({
         EXPECTED_APPROVAL_RECEIPT_PAYLOAD_SHA256,
       legacyEvidenceSubstitutionForbidden: true,
       actualTrafficEvidenceRequiredFor15_3_4: true,
+      productionReadinessBridgeVersion: READINESS_BRIDGE_VERSION,
+      productionReadinessFileSha256: EXPECTED_READINESS_FILE_SHA256,
     }),
     approvalBinding: approval.preflight?.approvalBinding || null,
     promotionDecision: approval.preflight?.promotionDecision || null,
@@ -347,6 +382,7 @@ module.exports = Object.freeze({
   EXPECTED_APPROVAL_RECEIPT_PAYLOAD_SHA256,
   EXPECTED_F16_GATE_SHA256,
   EXPECTED_G_MODULE_SHA256,
+  EXPECTED_READINESS_BRIDGE_SHA256,
   ENV,
   normalizeSha256,
   parseStrictBoolean,

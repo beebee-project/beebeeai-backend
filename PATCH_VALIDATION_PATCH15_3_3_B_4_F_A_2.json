@@ -1,0 +1,25 @@
+{
+  "version": "query_candidate_patch15_3_3_B_4_F_A_2_validation_v1",
+  "patch": "Readiness-aware Runtime Compatibility Repair",
+  "status": "PACKAGE_VALIDATED_OFFLINE",
+  "baselineHead": "cd506c862f0aae2f1e063b7d24465241300da4a7",
+  "rootCause": "F.1.6 calls Feature Control PRODUCTION_CANDIDATE_MERGE without readinessGate; actual Feature Control blocks READINESS_EVIDENCE_INVALID.",
+  "repair": {
+    "f16GateModified": false,
+    "b2RuntimeModified": false,
+    "aGateModified": true,
+    "newReadinessBridge": true,
+    "sanitizedPatch13_3ReadinessBound": true,
+    "bridgeScope": "PRODUCTION_CANDIDATE_MERGE_ONLY"
+  },
+  "guardrails": {
+    "railwayVariablesModified": false,
+    "deploymentTriggered": false,
+    "providerCallsExecuted": 0,
+    "actualLiveRequestExecuted": false,
+    "productionRouteEnabledByPatch": false,
+    "productionReadyAssignmentEnabledByPatch": false,
+    "legacyEvidenceSubstituted": false,
+    "failClosed": true
+  }
+}

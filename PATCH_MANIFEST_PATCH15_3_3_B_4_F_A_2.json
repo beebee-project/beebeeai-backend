@@ -1,0 +1,86 @@
+{
+  "version": "query_candidate_patch15_3_3_B_4_F_A_2_manifest_v1",
+  "patch": "Readiness-aware Runtime Compatibility Repair",
+  "baselineHead": "cd506c862f0aae2f1e063b7d24465241300da4a7",
+  "sourceCaptureZipSha256": "86B5F725E4BC7AED375EE04E8F5319A8D4278F00F982178DF4B533566D64B5D5",
+  "existingProductionSourcesModified": [
+    "automation/queryCandidatePlannerInternalCanaryLiveBootstrapGate.js"
+  ],
+  "newProductionSources": [
+    "automation/queryCandidatePlannerInternalCanaryBootstrapReadinessBridge.js"
+  ],
+  "f16GateModified": false,
+  "b2RuntimeModified": false,
+  "routeFilesModified": false,
+  "railwayEnvironmentModified": false,
+  "providerCallsByPatch": 0,
+  "actualLiveRequestByPatch": false,
+  "predecessors": {
+    "aGate": "4585B4549B0F756274F47FBB9089E56A07D21C6EFE3C1929214E856B068B5498",
+    "f16Gate": "ED43CFAF798FE904EDB0308EE82EFDB5A17D599EC44416072DE152F625E436E7",
+    "b2Runtime": "F52737193BCCA38C8534BB12698D96E2B162381E62AA7170B82AB0E01C19519A",
+    "featureControl": "E80A47537ECDB4454C6120693A9F3E725F74AC986C42ABF52E6AD163B30EAB07"
+  },
+  "newIdentities": {
+    "aGate": "DFE04C089F0F514FA60026BE9FD3EF4EDA0DD584B4B55ECC6C2AF54FDECECD7D",
+    "readinessBridge": "77DB527F808BBB61BD63BD61913E01A489AB25E154C5D4C0E67DAC730AB81259",
+    "sanitizedReadiness": "46D1211AF4F318DAB91D137F0728C3AE6F246CD8B85A2582802CCB6DB1475AC4"
+  },
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_3_B_4_F_A_2.json",
+      "bytes": 955,
+      "sha256": "B4F6907E9B45DBDA679D54E67E9D830EC3FED20E8B4CE2A6033765A870530F8F"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_3_B_4_F_A_2_READINESS_AWARE_RUNTIME_COMPATIBILITY_REPAIR.md",
+      "bytes": 2746,
+      "sha256": "226634F89F71523D676AA5C45C190B413EB3482367ECC68731B36F607CFA3C48"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryBootstrapReadinessBridge.js",
+      "bytes": 6549,
+      "sha256": "77DB527F808BBB61BD63BD61913E01A489AB25E154C5D4C0E67DAC730AB81259"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryLiveBootstrapGate.js",
+      "bytes": 12823,
+      "sha256": "DFE04C089F0F514FA60026BE9FD3EF4EDA0DD584B4B55ECC6C2AF54FDECECD7D"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerInternalCanaryBootstrapProductionReadiness.v1.json",
+      "bytes": 470,
+      "sha256": "46D1211AF4F318DAB91D137F0728C3AE6F246CD8B85A2582802CCB6DB1475AC4"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyPatch15_3_3_B_4_F_A_2.js",
+      "bytes": 2575,
+      "sha256": "12EE4F1E455B96A43492C501817FF8FDA7EA01BF463A279B9711EC5FBFB3BD26"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_A_2FailClosedReadinessSmokeTest.js",
+      "bytes": 3511,
+      "sha256": "32D7E8E63034D6DDA05287A189D1BD2DE8E45ADECC29237F6F258C6F96729311"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_A_2ProtectedSourcesSmokeTest.js",
+      "bytes": 1555,
+      "sha256": "F2251E7C9D52CD988BE8AB6E4F22EB8868ED83BE75977E96EEB1C7952CF5806D"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_A_2ReadinessAwareFeatureControlSmokeTest.js",
+      "bytes": 2471,
+      "sha256": "ACD0D932A89BDE98BA191B0FE80179EA395A25FF5404127C1FE223EDB01A9AA8"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_A_2RealF16FeatureControlCompatibilitySmokeTest.js",
+      "bytes": 4650,
+      "sha256": "DC7AF6EB64F651A9AD8064719419B8AFE5D697D0B0B1BCC0CB815D24C9E95DFB"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_A_2SourceContractSmokeTest.js",
+      "bytes": 1345,
+      "sha256": "1FA2F99A9EF83F6BBCBCFDE13C9A8D6E8E733B51E6681C2B2227E59DAB2E5AF9"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "eligible": true,
+  "decision": "ELIGIBLE_FOR_CONTROLLED_PRODUCTION_PROMOTION_REVIEW",
+  "guardrails": {
+    "shadowOnlyEvidence": true,
+    "productionPromotionAllowed": false,
+    "productionRouteAutoWired": false,
+    "productionCandidateMergeAllowed": false,
+    "productionReadyAssignmentAllowed": false,
+    "manualPromotionReviewRequired": true,
+    "failClosed": true
+  },
+  "gateSha256": "12fe722248ff2403a334ffbe735f97eec7cc52de7099a118c4144fd16d3e7823"
+}
