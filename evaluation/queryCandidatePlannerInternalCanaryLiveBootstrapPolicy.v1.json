@@ -1,0 +1,21 @@
+{
+  "version": "query_candidate_planner_internal_canary_live_bootstrap_policy_v1",
+  "patch": "15.3.3-A",
+  "purpose": "Authorize only a single approved internal allowlist subject to proceed from G bootstrap readiness toward first live canary execution without fabricating legacy real-shadow evidence.",
+  "defaultEnabled": false,
+  "defaultKillSwitch": true,
+  "legacyEvidenceSubstitutionForbidden": true,
+  "bootstrapAllowedOnlyForLegacyReason": "READINESS_EVIDENCE_INVALID",
+  "internalAllowlistOnly": true,
+  "singleApprovedSubjectOnly": true,
+  "rolloutPercent": 0,
+  "semanticProfilerOnly": true,
+  "providerCallsByPatch": 0,
+  "actualOperationalTelemetryByPatch": false,
+  "railwayModifiedByPatch": false,
+  "routeModifiedByPatch": false,
+  "actualInternalUserExposureByPatch": false,
+  "percentageRolloutAuthorized": false,
+  "productionPromotionAuthorized": false,
+  "next": "15.3.3-B explicit runtime integration and first internal live request"
+}

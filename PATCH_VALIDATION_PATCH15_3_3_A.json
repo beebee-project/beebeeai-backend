@@ -1,0 +1,17 @@
+{
+  "patch": "15.3.3-A",
+  "name": "Single-Subject Live Bootstrap Authorization Gate",
+  "result": "READY_FOR_LOCAL_BOOTSTRAP_GATE_VERIFICATION",
+  "addsOnly": true,
+  "defaultEnabled": false,
+  "defaultKillSwitch": true,
+  "routeModified": false,
+  "railwayModified": false,
+  "providerCalls": 0,
+  "actualInternalUserExposure": false,
+  "actualOperationalTelemetry": false,
+  "legacyEvidenceSubstitutionForbidden": true,
+  "rolloutPercent": 0,
+  "percentageRolloutAuthorized": false,
+  "productionPromotionAuthorized": false
+}

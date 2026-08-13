@@ -1,0 +1,110 @@
+{
+  "version": "query_candidate_patch15_3_3_A_manifest_v1",
+  "patch": "15.3.3-A",
+  "name": "Single-Subject Live Bootstrap Authorization Gate",
+  "fileCount": 17,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_3_A.json",
+      "bytes": 529,
+      "sha256": "635893d1d353bdc1915711b6a8e7b98baedd0103c1f586bf288201bee1f71a5a"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_3_A_SINGLE_SUBJECT_LIVE_BOOTSTRAP_GATE.md",
+      "bytes": 2399,
+      "sha256": "87c3d7685fad1d46e768aee56fff77ddbbe0d9341470ea4352c86d1f6801f236"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryLiveBootstrapGate.js",
+      "bytes": 11345,
+      "sha256": "4585b4549b0f756274f47fbb9089e56a07d21c6efe3c1929214e856b068b5498"
+    },
+    {
+      "path": "evaluation/queryCandidatePlannerInternalCanaryLiveBootstrapPolicy.v1.json",
+      "bytes": 958,
+      "sha256": "c3b75c9832eb837e2f6ece0d9498675232e0dd08bb41a1ce9003aded1368a66b"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyInternalCanaryLiveBootstrapReadiness.js",
+      "bytes": 5533,
+      "sha256": "92b2085b188f3aefafc0d84008e3cf8542e0f9cb504f67b53505740719747c8c"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_AAllowSmokeTest.js",
+      "bytes": 1128,
+      "sha256": "0b2db3b1c48ce98bf5c0baea11dfc28d091fc8bf571bce425767ca1c664f5be5"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_ADefaultBlockedSmokeTest.js",
+      "bytes": 649,
+      "sha256": "13d6475b262f0fb824caa8a174e6dc590c42defa2123fe4199fe9bb056d48136"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_AGBundleSmokeTest.js",
+      "bytes": 709,
+      "sha256": "5ceb81fd0fd80a4423d6e451a4c74dbb0cd4bcf32eefb5ce2cdc1284f470f936"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_AKillSwitchSmokeTest.js",
+      "bytes": 679,
+      "sha256": "d65edc37b93e41ccff616a6ed767e3d9d27a4c80b304536a84ba4bdd0c699eb6"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_ALegacyBoundarySmokeTest.js",
+      "bytes": 674,
+      "sha256": "81c3d7e010b675181624d4a9697ca04f7ce1576dfe5f84601f7f867171c4e948"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_ANoLegacySubstitutionSmokeTest.js",
+      "bytes": 762,
+      "sha256": "2fed289a62d35cfce4d6fde0a2b557621e6911ab28a4ab467d192b9c0e3c3c22"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_ANoRuntimeMutationSmokeTest.js",
+      "bytes": 837,
+      "sha256": "8376729a806e8ede91beb283b05dafca9c76245e56a6636520cf962710f9684b"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_APolicySmokeTest.js",
+      "bytes": 600,
+      "sha256": "f4c55bfba346790e858ef688633630e05e3a7432d3675e94fde78e63a476f699"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_APrivacySmokeTest.js",
+      "bytes": 713,
+      "sha256": "5f6be13837fb60b955f2ad8c0142c99eeabeb5088c618da3939d516b9215c4ac"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_AProtectedDependenciesSmokeTest.js",
+      "bytes": 312,
+      "sha256": "54e6e4b31c86bc2f2ec6a7d09dae74ace3daffde38f7a50b101ae36d441d8752"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_ASubjectSmokeTest.js",
+      "bytes": 625,
+      "sha256": "e217984d99917b9e5fa7dee75850f9d0bd8ce6a21453f8749d96171f97ee84d3"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_ATestSupport.js",
+      "bytes": 9524,
+      "sha256": "bbbfd0ae52379d45dc33f3fc18ea0776115d6a0dcc80ae7ea83ea460a4c1dccd"
+    }
+  ],
+  "changeSet": {
+    "addsOnly": true,
+    "existingFilesReplaced": 0,
+    "routeFilesChanged": 0,
+    "railwayModified": false
+  },
+  "guardrails": {
+    "defaultEnabled": false,
+    "defaultKillSwitch": true,
+    "legacyEvidenceSubstitutionForbidden": true,
+    "providerCalls": 0,
+    "actualInternalUserExposure": false,
+    "actualOperationalTelemetry": false,
+    "rolloutPercent": 0,
+    "percentageRolloutAuthorized": false,
+    "productionPromotionAuthorized": false
+  }
+}
