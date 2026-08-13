@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -19,8 +17,14 @@ try {
   const bytes = fs.readFileSync(resolved);
   const bundle = JSON.parse(bytes.toString("utf8"));
   verifyFinalEvaluationEvidenceBundle(bundle);
-  const fileSha256 = crypto.createHash("sha256").update(bytes).digest("hex").toUpperCase();
-  console.log("PASS Patch 15.3.2-G final evaluation evidence bundle verification");
+  const fileSha256 = crypto
+    .createHash("sha256")
+    .update(bytes)
+    .digest("hex")
+    .toUpperCase();
+  console.log(
+    "PASS Patch 15.3.2-G final evaluation evidence bundle verification",
+  );
   console.log(`READINESS_DECISION ${bundle.decision}`);
   console.log(`BUNDLE_PAYLOAD_SHA256 ${bundle.bundlePayloadSha256}`);
   console.log(`BUNDLE_FILE_SHA256 ${fileSha256}`);

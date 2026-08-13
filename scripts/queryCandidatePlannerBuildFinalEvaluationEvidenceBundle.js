@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -28,16 +26,26 @@ function main() {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const bytes = Buffer.from(`${JSON.stringify(bundle, null, 2)}\n`, "utf8");
   fs.writeFileSync(target, bytes, { mode: 0o600 });
-  const fileSha256 = crypto.createHash("sha256").update(bytes).digest("hex").toUpperCase();
+  const fileSha256 = crypto
+    .createHash("sha256")
+    .update(bytes)
+    .digest("hex")
+    .toUpperCase();
 
   console.log("PASS Patch 15.3.2-G final evaluation evidence bundle built");
   console.log(`READINESS_DECISION ${bundle.decision}`);
   console.log(`BUNDLE_PAYLOAD_SHA256 ${bundle.bundlePayloadSha256}`);
   console.log(`BUNDLE_FILE_SHA256 ${fileSha256}`);
-  console.log(`FINAL_BASELINE_SHA256 ${bundle.immutableBindings.finalBaselineSha256}`);
-  console.log(`CANDIDATE_PAYLOAD_SHA256 ${bundle.immutableBindings.candidatePayloadSha256}`);
+  console.log(
+    `FINAL_BASELINE_SHA256 ${bundle.immutableBindings.finalBaselineSha256}`,
+  );
+  console.log(
+    `CANDIDATE_PAYLOAD_SHA256 ${bundle.immutableBindings.candidatePayloadSha256}`,
+  );
   console.log(`ALLOWLIST_SHA256 ${bundle.immutableBindings.allowlistSha256}`);
-  console.log(`APPROVAL_RECEIPT_PAYLOAD_SHA256 ${bundle.immutableBindings.approvalReceiptPayloadSha256}`);
+  console.log(
+    `APPROVAL_RECEIPT_PAYLOAD_SHA256 ${bundle.immutableBindings.approvalReceiptPayloadSha256}`,
+  );
   console.log("BOOTSTRAP_ONLY true");
   console.log("LEGACY_15_3_REAL_SHADOW_CONTRACT_SATISFIED false");
   console.log("ACTUAL_TRAFFIC_EVIDENCE_REQUIRED_FOR_15_3_4 true");

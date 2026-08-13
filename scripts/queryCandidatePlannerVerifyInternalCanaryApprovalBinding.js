@@ -1,5 +1,3 @@
-"use strict";
-
 const fs = require("fs");
 const path = require("path");
 
@@ -30,19 +28,15 @@ function main() {
     throw new Error("Approval receipt file missing");
   }
 
-  const receipt = JSON.parse(
-    fs.readFileSync(receiptPath, "utf8"),
-  );
+  const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
 
-  const approvalBundleSha256 =
-    String(
-      args["approval-bundle-sha256"] ||
-        receipt.approvalReceiptPayloadSha256 ||
-        "",
-    ).trim();
+  const approvalBundleSha256 = String(
+    args["approval-bundle-sha256"] ||
+      receipt.approvalReceiptPayloadSha256 ||
+      "",
+  ).trim();
 
-  const allowlistSha256 =
-    String(args["allowlist-sha256"] || "").trim();
+  const allowlistSha256 = String(args["allowlist-sha256"] || "").trim();
 
   const env = {
     [ENV.receiptJson]: JSON.stringify(receipt),
@@ -93,9 +87,7 @@ function main() {
     throw new Error(decision.reason);
   }
 
-  console.log(
-    "PASS Patch 15.3.2-F.1.6 approval binding offline verification",
-  );
+  console.log("PASS Patch 15.3.2-F.1.6 approval binding offline verification");
   console.log(`GATE_DECISION ${decision.decision}`);
   console.log(`GATE_REASON ${decision.reason}`);
   console.log(

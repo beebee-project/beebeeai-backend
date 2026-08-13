@@ -1,5 +1,3 @@
-"use strict";
-
 const crypto = require("crypto");
 
 const GATE_VERSION =
@@ -13,55 +11,38 @@ const RECEIPT_VERSION =
 
 const RECEIPT_SCOPE = "INTERNAL_ALLOWLIST_CANARY_ONLY";
 
-const APPROVAL_DECISION =
-  "INTERNAL_ALLOWLIST_CANARY_MANUAL_APPROVAL_GRANTED";
+const APPROVAL_DECISION = "INTERNAL_ALLOWLIST_CANARY_MANUAL_APPROVAL_GRANTED";
 
 const EXPECTED_CANDIDATE_PAYLOAD_SHA256 =
   "928F6A6E0AA8683D63A5A2CB62199FA460EB84494B119EB7E171000843D484EA";
 
 const ENV = Object.freeze({
-  receiptJson:
-    "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_RECEIPT_JSON",
-  approvalBundleSha256:
-    "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_BUNDLE_SHA256",
-  allowlistSha256:
-    "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256",
+  receiptJson: "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_RECEIPT_JSON",
+  approvalBundleSha256: "QUERY_CANDIDATE_PLANNER_CANARY_APPROVAL_BUNDLE_SHA256",
+  allowlistSha256: "QUERY_CANDIDATE_PLANNER_PROMOTION_ALLOWLIST_SHA256",
 
-  internalCanaryEnabled:
-    "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_ENABLED",
+  internalCanaryEnabled: "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_ENABLED",
   internalCanaryKillSwitch:
     "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_KILL_SWITCH",
-  internalCanaryLlmMode:
-    "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_LLM_MODE",
+  internalCanaryLlmMode: "QUERY_CANDIDATE_PLANNER_INTERNAL_CANARY_LLM_MODE",
 
-  globalKillSwitch:
-    "QUERY_CANDIDATE_PLANNER_KILL_SWITCH",
-  featureEnabled:
-    "QUERY_CANDIDATE_PLANNER_FEATURE_ENABLED",
-  shadowEnabled:
-    "QUERY_CANDIDATE_PLANNER_SHADOW_ENABLED",
-  providerEnabled:
-    "QUERY_CANDIDATE_PLANNER_PROVIDER_ENABLED",
-  providerKillSwitch:
-    "QUERY_CANDIDATE_PLANNER_PROVIDER_KILL_SWITCH",
+  globalKillSwitch: "QUERY_CANDIDATE_PLANNER_KILL_SWITCH",
+  featureEnabled: "QUERY_CANDIDATE_PLANNER_FEATURE_ENABLED",
+  shadowEnabled: "QUERY_CANDIDATE_PLANNER_SHADOW_ENABLED",
+  providerEnabled: "QUERY_CANDIDATE_PLANNER_PROVIDER_ENABLED",
+  providerKillSwitch: "QUERY_CANDIDATE_PLANNER_PROVIDER_KILL_SWITCH",
 
-  productionEnabled:
-    "QUERY_CANDIDATE_PLANNER_PRODUCTION_ENABLED",
+  productionEnabled: "QUERY_CANDIDATE_PLANNER_PRODUCTION_ENABLED",
   productionCandidateMergeEnabled:
     "QUERY_CANDIDATE_PLANNER_PRODUCTION_CANDIDATE_MERGE_ENABLED",
   productionReadyAssignmentEnabled:
     "QUERY_CANDIDATE_PLANNER_PRODUCTION_READY_ASSIGNMENT_ENABLED",
-  productionRouteEnabled:
-    "QUERY_CANDIDATE_PLANNER_PRODUCTION_ROUTE_ENABLED",
-  productionKillSwitch:
-    "QUERY_CANDIDATE_PLANNER_PRODUCTION_KILL_SWITCH",
+  productionRouteEnabled: "QUERY_CANDIDATE_PLANNER_PRODUCTION_ROUTE_ENABLED",
+  productionKillSwitch: "QUERY_CANDIDATE_PLANNER_PRODUCTION_KILL_SWITCH",
 
-  promotionGateEnabled:
-    "QUERY_CANDIDATE_PLANNER_PROMOTION_GATE_ENABLED",
-  promotionAudienceMode:
-    "QUERY_CANDIDATE_PLANNER_PROMOTION_AUDIENCE_MODE",
-  promotionRolloutPercent:
-    "QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT",
+  promotionGateEnabled: "QUERY_CANDIDATE_PLANNER_PROMOTION_GATE_ENABLED",
+  promotionAudienceMode: "QUERY_CANDIDATE_PLANNER_PROMOTION_AUDIENCE_MODE",
+  promotionRolloutPercent: "QUERY_CANDIDATE_PLANNER_PROMOTION_ROLLOUT_PERCENT",
 });
 
 const REQUIRED_TRUE = Object.freeze([
@@ -122,14 +103,18 @@ function sha256Text(value) {
 }
 
 function normalizeSha256(value) {
-  const normalized = String(value || "").trim().toUpperCase();
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase();
   return /^[A-F0-9]{64}$/.test(normalized) && !/^0{64}$/.test(normalized)
     ? normalized
     : "";
 }
 
 function parseStrictBoolean(value) {
-  const raw = String(value == null ? "" : value).trim().toLowerCase();
+  const raw = String(value == null ? "" : value)
+    .trim()
+    .toLowerCase();
   if (raw === "1" || raw === "true") return { valid: true, value: true };
   if (raw === "0" || raw === "false") return { valid: true, value: false };
   return { valid: false, value: false };
@@ -147,9 +132,7 @@ function safeSubject(subject = {}) {
   const subjectSha256 = normalizeSha256(subject.subjectSha256);
   const subjectTagSha256 =
     normalizeSha256(subject.subjectTagSha256) ||
-    (subjectSha256
-      ? sha256Text(`safe-tag:${subjectSha256}`)
-      : "");
+    (subjectSha256 ? sha256Text(`safe-tag:${subjectSha256}`) : "");
 
   return Object.freeze({
     complete: subject.complete === true && Boolean(subjectSha256),
@@ -196,8 +179,7 @@ function blocked({
     reason: String(reason || "F_1_6_APPROVAL_BINDING_BLOCKED"),
     evidenceSha256: receiptPayloadSha || approvalBundleSha256 || "",
     summary: Object.freeze({
-      source:
-        "F_1_6_MANUAL_APPROVAL_BINDING_GATE",
+      source: "F_1_6_MANUAL_APPROVAL_BINDING_GATE",
       candidatePayloadSha256: candidateSha,
       approvalReceiptPayloadSha256: receiptPayloadSha,
       actualOperationalTelemetry: false,
@@ -299,9 +281,7 @@ function validateReceipt(receipt = {}) {
   const candidatePayloadSha256 = normalizeSha256(
     receipt.immutableBindings?.candidatePayloadSha256,
   );
-  if (
-    candidatePayloadSha256 !== EXPECTED_CANDIDATE_PAYLOAD_SHA256
-  ) {
+  if (candidatePayloadSha256 !== EXPECTED_CANDIDATE_PAYLOAD_SHA256) {
     return {
       valid: false,
       reason: "F_1_6_CANDIDATE_PAYLOAD_SHA_MISMATCH",
@@ -518,9 +498,7 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     });
   }
 
-  const approvalBundleSha256 = normalizeSha256(
-    env[ENV.approvalBundleSha256],
-  );
+  const approvalBundleSha256 = normalizeSha256(env[ENV.approvalBundleSha256]);
   if (!approvalBundleSha256) {
     return blocked({
       reason: "F_1_6_APPROVAL_BUNDLE_SHA_REQUIRED",
@@ -529,10 +507,7 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     });
   }
 
-  if (
-    approvalBundleSha256 !==
-    receiptValidation.approvalReceiptPayloadSha256
-  ) {
+  if (approvalBundleSha256 !== receiptValidation.approvalReceiptPayloadSha256) {
     return blocked({
       reason: "F_1_6_APPROVAL_BUNDLE_SHA_MISMATCH",
       subject,
@@ -625,9 +600,9 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     }
   }
 
-  const audienceMode = String(
-    env[ENV.promotionAudienceMode] || "",
-  ).trim().toUpperCase();
+  const audienceMode = String(env[ENV.promotionAudienceMode] || "")
+    .trim()
+    .toUpperCase();
 
   if (audienceMode !== "ALLOWLIST") {
     return blocked({
@@ -697,13 +672,11 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     valid: true,
     reason:
       "F_1_6_MANUAL_APPROVED_CANONICAL_BENCHMARK_WITH_HISTORICAL_LIVE_PARITY",
-    evidenceSha256:
-      receiptValidation.approvalReceiptPayloadSha256,
+    evidenceSha256: receiptValidation.approvalReceiptPayloadSha256,
     summary: Object.freeze({
       source:
         "CANONICAL_BENCHMARK_WITH_APPROVED_ACTUAL_PRICING_AND_HISTORICAL_LIVE_PARITY",
-      candidatePayloadSha256:
-        receiptValidation.candidatePayloadSha256,
+      candidatePayloadSha256: receiptValidation.candidatePayloadSha256,
       approvalReceiptPayloadSha256:
         receiptValidation.approvalReceiptPayloadSha256,
       actualOperationalTelemetry: false,
@@ -723,8 +696,7 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     version: PREFLIGHT_VERSION,
     status: "ALLOWLIST_PREFLIGHT_ALLOWED",
     allowed: true,
-    reason:
-      "F_1_6_INTERNAL_ALLOWLIST_MANUAL_APPROVAL_BINDING_ALLOWED",
+    reason: "F_1_6_INTERNAL_ALLOWLIST_MANUAL_APPROVAL_BINDING_ALLOWED",
     subject: Object.freeze({
       complete: true,
       subjectSha256: safe.subjectSha256,
@@ -736,8 +708,7 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     approvalBinding: Object.freeze({
       version: GATE_VERSION,
       valid: true,
-      candidatePayloadSha256:
-        receiptValidation.candidatePayloadSha256,
+      candidatePayloadSha256: receiptValidation.candidatePayloadSha256,
       approvalReceiptPayloadSha256:
         receiptValidation.approvalReceiptPayloadSha256,
       approvalBundleSha256,
@@ -767,8 +738,7 @@ function evaluateQueryCandidatePlannerInternalCanaryApprovalBindingGate({
     version: GATE_VERSION,
     allowed: true,
     decision: "ALLOW",
-    reason:
-      "F_1_6_INTERNAL_ALLOWLIST_MANUAL_APPROVAL_BINDING_ALLOWED",
+    reason: "F_1_6_INTERNAL_ALLOWLIST_MANUAL_APPROVAL_BINDING_ALLOWED",
     failClosed: true,
     preflight,
     featureControlPresent: true,
