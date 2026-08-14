@@ -1,0 +1,54 @@
+{
+  "version": "query_candidate_patch15_3_3_B_4_F_C_1_manifest_v1",
+  "patch": "15.3.3-B-4-F-C.1",
+  "title": "Readiness Bridge Identity Convergence Repair",
+  "sourceCommit": "45620d3a869c2f5b3b9ebf560c812c6f40ab7225",
+  "predecessor": {
+    "aGateSha256": "DFE04C089F0F514FA60026BE9FD3EF4EDA0DD584B4B55ECC6C2AF54FDECECD7D",
+    "bridgeSha256": "77DB527F808BBB61BD63BD61913E01A489AB25E154C5D4C0E67DAC730AB81259"
+  },
+  "result": {
+    "aGateSha256": "9386A73BAD4E37C055209AF59B86C5FFB21A62545E26017BFB5D3A109E4EB1D9",
+    "bridgeSha256": "77DB527F808BBB61BD63BD61913E01A489AB25E154C5D4C0E67DAC730AB81259"
+  },
+  "productionSourceChangeCount": 1,
+  "files": [
+    {
+      "path": "PATCH_VALIDATION_PATCH15_3_3_B_4_F_C_1.json",
+      "bytes": 633,
+      "sha256": "10E49A944255656318A27AC1FA123130B37D629AEFC93694579A72B1FABCAE5A"
+    },
+    {
+      "path": "README_QUERY_CANDIDATE_PATCH15_3_3_B_4_F_C_1_READINESS_BRIDGE_IDENTITY_CONVERGENCE_REPAIR.md",
+      "bytes": 1774,
+      "sha256": "EF9C1F4E59C2F438EDD9F613CB1B8A33AA025F1E44893E74648E2136C01DE99B"
+    },
+    {
+      "path": "automation/queryCandidatePlannerInternalCanaryLiveBootstrapGate.js",
+      "bytes": 12823,
+      "sha256": "9386A73BAD4E37C055209AF59B86C5FFB21A62545E26017BFB5D3A109E4EB1D9"
+    },
+    {
+      "path": "scripts/queryCandidatePlannerVerifyPatch15_3_3_B_4_F_C_1.js",
+      "bytes": 2990,
+      "sha256": "11C197C58AB485DAE43F55418F187E395262F8EC9268B600DF1EA5FD61911BE9"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_C_1BridgeShaConvergenceSmokeTest.js",
+      "bytes": 1028,
+      "sha256": "1BCF0EB517AED576135B5AC963C4FFED0E507CADBD4EAA1790820E4989D494F1"
+    },
+    {
+      "path": "tests/queryCandidatePatch15_3_3_B_4_F_C_1ProtectedSourcesSmokeTest.js",
+      "bytes": 1662,
+      "sha256": "A256A6C7C29884A4A124691180FF4FD9829BB24E823901E70D86C3C2D048B4A8"
+    }
+  ],
+  "guardrails": {
+    "railwayMutation": false,
+    "deploy": false,
+    "providerCalls": 0,
+    "actualLiveRequest": false,
+    "failClosedDesiredConfigRequiredBeforePush": true
+  }
+}

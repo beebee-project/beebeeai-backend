@@ -1,0 +1,13 @@
+{
+  "version": "query_candidate_patch15_3_3_B_4_F_C_1_validation_v1",
+  "decision": "READY_FOR_LOCAL_APPLY_AFTER_FAIL_CLOSED_RAILWAY_RESTORATION",
+  "sourceCommit": "45620d3a869c2f5b3b9ebf560c812c6f40ab7225",
+  "observedFailure": "BOOTSTRAP_READINESS_BRIDGE_SHA_DRIFT",
+  "rootCause": "A Gate retained the A.2 V1 bridge SHA pin after A.2 V2 changed the bridge bytes during readiness JSON format normalization.",
+  "productionSourceChangeCount": 1,
+  "railwayMutationByPatch": false,
+  "deploymentByPatch": false,
+  "providerCallsByPatch": 0,
+  "actualLiveRequestByPatch": false,
+  "requiresFailClosedDesiredConfigBeforePush": true
+}
